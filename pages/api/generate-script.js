@@ -43,15 +43,28 @@ IMPORTANTE:
         model: 'openai/gpt-oss-20b',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.8,
+        max_completion_tokens: 6000,
+        response_format: { type: 'json_object' },
       }),
     });
 
     const data = await groqRes.json();
     if (!groqRes.ok) throw new Error(data.error?.message || 'Erro na Groq');
 
+    const finishReason = data.choices[0].finish_reason;
     let content = data.choices[0].message.content.trim();
     content = content.replace(/^```json/, '').replace(/```$/, '').trim();
-    const parsed = JSON.parse(content);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseErr) {
+      const motivo =
+        finishReason === 'length'
+          ? ' (a resposta foi cortada por ter passado do limite de tamanho — tente um tema mais específico ou o formato Short)'
+          : '';
+      throw new Error(`A resposta do modelo não veio em JSON válido${motivo}.`);
+    }
 
     return res.status(200).json(parsed);
   } catch (err) {
