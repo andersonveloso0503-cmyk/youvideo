@@ -26,33 +26,45 @@ export default async function handler(req, res) {
   try {
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
-    // TODO: baixar o vídeo de videoUrl como stream e passar em media.body abaixo.
-    // Deixando a chamada pronta pra quando a etapa de montagem (Shotstack) estiver
-    // retornando uma URL real de vídeo.
-    /*
-    const videoStream = await fetch(videoUrl).then(r => r.body);
+    const videoRes = await fetch(videoUrl);
+    if (!videoRes.ok || !videoRes.body) {
+      throw new Error('Não foi possível baixar o vídeo montado a partir da URL da Shotstack');
+    }
 
     const uploadRes = await youtube.videos.insert({
       part: ['snippet', 'status'],
       requestBody: {
         snippet: {
-          title: titulo,
-          description: descricao,
-          tags,
+          title: titulo || 'Vídeo Youvideo',
+          description: descricao || '',
+          tags: tags || [],
         },
         status: {
-          privacyStatus: 'private', // trocar pra 'public' depois de revisar
+          privacyStatus: 'private', // trocar pra 'public' depois de revisar manualmente
           selfDeclaredMadeForKids: false,
         },
       },
-      media: { body: videoStream },
+      media: { body: videoRes.body },
     });
 
-    return res.status(200).json({ videoId: uploadRes.data.id });
-    */
+    const videoId = uploadRes.data.id;
+
+    // Sobe a thumbnail personalizada, se já tiver sido gerada.
+    if (thumbnailUrl) {
+      try {
+        const thumbRes = await fetch(thumbnailUrl);
+        if (thumbRes.ok && thumbRes.body) {
+          await youtube.thumbnails.set({ videoId, media: { body: thumbRes.body } });
+        }
+      } catch {
+        // Não trava o upload principal se a thumbnail falhar — o vídeo já subiu.
+      }
+    }
 
     return res.status(200).json({
-      status: 'pendente: conectar o stream real do vídeo montado ao upload do YouTube',
+      videoId,
+      status: 'privado no YouTube — revise e publique manualmente quando quiser',
+      link: `https://studio.youtube.com/video/${videoId}/edit`,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
