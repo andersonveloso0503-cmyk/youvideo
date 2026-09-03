@@ -43,6 +43,7 @@ export default async function handler(req, res) {
         status: {
           privacyStatus: 'private', // trocar pra 'public' depois de revisar manualmente
           selfDeclaredMadeForKids: false,
+          containsSyntheticMedia: true,
         },
       },
       media: { body: Readable.fromWeb(videoRes.body) },

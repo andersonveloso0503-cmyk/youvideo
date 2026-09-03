@@ -19,13 +19,14 @@ Estilo visual: ${estilo}
 ${formatoInstrucao}
 
 IMPORTANTE:
+- Descreva cenas de forma visualmente segura para geração por IA: evite ferimentos, sangue, violência gráfica ou sofrimento físico explícito nas descrições visuais das cenas — prefira transmitir emoção e tensão pela expressão dos personagens, luz e composição, não por detalhes gráficos.
 - Não copie trechos literais de nenhuma tradução da Bíblia; narre a história com suas próprias palavras, de forma envolvente e fiel ao relato.
 - Divida a narração em cenas curtas, pensando em cada cena como um clipe de vídeo separado.
 - Retorne APENAS um JSON válido, sem texto antes ou depois, no formato:
 {
   "titulo": "título chamativo mas não enganoso, em português",
-  "descricao": "descrição para o YouTube, 2-3 frases + contexto",
-  "tags": ["tag1", "tag2", "..."],
+  "descricao": "descrição completa para o YouTube, em português: um parágrafo de abertura envolvente (2-3 frases resumindo o vídeo), seguido de mais contexto sobre a história e seu significado (pelo menos 150 palavras no total), terminando com 3-5 hashtags relevantes",
+  "tags": ["12 a 15 tags relevantes em português, misturando termos amplos (ex: história bíblica) e específicos (ex: nome do personagem)"],
   "narracao": "texto completo da narração, em português",
   "cenas": [
     { "descricao": "descrição visual da cena para gerar imagem/vídeo", "textoNarrado": "trecho da narração correspondente" }

@@ -30,6 +30,7 @@ export default async function handler(req, res) {
   const output = {
     format: 'mp4',
     resolution: isVertical ? 'mobile' : 'hd',
+    aspectRatio: isVertical ? '9:16' : '16:9',
   };
 
   // Cada cena vira um clipe sequencial na trilha de vídeo; a narração inteira
