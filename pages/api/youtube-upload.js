@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { Readable } from 'stream';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -44,7 +45,7 @@ export default async function handler(req, res) {
           selfDeclaredMadeForKids: false,
         },
       },
-      media: { body: videoRes.body },
+      media: { body: Readable.fromWeb(videoRes.body) },
     });
 
     const videoId = uploadRes.data.id;
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
       try {
         const thumbRes = await fetch(thumbnailUrl);
         if (thumbRes.ok && thumbRes.body) {
-          await youtube.thumbnails.set({ videoId, media: { body: thumbRes.body } });
+          await youtube.thumbnails.set({ videoId, media: { body: Readable.fromWeb(thumbRes.body) } });
         }
       } catch {
         // Não trava o upload principal se a thumbnail falhar — o vídeo já subiu.
