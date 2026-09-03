@@ -253,6 +253,7 @@ function ThumbnailResult({ result }) {
     </div>
   );
 }
+function ScriptResult({ result }) {
   return (
     <div className="result-box" style={{ whiteSpace: 'normal' }}>
       <p><b>Título:</b> {result.titulo}</p>
