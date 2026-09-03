@@ -191,6 +191,13 @@ export default function Home() {
       tags: results.script?.tags,
     });
 
+  const publishTiktok = () =>
+    runStep('publishTiktok', '/api/tiktok-upload', {
+      videoUrl: results.assemble?.videoUrl,
+      titulo: results.script?.titulo,
+      descricao: results.script?.descricao,
+    });
+
   return (
     <div className="container">
       <h1>Youvideo</h1>
@@ -262,6 +269,7 @@ export default function Home() {
         disabled={!results.voice || !results.visual}
         onRun={assembleVideo}
         result={results.assemble}
+        renderResult={(r) => <AssembleResult result={r} />}
       />
 
       <StepCard
@@ -283,6 +291,16 @@ export default function Home() {
         disabled={!results.assemble?.videoUrl}
         onRun={publish}
         result={results.publish}
+      />
+
+      <StepCard
+        n={7}
+        title="Publicar no TikTok"
+        status={status.publishTiktok}
+        loading={loading === 'publishTiktok'}
+        disabled={!results.assemble?.videoUrl}
+        onRun={publishTiktok}
+        result={results.publishTiktok}
       />
 
       <BrollSearch />
@@ -312,6 +330,25 @@ function StepCard({ n, title, status, loading, disabled, onRun, result, renderRe
       {result && !result.error && !renderResult && (
         <div className="result-box">{JSON.stringify(result, null, 2)}</div>
       )}
+    </div>
+  );
+}
+
+function AssembleResult({ result }) {
+  if (!result.videoUrl) {
+    return <div className="result-box">{result.status || 'processando...'}</div>;
+  }
+  return (
+    <div className="result-box">
+      <video src={result.videoUrl} controls style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
+      <div style={{ marginTop: 10 }}>
+        <a href={result.videoUrl} download target="_blank" rel="noreferrer">
+          <button style={{ marginTop: 0 }}>Baixar vídeo completo</button>
+        </a>
+      </div>
+      <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>
+        Baixe e suba manualmente no Kwai ou em qualquer outro app.
+      </div>
     </div>
   );
 }
