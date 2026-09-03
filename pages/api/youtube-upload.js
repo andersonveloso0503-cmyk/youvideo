@@ -27,6 +27,10 @@ export default async function handler(req, res) {
   try {
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
+    const listaTags = tags && tags.length ? tags : [];
+    const hashtags = listaTags.map((t) => `#${t.replace(/\s+/g, '')}`).join(' ');
+    const descricaoFinal = [descricao || '', '', hashtags].filter(Boolean).join('\n');
+
     const videoRes = await fetch(videoUrl);
     if (!videoRes.ok || !videoRes.body) {
       throw new Error('Não foi possível baixar o vídeo montado a partir da URL da Shotstack');
@@ -37,8 +41,8 @@ export default async function handler(req, res) {
       requestBody: {
         snippet: {
           title: titulo || 'Vídeo Youvideo',
-          description: descricao || '',
-          tags: tags || [],
+          description: descricaoFinal,
+          tags: listaTags,
         },
         status: {
           privacyStatus: 'private', // trocar pra 'public' depois de revisar manualmente

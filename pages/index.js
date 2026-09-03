@@ -113,6 +113,7 @@ export default function Home() {
     const primeiro = await runStep('visual', '/api/generate-visual', {
       cenas: results.script?.cenas || [],
       estilo,
+      formato,
     });
     if (!primeiro) return;
 
@@ -325,6 +326,8 @@ function VisualResult({ result }) {
               <video src={a.videoUrl} controls style={{ width: '100%', borderRadius: 6 }} />
             ) : a.imageUrl ? (
               <img src={a.imageUrl} alt={a.cena} style={{ width: '100%', borderRadius: 6 }} />
+            ) : a.erro ? (
+              <div style={{ color: '#ff9d9d', fontSize: 11 }}>{a.erro}</div>
             ) : (
               <div style={{ color: '#999' }}>{a.status || 'sem imagem'}</div>
             )}

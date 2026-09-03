@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { cenas, estilo } = req.body;
+  const { cenas, estilo, formato } = req.body;
   if (!cenas || !cenas.length) return res.status(400).json({ error: 'Nenhuma cena recebida' });
 
   if (!process.env.FLUX_API_KEY) {
@@ -28,7 +28,11 @@ export default async function handler(req, res) {
           'x-key': process.env.FLUX_API_KEY,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt: promptFinal, width: 1344, height: 768 }),
+        body: JSON.stringify({
+          prompt: promptFinal,
+          width: formato === 'short' ? 768 : 1344,
+          height: formato === 'short' ? 1344 : 768,
+        }),
       });
 
       const submitData = await submitRes.json();
@@ -36,6 +40,7 @@ export default async function handler(req, res) {
 
       const pollingUrl = submitData.polling_url;
       let imageUrl = null;
+      let bloqueada = false;
       let tentativas = 0;
 
       while (tentativas < 45) {
@@ -48,9 +53,18 @@ export default async function handler(req, res) {
           break;
         }
         if (['Error', 'Failed', 'Request Moderated', 'Content Moderated'].includes(pollData.status)) {
-          throw new Error(`Geração falhou: ${pollData.status} (cena: "${cena.descricao}")`);
+          bloqueada = true;
+          break;
         }
         tentativas++;
+      }
+
+      if (bloqueada) {
+        arquivos.push({
+          cena: cena.descricao,
+          erro: 'Essa cena foi barrada pelo filtro de conteúdo da Flux e foi pulada.',
+        });
+        continue;
       }
 
       if (!imageUrl) throw new Error(`Tempo esgotado esperando a imagem da cena "${cena.descricao}"`);
@@ -62,7 +76,7 @@ export default async function handler(req, res) {
       // consulta o andamento depois em /api/check-kling-status.
       if (process.env.KLING_API_KEY) {
         try {
-          arquivo.klingTaskId = await enviarParaKling(imageUrl, cena.descricao);
+          arquivo.klingTaskId = await enviarParaKling(imageUrl, cena.descricao, formato);
         } catch (err) {
           arquivo.avisoVideo = `Não deu pra enviar essa cena pra animação (${err.message}); ficou só a imagem estática.`;
         }
@@ -77,7 +91,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function enviarParaKling(imageUrl, descricaoCena) {
+async function enviarParaKling(imageUrl, descricaoCena, formato) {
   const submitRes = await fetch('https://api.piapi.ai/api/v1/task', {
     method: 'POST',
     headers: {
@@ -91,7 +105,7 @@ async function enviarParaKling(imageUrl, descricaoCena) {
         version: '2.6',
         mode: 'std',
         duration: 5,
-        aspect_ratio: '16:9',
+        aspect_ratio: formato === 'short' ? '9:16' : '16:9',
         image_url: imageUrl,
         prompt: `${descricaoCena}, movimento de câmera sutil, cena viva mas estável`,
       },
