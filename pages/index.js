@@ -117,6 +117,7 @@ export default function Home() {
         disabled={!tema}
         onRun={generateScript}
         result={results.script}
+        renderResult={(r) => <ScriptResult result={r} />}
       />
 
       <StepCard
@@ -172,7 +173,7 @@ export default function Home() {
   );
 }
 
-function StepCard({ n, title, status, loading, disabled, onRun, result }) {
+function StepCard({ n, title, status, loading, disabled, onRun, result, renderResult }) {
   return (
     <div className="card">
       <h2>
@@ -187,11 +188,34 @@ function StepCard({ n, title, status, loading, disabled, onRun, result }) {
       <button disabled={disabled || loading} onClick={onRun}>
         {loading ? 'Gerando...' : 'Executar etapa'}
       </button>
-      {result && (
-        <div className="result-box">
-          {result.error ? `Erro: ${result.error}` : JSON.stringify(result, null, 2)}
-        </div>
+      {result && result.error && (
+        <div className="result-box">Erro: {result.error}</div>
       )}
+      {result && !result.error && renderResult && renderResult(result)}
+      {result && !result.error && !renderResult && (
+        <div className="result-box">{JSON.stringify(result, null, 2)}</div>
+      )}
+    </div>
+  );
+}
+
+function ScriptResult({ result }) {
+  return (
+    <div className="result-box" style={{ whiteSpace: 'normal' }}>
+      <p><b>Título:</b> {result.titulo}</p>
+      <p><b>Descrição:</b> {result.descricao}</p>
+      <p><b>Tags:</b> {(result.tags || []).join(', ')}</p>
+      <p><b>Narração:</b></p>
+      <p style={{ whiteSpace: 'pre-wrap' }}>{result.narracao}</p>
+      <p><b>Cenas ({(result.cenas || []).length}):</b></p>
+      <ol>
+        {(result.cenas || []).map((c, i) => (
+          <li key={i} style={{ marginBottom: 8 }}>
+            <i>{c.descricao}</i>
+            {c.textoNarrado && <div style={{ color: '#999' }}>"{c.textoNarrado}"</div>}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
