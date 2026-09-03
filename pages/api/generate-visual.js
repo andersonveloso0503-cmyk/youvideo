@@ -69,7 +69,7 @@ export default async function handler(req, res) {
 
       if (!imageUrl) throw new Error(`Tempo esgotado esperando a imagem da cena "${cena.descricao}"`);
 
-      const arquivo = { cena: cena.descricao, imageUrl };
+      const arquivo = { cena: cena.descricao, textoNarrado: cena.textoNarrado || '', imageUrl };
 
       // Se a Kling estiver configurada, só ENVIA o pedido de animação (não espera
       // terminar aqui, pra não estourar o limite de 60s do Vercel). O painel

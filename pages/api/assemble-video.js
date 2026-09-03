@@ -52,6 +52,23 @@ export default async function handler(req, res) {
 
   const timeline = {
     tracks: [
+      {
+        clips: videosValidos
+          .filter((c) => c.textoNarrado)
+          .map((c, i) => ({
+            asset: {
+              type: 'title',
+              text: c.textoNarrado,
+              style: 'minimal',
+              color: '#ffffff',
+              size: 'medium',
+              background: 'rgba(0,0,0,0.55)',
+              position: 'bottom',
+            },
+            start: i * duracaoPorCena,
+            length: duracaoPorCena,
+          })),
+      },
       { clips: clipsVideo },
       {
         clips: [
