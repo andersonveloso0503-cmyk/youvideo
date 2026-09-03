@@ -57,19 +57,18 @@ export default async function handler(req, res) {
           .filter((c) => c.textoNarrado)
           .map((c, i) => ({
             asset: {
-              type: 'title',
-              text: c.textoNarrado,
-              style: 'minimal',
-              color: '#ffffff',
-              size: 'small',
-              background: 'rgba(0,0,0,0.55)',
-              position: 'bottom',
+              type: 'html',
+              html: `<p>${c.textoNarrado}</p>`,
+              css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
+                isVertical ? 42 : 34
+              }px; font-weight: 700; color: #ffffff; text-align: center; background: rgba(0,0,0,0.6); padding: 16px 24px; border-radius: 8px; margin: 0; }`,
+              width: isVertical ? 900 : 1500,
+              height: 220,
             },
             start: i * duracaoPorCena,
             length: duracaoPorCena,
-            width: isVertical ? 900 : 1500,
             position: 'bottom',
-            offset: { y: 0.05 },
+            offset: { y: 0.06 },
           })),
       },
       { clips: clipsVideo },
