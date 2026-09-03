@@ -33,37 +33,48 @@ IMPORTANTE:
 }`;
 
   try {
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.8,
-        max_completion_tokens: 6000,
-        response_format: { type: 'json_object' },
-      }),
-    });
+    const chamarGroq = async (tentativaExtra) => {
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'openai/gpt-oss-20b',
+          messages: [
+            { role: 'user', content: prompt },
+            ...(tentativaExtra
+              ? [{ role: 'user', content: 'Sua última resposta não era um JSON válido. Responda APENAS com o objeto JSON, sem nenhum texto antes ou depois, sem comentários, com todas as aspas internas escapadas corretamente.' }]
+              : []),
+          ],
+          temperature: tentativaExtra ? 0.4 : 0.8,
+          max_completion_tokens: 6000,
+          response_format: { type: 'json_object' },
+        }),
+      });
+      return groqRes.json();
+    };
 
-    const data = await groqRes.json();
-    if (!groqRes.ok) throw new Error(data.error?.message || 'Erro na Groq');
-
-    const finishReason = data.choices[0].finish_reason;
-    let content = data.choices[0].message.content.trim();
+    let data = await chamarGroq(false);
+    let content = data.choices?.[0]?.message?.content?.trim() || '';
     content = content.replace(/^```json/, '').replace(/```$/, '').trim();
 
     let parsed;
     try {
       parsed = JSON.parse(content);
-    } catch (parseErr) {
-      const motivo =
-        finishReason === 'length'
-          ? ' (a resposta foi cortada por ter passado do limite de tamanho — tente um tema mais específico ou o formato Short)'
-          : '';
-      throw new Error(`A resposta do modelo não veio em JSON válido${motivo}.`);
+    } catch {
+      // Segunda tentativa, mais conservadora, pedindo explicitamente JSON puro.
+      data = await chamarGroq(true);
+      content = data.choices?.[0]?.message?.content?.trim() || '';
+      content = content.replace(/^```json/, '').replace(/```$/, '').trim();
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        throw new Error(
+          'A resposta do modelo não veio em JSON válido mesmo após tentar de novo. Tente um tema mais simples ou direto.'
+        );
+      }
     }
 
     return res.status(200).json(parsed);
