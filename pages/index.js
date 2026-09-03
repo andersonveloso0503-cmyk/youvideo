@@ -151,6 +151,7 @@ export default function Home() {
       audioUrl: results.voice?.audioUrl,
       cenas: results.visual?.arquivos,
       formato,
+      palavras: results.voice?.palavras,
     });
     if (!primeira || !primeira.renderId) return;
 

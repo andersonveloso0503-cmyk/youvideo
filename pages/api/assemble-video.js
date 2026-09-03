@@ -2,7 +2,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return checkStatus(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { audioUrl, cenas, formato } = req.body;
+  const { audioUrl, cenas, formato, palavras } = req.body;
 
   if (!process.env.SHOTSTACK_API_KEY) {
     return res.status(500).json({
@@ -50,8 +50,27 @@ export default async function handler(req, res) {
     return clip;
   });
 
+  const legendaKaraoke = (palavras || [])
+    .filter((p) => p.start != null && p.end != null && p.end > p.start)
+    .map((p) => ({
+      asset: {
+        type: 'html',
+        html: `<p>${p.texto}</p>`,
+        css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
+          isVertical ? 48 : 40
+        }px; font-weight: 700; color: #ffffff; text-align: center; background: #000000; padding: 10px 22px; border-radius: 4px; margin: 0; }`,
+        width: isVertical ? 700 : 900,
+        height: 120,
+      },
+      start: p.start,
+      length: Math.max(p.end - p.start, 0.15),
+      position: 'bottom',
+      offset: { y: 0.08 },
+    }));
+
   const timeline = {
     tracks: [
+      ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
       { clips: clipsVideo },
       {
         clips: [

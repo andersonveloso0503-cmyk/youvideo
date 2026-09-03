@@ -12,12 +12,11 @@ export default async function handler(req, res) {
     });
   }
 
-  // Voz padrão multilíngue da ElevenLabs (pt-BR funciona bem com o modelo multilingual).
   const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
 
   try {
     const ttsRes = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/with-timestamps`,
       {
         method: 'POST',
         headers: {
@@ -36,7 +35,8 @@ export default async function handler(req, res) {
       throw new Error(err);
     }
 
-    const audioBuffer = Buffer.from(await ttsRes.arrayBuffer());
+    const data = await ttsRes.json();
+    const audioBuffer = Buffer.from(data.audio_base64, 'base64');
     const nomeArquivo = `narracao-${Date.now()}.mp3`;
 
     const blob = await put(nomeArquivo, audioBuffer, {
@@ -45,8 +45,43 @@ export default async function handler(req, res) {
       token: process.env.MEDIA_READ_WRITE_TOKEN,
     });
 
-    return res.status(200).json({ audioUrl: blob.url });
+    const palavras = agruparPalavras(data.alignment);
+
+    return res.status(200).json({ audioUrl: blob.url, palavras });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
+}
+
+// Junta o alinhamento por caractere da ElevenLabs em palavras, com o tempo
+// exato (em segundos) em que cada uma começa e termina sendo falada.
+function agruparPalavras(alignment) {
+  if (!alignment?.characters) return [];
+  const { characters, character_start_times_seconds, character_end_times_seconds } = alignment;
+
+  const palavras = [];
+  let atual = '';
+  let inicio = null;
+
+  for (let i = 0; i < characters.length; i++) {
+    const c = characters[i];
+    if (c.trim() === '') {
+      if (atual) {
+        palavras.push({ texto: atual, start: inicio, end: character_end_times_seconds[i - 1] });
+        atual = '';
+        inicio = null;
+      }
+      continue;
+    }
+    if (inicio === null) inicio = character_start_times_seconds[i];
+    atual += c;
+  }
+  if (atual) {
+    palavras.push({
+      texto: atual,
+      start: inicio,
+      end: character_end_times_seconds[characters.length - 1],
+    });
+  }
+  return palavras;
 }
