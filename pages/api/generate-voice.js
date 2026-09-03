@@ -1,3 +1,5 @@
+import { put } from '@vercel/blob';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -11,7 +13,6 @@ export default async function handler(req, res) {
   }
 
   // Voz padrão multilíngue da ElevenLabs (pt-BR funciona bem com o modelo multilingual).
-  // Depois trocamos por uma voice_id escolhida por você no site da ElevenLabs.
   const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
 
   try {
@@ -35,13 +36,15 @@ export default async function handler(req, res) {
       throw new Error(err);
     }
 
-    // ElevenLabs devolve o áudio binário direto; em produção isso deve ser
-    // salvo em um storage (ex: Vercel Blob, igual você já faz com os PDFs no LCS Hub)
-    // e retornar a URL pública. Deixando o placeholder pronto pra essa etapa.
-    return res.status(200).json({
-      audioUrl: 'PENDENTE: salvar o áudio no Vercel Blob e retornar a URL aqui',
-      aviso: 'Áudio gerado com sucesso na ElevenLabs — falta conectar o Blob storage.',
+    const audioBuffer = Buffer.from(await ttsRes.arrayBuffer());
+    const nomeArquivo = `narracao-${Date.now()}.mp3`;
+
+    const blob = await put(nomeArquivo, audioBuffer, {
+      access: 'public',
+      contentType: 'audio/mpeg',
     });
+
+    return res.status(200).json({ audioUrl: blob.url });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
