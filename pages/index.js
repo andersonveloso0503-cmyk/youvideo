@@ -160,6 +160,7 @@ export default function Home() {
         disabled={!results.script}
         onRun={generateVisual}
         result={results.visual}
+        renderResult={(r) => <VisualResult result={r} />}
       />
 
       <StepCard
@@ -180,6 +181,7 @@ export default function Home() {
         disabled={!results.script}
         onRun={generateThumbnail}
         result={results.thumbnail}
+        renderResult={(r) => <ThumbnailResult result={r} />}
       />
 
       <StepCard
@@ -221,7 +223,36 @@ function StepCard({ n, title, status, loading, disabled, onRun, result, renderRe
   );
 }
 
-function ScriptResult({ result }) {
+function VisualResult({ result }) {
+  return (
+    <div className="result-box">
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        {(result.arquivos || []).map((a, i) => (
+          <div key={i} style={{ width: 150 }}>
+            {a.imageUrl ? (
+              <img src={a.imageUrl} alt={a.cena} style={{ width: '100%', borderRadius: 6 }} />
+            ) : (
+              <div style={{ color: '#999' }}>{a.status || 'sem imagem'}</div>
+            )}
+            <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>{a.cena}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ThumbnailResult({ result }) {
+  return (
+    <div className="result-box">
+      {result.imageUrl ? (
+        <img src={result.imageUrl} alt="thumbnail" style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
+      ) : (
+        <div style={{ color: '#999' }}>{result.status || 'sem imagem'}</div>
+      )}
+    </div>
+  );
+}
   return (
     <div className="result-box" style={{ whiteSpace: 'normal' }}>
       <p><b>Título:</b> {result.titulo}</p>

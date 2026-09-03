@@ -4,30 +4,66 @@ export default async function handler(req, res) {
   const { cenas, estilo } = req.body;
   if (!cenas || !cenas.length) return res.status(400).json({ error: 'Nenhuma cena recebida' });
 
-  if (!process.env.FLUX_API_KEY || !process.env.KLING_API_KEY) {
+  if (!process.env.FLUX_API_KEY) {
     return res.status(500).json({
-      error:
-        'FLUX_API_KEY e/ou KLING_API_KEY não configuradas ainda. Crie conta em cada serviço e adicione as chaves no Vercel.',
+      error: 'FLUX_API_KEY não configurada ainda. Crie conta em dashboard.bfl.ai e adicione no Vercel.',
     });
   }
 
   const estiloPrompt =
     estilo === 'desenho'
-      ? 'estilo desenho animado, cores vibrantes, traço consistente'
-      : 'estilo realista, cinematográfico, iluminação natural';
+      ? 'estilo desenho animado, cores vibrantes, traço consistente, ilustração 2D'
+      : 'estilo realista, cinematográfico, iluminação natural, fotografia dramática';
 
   try {
     const arquivos = [];
 
     for (const cena of cenas) {
-      const promptFinal = `${cena.descricao}, ${estiloPrompt}, personagens bíblicos consistentes com a série`;
+      const promptFinal = `${cena.descricao}, ${estiloPrompt}, personagens bíblicos, composição de cena de vídeo, alta qualidade`;
 
-      // TODO: chamar a API da Flux aqui com promptFinal para gerar a imagem-base da cena
-      // TODO: em seguida chamar a API da Kling usando a imagem gerada para animar (image-to-video)
+      const submitRes = await fetch('https://api.bfl.ai/v1/flux-2-pro', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'x-key': process.env.FLUX_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: promptFinal,
+          width: 1344,
+          height: 768,
+        }),
+      });
+
+      const submitData = await submitRes.json();
+      if (!submitRes.ok) throw new Error(submitData.detail || 'Erro ao enviar pedido ao Flux');
+
+      const pollingUrl = submitData.polling_url;
+      let imageUrl = null;
+      let tentativas = 0;
+
+      while (tentativas < 60) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const pollRes = await fetch(pollingUrl, {
+          headers: { 'x-key': process.env.FLUX_API_KEY },
+        });
+        const pollData = await pollRes.json();
+
+        if (pollData.status === 'Ready') {
+          imageUrl = pollData.result?.sample;
+          break;
+        }
+        if (['Error', 'Failed', 'Request Moderated', 'Content Moderated'].includes(pollData.status)) {
+          throw new Error(`Geração falhou: ${pollData.status} (cena: "${cena.descricao}")`);
+        }
+        tentativas++;
+      }
+
+      if (!imageUrl) throw new Error(`Tempo esgotado esperando a imagem da cena "${cena.descricao}"`);
+
       arquivos.push({
         cena: cena.descricao,
-        prompt: promptFinal,
-        status: 'pendente: integrar chamada real à Flux/Kling',
+        imageUrl,
       });
     }
 
