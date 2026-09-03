@@ -55,12 +55,34 @@ export default function Home() {
       estilo,
     });
 
-  const assembleVideo = () =>
-    runStep('assemble', '/api/assemble-video', {
+  const assembleVideo = async () => {
+    const primeira = await runStep('assemble', '/api/assemble-video', {
       audioUrl: results.voice?.audioUrl,
       cenas: results.visual?.arquivos,
       formato,
     });
+    if (!primeira || !primeira.renderId) return;
+
+    setLoading('assemble');
+    let tentativas = 0;
+    while (tentativas < 40) {
+      await new Promise((r) => setTimeout(r, 5000));
+      const check = await fetch(`/api/assemble-video?id=${primeira.renderId}`).then((r) => r.json());
+      if (check.status === 'done') {
+        setResults((r) => ({ ...r, assemble: { ...primeira, ...check } }));
+        setStatus((s) => ({ ...s, assemble: 'ok' }));
+        break;
+      }
+      if (check.status === 'failed') {
+        setResults((r) => ({ ...r, assemble: { error: 'A montagem falhou na Shotstack' } }));
+        setStatus((s) => ({ ...s, assemble: 'error' }));
+        break;
+      }
+      setResults((r) => ({ ...r, assemble: { ...primeira, status: check.status } }));
+      tentativas++;
+    }
+    setLoading(null);
+  };
 
   const generateThumbnail = () =>
     runStep('thumbnail', '/api/generate-thumbnail', {
