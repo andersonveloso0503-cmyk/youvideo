@@ -42,6 +42,7 @@ export default async function handler(req, res) {
     const blob = await put(nomeArquivo, audioBuffer, {
       access: 'public',
       contentType: 'audio/mpeg',
+      token: process.env.MEDIA_READ_WRITE_TOKEN,
     });
 
     return res.status(200).json({ audioUrl: blob.url });
