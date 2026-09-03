@@ -54,8 +54,9 @@ export default async function handler(req, res) {
     tracks: [
       {
         clips: videosValidos
+          .map((c, i) => ({ ...c, indiceOriginal: i }))
           .filter((c) => c.textoNarrado)
-          .map((c, i) => ({
+          .map((c) => ({
             asset: {
               type: 'html',
               html: `<p>${c.textoNarrado}</p>`,
@@ -65,7 +66,7 @@ export default async function handler(req, res) {
               width: isVertical ? 900 : 1500,
               height: 220,
             },
-            start: i * duracaoPorCena,
+            start: c.indiceOriginal * duracaoPorCena,
             length: duracaoPorCena,
             position: 'bottom',
             offset: { y: 0.06 },
