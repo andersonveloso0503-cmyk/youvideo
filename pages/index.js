@@ -1,5 +1,65 @@
 import { useState } from 'react';
 
+function BrollSearch() {
+  const [query, setQuery] = useState('');
+  const [resultados, setResultados] = useState(null);
+  const [buscando, setBuscando] = useState(false);
+  const [erro, setErro] = useState(null);
+
+  async function buscar() {
+    if (!query) return;
+    setBuscando(true);
+    setErro(null);
+    try {
+      const res = await fetch('/api/stock-media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setResultados(data.resultados || []);
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2>Material de apoio (b-roll, banco livre de direitos)</h2>
+      <label>Buscar (ex: deserto, mar da Galileia, ruínas antigas)</label>
+      <div className="row">
+        <div>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Ex: paisagem deserto"
+          />
+        </div>
+      </div>
+      <button disabled={buscando || !query} onClick={buscar}>
+        {buscando ? 'Buscando...' : 'Buscar'}
+      </button>
+      {erro && <div className="result-box">Erro: {erro}</div>}
+      {resultados && (
+        <div className="result-box">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {resultados.map((r) => (
+              <a key={r.id} href={r.videoUrl} target="_blank" rel="noreferrer" style={{ width: 120 }}>
+                <img src={r.preview} alt="preview" style={{ width: '100%', borderRadius: 6 }} />
+              </a>
+            ))}
+          </div>
+          {!resultados.length && <div style={{ color: '#999' }}>Nada encontrado pra esse termo.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const STEPS = [
   { key: 'script', label: '1. Roteiro' },
   { key: 'voice', label: '2. Narração' },
@@ -223,6 +283,8 @@ export default function Home() {
         onRun={publish}
         result={results.publish}
       />
+
+      <BrollSearch />
     </div>
   );
 }
