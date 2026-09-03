@@ -52,26 +52,6 @@ export default async function handler(req, res) {
 
   const timeline = {
     tracks: [
-      {
-        clips: videosValidos
-          .map((c, i) => ({ ...c, indiceOriginal: i }))
-          .filter((c) => c.textoNarrado)
-          .map((c) => ({
-            asset: {
-              type: 'html',
-              html: `<p>${c.textoNarrado}</p>`,
-              css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
-                isVertical ? 42 : 34
-              }px; font-weight: 700; color: #ffffff; text-align: center; background: rgba(0,0,0,0.6); padding: 16px 24px; border-radius: 8px; margin: 0; }`,
-              width: isVertical ? 900 : 1500,
-              height: 220,
-            },
-            start: c.indiceOriginal * duracaoPorCena,
-            length: duracaoPorCena,
-            position: 'bottom',
-            offset: { y: 0.06 },
-          })),
-      },
       { clips: clipsVideo },
       {
         clips: [
