@@ -49,11 +49,41 @@ export default function Home() {
       texto: results.script?.narracao || '',
     });
 
-  const generateVisual = () =>
-    runStep('visual', '/api/generate-visual', {
+  const generateVisual = async () => {
+    const primeiro = await runStep('visual', '/api/generate-visual', {
       cenas: results.script?.cenas || [],
       estilo,
     });
+    if (!primeiro) return;
+
+    const pendentes = (primeiro.arquivos || []).filter((a) => a.klingTaskId);
+    if (!pendentes.length) return;
+
+    setLoading('visual');
+    let tentativas = 0;
+    while (tentativas < 90) {
+      await new Promise((r) => setTimeout(r, 5000));
+      let todasProntas = true;
+
+      for (const arquivo of pendentes) {
+        if (arquivo.videoUrl || arquivo.falhouAnimacao) continue;
+        const check = await fetch(`/api/check-kling-status?taskId=${arquivo.klingTaskId}`).then((r) => r.json());
+        if (check.status === 'done') {
+          arquivo.videoUrl = check.videoUrl;
+        } else if (check.status === 'failed') {
+          arquivo.falhouAnimacao = true;
+          arquivo.avisoVideo = check.error;
+        } else {
+          todasProntas = false;
+        }
+      }
+
+      setResults((r) => ({ ...r, visual: { arquivos: primeiro.arquivos } }));
+      if (todasProntas) break;
+      tentativas++;
+    }
+    setLoading(null);
+  };
 
   const assembleVideo = async () => {
     const primeira = await runStep('assemble', '/api/assemble-video', {
@@ -229,10 +259,15 @@ function VisualResult({ result }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
         {(result.arquivos || []).map((a, i) => (
           <div key={i} style={{ width: 150 }}>
-            {a.imageUrl ? (
+            {a.videoUrl ? (
+              <video src={a.videoUrl} controls style={{ width: '100%', borderRadius: 6 }} />
+            ) : a.imageUrl ? (
               <img src={a.imageUrl} alt={a.cena} style={{ width: '100%', borderRadius: 6 }} />
             ) : (
               <div style={{ color: '#999' }}>{a.status || 'sem imagem'}</div>
+            )}
+            {a.klingTaskId && !a.videoUrl && !a.falhouAnimacao && (
+              <div style={{ fontSize: 11, color: '#4f7cff' }}>animando...</div>
             )}
             <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>{a.cena}</div>
           </div>

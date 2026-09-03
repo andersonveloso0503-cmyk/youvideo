@@ -28,11 +28,7 @@ export default async function handler(req, res) {
           'x-key': process.env.FLUX_API_KEY,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          prompt: promptFinal,
-          width: 1344,
-          height: 768,
-        }),
+        body: JSON.stringify({ prompt: promptFinal, width: 1344, height: 768 }),
       });
 
       const submitData = await submitRes.json();
@@ -42,11 +38,9 @@ export default async function handler(req, res) {
       let imageUrl = null;
       let tentativas = 0;
 
-      while (tentativas < 60) {
+      while (tentativas < 45) {
         await new Promise((r) => setTimeout(r, 1000));
-        const pollRes = await fetch(pollingUrl, {
-          headers: { 'x-key': process.env.FLUX_API_KEY },
-        });
+        const pollRes = await fetch(pollingUrl, { headers: { 'x-key': process.env.FLUX_API_KEY } });
         const pollData = await pollRes.json();
 
         if (pollData.status === 'Ready') {
@@ -61,14 +55,53 @@ export default async function handler(req, res) {
 
       if (!imageUrl) throw new Error(`Tempo esgotado esperando a imagem da cena "${cena.descricao}"`);
 
-      arquivos.push({
-        cena: cena.descricao,
-        imageUrl,
-      });
+      const arquivo = { cena: cena.descricao, imageUrl };
+
+      // Se a Kling estiver configurada, só ENVIA o pedido de animação (não espera
+      // terminar aqui, pra não estourar o limite de 60s do Vercel). O painel
+      // consulta o andamento depois em /api/check-kling-status.
+      if (process.env.KLING_API_KEY) {
+        try {
+          arquivo.klingTaskId = await enviarParaKling(imageUrl, cena.descricao);
+        } catch (err) {
+          arquivo.avisoVideo = `Não deu pra enviar essa cena pra animação (${err.message}); ficou só a imagem estática.`;
+        }
+      }
+
+      arquivos.push(arquivo);
     }
 
     return res.status(200).json({ arquivos });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
+}
+
+async function enviarParaKling(imageUrl, descricaoCena) {
+  const submitRes = await fetch('https://api.piapi.ai/api/v1/task', {
+    method: 'POST',
+    headers: {
+      'X-API-Key': process.env.KLING_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'kling',
+      task_type: 'video_generation',
+      input: {
+        version: '2.6',
+        mode: 'std',
+        duration: 5,
+        aspect_ratio: '16:9',
+        image_url: imageUrl,
+        prompt: `${descricaoCena}, movimento de câmera sutil, cena viva mas estável`,
+      },
+    }),
+  });
+
+  const submitData = await submitRes.json();
+  if (!submitRes.ok) throw new Error(submitData.message || 'Erro ao enviar pedido à Kling');
+
+  const taskId = submitData.data?.task_id || submitData.task_id;
+  if (!taskId) throw new Error('Kling não retornou um task_id');
+  return taskId;
 }
