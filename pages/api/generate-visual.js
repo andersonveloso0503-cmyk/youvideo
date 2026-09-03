@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { cenas, estilo, formato } = req.body;
+  const { cenas, estilo, formato, duracaoAlvo } = req.body;
   if (!cenas || !cenas.length) return res.status(400).json({ error: 'Nenhuma cena recebida' });
 
   if (!process.env.FLUX_API_KEY) {
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
       // consulta o andamento depois em /api/check-kling-status.
       if (process.env.KLING_API_KEY) {
         try {
-          arquivo.klingTaskId = await enviarParaKling(imageUrl, cena.descricao, formato);
+          arquivo.klingTaskId = await enviarParaKling(imageUrl, cena.descricao, formato, duracaoAlvo);
         } catch (err) {
           arquivo.avisoVideo = `Não deu pra enviar essa cena pra animação (${err.message}); ficou só a imagem estática.`;
         }
@@ -91,7 +91,11 @@ export default async function handler(req, res) {
   }
 }
 
-async function enviarParaKling(imageUrl, descricaoCena, formato) {
+async function enviarParaKling(imageUrl, descricaoCena, formato, duracaoAlvo) {
+  // A Kling só aceita durações fixas (5 ou 10s). Escolhe a que cobre o tempo
+  // real da cena sem sobrar — evita o vídeo "congelar" no último frame.
+  const duracaoKling = duracaoAlvo && duracaoAlvo > 5 ? 10 : 5;
+
   const submitRes = await fetch('https://api.piapi.ai/api/v1/task', {
     method: 'POST',
     headers: {
@@ -104,7 +108,7 @@ async function enviarParaKling(imageUrl, descricaoCena, formato) {
       input: {
         version: '2.6',
         mode: 'std',
-        duration: 5,
+        duration: duracaoKling,
         aspect_ratio: formato === 'short' ? '9:16' : '16:9',
         image_url: imageUrl,
         prompt: `${descricaoCena}, movimento de câmera sutil, cena viva mas estável`,

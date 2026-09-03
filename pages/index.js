@@ -110,10 +110,15 @@ export default function Home() {
     });
 
   const generateVisual = async () => {
+    const numCenas = (results.script?.cenas || []).length || 1;
+    const ultimaPalavra = (results.voice?.palavras || []).filter((p) => p.end != null).pop();
+    const duracaoAlvo = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
+
     const primeiro = await runStep('visual', '/api/generate-visual', {
       cenas: results.script?.cenas || [],
       estilo,
       formato,
+      duracaoAlvo,
     });
     if (!primeiro) return;
 
