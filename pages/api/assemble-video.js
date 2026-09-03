@@ -33,9 +33,13 @@ export default async function handler(req, res) {
     aspectRatio: isVertical ? '9:16' : '16:9',
   };
 
-  // Cada cena vira um clipe sequencial na trilha de vídeo; a narração inteira
-  // toca por baixo numa trilha de áudio separada.
-  const duracaoPorCena = 5; // segundos, ajustável depois
+  // Usa o tempo real da narração (baseado no timing das palavras) pra dividir
+  // as cenas de forma proporcional, em vez de um tempo fixo — evita o vídeo
+  // terminar antes ou depois do áudio.
+  const ultimaPalavra = (palavras || []).filter((p) => p.end != null).pop();
+  const duracaoTotalAudio = ultimaPalavra ? ultimaPalavra.end + 0.4 : videosValidos.length * 5;
+  const duracaoPorCena = duracaoTotalAudio / videosValidos.length;
+
   let inicio = 0;
   const clipsVideo = videosValidos.map((c) => {
     const clip = {
