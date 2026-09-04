@@ -80,10 +80,10 @@ export default async function handler(req, res) {
           type: 'html',
           html: `<p>${html}</p>`,
           css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
-            isVertical ? 30 : 34
-          }px; font-weight: 700; text-align: center; background: #000000; padding: 10px 18px; border-radius: 4px; margin: 0; }`,
-          width: isVertical ? 800 : 1500,
-          height: 130,
+            isVertical ? 20 : 26
+          }px; font-weight: 700; text-align: center; background: #000000; padding: 8px 14px; border-radius: 4px; margin: 0; }`,
+          width: isVertical ? 600 : 1200,
+          height: 100,
         },
         start: palavraAtual.start,
         length: Math.max(palavraAtual.end - palavraAtual.start, 0.12),
