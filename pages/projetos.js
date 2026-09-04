@@ -1,17 +1,11 @@
 import { useEffect, useState } from 'react';
 
-async function compartilhar(videoUrl, titulo) {
+async function compartilhar(arquivoPreparado, titulo) {
   try {
-    const res = await fetch(videoUrl);
-    const blob = await res.blob();
-    const arquivo = new File([blob], 'youvideo.mp4', { type: 'video/mp4' });
-
-    if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
-      await navigator.share({ files: [arquivo], title: titulo || 'Youvideo' });
+    if (navigator.canShare && navigator.canShare({ files: [arquivoPreparado] })) {
+      await navigator.share({ files: [arquivoPreparado], title: titulo || 'Youvideo' });
     } else {
-      // Celular/navegador não suporta compartilhar arquivo direto — baixa
-      // pra você mandar manualmente pelo app.
-      const blobUrl = URL.createObjectURL(blob);
+      const blobUrl = URL.createObjectURL(arquivoPreparado);
       const a = document.createElement('a');
       a.href = blobUrl;
       a.download = 'youvideo.mp4';
@@ -22,20 +16,35 @@ async function compartilhar(videoUrl, titulo) {
       alert('Seu navegador não suporta o menu de compartilhar direto. O vídeo foi baixado — abre ele e compartilha manualmente pro TikTok/Kwai.');
     }
   } catch (err) {
-    alert('Não deu pra compartilhar: ' + err.message);
+    if (err.name !== 'AbortError') alert('Não deu pra compartilhar: ' + err.message);
   }
 }
 
 export default function Projetos() {
   const [projetos, setProjetos] = useState(null);
   const [erro, setErro] = useState(null);
+  const [arquivos, setArquivos] = useState({});
 
   useEffect(() => {
     fetch('/api/list-projects')
       .then((r) => r.json())
       .then((data) => {
         if (data.error) throw new Error(data.error);
-        setProjetos(data.projetos || []);
+        const lista = data.projetos || [];
+        setProjetos(lista);
+        // Baixa cada vídeo em segundo plano assim que a lista chega, pra
+        // "Enviar" poder abrir o menu nativo instantaneamente quando clicado
+        // (no iPhone, esperar o download DEPOIS do clique faz o menu não abrir).
+        lista.forEach((p) => {
+          if (!p.videoUrl) return;
+          fetch(p.videoUrl)
+            .then((r) => r.blob())
+            .then((blob) => {
+              const arquivo = new File([blob], 'youvideo.mp4', { type: 'video/mp4' });
+              setArquivos((prev) => ({ ...prev, [p.id]: arquivo }));
+            })
+            .catch(() => {});
+        });
       })
       .catch((err) => setErro(err.message));
   }, []);
@@ -65,7 +74,12 @@ export default function Projetos() {
             <>
               <video src={p.videoUrl} controls style={{ width: '100%', maxWidth: 300, borderRadius: 6, marginTop: 10 }} />
               <div style={{ marginTop: 10 }}>
-                <button onClick={() => compartilhar(p.videoUrl, p.titulo)}>Enviar (TikTok / Kwai / etc)</button>
+                <button
+                  disabled={!arquivos[p.id]}
+                  onClick={() => compartilhar(arquivos[p.id], p.titulo)}
+                >
+                  {arquivos[p.id] ? 'Enviar (TikTok / Kwai / etc)' : 'Preparando...'}
+                </button>
               </div>
             </>
           )}
