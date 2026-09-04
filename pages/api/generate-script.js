@@ -1,17 +1,22 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { tema, estilo, formato } = req.body;
+  const { tema, estilo, formato, duracaoDesejada } = req.body;
   if (!tema) return res.status(400).json({ error: 'Tema é obrigatório' });
 
   if (!process.env.GROQ_API_KEY) {
     return res.status(500).json({ error: 'GROQ_API_KEY não configurada no Vercel' });
   }
 
+  const duracaoSegundos = Number(duracaoDesejada) || (formato === 'short' ? 180 : 420);
+  const palavrasAlvo = Math.round(duracaoSegundos * 2.3); // ritmo médio de narração em português
+  const duracaoMin = Math.floor(duracaoSegundos / 60);
+  const duracaoSeg = duracaoSegundos % 60;
+
   const formatoInstrucao =
     formato === 'short'
-      ? 'Formato Short: narração de 30 a 50 segundos, direto ao ponto, gancho forte nos primeiros 3 segundos.'
-      : 'Formato vídeo longo: narração de 4 a 7 minutos, com introdução, desenvolvimento e conclusão.';
+      ? `Formato Short: a narração precisa ter aproximadamente ${palavrasAlvo} palavras (pra durar bem perto de ${duracaoMin > 0 ? `${duracaoMin}min ` : ''}${duracaoSeg}s ao ser falada), gancho forte nos primeiros 3 segundos, ritmo direto.`
+      : `Formato vídeo longo: a narração precisa ter aproximadamente ${palavrasAlvo} palavras (pra durar bem perto de ${duracaoMin}min ao ser falada), com introdução, desenvolvimento e conclusão bem desenvolvidos — não encurte o conteúdo, expanda com contexto histórico e detalhes da história pra atingir esse tamanho.`;
 
   const prompt = `Você é roteirista de um canal de histórias bíblicas no YouTube.
 Tema: "${tema}"
@@ -50,7 +55,7 @@ IMPORTANTE:
               : []),
           ],
           temperature: tentativaExtra ? 0.4 : 0.8,
-          max_completion_tokens: 6000,
+          max_completion_tokens: 8000,
           response_format: { type: 'json_object' },
         }),
       });

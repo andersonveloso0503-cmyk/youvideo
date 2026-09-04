@@ -73,6 +73,7 @@ export default function Home() {
   const [tema, setTema] = useState('');
   const [estilo, setEstilo] = useState('realista');
   const [formato, setFormato] = useState('longo');
+  const [duracaoDesejada, setDuracaoDesejada] = useState('420');
   const [vozId, setVozId] = useState('');
   const [vozes, setVozes] = useState(null);
 
@@ -112,7 +113,7 @@ export default function Home() {
   }
 
   const generateScript = () =>
-    runStep('script', '/api/generate-script', { tema, estilo, formato });
+    runStep('script', '/api/generate-script', { tema, estilo, formato, duracaoDesejada });
 
   const generateVoice = () =>
     runStep('voice', '/api/generate-voice', {
@@ -261,12 +262,34 @@ export default function Home() {
           </div>
           <div>
             <label>Formato</label>
-            <select value={formato} onChange={(e) => setFormato(e.target.value)}>
+            <select
+              value={formato}
+              onChange={(e) => {
+                setFormato(e.target.value);
+                setDuracaoDesejada(e.target.value === 'short' ? '180' : '420');
+              }}
+            >
               <option value="longo">Vídeo longo</option>
               <option value="short">Short</option>
             </select>
           </div>
         </div>
+        <label>Duração desejada</label>
+        <select value={duracaoDesejada} onChange={(e) => setDuracaoDesejada(e.target.value)}>
+          {formato === 'short' ? (
+            <>
+              <option value="60">Até 1 minuto</option>
+              <option value="120">Até 2 minutos</option>
+              <option value="180">Até 3 minutos (máximo do YouTube)</option>
+            </>
+          ) : (
+            <>
+              <option value="420">7 minutos</option>
+              <option value="600">10 minutos</option>
+              <option value="900">15 minutos</option>
+            </>
+          )}
+        </select>
         <label>Voz do narrador</label>
         <select value={vozId} onChange={(e) => setVozId(e.target.value)}>
           <option value="">Padrão</option>
