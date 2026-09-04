@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   const estiloPrompt =
     estilo === 'desenho'
       ? 'estilo desenho animado, cores vibrantes, traço consistente, ilustração 2D'
-      : 'estilo realista, cinematográfico, iluminação natural, fotografia dramática';
+      : 'fotografia hiper-realista, foto tirada com câmera DSLR, lente 85mm, profundidade de campo rasa, textura de pele natural com poros visíveis, iluminação cinematográfica dramática, grão de filme sutil, 8K, ultra detalhado, NÃO parece pintura nem ilustração digital';
 
   try {
     const arquivos = [];
@@ -70,18 +70,6 @@ export default async function handler(req, res) {
       if (!imageUrl) throw new Error(`Tempo esgotado esperando a imagem da cena "${cena.descricao}"`);
 
       const arquivo = { cena: cena.descricao, textoNarrado: cena.textoNarrado || '', imageUrl };
-
-      // Se a Kling estiver configurada, só ENVIA o pedido de animação (não espera
-      // terminar aqui, pra não estourar o limite de 60s do Vercel). O painel
-      // consulta o andamento depois em /api/check-kling-status.
-      if (process.env.KLING_API_KEY) {
-        try {
-          arquivo.klingTaskId = await enviarParaKling(imageUrl, cena.descricao, formato, duracaoAlvo);
-        } catch (err) {
-          arquivo.avisoVideo = `Não deu pra enviar essa cena pra animação (${err.message}); ficou só a imagem estática.`;
-        }
-      }
-
       arquivos.push(arquivo);
     }
 
@@ -89,37 +77,4 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
-}
-
-async function enviarParaKling(imageUrl, descricaoCena, formato, duracaoAlvo) {
-  // A Kling só aceita durações fixas (5 ou 10s). Escolhe a que cobre o tempo
-  // real da cena sem sobrar — evita o vídeo "congelar" no último frame.
-  const duracaoKling = duracaoAlvo && duracaoAlvo > 5 ? 10 : 5;
-
-  const submitRes = await fetch('https://api.piapi.ai/api/v1/task', {
-    method: 'POST',
-    headers: {
-      'X-API-Key': process.env.KLING_API_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'kling',
-      task_type: 'video_generation',
-      input: {
-        version: '2.6',
-        mode: 'std',
-        duration: duracaoKling,
-        aspect_ratio: formato === 'short' ? '9:16' : '16:9',
-        image_url: imageUrl,
-        prompt: `${descricaoCena}, movimento de câmera sutil, cena viva mas estável`,
-      },
-    }),
-  });
-
-  const submitData = await submitRes.json();
-  if (!submitRes.ok) throw new Error(submitData.message || 'Erro ao enviar pedido à Kling');
-
-  const taskId = submitData.data?.task_id || submitData.task_id;
-  if (!taskId) throw new Error('Kling não retornou um task_id');
-  return taskId;
 }

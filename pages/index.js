@@ -77,6 +77,7 @@ export default function Home() {
   const [status, setStatus] = useState({});
   const [results, setResults] = useState({});
   const [loading, setLoading] = useState(null);
+  const [duracaoAlvo, setDuracaoAlvo] = useState(undefined);
 
   async function runStep(key, endpoint, body) {
     setLoading(key);
@@ -114,9 +115,18 @@ export default function Home() {
     const ultimaPalavra = (results.voice?.palavras || []).filter((p) => p.end != null).pop();
     const duracaoAlvo = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
 
-    const primeiro = await runStep('visual', '/api/generate-visual', {
+    await runStep('visual', '/api/generate-visual', {
       cenas: results.script?.cenas || [],
       estilo,
+      formato,
+    });
+    // guarda a duração calculada pra usar depois, quando o usuário mandar animar
+    setDuracaoAlvo(duracaoAlvo);
+  };
+
+  const animateScenes = async () => {
+    const primeiro = await runStep('visual', '/api/animate-scenes', {
+      arquivos: results.visual?.arquivos || [],
       formato,
       duracaoAlvo,
     });
@@ -258,13 +268,22 @@ export default function Home() {
 
       <StepCard
         n={3}
-        title="Imagens / vídeo dos personagens e cenas"
+        title="Imagens dos personagens e cenas"
         status={status.visual}
         loading={loading === 'visual'}
         disabled={!results.script}
         onRun={generateVisual}
         result={results.visual}
-        renderResult={(r) => <VisualResult result={r} />}
+        renderResult={(r) => (
+          <>
+            <VisualResult result={r} />
+            {r.arquivos?.some((a) => a.imageUrl && !a.klingTaskId && !a.videoUrl) && (
+              <button onClick={animateScenes} disabled={loading === 'visual'}>
+                {loading === 'visual' ? 'Animando...' : 'Animar essas cenas (gasta crédito Kling)'}
+              </button>
+            )}
+          </>
+        )}
       />
 
       <StepCard

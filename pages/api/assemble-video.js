@@ -54,23 +54,44 @@ export default async function handler(req, res) {
     return clip;
   });
 
-  const legendaKaraoke = (palavras || [])
-    .filter((p) => p.start != null && p.end != null && p.end > p.start)
-    .map((p) => ({
-      asset: {
-        type: 'html',
-        html: `<p>${p.texto}</p>`,
-        css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
-          isVertical ? 48 : 40
-        }px; font-weight: 700; color: #ffffff; text-align: center; background: #000000; padding: 10px 22px; border-radius: 4px; margin: 0; }`,
-        width: isVertical ? 700 : 900,
-        height: 120,
-      },
-      start: p.start,
-      length: Math.max(p.end - p.start, 0.15),
-      position: 'bottom',
-      offset: { y: 0.08 },
-    }));
+  // Agrupa as palavras em blocos curtos (tipo linha de legenda) e, pra cada
+  // palavra dentro do bloco, gera um clipe mostrando a frase toda com a
+  // palavra atual destacada em cor diferente — efeito karaokê.
+  const TAMANHO_BLOCO = 5;
+  const palavrasValidas = (palavras || []).filter((p) => p.start != null && p.end != null && p.end > p.start);
+  const blocos = [];
+  for (let i = 0; i < palavrasValidas.length; i += TAMANHO_BLOCO) {
+    blocos.push(palavrasValidas.slice(i, i + TAMANHO_BLOCO));
+  }
+
+  const legendaKaraoke = [];
+  for (const bloco of blocos) {
+    bloco.forEach((palavraAtual, idx) => {
+      const html = bloco
+        .map((p, i) =>
+          i === idx
+            ? `<span style="color:#ffd60a">${p.texto}</span>`
+            : `<span style="color:#ffffff">${p.texto}</span>`
+        )
+        .join(' ');
+
+      legendaKaraoke.push({
+        asset: {
+          type: 'html',
+          html: `<p>${html}</p>`,
+          css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
+            isVertical ? 40 : 34
+          }px; font-weight: 700; text-align: center; background: #000000; padding: 12px 22px; border-radius: 4px; margin: 0; }`,
+          width: isVertical ? 900 : 1500,
+          height: 160,
+        },
+        start: palavraAtual.start,
+        length: Math.max(palavraAtual.end - palavraAtual.start, 0.12),
+        position: 'bottom',
+        offset: { y: 0.08 },
+      });
+    });
+  }
 
   const timeline = {
     tracks: [
