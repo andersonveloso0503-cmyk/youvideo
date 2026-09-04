@@ -73,6 +73,7 @@ export default function Home() {
   const [tema, setTema] = useState('');
   const [estilo, setEstilo] = useState('realista');
   const [formato, setFormato] = useState('longo');
+  const [vozId, setVozId] = useState('');
 
   const [status, setStatus] = useState({});
   const [results, setResults] = useState({});
@@ -108,6 +109,7 @@ export default function Home() {
   const generateVoice = () =>
     runStep('voice', '/api/generate-voice', {
       texto: results.script?.narracao || '',
+      vozId,
     });
 
   const generateVisual = async () => {
@@ -229,7 +231,8 @@ export default function Home() {
     <div className="container">
       <h1>Youvideo</h1>
       <p className="subtitle">
-        Painel de criação de vídeos bíblicos com IA · <a href="/projetos" style={{ color: '#4f7cff' }}>Meus Projetos</a>
+        Painel de criação de vídeos bíblicos com IA · <a href="/agendar" style={{ color: '#4f7cff' }}>Agendar Vídeos</a> ·{' '}
+        <a href="/projetos" style={{ color: '#4f7cff' }}>Meus Projetos</a>
       </p>
 
       <div className="card">
@@ -256,6 +259,20 @@ export default function Home() {
             </select>
           </div>
         </div>
+        <label>Voz do narrador (opcional)</label>
+        <input
+          type="text"
+          value={vozId}
+          onChange={(e) => setVozId(e.target.value)}
+          placeholder="Cole aqui o Voice ID da ElevenLabs (deixe em branco pra usar a padrão)"
+        />
+        <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+          Procure vozes em{' '}
+          <a href="https://elevenlabs.io/app/voice-library" target="_blank" rel="noreferrer" style={{ color: '#4f7cff' }}>
+            elevenlabs.io/app/voice-library
+          </a>
+          , clique na que quiser e copie o Voice ID.
+        </div>
       </div>
 
       <StepCard
@@ -277,6 +294,7 @@ export default function Home() {
         disabled={!results.script?.narracao}
         onRun={generateVoice}
         result={results.voice}
+        renderResult={(r) => <VoiceResult result={r} />}
       />
 
       <StepCard
@@ -435,6 +453,9 @@ function VisualResult({ result }) {
             {a.klingTaskId && !a.videoUrl && !a.falhouAnimacao && (
               <div style={{ fontSize: 11, color: '#4f7cff' }}>animando...</div>
             )}
+            {a.avisoVideo && (
+              <div style={{ fontSize: 11, color: '#ff9d9d' }}>{a.avisoVideo}</div>
+            )}
             <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>{a.cena}</div>
           </div>
         ))}
@@ -461,6 +482,18 @@ function ThumbnailResult({ result }) {
     </div>
   );
 }
+function VoiceResult({ result }) {
+  if (!result.audioUrl) return <div className="result-box">{result.status || 'processando...'}</div>;
+  return (
+    <div className="result-box">
+      <audio src={result.audioUrl} controls style={{ width: '100%' }} />
+      <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>
+        {(result.palavras || []).length} palavras com timing sincronizado
+      </div>
+    </div>
+  );
+}
+
 function ScriptResult({ result }) {
   return (
     <div className="result-box" style={{ whiteSpace: 'normal' }}>

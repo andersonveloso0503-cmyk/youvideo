@@ -3,7 +3,7 @@ import { put } from '@vercel/blob';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { texto } = req.body;
+  const { texto, vozId } = req.body;
   if (!texto) return res.status(400).json({ error: 'Texto da narração é obrigatório' });
 
   if (!process.env.ELEVENLABS_API_KEY) {
@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
+  const VOICE_ID = vozId || process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
 
   try {
     const ttsRes = await fetch(
