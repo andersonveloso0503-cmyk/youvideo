@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 function BrollSearch() {
   const [query, setQuery] = useState('');
@@ -74,6 +74,14 @@ export default function Home() {
   const [estilo, setEstilo] = useState('realista');
   const [formato, setFormato] = useState('longo');
   const [vozId, setVozId] = useState('');
+  const [vozes, setVozes] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/list-voices')
+      .then((r) => r.json())
+      .then((data) => setVozes(data.vozes || []))
+      .catch(() => setVozes([]));
+  }, []);
 
   const [status, setStatus] = useState({});
   const [results, setResults] = useState({});
@@ -259,20 +267,23 @@ export default function Home() {
             </select>
           </div>
         </div>
-        <label>Voz do narrador (opcional)</label>
-        <input
-          type="text"
-          value={vozId}
-          onChange={(e) => setVozId(e.target.value)}
-          placeholder="Cole aqui o Voice ID da ElevenLabs (deixe em branco pra usar a padrão)"
-        />
-        <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-          Procure vozes em{' '}
-          <a href="https://elevenlabs.io/app/voice-library" target="_blank" rel="noreferrer" style={{ color: '#4f7cff' }}>
-            elevenlabs.io/app/voice-library
-          </a>
-          , clique na que quiser e copie o Voice ID.
-        </div>
+        <label>Voz do narrador</label>
+        <select value={vozId} onChange={(e) => setVozId(e.target.value)}>
+          <option value="">Padrão</option>
+          {vozes?.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.nome} {v.genero ? `(${v.genero})` : ''}
+            </option>
+          ))}
+        </select>
+        {vozId && vozes?.find((v) => v.id === vozId)?.preview && (
+          <audio
+            src={vozes.find((v) => v.id === vozId).preview}
+            controls
+            style={{ width: '100%', marginTop: 8 }}
+          />
+        )}
+        {vozes === null && <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>Carregando vozes...</div>}
       </div>
 
       <StepCard
