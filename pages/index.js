@@ -340,6 +340,23 @@ function StepCard({ n, title, status, loading, disabled, onRun, result, renderRe
   );
 }
 
+async function baixarArquivo(url, nomeArquivo) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+  } catch (err) {
+    alert('Não deu pra baixar automaticamente. Segure o dedo em cima do vídeo/imagem e escolha "Salvar" no menu que aparecer.');
+  }
+}
+
 function AssembleResult({ result }) {
   if (!result.videoUrl) {
     return <div className="result-box">{result.status || 'processando...'}</div>;
@@ -348,9 +365,9 @@ function AssembleResult({ result }) {
     <div className="result-box">
       <video src={result.videoUrl} controls style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
       <div style={{ marginTop: 10 }}>
-        <a href={result.videoUrl} download target="_blank" rel="noreferrer">
-          <button style={{ marginTop: 0 }}>Baixar vídeo completo</button>
-        </a>
+        <button style={{ marginTop: 0 }} onClick={() => baixarArquivo(result.videoUrl, 'youvideo.mp4')}>
+          Baixar vídeo completo
+        </button>
       </div>
       <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>
         Baixe e suba manualmente no Kwai ou em qualquer outro app.
@@ -389,7 +406,14 @@ function ThumbnailResult({ result }) {
   return (
     <div className="result-box">
       {result.imageUrl ? (
-        <img src={result.imageUrl} alt="thumbnail" style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
+        <>
+          <img src={result.imageUrl} alt="thumbnail" style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
+          <div style={{ marginTop: 10 }}>
+            <button style={{ marginTop: 0 }} onClick={() => baixarArquivo(result.imageUrl, 'thumbnail.png')}>
+              Baixar thumbnail
+            </button>
+          </div>
+        </>
       ) : (
         <div style={{ color: '#999' }}>{result.status || 'sem imagem'}</div>
       )}
