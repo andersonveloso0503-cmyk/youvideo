@@ -214,10 +214,23 @@ export default function Home() {
       descricao: results.script?.descricao,
     });
 
+  const salvarProjeto = () =>
+    runStep('salvar', '/api/save-project', {
+      tema,
+      estilo,
+      formato,
+      titulo: results.script?.titulo,
+      descricao: results.script?.descricao,
+      videoUrl: results.assemble?.videoUrl,
+      thumbnailUrl: results.thumbnail?.imageUrl,
+    });
+
   return (
     <div className="container">
       <h1>Youvideo</h1>
-      <p className="subtitle">Painel de criação de vídeos bíblicos com IA</p>
+      <p className="subtitle">
+        Painel de criação de vídeos bíblicos com IA · <a href="/projetos" style={{ color: '#4f7cff' }}>Meus Projetos</a>
+      </p>
 
       <div className="card">
         <h2>Tema do vídeo</h2>
@@ -327,6 +340,15 @@ export default function Home() {
         onRun={publishTiktok}
         result={results.publishTiktok}
       />
+
+      <div className="card">
+        <h2>Salvar este projeto</h2>
+        <button disabled={!results.script || loading === 'salvar'} onClick={salvarProjeto}>
+          {loading === 'salvar' ? 'Salvando...' : 'Salvar projeto'}
+        </button>
+        {status.salvar === 'ok' && <div className="result-box">Salvo! Vê em "Meus Projetos" no topo da página.</div>}
+        {status.salvar === 'error' && <div className="result-box">Erro: {results.salvar?.error}</div>}
+      </div>
 
       <BrollSearch />
     </div>
