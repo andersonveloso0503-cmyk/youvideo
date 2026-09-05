@@ -1,3 +1,5 @@
+import { put } from '@vercel/blob';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -39,7 +41,7 @@ export default async function handler(req, res) {
       if (!submitRes.ok) throw new Error(submitData.detail || 'Erro ao enviar pedido ao Flux');
 
       const pollingUrl = submitData.polling_url;
-      let imageUrl = null;
+      let imageUrlTemporaria = null;
       let bloqueada = false;
       let tentativas = 0;
 
@@ -49,7 +51,7 @@ export default async function handler(req, res) {
         const pollData = await pollRes.json();
 
         if (pollData.status === 'Ready') {
-          imageUrl = pollData.result?.sample;
+          imageUrlTemporaria = pollData.result?.sample;
           break;
         }
         if (['Error', 'Failed', 'Request Moderated', 'Content Moderated'].includes(pollData.status)) {
@@ -67,9 +69,20 @@ export default async function handler(req, res) {
         continue;
       }
 
-      if (!imageUrl) throw new Error(`Tempo esgotado esperando a imagem da cena "${cena.descricao}"`);
+      if (!imageUrlTemporaria) throw new Error(`Tempo esgotado esperando a imagem da cena "${cena.descricao}"`);
 
-      const arquivo = { cena: cena.descricao, textoNarrado: cena.textoNarrado || '', imageUrl };
+      // O link que a Flux devolve é temporário e expira rápido — baixa a
+      // imagem e salva no Blob do próprio projeto, com URL permanente, pra
+      // não falhar depois na hora de animar ou montar o vídeo.
+      const imgRes = await fetch(imageUrlTemporaria);
+      const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+      const blob = await put(`cena-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`, imgBuffer, {
+        access: 'public',
+        contentType: 'image/jpeg',
+        token: process.env.MEDIA_READ_WRITE_TOKEN,
+      });
+
+      const arquivo = { cena: cena.descricao, textoNarrado: cena.textoNarrado || '', imageUrl: blob.url };
       arquivos.push(arquivo);
     }
 

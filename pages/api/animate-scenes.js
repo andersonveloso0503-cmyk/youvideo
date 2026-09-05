@@ -29,8 +29,6 @@ export default async function handler(req, res) {
 }
 
 async function enviarParaKling(imageUrl, descricaoCena, formato, duracaoAlvo) {
-  // A Kling só aceita durações fixas (5 ou 10s). Escolhe a que cobre o tempo
-  // real da cena sem sobrar — evita o vídeo "congelar" no último frame.
   const duracaoKling = duracaoAlvo && duracaoAlvo > 5 ? 10 : 5;
 
   const submitRes = await fetch('https://api.piapi.ai/api/v1/task', {

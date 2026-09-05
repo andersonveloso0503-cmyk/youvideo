@@ -1,3 +1,5 @@
+import { put } from '@vercel/blob';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -30,7 +32,7 @@ export default async function handler(req, res) {
     if (!submitRes.ok) throw new Error(submitData.detail || 'Erro ao enviar pedido ao Flux');
 
     const pollingUrl = submitData.polling_url;
-    let imageUrl = null;
+    let imageUrlTemporaria = null;
     let tentativas = 0;
 
     while (tentativas < 60) {
@@ -39,7 +41,7 @@ export default async function handler(req, res) {
       const pollData = await pollRes.json();
 
       if (pollData.status === 'Ready') {
-        imageUrl = pollData.result?.sample;
+        imageUrlTemporaria = pollData.result?.sample;
         break;
       }
       if (['Error', 'Failed', 'Request Moderated', 'Content Moderated'].includes(pollData.status)) {
@@ -48,9 +50,17 @@ export default async function handler(req, res) {
       tentativas++;
     }
 
-    if (!imageUrl) throw new Error('Tempo esgotado esperando a thumbnail');
+    if (!imageUrlTemporaria) throw new Error('Tempo esgotado esperando a thumbnail');
 
-    return res.status(200).json({ imageUrl });
+    const imgRes = await fetch(imageUrlTemporaria);
+    const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+    const blob = await put(`thumbnail-${Date.now()}.jpg`, imgBuffer, {
+      access: 'public',
+      contentType: 'image/jpeg',
+      token: process.env.MEDIA_READ_WRITE_TOKEN,
+    });
+
+    return res.status(200).json({ imageUrl: blob.url });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

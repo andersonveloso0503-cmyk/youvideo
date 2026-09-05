@@ -68,8 +68,8 @@ export default async function handler(req, res) {
             continue;
           }
           try {
-            const { requestId, statusUrl, responseUrl } = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo);
-            arquivosAnimados.push({ ...arquivo, klingTaskId: requestId, statusUrl, responseUrl });
+            const klingTaskId = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo);
+            arquivosAnimados.push({ ...arquivo, klingTaskId });
           } catch (err) {
             arquivosAnimados.push({ ...arquivo, avisoVideo: err.message });
           }
@@ -86,7 +86,7 @@ export default async function handler(req, res) {
             arquivosAtualizados.push(arquivo);
             continue;
           }
-          const check = await checarAnimacao(arquivo.statusUrl, arquivo.responseUrl);
+          const check = await checarAnimacao(arquivo.klingTaskId);
           if (check.status === 'done') {
             arquivosAtualizados.push({ ...arquivo, videoUrl: check.videoUrl });
           } else if (check.status === 'failed') {
