@@ -54,9 +54,11 @@ export default async function handler(req, res) {
     return clip;
   });
 
-  // Agrupa as palavras em blocos curtos (tipo linha de legenda) e, pra cada
-  // palavra dentro do bloco, gera um clipe mostrando a frase toda com a
-  // palavra atual destacada em cor diferente — efeito karaokê.
+  // Agrupa as palavras em blocos curtos (tipo linha de legenda). Em vídeos
+  // curtos (Shorts), cada palavra do bloco vira um clipe próprio pra dar o
+  // efeito karaokê (destaque muda em tempo real). Em vídeos longos isso geraria
+  // centenas de clipes e estoura o limite de tamanho da Shotstack — então ali
+  // cada bloco inteiro vira só UM clipe, sem o destaque palavra por palavra.
   const TAMANHO_BLOCO = 5;
   const palavrasValidas = (palavras || []).filter((p) => p.start != null && p.end != null && p.end > p.start);
   const blocos = [];
@@ -64,35 +66,49 @@ export default async function handler(req, res) {
     blocos.push(palavrasValidas.slice(i, i + TAMANHO_BLOCO));
   }
 
-  const legendaKaraoke = [];
-  for (const bloco of blocos) {
-    bloco.forEach((palavraAtual, idx) => {
-      const html = bloco
-        .map((p, i) =>
-          i === idx
-            ? `<span style="color:#ffd60a">${p.texto}</span>`
-            : `<span style="color:#ffffff">${p.texto}</span>`
-        )
-        .join(' ');
+  const cssLegenda = `p { font-family: 'Open Sans', sans-serif; font-size: ${
+    isVertical ? 20 : 26
+  }px; font-weight: 700; text-align: center; background: #000000; padding: 8px 14px; border-radius: 4px; margin: 0; width: ${
+    isVertical ? 560 : 1160
+  }px; max-width: ${isVertical ? 560 : 1160}px; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word; }`;
 
+  const legendaKaraoke = [];
+  if (isVertical) {
+    // Short: efeito karaokê completo, palavra por palavra.
+    for (const bloco of blocos) {
+      bloco.forEach((palavraAtual, idx) => {
+        const html = bloco
+          .map((p, i) =>
+            i === idx
+              ? `<span style="color:#ffd60a">${p.texto}</span>`
+              : `<span style="color:#ffffff">${p.texto}</span>`
+          )
+          .join(' ');
+
+        legendaKaraoke.push({
+          asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 600 : 1200, height: 100 },
+          start: palavraAtual.start,
+          length: Math.max(palavraAtual.end - palavraAtual.start, 0.12),
+          position: 'bottom',
+          offset: { y: 0.08 },
+        });
+      });
+    }
+  } else {
+    // Vídeo longo: um clipe só por bloco (sem destaque palavra por palavra),
+    // pra não estourar o limite de tamanho do pedido.
+    for (const bloco of blocos) {
+      const html = bloco.map((p) => `<span style="color:#ffffff">${p.texto}</span>`).join(' ');
+      const inicioBloco = bloco[0].start;
+      const fimBloco = bloco[bloco.length - 1].end;
       legendaKaraoke.push({
-        asset: {
-          type: 'html',
-          html: `<p>${html}</p>`,
-          css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
-            isVertical ? 20 : 26
-          }px; font-weight: 700; text-align: center; background: #000000; padding: 8px 14px; border-radius: 4px; margin: 0; width: ${
-            isVertical ? 560 : 1160
-          }px; max-width: ${isVertical ? 560 : 1160}px; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word; }`,
-          width: isVertical ? 600 : 1200,
-          height: 100,
-        },
-        start: palavraAtual.start,
-        length: Math.max(palavraAtual.end - palavraAtual.start, 0.12),
+        asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: 1200, height: 100 },
+        start: inicioBloco,
+        length: Math.max(fimBloco - inicioBloco, 0.5),
         position: 'bottom',
         offset: { y: 0.08 },
       });
-    });
+    }
   }
 
   const timeline = {
