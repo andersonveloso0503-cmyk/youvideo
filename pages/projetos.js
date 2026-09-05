@@ -20,6 +20,23 @@ async function compartilhar(arquivoPreparado, titulo) {
   }
 }
 
+async function baixarDireto(videoUrl) {
+  try {
+    const res = await fetch(`/api/proxy-video?url=${encodeURIComponent(videoUrl)}`);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = 'youvideo.mp4';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+  } catch (err) {
+    alert('Não deu pra baixar: ' + err.message);
+  }
+}
+
 export default function Projetos() {
   const [projetos, setProjetos] = useState(null);
   const [erro, setErro] = useState(null);
@@ -74,6 +91,9 @@ export default function Projetos() {
           {p.videoUrl && (
             <>
               <video src={p.videoUrl} controls style={{ width: '100%', maxWidth: 300, borderRadius: 6, marginTop: 10 }} />
+              <div style={{ marginTop: 10 }}>
+                <button onClick={() => baixarDireto(p.videoUrl)}>Baixar vídeo</button>
+              </div>
               <div style={{ marginTop: 10 }}>
                 {falhas[p.id] ? (
                   <div style={{ color: '#ff9d9d', fontSize: 12 }}>
