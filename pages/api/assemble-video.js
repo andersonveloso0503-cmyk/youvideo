@@ -167,6 +167,7 @@ async function checkStatus(req, res) {
     return res.status(200).json({
       status: data.response.status, // queued | fetching | rendering | saving | done | failed
       videoUrl: data.response.url || null,
+      erro: data.response.status === 'failed' ? data.response.error || data.response.data?.error || 'Motivo não informado pela Shotstack' : undefined,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });

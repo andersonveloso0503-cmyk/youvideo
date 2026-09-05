@@ -68,8 +68,8 @@ export default async function handler(req, res) {
             continue;
           }
           try {
-            const klingTaskId = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo);
-            arquivosAnimados.push({ ...arquivo, klingTaskId });
+            const { requestId, statusUrl, responseUrl } = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo);
+            arquivosAnimados.push({ ...arquivo, klingTaskId: requestId, statusUrl, responseUrl });
           } catch (err) {
             arquivosAnimados.push({ ...arquivo, avisoVideo: err.message });
           }
@@ -86,7 +86,7 @@ export default async function handler(req, res) {
             arquivosAtualizados.push(arquivo);
             continue;
           }
-          const check = await checarAnimacao(arquivo.klingTaskId);
+          const check = await checarAnimacao(arquivo.statusUrl, arquivo.responseUrl);
           if (check.status === 'done') {
             arquivosAtualizados.push({ ...arquivo, videoUrl: check.videoUrl });
           } else if (check.status === 'failed') {
@@ -130,7 +130,7 @@ export default async function handler(req, res) {
           });
           await ref.update({ status: 'concluido', videoUrl: check.videoUrl, thumbnailUrl: thumbnailUrl || null });
         } else if (check.status === 'failed') {
-          await ref.update({ status: 'erro', erro: 'Falha na montagem da Shotstack' });
+          await ref.update({ status: 'erro', erro: `Falha na montagem da Shotstack: ${check.erro || 'motivo não informado'}` });
         }
         break;
       }
