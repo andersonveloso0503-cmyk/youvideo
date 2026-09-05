@@ -24,6 +24,7 @@ export default function Projetos() {
   const [projetos, setProjetos] = useState(null);
   const [erro, setErro] = useState(null);
   const [arquivos, setArquivos] = useState({});
+  const [falhas, setFalhas] = useState({});
 
   useEffect(() => {
     fetch('/api/list-projects')
@@ -32,18 +33,18 @@ export default function Projetos() {
         if (data.error) throw new Error(data.error);
         const lista = data.projetos || [];
         setProjetos(lista);
-        // Baixa cada vídeo em segundo plano assim que a lista chega, pra
-        // "Enviar" poder abrir o menu nativo instantaneamente quando clicado
-        // (no iPhone, esperar o download DEPOIS do clique faz o menu não abrir).
         lista.forEach((p) => {
           if (!p.videoUrl) return;
-          fetch(p.videoUrl)
-            .then((r) => r.blob())
+          fetch(`/api/proxy-video?url=${encodeURIComponent(p.videoUrl)}`)
+            .then((r) => {
+              if (!r.ok) throw new Error('Falha ao baixar');
+              return r.blob();
+            })
             .then((blob) => {
               const arquivo = new File([blob], 'youvideo.mp4', { type: 'video/mp4' });
               setArquivos((prev) => ({ ...prev, [p.id]: arquivo }));
             })
-            .catch(() => {});
+            .catch(() => setFalhas((prev) => ({ ...prev, [p.id]: true })));
         });
       })
       .catch((err) => setErro(err.message));
@@ -74,12 +75,15 @@ export default function Projetos() {
             <>
               <video src={p.videoUrl} controls style={{ width: '100%', maxWidth: 300, borderRadius: 6, marginTop: 10 }} />
               <div style={{ marginTop: 10 }}>
-                <button
-                  disabled={!arquivos[p.id]}
-                  onClick={() => compartilhar(arquivos[p.id], p.titulo)}
-                >
-                  {arquivos[p.id] ? 'Enviar (TikTok / Kwai / etc)' : 'Preparando...'}
-                </button>
+                {falhas[p.id] ? (
+                  <div style={{ color: '#ff9d9d', fontSize: 12 }}>
+                    Não deu pra preparar o compartilhamento automático — segure o dedo em cima do vídeo acima e escolha "Salvar Vídeo" ou "Compartilhar" no menu do seu celular.
+                  </div>
+                ) : (
+                  <button disabled={!arquivos[p.id]} onClick={() => compartilhar(arquivos[p.id], p.titulo)}>
+                    {arquivos[p.id] ? 'Enviar (TikTok / Kwai / etc)' : 'Preparando...'}
+                  </button>
+                )}
               </div>
             </>
           )}
