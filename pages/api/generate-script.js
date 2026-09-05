@@ -24,9 +24,14 @@ Estilo visual: ${estilo}
 ${formatoInstrucao}
 
 IMPORTANTE:
-- Descreva cenas de forma visualmente segura para geração por IA: evite ferimentos, sangue, violência gráfica ou sofrimento físico explícito nas descrições visuais das cenas — prefira transmitir emoção e tensão pela expressão dos personagens, luz e composição, não por detalhes gráficos.
+- Descreva cenas de forma visualmente segura para geração por IA: evite completamente palavras como "cruz", "crucificação", "sangue", "ferimentos", "soldados armados", "chicote", "coroa de espinhos" nas descrições visuais — mesmo cenas de sofrimento ou morte devem ser descritas de forma simbólica e indireta (ex: "silhueta ao entardecer, luz dourada, expressão serena", "figura solitária numa colina, céu dramático") em vez de literal. Transmita a emoção pela luz, composição e expressão do rosto, nunca por elementos de violência explícitos na descrição.
 - Não copie trechos literais de nenhuma tradução da Bíblia; narre a história com suas próprias palavras, de forma envolvente e fiel ao relato.
 - Divida a narração em cenas curtas, pensando em cada cena como um clipe de vídeo separado.
+- GATILHOS DE RETENÇÃO (aplique de verdade, não apenas mencione):
+  1. Nos primeiros 3-5 segundos da narração, comece com uma pergunta intrigante, uma afirmação surpreendente ou um "flash-forward" do momento mais tenso da história (ex: "O que você faria se descobrisse que seu melhor amigo te traiu por 30 moedas?") — nunca comece com "Olá" ou apresentação genérica.
+  2. No meio da narração, insira pelo menos um "gancho de continuidade" (ex: "mas o que aconteceu a seguir mudaria tudo...") pra segurar quem está pensando em sair.
+  3. Termine com uma pergunta reflexiva pro espectador ou um convite claro pra comentar/seguir a série (ex: "Você já passou por uma situação parecida? Conta nos comentários.").
+  4. Use frases curtas e diretas na narração, evite parágrafos longos e formais — o tom deve soar como alguém contando uma história empolgante, não uma aula.
 - Retorne APENAS um JSON válido, sem texto antes ou depois, no formato:
 {
   "titulo": "título chamativo mas não enganoso, em português",

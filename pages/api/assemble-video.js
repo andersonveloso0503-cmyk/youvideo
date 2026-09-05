@@ -81,7 +81,9 @@ export default async function handler(req, res) {
           html: `<p>${html}</p>`,
           css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
             isVertical ? 20 : 26
-          }px; font-weight: 700; text-align: center; background: #000000; padding: 8px 14px; border-radius: 4px; margin: 0; }`,
+          }px; font-weight: 700; text-align: center; background: #000000; padding: 8px 14px; border-radius: 4px; margin: 0; width: ${
+            isVertical ? 560 : 1160
+          }px; max-width: ${isVertical ? 560 : 1160}px; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word; }`,
           width: isVertical ? 600 : 1200,
           height: 100,
         },
