@@ -154,7 +154,9 @@ export default function Home() {
 
       for (const arquivo of pendentes) {
         if (arquivo.videoUrl || arquivo.falhouAnimacao) continue;
-        const check = await fetch(`/api/check-kling-status?taskId=${arquivo.klingTaskId}`).then((r) => r.json());
+        const check = await fetch(
+          `/api/check-kling-status?statusUrl=${encodeURIComponent(arquivo.statusUrl)}&responseUrl=${encodeURIComponent(arquivo.responseUrl)}`
+        ).then((r) => r.json());
         if (check.status === 'done') {
           arquivo.videoUrl = check.videoUrl;
         } else if (check.status === 'failed') {

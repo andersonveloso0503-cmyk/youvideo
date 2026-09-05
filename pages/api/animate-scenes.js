@@ -4,8 +4,8 @@ export default async function handler(req, res) {
   const { arquivos, formato, duracaoAlvo } = req.body;
   if (!arquivos || !arquivos.length) return res.status(400).json({ error: 'Nenhuma imagem recebida' });
 
-  if (!process.env.KLING_API_KEY) {
-    return res.status(500).json({ error: 'KLING_API_KEY não configurada ainda.' });
+  if (!process.env.FAL_KEY) {
+    return res.status(500).json({ error: 'FAL_KEY não configurada ainda.' });
   }
 
   try {
@@ -16,8 +16,8 @@ export default async function handler(req, res) {
         continue;
       }
       try {
-        const klingTaskId = await enviarParaKling(arquivo.imageUrl, arquivo.cena, formato, duracaoAlvo);
-        atualizados.push({ ...arquivo, klingTaskId });
+        const { requestId, statusUrl, responseUrl } = await enviarParaKling(arquivo.imageUrl, arquivo.cena, formato, duracaoAlvo);
+        atualizados.push({ ...arquivo, klingTaskId: requestId, statusUrl, responseUrl });
       } catch (err) {
         atualizados.push({ ...arquivo, avisoVideo: `Não deu pra animar (${err.message}); ficou só a imagem estática.` });
       }
@@ -29,32 +29,28 @@ export default async function handler(req, res) {
 }
 
 async function enviarParaKling(imageUrl, descricaoCena, formato, duracaoAlvo) {
-  const duracaoKling = duracaoAlvo && duracaoAlvo > 5 ? 10 : 5;
+  const duracaoVideo = duracaoAlvo && duracaoAlvo > 5 ? 10 : 5;
 
-  const submitRes = await fetch('https://api.piapi.ai/api/v1/task', {
+  const submitRes = await fetch('https://fal.run/minimax/h3-max/image-to-video', {
     method: 'POST',
     headers: {
-      'X-API-Key': process.env.KLING_API_KEY,
+      Authorization: `Key ${process.env.FAL_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'kling',
-      task_type: 'video_generation',
-      input: {
-        version: '2.6',
-        mode: 'pro',
-        duration: duracaoKling,
-        aspect_ratio: formato === 'short' ? '9:16' : '16:9',
-        image_url: imageUrl,
-        prompt: `${descricaoCena}, movimento de câmera sutil, cena viva mas estável`,
-      },
+      prompt: `${descricaoCena}, movimento de câmera sutil, cena viva mas estável`,
+      image_url: imageUrl,
+      duration: duracaoVideo,
+      resolution: '768p',
     }),
   });
 
   const submitData = await submitRes.json();
-  if (!submitRes.ok) throw new Error(submitData.message || 'Erro ao enviar pedido à Kling');
+  if (!submitRes.ok) throw new Error(submitData.detail || submitData.message || 'Erro ao enviar pedido à fal.ai');
 
-  const taskId = submitData.data?.task_id || submitData.task_id;
-  if (!taskId) throw new Error('Kling não retornou um task_id');
-  return taskId;
+  return {
+    requestId: submitData.request_id,
+    statusUrl: submitData.status_url || `https://queue.fal.run/minimax/h3-max/requests/${submitData.request_id}/status`,
+    responseUrl: submitData.response_url || `https://queue.fal.run/minimax/h3-max/requests/${submitData.request_id}`,
+  };
 }

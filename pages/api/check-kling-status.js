@@ -1,30 +1,35 @@
 export default async function handler(req, res) {
-  const { taskId } = req.query;
-  if (!taskId) return res.status(400).json({ error: 'Parâmetro taskId é obrigatório' });
+  const { statusUrl, responseUrl } = req.query;
+  if (!statusUrl || !responseUrl) {
+    return res.status(400).json({ error: 'Parâmetros statusUrl e responseUrl são obrigatórios' });
+  }
 
-  if (!process.env.KLING_API_KEY) {
-    return res.status(500).json({ error: 'KLING_API_KEY não configurada' });
+  if (!process.env.FAL_KEY) {
+    return res.status(500).json({ error: 'FAL_KEY não configurada' });
   }
 
   try {
-    const statusRes = await fetch(`https://api.piapi.ai/api/v1/task/${taskId}`, {
-      headers: { 'X-API-Key': process.env.KLING_API_KEY },
+    const statusRes = await fetch(statusUrl, {
+      headers: { Authorization: `Key ${process.env.FAL_KEY}` },
     });
     const statusData = await statusRes.json();
-    if (!statusRes.ok) throw new Error(statusData.message || 'Erro ao consultar status da Kling');
+    if (!statusRes.ok) throw new Error(statusData.detail || 'Erro ao consultar status da fal.ai');
 
-    const info = statusData.data || statusData;
+    if (statusData.status === 'COMPLETED') {
+      const resultRes = await fetch(responseUrl, {
+        headers: { Authorization: `Key ${process.env.FAL_KEY}` },
+      });
+      const resultData = await resultRes.json();
+      if (!resultRes.ok) throw new Error(resultData.detail || 'Erro ao buscar o vídeo pronto');
 
-    if (info.status === 'completed' || info.status === 'success') {
-      const videoUrl =
-        info.output?.video_url ||
-        info.output?.works?.[0]?.video?.resource_without_watermark ||
-        info.output?.works?.[0]?.video?.resource;
-      return res.status(200).json({ status: 'done', videoUrl: videoUrl || null });
+      const videoUrl = resultData.video?.url || resultData.data?.video?.url || null;
+      return res.status(200).json({ status: 'done', videoUrl });
     }
-    if (info.status === 'failed') {
-      return res.status(200).json({ status: 'failed', error: info.error?.message || 'Kling falhou' });
+
+    if (statusData.status === 'ERROR' || statusData.status === 'FAILED') {
+      return res.status(200).json({ status: 'failed', error: statusData.error || 'Falha na geração' });
     }
+
     return res.status(200).json({ status: 'processing' });
   } catch (err) {
     return res.status(500).json({ error: err.message });
