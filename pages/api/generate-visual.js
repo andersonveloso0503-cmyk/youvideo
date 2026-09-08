@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     const arquivos = [];
 
     for (const cena of cenas) {
-      const promptFinal = `${cena.descricao}, ${estiloPrompt}, personagens bíblicos, composição de cena de vídeo, alta qualidade`;
+      const promptFinal = `${cena.descricao}, ${estiloPrompt}, personagens bíblicos vestidos com roupas completas da época, composição de cena de vídeo, alta qualidade. Evite: armas, espadas, facas, sangue, ferimentos, nudez, torso nu, violência gráfica.`;
 
       const submitRes = await fetch('https://api.bfl.ai/v1/flux-2-pro', {
         method: 'POST',

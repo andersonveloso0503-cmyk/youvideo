@@ -242,7 +242,8 @@ export default function Home() {
     <div className="container">
       <h1>Youvideo</h1>
       <p className="subtitle">
-        Painel de criação de vídeos bíblicos com IA · <a href="/agendar" style={{ color: '#4f7cff' }}>Agendar Vídeos</a> ·{' '}
+        Painel de criação de vídeos bíblicos com IA · <a href="/temas" style={{ color: '#4f7cff' }}>Temas</a> ·{' '}
+        <a href="/agendar" style={{ color: '#4f7cff' }}>Agendar Vídeos</a> ·{' '}
         <a href="/projetos" style={{ color: '#4f7cff' }}>Meus Projetos</a>
       </p>
 

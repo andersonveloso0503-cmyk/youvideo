@@ -16,7 +16,7 @@ export default async function handler(req, res) {
       estilo === 'desenho'
         ? 'Estilo desenho animado vibrante, traço bem definido, cores saturadas.'
         : 'Fotografia hiper-realista, câmera DSLR, lente 85mm, textura de pele natural com poros visíveis, iluminação dramática (tipo "chiaroscuro"), grão de filme sutil, NÃO parece pintura nem arte digital.'
-    } Close extremo no rosto do personagem principal com expressão forte e emocional (surpresa, determinação ou dor, conforme a cena), olhar direto pra câmera. Fundo desfocado com elemento simbólico da história ao fundo (ex: luz forte, estrada, templo, tempestade). Composição de regra dos terços, alto contraste entre luz e sombra, cores saturadas e quentes que se destacam em miniatura pequena. Sem texto sobreposto. Sem marca d'água. Qualidade de fotografia profissional 4K.`;
+    } Close extremo no rosto do personagem principal com expressão forte e emocional (surpresa, determinação ou dor, conforme a cena), olhar direto pra câmera, vestido com roupas completas da época. Fundo desfocado com elemento simbólico da história ao fundo (ex: luz forte, estrada, templo, tempestade). Composição de regra dos terços, alto contraste entre luz e sombra, cores saturadas e quentes que se destacam em miniatura pequena. Sem texto sobreposto. Sem marca d'água. Qualidade de fotografia profissional 4K. Evite: armas, espadas, facas, sangue, ferimentos, nudez, torso nu, violência gráfica.`;
 
     const submitRes = await fetch('https://api.bfl.ai/v1/flux-2-pro', {
       method: 'POST',

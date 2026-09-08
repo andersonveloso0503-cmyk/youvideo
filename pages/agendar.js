@@ -48,6 +48,7 @@ export default function Agendar() {
       <h1>Agendar Vídeos</h1>
       <p className="subtitle">
         <a href="/" style={{ color: '#4f7cff' }}>← voltar pro painel</a> ·{' '}
+        <a href="/temas" style={{ color: '#4f7cff' }}>Temas</a> ·{' '}
         <a href="/projetos" style={{ color: '#4f7cff' }}>Meus Projetos</a>
       </p>
 

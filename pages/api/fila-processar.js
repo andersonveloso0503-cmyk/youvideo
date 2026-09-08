@@ -8,6 +8,7 @@ import {
   iniciarMontagem,
   checarMontagem,
   gerarThumbnail,
+  publicarYoutubePrivado,
 } from '../../lib/pipeline';
 
 export default async function handler(req, res) {
@@ -118,6 +119,23 @@ export default async function handler(req, res) {
             titulo: item.roteiro.titulo,
             estilo: item.estilo,
           });
+
+          let youtubeVideoId = null;
+          let avisoYoutube = null;
+          if (process.env.YOUTUBE_REFRESH_TOKEN) {
+            try {
+              youtubeVideoId = await publicarYoutubePrivado({
+                videoUrl: check.videoUrl,
+                thumbnailUrl,
+                titulo: item.roteiro.titulo,
+                descricao: item.roteiro.descricao,
+                tags: item.roteiro.tags,
+              });
+            } catch (err) {
+              avisoYoutube = `Vídeo pronto, mas não subiu pro YouTube sozinho: ${err.message}`;
+            }
+          }
+
           await db.collection('youvideo_projects').add({
             tema: item.tema,
             estilo: item.estilo,
@@ -126,9 +144,16 @@ export default async function handler(req, res) {
             descricao: item.roteiro.descricao,
             videoUrl: check.videoUrl,
             thumbnailUrl: thumbnailUrl || null,
+            youtubeVideoId: youtubeVideoId || null,
+            avisoYoutube,
             criadoEm: new Date().toISOString(),
           });
-          await ref.update({ status: 'concluido', videoUrl: check.videoUrl, thumbnailUrl: thumbnailUrl || null });
+          await ref.update({
+            status: 'concluido',
+            videoUrl: check.videoUrl,
+            thumbnailUrl: thumbnailUrl || null,
+            youtubeVideoId: youtubeVideoId || null,
+          });
         } else if (check.status === 'failed') {
           await ref.update({ status: 'erro', erro: `Falha na montagem da Shotstack: ${check.erro || 'motivo não informado'}` });
         }

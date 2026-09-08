@@ -85,6 +85,19 @@ export default function Projetos() {
             <img src={p.thumbnailUrl} alt={p.titulo} style={{ width: '100%', maxWidth: 300, borderRadius: 6, marginBottom: 10 }} />
           )}
           <p style={{ fontSize: 13, color: '#aaa' }}>{p.descricao}</p>
+          {p.youtubeVideoId && (
+            <p style={{ fontSize: 12 }}>
+              <a
+                href={`https://studio.youtube.com/video/${p.youtubeVideoId}/edit`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#4f7cff' }}
+              >
+                Já está no YouTube como privado — revisar e publicar
+              </a>
+            </p>
+          )}
+          {p.avisoYoutube && <p style={{ fontSize: 12, color: '#ff9d9d' }}>{p.avisoYoutube}</p>}
           <p style={{ fontSize: 12, color: '#666' }}>
             {p.estilo} · {p.formato} · {new Date(p.criadoEm).toLocaleString('pt-BR')}
           </p>
