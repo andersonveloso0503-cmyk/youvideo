@@ -41,7 +41,9 @@ export default async function handler(req, res) {
   const duracaoPorCena = duracaoTotalAudio / videosValidos.length;
 
   let inicio = 0;
+  let contadorCena = 0;
   const clipsVideo = videosValidos.map((c) => {
+    contadorCena++;
     const clip = {
       asset: c.videoUrl
         ? { type: 'video', src: c.videoUrl }
@@ -49,6 +51,9 @@ export default async function handler(req, res) {
       start: inicio,
       length: duracaoPorCena,
       fit: 'cover',
+      // Cenas sem animação real ganham um zoom lento (efeito Ken Burns),
+      // alternando pra dentro/fora — dá sensação de movimento sem custo.
+      ...(!c.videoUrl ? { effect: contadorCena % 2 === 0 ? 'zoomIn' : 'zoomOut' } : {}),
     };
     inicio += duracaoPorCena;
     return clip;

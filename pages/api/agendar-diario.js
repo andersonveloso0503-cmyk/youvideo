@@ -32,11 +32,18 @@ export default async function handler(req, res) {
     const formato = ultimoFormato === 'longo' ? 'short' : 'longo';
     const duracaoDesejada = formato === 'short' ? '180' : '420';
 
+    // Anima só 1 vídeo a cada 7 (uma vez por semana) — o resto sai estático,
+    // pra caber no orçamento combinado.
+    const contagemSnap = await db.collection('youvideo_fila').where('origem', '==', 'auto').count().get();
+    const totalAuto = contagemSnap.data().count;
+    const animar = totalAuto % 7 === 0;
+
     await db.collection('youvideo_fila').add({
       tema,
       estilo: 'desenho',
       formato,
       duracaoDesejada,
+      animar,
       origem: 'auto',
       status: 'pendente',
       criadoEm: new Date().toISOString(),
@@ -44,7 +51,7 @@ export default async function handler(req, res) {
 
     await temaDoc.ref.update({ usado: true, usadoEm: new Date().toISOString() });
 
-    return res.status(200).json({ agendado: tema, formato });
+    return res.status(200).json({ agendado: tema, formato, animar });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

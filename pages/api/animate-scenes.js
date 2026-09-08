@@ -29,9 +29,7 @@ export default async function handler(req, res) {
 }
 
 async function enviarParaKling(imageUrl, descricaoCena, formato, duracaoAlvo) {
-  const duracaoVideo = duracaoAlvo && duracaoAlvo > 5 ? 10 : 5;
-
-  const submitRes = await fetch('https://fal.run/minimax/h3-max/image-to-video', {
+  const submitRes = await fetch('https://fal.run/fal-ai/wan/v2.2-a14b/image-to-video/turbo', {
     method: 'POST',
     headers: {
       Authorization: `Key ${process.env.FAL_KEY}`,
@@ -40,8 +38,7 @@ async function enviarParaKling(imageUrl, descricaoCena, formato, duracaoAlvo) {
     body: JSON.stringify({
       prompt: `${descricaoCena}, movimento de câmera sutil, cena viva mas estável`,
       image_url: imageUrl,
-      duration: duracaoVideo,
-      resolution: '768p',
+      resolution: '720p',
     }),
   });
 
@@ -50,7 +47,7 @@ async function enviarParaKling(imageUrl, descricaoCena, formato, duracaoAlvo) {
 
   return {
     requestId: submitData.request_id,
-    statusUrl: submitData.status_url || `https://queue.fal.run/minimax/h3-max/requests/${submitData.request_id}/status`,
-    responseUrl: submitData.response_url || `https://queue.fal.run/minimax/h3-max/requests/${submitData.request_id}`,
+    statusUrl: submitData.status_url || `https://queue.fal.run/fal-ai/wan/requests/${submitData.request_id}/status`,
+    responseUrl: submitData.response_url || `https://queue.fal.run/fal-ai/wan/requests/${submitData.request_id}`,
   };
 }
