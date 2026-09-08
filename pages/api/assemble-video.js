@@ -111,8 +111,25 @@ export default async function handler(req, res) {
     }
   }
 
+  const marcaDagua = {
+    asset: {
+      type: 'html',
+      html: `<p>Em Nome de Jesus</p>`,
+      css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
+        isVertical ? 16 : 18
+      }px; font-weight: 600; color: rgba(255,255,255,0.55); text-shadow: 0 1px 3px rgba(0,0,0,0.6); margin: 0; }`,
+      width: 300,
+      height: 40,
+    },
+    start: 0,
+    length: inicio,
+    position: 'topRight',
+    offset: { x: -0.03, y: 0.04 },
+  };
+
   const timeline = {
     tracks: [
+      { clips: [marcaDagua] },
       ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
       { clips: clipsVideo },
       {
