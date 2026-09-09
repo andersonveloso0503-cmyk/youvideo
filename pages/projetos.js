@@ -52,8 +52,13 @@ export default function Projetos() {
             <>
               <video src={p.videoUrl} controls playsInline style={{ width: '100%', maxWidth: 300, borderRadius: 6, marginTop: 10 }} />
               <div style={{ marginTop: 10 }}>
-                <a href={p.videoUrl} download target="_blank" rel="noreferrer">
-                  <button style={{ marginTop: 0 }}>Baixar / Abrir vídeo</button>
+                <a href={`/api/download-video?url=${encodeURIComponent(p.videoUrl)}`} target="_blank" rel="noreferrer">
+                  <button style={{ marginTop: 0 }}>Baixar vídeo</button>
+                </a>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <a href={p.videoUrl} target="_blank" rel="noreferrer" style={{ color: '#4f7cff', fontSize: 13 }}>
+                  Ou abrir o vídeo direto (tela cheia)
                 </a>
               </div>
               <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>
