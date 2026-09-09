@@ -78,7 +78,7 @@ export default async function handler(req, res) {
         // Manda animar só um LOTE pequeno de cenas por execução (evita estourar
         // o tempo limite quando há muitas cenas). O que já foi enviado fica
         // marcado; a próxima execução do cron continua de onde parou.
-        const LOTE = 3;
+        const LOTE = 1;
         const arquivosAnimados = [...item.arquivos];
         let enviadosNesseLote = 0;
 
