@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 }
 
 async function enviarParaKling(imageUrl, descricaoCena, formato, duracaoAlvo) {
-  const submitRes = await fetch('https://fal.run/fal-ai/wan/v2.2-a14b/image-to-video/turbo', {
+  const submitRes = await fetch('https://queue.fal.run/fal-ai/wan/v2.2-a14b/image-to-video/turbo', {
     method: 'POST',
     headers: {
       Authorization: `Key ${process.env.FAL_KEY}`,
