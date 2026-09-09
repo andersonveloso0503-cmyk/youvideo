@@ -1,15 +1,46 @@
 import { useEffect, useState } from 'react';
 
+async function compartilhar(arquivo, titulo, setStatus) {
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+      await navigator.share({ files: [arquivo], title: titulo || 'Youvideo' });
+    } else {
+      setStatus('sem-suporte');
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') setStatus('erro:' + err.message);
+  }
+}
+
 export default function Projetos() {
   const [projetos, setProjetos] = useState(null);
   const [erro, setErro] = useState(null);
+  const [arquivosProntos, setArquivosProntos] = useState({});
+  const [statusEnvio, setStatusEnvio] = useState({});
 
   useEffect(() => {
     fetch('/api/list-projects')
       .then((r) => r.json())
       .then((data) => {
         if (data.error) throw new Error(data.error);
-        setProjetos(data.projetos || []);
+        const lista = data.projetos || [];
+        setProjetos(lista);
+        // Baixa cada vídeo em segundo plano assim que a lista carrega, pra
+        // "Enviar" poder abrir o menu nativo na hora quando você clicar
+        // (no iPhone, esperar o download DEPOIS do clique bloqueia o menu).
+        lista.forEach((p) => {
+          if (!p.videoUrl) return;
+          fetch(`/api/download-video?url=${encodeURIComponent(p.videoUrl)}`)
+            .then((r) => {
+              if (!r.ok) throw new Error('Falha ao preparar');
+              return r.blob();
+            })
+            .then((blob) => {
+              const arquivo = new File([blob], 'youvideo.mp4', { type: 'video/mp4' });
+              setArquivosProntos((prev) => ({ ...prev, [p.id]: arquivo }));
+            })
+            .catch(() => {});
+        });
       })
       .catch((err) => setErro(err.message));
   }, []);
@@ -52,6 +83,25 @@ export default function Projetos() {
             <>
               <video src={p.videoUrl} controls playsInline style={{ width: '100%', maxWidth: 300, borderRadius: 6, marginTop: 10 }} />
               <div style={{ marginTop: 10 }}>
+                <button
+                  disabled={!arquivosProntos[p.id]}
+                  onClick={() =>
+                    compartilhar(arquivosProntos[p.id], p.titulo, (s) => setStatusEnvio((prev) => ({ ...prev, [p.id]: s })))
+                  }
+                  style={{ marginTop: 0 }}
+                >
+                  {arquivosProntos[p.id] ? 'Enviar (TikTok / Kwai / etc)' : 'Preparando...'}
+                </button>
+                {statusEnvio[p.id] === 'sem-suporte' && (
+                  <div style={{ fontSize: 11, color: '#ff9d9d', marginTop: 4 }}>
+                    Esse navegador não suporta compartilhar vídeo direto — usa o botão "Baixar vídeo" abaixo.
+                  </div>
+                )}
+                {statusEnvio[p.id]?.startsWith('erro:') && (
+                  <div style={{ fontSize: 11, color: '#ff9d9d', marginTop: 4 }}>{statusEnvio[p.id].slice(5)}</div>
+                )}
+              </div>
+              <div style={{ marginTop: 10 }}>
                 <a href={`/api/download-video?url=${encodeURIComponent(p.videoUrl)}`} target="_blank" rel="noreferrer">
                   <button style={{ marginTop: 0 }}>Baixar vídeo</button>
                 </a>
@@ -60,9 +110,6 @@ export default function Projetos() {
                 <a href={p.videoUrl} target="_blank" rel="noreferrer" style={{ color: '#4f7cff', fontSize: 13 }}>
                   Ou abrir o vídeo direto (tela cheia)
                 </a>
-              </div>
-              <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>
-                No computador, isso baixa direto. No iPhone/Android, abre o vídeo em tela cheia — toque no ícone de compartilhar dentro do player pra salvar na galeria ou mandar pro TikTok/Kwai.
               </div>
             </>
           )}
