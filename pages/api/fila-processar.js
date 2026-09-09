@@ -148,6 +148,7 @@ export default async function handler(req, res) {
             tema: item.tema,
             titulo: item.roteiro.titulo,
             estilo: item.estilo,
+            textoThumbnail: item.roteiro.textoThumbnail,
           });
 
           let youtubeVideoId = null;

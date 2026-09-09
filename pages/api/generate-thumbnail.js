@@ -3,7 +3,7 @@ import { put } from '@vercel/blob';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { tema, titulo, estilo } = req.body;
+  const { tema, titulo, estilo, textoThumbnail } = req.body;
 
   if (!process.env.FLUX_API_KEY) {
     return res.status(500).json({
@@ -54,13 +54,86 @@ export default async function handler(req, res) {
 
     const imgRes = await fetch(imageUrlTemporaria);
     const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
-    const blob = await put(`thumbnail-${Date.now()}.jpg`, imgBuffer, {
+    const blobBase = await put(`thumbnail-base-${Date.now()}.jpg`, imgBuffer, {
       access: 'public',
       contentType: 'image/jpeg',
       token: process.env.MEDIA_READ_WRITE_TOKEN,
     });
 
-    return res.status(200).json({ imageUrl: blob.url });
+    if (!textoThumbnail || !process.env.SHOTSTACK_API_KEY) {
+      return res.status(200).json({ imageUrl: blobBase.url });
+    }
+
+    // Sobrepõe o texto de forma nítida (a Flux não escreve texto de forma
+    // confiável) usando um render de imagem única na Shotstack — mesmo
+    // recurso de HTML que já usamos na legenda, evitando o canto inferior
+    // direito onde o YouTube mostra a duração do vídeo.
+    try {
+      const env = process.env.SHOTSTACK_ENV === 'production' ? 'v1' : 'stage';
+      const renderRes = await fetch(`https://api.shotstack.io/edit/${env}/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.SHOTSTACK_API_KEY },
+        body: JSON.stringify({
+          timeline: {
+            tracks: [
+              {
+                clips: [
+                  {
+                    asset: {
+                      type: 'html',
+                      html: `<p>${textoThumbnail}</p>`,
+                      css: `p { font-family: 'Open Sans', sans-serif; font-size: 64px; font-weight: 800; color: #ffffff; text-align: center; text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; margin: 0; text-transform: uppercase; }`,
+                      width: 900,
+                      height: 150,
+                    },
+                    start: 0,
+                    length: 1,
+                    position: 'top',
+                    offset: { y: -0.08 },
+                  },
+                ],
+              },
+              { clips: [{ asset: { type: 'image', src: blobBase.url }, start: 0, length: 1, fit: 'cover' }] },
+            ],
+          },
+          output: { format: 'jpg', size: { width: 1280, height: 720 } },
+        }),
+      });
+      const renderData = await renderRes.json();
+      if (!renderRes.ok) throw new Error(renderData.message || 'Erro ao compor texto na thumbnail');
+
+      const renderId = renderData.response.id;
+      let urlFinal = null;
+      let tentativasRender = 0;
+      while (tentativasRender < 30) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const statusRes = await fetch(`https://api.shotstack.io/edit/${env}/render/${renderId}`, {
+          headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY },
+        });
+        const statusData = await statusRes.json();
+        if (statusData.response.status === 'done') {
+          urlFinal = statusData.response.url;
+          break;
+        }
+        if (statusData.response.status === 'failed') throw new Error('Falha ao compor texto na thumbnail');
+        tentativasRender++;
+      }
+
+      if (!urlFinal) return res.status(200).json({ imageUrl: blobBase.url });
+
+      const finalRes = await fetch(urlFinal);
+      const finalBuffer = Buffer.from(await finalRes.arrayBuffer());
+      const blobFinal = await put(`thumbnail-${Date.now()}.jpg`, finalBuffer, {
+        access: 'public',
+        contentType: 'image/jpeg',
+        token: process.env.MEDIA_READ_WRITE_TOKEN,
+      });
+      return res.status(200).json({ imageUrl: blobFinal.url });
+    } catch {
+      // Se a composição do texto falhar por qualquer motivo, não trava o
+      // fluxo — usa a imagem base sem texto.
+      return res.status(200).json({ imageUrl: blobBase.url });
+    }
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

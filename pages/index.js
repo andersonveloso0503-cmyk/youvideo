@@ -209,6 +209,7 @@ export default function Home() {
       tema,
       titulo: results.script?.titulo,
       estilo,
+      textoThumbnail: results.script?.textoThumbnail,
     });
 
   const publish = () =>
