@@ -62,20 +62,44 @@ export default async function handler(req, res) {
         const ultimaPalavra = (item.narracao.palavras || []).filter((p) => p.end != null).pop();
         const duracaoAlvo = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
 
-        const arquivosAnimados = [];
-        for (const arquivo of item.arquivos) {
-          if (!arquivo.imageUrl) {
-            arquivosAnimados.push(arquivo);
-            continue;
-          }
+        if (item.animar === false) {
+          // Vídeo estático (mais barato): pula a animação e já manda montar
+          // direto com as imagens paradas.
+          const renderId = await iniciarMontagem({
+            audioUrl: item.narracao.audioUrl,
+            cenas: item.arquivos,
+            formato: item.formato,
+            palavras: item.narracao.palavras,
+          });
+          await ref.update({ duracaoAlvo, renderId, status: 'montando' });
+          break;
+        }
+
+        // Manda animar só um LOTE pequeno de cenas por execução (evita estourar
+        // o tempo limite quando há muitas cenas). O que já foi enviado fica
+        // marcado; a próxima execução do cron continua de onde parou.
+        const LOTE = 3;
+        const arquivosAnimados = [...item.arquivos];
+        let enviadosNesseLote = 0;
+
+        for (let i = 0; i < arquivosAnimados.length && enviadosNesseLote < LOTE; i++) {
+          const arquivo = arquivosAnimados[i];
+          if (!arquivo.imageUrl || arquivo.klingTaskId || arquivo.avisoVideo) continue;
           try {
             const { requestId, statusUrl, responseUrl } = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo);
-            arquivosAnimados.push({ ...arquivo, klingTaskId: requestId, statusUrl, responseUrl });
+            arquivosAnimados[i] = { ...arquivo, klingTaskId: requestId, statusUrl, responseUrl };
           } catch (err) {
-            arquivosAnimados.push({ ...arquivo, avisoVideo: err.message });
+            arquivosAnimados[i] = { ...arquivo, avisoVideo: err.message };
           }
+          enviadosNesseLote++;
         }
-        await ref.update({ arquivos: arquivosAnimados, duracaoAlvo, status: 'animando' });
+
+        const faltamEnviar = arquivosAnimados.some((a) => a.imageUrl && !a.klingTaskId && !a.avisoVideo);
+        await ref.update({
+          arquivos: arquivosAnimados,
+          duracaoAlvo,
+          status: faltamEnviar ? 'imagens_ok' : 'animando',
+        });
         break;
       }
 
