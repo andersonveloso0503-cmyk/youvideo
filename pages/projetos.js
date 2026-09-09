@@ -107,6 +107,16 @@ export default function Projetos() {
               <div style={{ marginTop: 10 }}>
                 <button onClick={() => baixarDireto(p.videoUrl)}>Baixar vídeo</button>
               </div>
+              <div style={{ marginTop: 8 }}>
+                <a
+                  href={`/api/proxy-video?url=${encodeURIComponent(p.videoUrl)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: '#4f7cff', fontSize: 13 }}
+                >
+                  Abrir vídeo em nova aba (iPhone: toque em compartilhar dentro do player)
+                </a>
+              </div>
               <div style={{ marginTop: 10 }}>
                 {falhas[p.id] ? (
                   <div style={{ color: '#ff9d9d', fontSize: 12 }}>
