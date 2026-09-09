@@ -34,7 +34,7 @@ IMPORTANTE:
   4. Use frases curtas e diretas na narração, evite parágrafos longos e formais — o tom deve soar como alguém contando uma história empolgante, não uma aula.
 - Retorne APENAS um JSON válido, sem texto antes ou depois, no formato:
 {
-  "titulo": "título chamativo mas não enganoso, em português",
+  "titulo": "siga este formato validado no nicho: '[Personagem] e [evento marcante] | [subtítulo emocional/intrigante]', ex: 'Jonas e a Baleia | A Fuga que Quase Custou Sua Vida' ou 'Raabe e o Fio Escarlate | O Segredo que Salvou uma Cidade'. Chamativo mas não enganoso, em português",
   "descricao": "descrição completa para o YouTube, em português: um parágrafo de abertura envolvente (2-3 frases resumindo o vídeo), seguido de mais contexto sobre a história e seu significado (pelo menos 150 palavras no total), terminando com 3-5 hashtags relevantes",
   "tags": ["12 a 15 tags relevantes em português, misturando termos amplos (ex: história bíblica) e específicos (ex: nome do personagem)"],
   "narracao": "texto completo da narração, em português",
