@@ -111,14 +111,20 @@ export default async function handler(req, res) {
             arquivosAtualizados.push(arquivo);
             continue;
           }
-          const check = await checarAnimacao(arquivo.statusUrl, arquivo.responseUrl);
-          if (check.status === 'done') {
-            arquivosAtualizados.push({ ...arquivo, videoUrl: check.videoUrl });
-          } else if (check.status === 'failed') {
-            arquivosAtualizados.push({ ...arquivo, falhouAnimacao: true, avisoVideo: check.error });
-          } else {
-            arquivosAtualizados.push(arquivo);
-            todasProntas = false;
+          try {
+            const check = await checarAnimacao(arquivo.statusUrl, arquivo.responseUrl);
+            if (check.status === 'done') {
+              arquivosAtualizados.push({ ...arquivo, videoUrl: check.videoUrl });
+            } else if (check.status === 'failed') {
+              arquivosAtualizados.push({ ...arquivo, falhouAnimacao: true, avisoVideo: check.error });
+            } else {
+              arquivosAtualizados.push(arquivo);
+              todasProntas = false;
+            }
+          } catch (err) {
+            // Não deixa uma cena com erro derrubar a execução inteira —
+            // marca essa cena como falha e segue com as outras.
+            arquivosAtualizados.push({ ...arquivo, falhouAnimacao: true, avisoVideo: err.message });
           }
         }
         if (todasProntas) {
