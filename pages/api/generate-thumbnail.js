@@ -3,7 +3,7 @@ import { put } from '@vercel/blob';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { tema, titulo, estilo, textoThumbnail } = req.body;
+  const { tema, titulo, estilo, thumbnailTitulo, thumbnailSubtitulo } = req.body;
 
   if (!process.env.FLUX_API_KEY) {
     return res.status(500).json({
@@ -12,11 +12,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const prompt = `Thumbnail profissional de YouTube estilo viral para vídeo sobre "${titulo || tema}". ${
+    const prompt = `Thumbnail profissional de YouTube estilo pôster de filme épico para vídeo bíblico sobre "${titulo || tema}". ${
       estilo === 'desenho'
         ? 'Estilo desenho animado vibrante, traço bem definido, cores saturadas.'
         : 'Fotografia hiper-realista, câmera DSLR, lente 85mm, textura de pele natural com poros visíveis, iluminação dramática (tipo "chiaroscuro"), grão de filme sutil, NÃO parece pintura nem arte digital.'
-    } Close extremo no rosto do personagem principal com expressão forte e emocional (surpresa, determinação ou dor, conforme a cena), olhar direto pra câmera, vestido com roupas completas da época. Fundo desfocado com elemento simbólico da história ao fundo (ex: luz forte, estrada, templo, tempestade). Composição de regra dos terços, alto contraste entre luz e sombra, cores saturadas e quentes que se destacam em miniatura pequena. Sem texto sobreposto. Sem marca d'água. Qualidade de fotografia profissional 4K. Evite: armas, espadas, facas, sangue, ferimentos, nudez, torso nu, violência gráfica.`;
+    } Retrato de meio-corpo ou close do personagem principal com expressão forte e emocional, olhar direto pra câmera, vestido com roupas completas da época. Fundo com paisagem bíblica dramática ao entardecer (deserto, montanhas, templo ou céu com nuvens douradas), luz de contraluz dourada (golden hour), criando atmosfera épica e cinematográfica. Composição de regra dos terços, alto contraste, cores saturadas e quentes (dourado, âmbar, laranja) que se destacam em miniatura pequena. Deixe a parte superior da imagem com menos detalhe e mais escura/uniforme, para permitir sobrepor texto grande depois. Sem texto sobreposto. Sem marca d'água. Qualidade de pôster de cinema 4K. Evite: armas, espadas, facas, sangue, ferimentos, nudez, torso nu, violência gráfica.`;
 
     const submitRes = await fetch('https://api.bfl.ai/v1/flux-2-pro', {
       method: 'POST',
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
       token: process.env.MEDIA_READ_WRITE_TOKEN,
     });
 
-    if (!textoThumbnail || !process.env.SHOTSTACK_API_KEY) {
+    if ((!thumbnailTitulo && !thumbnailSubtitulo) || !process.env.SHOTSTACK_API_KEY) {
       return res.status(200).json({ imageUrl: blobBase.url });
     }
 
@@ -81,15 +81,15 @@ export default async function handler(req, res) {
                   {
                     asset: {
                       type: 'html',
-                      html: `<p>${textoThumbnail}</p>`,
-                      css: `p { font-family: 'Open Sans', sans-serif; font-size: 64px; font-weight: 800; color: #ffffff; text-align: center; text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; margin: 0; text-transform: uppercase; }`,
-                      width: 900,
-                      height: 150,
+                      html: `<div><p class="titulo">${thumbnailTitulo || ''}</p><p class="subtitulo">${thumbnailSubtitulo || ''}</p></div>`,
+                      css: `@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Open+Sans:wght@800&display=swap'); div { display: flex; flex-direction: column; align-items: center; } .titulo { font-family: 'Cinzel', serif; font-size: 150px; font-weight: 900; color: #F6D370; text-align: center; text-shadow: 5px 5px 0 #000, -5px -5px 0 #000, 5px -5px 0 #000, -5px 5px 0 #000, 0 0 20px rgba(0,0,0,0.9); margin: 0; text-transform: uppercase; letter-spacing: 4px; line-height: 1; } .subtitulo { font-family: 'Open Sans', sans-serif; font-size: 46px; font-weight: 800; color: #ffffff; text-align: center; text-shadow: 3px 3px 0 #000, -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000; margin: 12px 0 0 0; text-transform: uppercase; letter-spacing: 1px; }`,
+                      width: 1150,
+                      height: 320,
                     },
                     start: 0,
                     length: 1,
                     position: 'top',
-                    offset: { y: -0.08 },
+                    offset: { y: -0.05 },
                   },
                 ],
               },
