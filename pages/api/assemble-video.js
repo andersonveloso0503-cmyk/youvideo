@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
   if (!audioUrl || audioUrl.startsWith('PENDENTE')) {
     return res.status(400).json({
-      error: 'Ainda não existe um áudio de narração pronto (etapa 2 precisa terminar primeiro).',
+      error: 'Ainda não existe um áudio pronto (etapa 2 precisa terminar primeiro).',
     });
   }
 
@@ -33,29 +33,35 @@ export default async function handler(req, res) {
     aspectRatio: isVertical ? '9:16' : '16:9',
   };
 
-  // Usa o tempo real da narração (baseado no timing das palavras) pra dividir
-  // as cenas de forma proporcional, em vez de um tempo fixo — evita o vídeo
-  // terminar antes ou depois do áudio.
+  // Usa o tempo real do áudio (baseado no timing das palavras) como duração
+  // total do vídeo, pra ele nunca terminar antes ou depois do áudio.
   const ultimaPalavra = (palavras || []).filter((p) => p.end != null).pop();
   const duracaoTotalAudio = ultimaPalavra ? ultimaPalavra.end + 0.4 : videosValidos.length * 5;
+
+  // Se TODAS as cenas trouxerem tempo explícito (start/length) — caso do
+  // fluxo de música, onde cada cena corresponde a um bloco real da letra —
+  // usa esses tempos em vez de dividir igualmente entre as cenas.
+  const usaTemposExplicitos = videosValidos.every((c) => c.start != null && c.length != null);
   const duracaoPorCena = duracaoTotalAudio / videosValidos.length;
 
   let inicio = 0;
   let contadorCena = 0;
   const clipsVideo = videosValidos.map((c) => {
     contadorCena++;
+    const start = usaTemposExplicitos ? c.start : inicio;
+    const length = usaTemposExplicitos ? c.length : duracaoPorCena;
     const clip = {
       asset: c.videoUrl
         ? { type: 'video', src: c.videoUrl }
         : { type: 'image', src: c.imageUrl },
-      start: inicio,
-      length: duracaoPorCena,
+      start,
+      length,
       fit: 'cover',
       // Cenas sem animação real ganham um zoom lento (efeito Ken Burns),
       // alternando pra dentro/fora — dá sensação de movimento sem custo.
       ...(!c.videoUrl ? { effect: contadorCena % 2 === 0 ? 'zoomIn' : 'zoomOut' } : {}),
     };
-    inicio += duracaoPorCena;
+    if (!usaTemposExplicitos) inicio += duracaoPorCena;
     return clip;
   });
 
@@ -127,7 +133,7 @@ export default async function handler(req, res) {
       height: 40,
     },
     start: 0,
-    length: inicio,
+    length: duracaoTotalAudio,
     position: 'topRight',
     offset: { x: -0.03, y: 0.04 },
   };
@@ -142,7 +148,7 @@ export default async function handler(req, res) {
           {
             asset: { type: 'audio', src: audioUrl },
             start: 0,
-            length: inicio,
+            length: duracaoTotalAudio,
           },
         ],
       },

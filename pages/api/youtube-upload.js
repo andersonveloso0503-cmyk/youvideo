@@ -1,19 +1,28 @@
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 
+// Cada canal autorizado tem o próprio refresh token, salvo numa variável de
+// ambiente diferente no Vercel — assim dá pra publicar em canais diferentes
+// sem misturar as contas.
+function nomeVariavelRefreshToken(canal) {
+  return canal === 'musica' ? 'YOUTUBE_REFRESH_TOKEN_MUSICA' : 'YOUTUBE_REFRESH_TOKEN';
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { videoUrl, thumbnailUrl, titulo, descricao, tags } = req.body;
+  const { videoUrl, thumbnailUrl, titulo, descricao, tags, canal } = req.body;
 
   if (!videoUrl) {
     return res.status(400).json({ error: 'Vídeo final ainda não foi montado (etapa 4)' });
   }
 
-  if (!process.env.YOUTUBE_REFRESH_TOKEN) {
+  const nomeVar = nomeVariavelRefreshToken(canal);
+  const refreshToken = process.env[nomeVar];
+
+  if (!refreshToken) {
     return res.status(500).json({
-      error:
-        'YOUTUBE_REFRESH_TOKEN não configurado. Acesse /api/auth/google uma vez, autorize sua conta e siga as instruções da tela final.',
+      error: `${nomeVar} não configurado. Acesse /api/auth/google?canal=${canal || 'apostolos'} uma vez, autorize a conta desse canal e siga as instruções da tela final.`,
     });
   }
 
@@ -22,7 +31,7 @@ export default async function handler(req, res) {
     process.env.GOOGLE_CLIENT_SECRET,
     process.env.GOOGLE_REDIRECT_URI
   );
-  oauth2Client.setCredentials({ refresh_token: process.env.YOUTUBE_REFRESH_TOKEN });
+  oauth2Client.setCredentials({ refresh_token: refreshToken });
 
   try {
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client });

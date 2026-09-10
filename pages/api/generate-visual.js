@@ -1,9 +1,21 @@
 import { put } from '@vercel/blob';
 
+const ESTILOS_VISUAIS = {
+  desenho: 'estilo desenho animado, cores vibrantes, traço consistente, ilustração 2D',
+  biblico_classico:
+    'pintura clássica bíblica estilo renascentista, técnica de óleo sobre tela, iluminação dramática tipo claro-escuro, cores ricas e profundas, composição de obra de arte sacra tradicional',
+  cinematografico:
+    'ilustração cinematográfica moderna, iluminação dramática de cinema, cores ricas e contrastadas, composição de still de filme épico, alto nível de detalhe',
+  aquarela:
+    'estilo aquarela suave, cores translúcidas e delicadas, traços fluidos, textura de papel visível, atmosfera serena e contemplativa',
+  realista:
+    'fotografia hiper-realista, foto tirada com câmera DSLR, lente 85mm, profundidade de campo rasa, textura de pele natural com poros visíveis, iluminação cinematográfica dramática, grão de filme sutil, 8K, ultra detalhado, NÃO parece pintura nem ilustração digital',
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { cenas, estilo, formato, duracaoAlvo } = req.body;
+  const { cenas, estilo, formato } = req.body;
   if (!cenas || !cenas.length) return res.status(400).json({ error: 'Nenhuma cena recebida' });
 
   if (!process.env.FLUX_API_KEY) {
@@ -12,10 +24,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const estiloPrompt =
-    estilo === 'desenho'
-      ? 'estilo desenho animado, cores vibrantes, traço consistente, ilustração 2D'
-      : 'fotografia hiper-realista, foto tirada com câmera DSLR, lente 85mm, profundidade de campo rasa, textura de pele natural com poros visíveis, iluminação cinematográfica dramática, grão de filme sutil, 8K, ultra detalhado, NÃO parece pintura nem ilustração digital';
+  const estiloPrompt = ESTILOS_VISUAIS[estilo] || ESTILOS_VISUAIS.realista;
 
   try {
     const arquivos = [];
@@ -82,7 +91,15 @@ export default async function handler(req, res) {
         token: process.env.MEDIA_READ_WRITE_TOKEN,
       });
 
-      const arquivo = { cena: cena.descricao, textoNarrado: cena.textoNarrado || '', imageUrl: blob.url };
+      const arquivo = {
+        cena: cena.descricao,
+        textoNarrado: cena.textoNarrado || '',
+        imageUrl: blob.url,
+        // Repassa o tempo explícito da cena quando ele vier definido (fluxo
+        // de música, sincronizado com o bloco da letra) — a montagem usa
+        // isso em vez de dividir o tempo igualmente entre as cenas.
+        ...(cena.start != null && cena.length != null ? { start: cena.start, length: cena.length } : {}),
+      };
       arquivos.push(arquivo);
     }
 
