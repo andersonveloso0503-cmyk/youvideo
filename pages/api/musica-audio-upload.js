@@ -5,11 +5,11 @@ export default async function handler(req, res) {
     const jsonResponse = await handleUpload({
       body: req.body,
       request: req,
+      token: process.env.MEDIA_READ_WRITE_TOKEN,
       onBeforeGenerateToken: async () => {
         return {
           allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp3'],
           addRandomSuffix: true,
-          token: process.env.MEDIA_READ_WRITE_TOKEN,
         };
       },
       onUploadCompleted: async () => {
