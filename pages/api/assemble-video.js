@@ -2,7 +2,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return checkStatus(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { audioUrl, cenas, formato, palavras } = req.body;
+  const { audioUrl, audioSegments, cenas, formato, palavras } = req.body;
 
   if (!process.env.SHOTSTACK_API_KEY) {
     return res.status(500).json({
@@ -10,7 +10,9 @@ export default async function handler(req, res) {
     });
   }
 
-  if (!audioUrl || audioUrl.startsWith('PENDENTE')) {
+  const temAudioSegments = audioSegments && audioSegments.length;
+
+  if (!temAudioSegments && (!audioUrl || audioUrl.startsWith('PENDENTE'))) {
     return res.status(400).json({
       error: 'Ainda não existe um áudio pronto (etapa 2 precisa terminar primeiro).',
     });
@@ -33,10 +35,15 @@ export default async function handler(req, res) {
     aspectRatio: isVertical ? '9:16' : '16:9',
   };
 
-  // Usa o tempo real do áudio (baseado no timing das palavras) como duração
-  // total do vídeo, pra ele nunca terminar antes ou depois do áudio.
+  // Usa o tempo real do áudio (baseado no timing das palavras, ou na soma
+  // dos segmentos no caso de medley) como duração total do vídeo, pra ele
+  // nunca terminar antes ou depois do áudio.
   const ultimaPalavra = (palavras || []).filter((p) => p.end != null).pop();
-  const duracaoTotalAudio = ultimaPalavra ? ultimaPalavra.end + 0.4 : videosValidos.length * 5;
+  const duracaoTotalAudio = temAudioSegments
+    ? Math.max(...audioSegments.map((s) => s.start + s.length))
+    : ultimaPalavra
+      ? ultimaPalavra.end + 0.4
+      : videosValidos.length * 5;
 
   // Se TODAS as cenas trouxerem tempo explícito (start/length) — caso do
   // fluxo de música, onde cada cena corresponde a um bloco real da letra —
@@ -153,20 +160,16 @@ export default async function handler(req, res) {
     offset: { x: -0.03, y: 0.04 },
   };
 
+  const clipsAudio = temAudioSegments
+    ? audioSegments.map((s) => ({ asset: { type: 'audio', src: s.url }, start: s.start, length: s.length }))
+    : [{ asset: { type: 'audio', src: audioUrl }, start: 0, length: duracaoTotalAudio }];
+
   const timeline = {
     tracks: [
       { clips: [marcaDagua] },
       ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
       { clips: clipsVideo },
-      {
-        clips: [
-          {
-            asset: { type: 'audio', src: audioUrl },
-            start: 0,
-            length: duracaoTotalAudio,
-          },
-        ],
-      },
+      { clips: clipsAudio },
     ],
   };
 
