@@ -55,6 +55,17 @@ export default async function handler(req, res) {
       primeira.length = primeira.start + primeira.length;
       primeira.start = 0;
     }
+    // Fecha qualquer buraco entre uma cena e a próxima (trechos
+    // instrumentais entre um bloco de letra e outro) esticando a cena
+    // atual até o início da seguinte.
+    for (let i = 0; i < videosValidos.length - 1; i++) {
+      const atual = videosValidos[i];
+      const proxima = videosValidos[i + 1];
+      const fimAtual = atual.start + atual.length;
+      if (fimAtual < proxima.start) {
+        atual.length = proxima.start - atual.start;
+      }
+    }
     const ultima = videosValidos[videosValidos.length - 1];
     const fimUltima = ultima.start + ultima.length;
     if (fimUltima < duracaoTotalAudio) {
@@ -102,42 +113,28 @@ export default async function handler(req, res) {
   }px; max-width: ${isVertical ? 560 : 1160}px; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word; }`;
 
   const legendaKaraoke = [];
-  if (isVertical) {
-    // Short: efeito karaokê completo, palavra por palavra.
-    for (const bloco of blocos) {
-      bloco.forEach((palavraAtual, idx) => {
-        const html = bloco
-          .map((p, i) =>
-            i === idx
-              ? `<span style="color:#ffd60a">${p.texto}</span>`
-              : `<span style="color:#ffffff">${p.texto}</span>`
-          )
-          .join(' ');
+  for (const bloco of blocos) {
+    bloco.forEach((palavraAtual, idx) => {
+      // Mostra só as palavras já cantadas até agora dentro do bloco (nunca
+      // as que ainda vão vir), com a atual destacada em amarelo — efeito
+      // karaokê sincronizado de verdade.
+      const html = bloco
+        .slice(0, idx + 1)
+        .map((p, i) =>
+          i === idx
+            ? `<span style="color:#ffd60a">${p.texto}</span>`
+            : `<span style="color:#ffffff">${p.texto}</span>`
+        )
+        .join(' ');
 
-        legendaKaraoke.push({
-          asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 600 : 1200, height: 100 },
-          start: palavraAtual.start,
-          length: Math.max(palavraAtual.end - palavraAtual.start, 0.12),
-          position: 'bottom',
-          offset: { y: 0.08 },
-        });
-      });
-    }
-  } else {
-    // Vídeo longo: um clipe só por bloco (sem destaque palavra por palavra),
-    // pra não estourar o limite de tamanho do pedido.
-    for (const bloco of blocos) {
-      const html = bloco.map((p) => `<span style="color:#ffffff">${p.texto}</span>`).join(' ');
-      const inicioBloco = bloco[0].start;
-      const fimBloco = bloco[bloco.length - 1].end;
       legendaKaraoke.push({
-        asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: 1200, height: 100 },
-        start: inicioBloco,
-        length: Math.max(fimBloco - inicioBloco, 0.5),
+        asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 600 : 1200, height: 100 },
+        start: palavraAtual.start,
+        length: Math.max(palavraAtual.end - palavraAtual.start, 0.12),
         position: 'bottom',
         offset: { y: 0.08 },
       });
-    }
+    });
   }
 
   const marcaDagua = {
