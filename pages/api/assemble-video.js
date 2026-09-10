@@ -44,6 +44,24 @@ export default async function handler(req, res) {
   const usaTemposExplicitos = videosValidos.every((c) => c.start != null && c.length != null);
   const duracaoPorCena = duracaoTotalAudio / videosValidos.length;
 
+  // Quando os tempos vêm de blocos de letra (fluxo de música), quase sempre
+  // sobra um trecho instrumental antes da primeira palavra cantada e/ou
+  // depois da última — sem isso, esses trechos ficam com tela preta porque
+  // nenhuma cena cobre esse intervalo. Estica a primeira e a última cena
+  // pra fechar essas pontas.
+  if (usaTemposExplicitos && videosValidos.length) {
+    const primeira = videosValidos[0];
+    if (primeira.start > 0) {
+      primeira.length = primeira.start + primeira.length;
+      primeira.start = 0;
+    }
+    const ultima = videosValidos[videosValidos.length - 1];
+    const fimUltima = ultima.start + ultima.length;
+    if (fimUltima < duracaoTotalAudio) {
+      ultima.length = duracaoTotalAudio - ultima.start;
+    }
+  }
+
   let inicio = 0;
   let contadorCena = 0;
   const clipsVideo = videosValidos.map((c) => {
