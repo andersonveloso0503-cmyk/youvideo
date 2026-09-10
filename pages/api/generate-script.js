@@ -34,8 +34,9 @@ IMPORTANTE:
   4. Use frases curtas e diretas na narração, evite parágrafos longos e formais — o tom deve soar como alguém contando uma história empolgante, não uma aula.
 - Retorne APENAS um JSON válido, sem texto antes ou depois, no formato:
 {
-  "titulo": "siga este formato validado no nicho: '[Personagem] e [evento marcante] | [subtítulo emocional/intrigante]', ex: 'Jonas e a Baleia | A Fuga que Quase Custou Sua Vida' ou 'Raabe e o Fio Escarlate | O Segredo que Salvou uma Cidade'. Chamativo mas não enganoso, em português",
-  "textoThumbnail": "2 a 3 palavras curtas e impactantes pra sobrepor na thumbnail (ex: 'FÉ TESTADA', 'A TRAIÇÃO'), em maiúsculas, em português",
+  "titulo": "PRIORIZE o formato de pergunta provocativa 'Por Que [pergunta intrigante sobre a história]?' (ex: 'Por Que Jesus Desceu ao Inferno nos 3 Dias Antes da Ressurreição?', 'Por Que Deus Deu a Jesus Apenas 33 Anos?') — é o padrão com maior volume de visualizações comprovado no nicho de histórias bíblicas no YouTube. Alternativa válida: '[Personagem] e [evento marcante] | [subtítulo emocional/intrigante]', ex: 'Jonas e a Baleia | A Fuga que Quase Custou Sua Vida'. Chamativo mas não enganoso, em português",
+  "thumbnailTitulo": "o NOME do personagem principal, ou no máximo 2 palavras, pra aparecer BEM GRANDE na thumbnail como título de pôster de filme (ex: 'LUCAS', 'A TRAIÇÃO', 'O MILAGRE'), em maiúsculas, em português",
+  "thumbnailSubtitulo": "frase curta de 4 a 7 palavras que gera curiosidade/mistério e reforça o CTA de clicar, pra aparecer menor logo abaixo do título (ex: 'A HISTÓRIA QUE NINGUÉM CONTOU', 'O QUE A BÍBLIA REVELA SOBRE ELE'), em maiúsculas, em português",
   "descricao": "descrição completa para o YouTube, em português: um parágrafo de abertura envolvente (2-3 frases resumindo o vídeo), seguido de mais contexto sobre a história e seu significado (pelo menos 150 palavras no total), terminando com 3-5 hashtags relevantes",
   "tags": ["12 a 15 tags relevantes em português, misturando termos amplos (ex: história bíblica) e específicos (ex: nome do personagem)"],
   "narracao": "texto completo da narração, em português",
