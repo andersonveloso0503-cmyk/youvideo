@@ -1,5 +1,7 @@
 import { put } from '@vercel/blob';
 
+export const config = { api: { bodyParser: { sizeLimit: '15mb' } } };
+
 const ESTILOS_VISUAIS = {
   desenho: 'estilo desenho animado, cores vibrantes, traço consistente, ilustração 2D',
   biblico_classico:
