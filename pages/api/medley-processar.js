@@ -79,38 +79,50 @@ export default async function handler(req, res) {
 
       const musica = musicas[idx];
 
-      switch (musica.status) {
-        case 'pendente': {
-          const { palavras, blocos } = await chamar('/api/align-letra', { audioUrl: musica.audioUrl, letra: musica.letra });
-          const duracao = await probarDuracao(musica.audioUrl);
-          musicas[idx] = { ...musica, palavras, blocoCompleto: blocos, duracao, status: 'alinhado' };
-          await doc.ref.update({ musicas });
-          break;
-        }
+      try {
+        switch (musica.status) {
+          case 'pendente': {
+            const { palavras, blocos } = await chamar('/api/align-letra', { audioUrl: musica.audioUrl, letra: musica.letra });
+            const duracao = await probarDuracao(musica.audioUrl);
+            musicas[idx] = { ...musica, palavras, blocoCompleto: blocos, duracao, status: 'alinhado' };
+            await doc.ref.update({ musicas });
+            break;
+          }
 
-        case 'alinhado': {
-          // 1 cena só pra música inteira (não por bloco), pra não gerar
-          // dezenas de imagens numa faixa longa.
-          const blocoUnico = [{ tipo: 'Música completa', texto: musica.letra, start: 0, end: musica.duracao }];
-          const { cenas } = await chamar('/api/generate-cenas-musica', { blocos: blocoUnico, estilo: medley.estilo });
-          musicas[idx] = { ...musica, cena: cenas[0], status: 'cenas_ok' };
-          await doc.ref.update({ musicas });
-          break;
-        }
+          case 'alinhado': {
+            // 1 cena só pra música inteira (não por bloco), pra não gerar
+            // dezenas de imagens numa faixa longa.
+            const blocoUnico = [{ tipo: 'Música completa', texto: musica.letra, start: 0, end: musica.duracao }];
+            const { cenas } = await chamar('/api/generate-cenas-musica', { blocos: blocoUnico, estilo: medley.estilo });
+            musicas[idx] = { ...musica, cena: cenas[0], status: 'cenas_ok' };
+            await doc.ref.update({ musicas });
+            break;
+          }
 
-        case 'cenas_ok': {
-          const { arquivos } = await chamar('/api/generate-visual', {
-            cenas: [musica.cena],
-            estilo: medley.estilo,
-            formato: medley.formato,
-          });
-          musicas[idx] = { ...musica, arquivo: arquivos[0], status: 'imagem_ok' };
-          await doc.ref.update({ musicas });
-          break;
-        }
+          case 'cenas_ok': {
+            const { arquivos } = await chamar('/api/generate-visual', {
+              cenas: [musica.cena],
+              estilo: medley.estilo,
+              formato: medley.formato,
+            });
+            if (!arquivos[0]?.imageUrl) {
+              throw new Error(
+                `A imagem da música #${idx + 1} foi bloqueada pelo filtro de conteúdo da Flux: ${
+                  arquivos[0]?.erro || 'motivo não informado'
+                }. Tente descrever a cena de outro jeito ou pule essa música.`
+              );
+            }
+            musicas[idx] = { ...musica, arquivo: arquivos[0], status: 'imagem_ok' };
+            await doc.ref.update({ musicas });
+            break;
+          }
 
-        default:
-          break;
+          default:
+            break;
+        }
+      } catch (erroMusica) {
+        await doc.ref.update({ status: 'erro', erro: erroMusica.message });
+        return res.status(200).json({ medley: doc.id, erro: erroMusica.message });
       }
 
       return res.status(200).json({ medley: doc.id, musicaProcessada: idx, statusAnterior: musica.status });
