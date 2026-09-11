@@ -38,7 +38,12 @@ export default async function handler(req, res) {
 
     const listaTags = tags && tags.length ? tags : [];
     const hashtags = listaTags.map((t) => `#${t.replace(/\s+/g, '')}`).join(' ');
-    const descricaoFinal = [descricao || '', '', hashtags].filter(Boolean).join('\n');
+    const LIMITE_DESCRICAO_YOUTUBE = 4900; // deixa uma margem do limite real de 5000
+    let descricaoCortada = descricao || '';
+    if (descricaoCortada.length > LIMITE_DESCRICAO_YOUTUBE) {
+      descricaoCortada = descricaoCortada.slice(0, LIMITE_DESCRICAO_YOUTUBE) + '\n\n(...)';
+    }
+    const descricaoFinal = [descricaoCortada, '', hashtags].filter(Boolean).join('\n');
 
     const videoRes = await fetch(videoUrl);
     if (!videoRes.ok || !videoRes.body) {
