@@ -71,6 +71,7 @@ export default async function handler(req, res) {
         const { renderId } = await chamar('/api/assemble-video', {
           dataUrl: dadosBlob.url,
           formato: medley.formato,
+          ambiente: medley.ambiente || 'production',
         });
 
         await doc.ref.update({ renderId, status: 'montando' });
@@ -134,7 +135,7 @@ export default async function handler(req, res) {
       const doc = montando.docs[0];
       const medley = doc.data();
 
-      const checkRes = await fetch(`${baseUrl}/api/assemble-video?id=${medley.renderId}`);
+      const checkRes = await fetch(`${baseUrl}/api/assemble-video?id=${medley.renderId}&ambiente=${medley.ambiente || 'production'}`);
       const check = await checkRes.json();
       if (!checkRes.ok) throw new Error(check.error || 'Erro checando a montagem do medley');
 
