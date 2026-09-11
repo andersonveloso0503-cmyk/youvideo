@@ -116,47 +116,64 @@ export default async function handler(req, res) {
     return clip;
   });
 
-  // Agrupa as palavras em blocos curtos (tipo linha de legenda). Em vídeos
-  // curtos (Shorts), cada palavra do bloco vira um clipe próprio pra dar o
-  // efeito karaokê (destaque muda em tempo real). Em vídeos longos isso geraria
-  // centenas de clipes e estoura o limite de tamanho da Shotstack — então ali
-  // cada bloco inteiro vira só UM clipe, sem o destaque palavra por palavra.
+  // Cada palavra vira 1 clipe de legenda pro efeito karaokê. Isso funciona
+  // bem pra 1 música, mas num medley de várias músicas o total de palavras
+  // pode passar de mil — o que faz o pedido de montagem estourar o limite de
+  // tamanho da Shotstack. Acima desse limite, agrupa em blocos (ainda
+  // sincronizados com o tempo certo, só sem o destaque cor a cor).
+  const LIMITE_PALAVRAS_KARAOKE = 500;
   const TAMANHO_BLOCO = 5;
   const palavrasValidas = (palavras || []).filter((p) => p.start != null && p.end != null && p.end > p.start);
+  const usaKaraokePorPalavra = palavrasValidas.length <= LIMITE_PALAVRAS_KARAOKE;
   const blocos = [];
   for (let i = 0; i < palavrasValidas.length; i += TAMANHO_BLOCO) {
     blocos.push(palavrasValidas.slice(i, i + TAMANHO_BLOCO));
   }
 
-  const cssLegenda = `p { font-family: 'Open Sans', sans-serif; font-size: ${
+  const cssLegenda = `p{font-family:'Open Sans',sans-serif;font-size:${
     isVertical ? 19 : 25
-  }px; font-weight: 700; text-align: center; background: #000000; padding: 8px 14px; border-radius: 4px; margin: 0; width: ${
+  }px;font-weight:700;text-align:center;background:#000;padding:8px 14px;border-radius:4px;margin:0;width:${
     isVertical ? 560 : 1160
-  }px; max-width: ${isVertical ? 560 : 1160}px; box-sizing: border-box; word-wrap: break-word; overflow-wrap: break-word; }`;
+  }px;max-width:${isVertical ? 560 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}`;
 
   const legendaKaraoke = [];
   for (const bloco of blocos) {
-    bloco.forEach((palavraAtual, idx) => {
-      // Mostra só as palavras já cantadas até agora dentro do bloco (nunca
-      // as que ainda vão vir), com a atual destacada em amarelo — efeito
-      // karaokê sincronizado de verdade.
-      const html = bloco
-        .slice(0, idx + 1)
-        .map((p, i) =>
-          i === idx
-            ? `<span style="color:#ffd60a">${p.texto}</span>`
-            : `<span style="color:#ffffff">${p.texto}</span>`
-        )
-        .join(' ');
+    if (usaKaraokePorPalavra) {
+      bloco.forEach((palavraAtual, idx) => {
+        // Mostra só as palavras já cantadas até agora dentro do bloco (nunca
+        // as que ainda vão vir), com a atual destacada em amarelo — efeito
+        // karaokê sincronizado de verdade.
+        const html = bloco
+          .slice(0, idx + 1)
+          .map((p, i) =>
+            i === idx
+              ? `<span style="color:#ffd60a">${p.texto}</span>`
+              : `<span style="color:#ffffff">${p.texto}</span>`
+          )
+          .join(' ');
 
+        legendaKaraoke.push({
+          asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 600 : 1200, height: 100 },
+          start: palavraAtual.start,
+          length: Math.max(palavraAtual.end - palavraAtual.start, 0.12),
+          position: 'bottom',
+          offset: { y: 0.08 },
+        });
+      });
+    } else {
+      // Vídeo muito longo (medley): 1 clipe por bloco inteiro, texto branco
+      // uniforme, ainda no tempo certo — sem gerar milhares de clipes.
+      const html = bloco.map((p) => `<span style="color:#ffffff">${p.texto}</span>`).join(' ');
+      const inicioBloco = bloco[0].start;
+      const fimBloco = bloco[bloco.length - 1].end;
       legendaKaraoke.push({
         asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 600 : 1200, height: 100 },
-        start: palavraAtual.start,
-        length: Math.max(palavraAtual.end - palavraAtual.start, 0.12),
+        start: inicioBloco,
+        length: Math.max(fimBloco - inicioBloco, 0.5),
         position: 'bottom',
         offset: { y: 0.08 },
       });
-    });
+    }
   }
 
   const marcaDagua = {
