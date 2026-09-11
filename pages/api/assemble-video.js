@@ -160,6 +160,27 @@ export default async function handler(req, res) {
     offset: { x: -0.03, y: 0.04 },
   };
 
+  const equalizerVisual = {
+    asset: {
+      type: 'html5',
+      html: '<div class="eq"><span></span><span></span><span></span><span></span><span></span></div>',
+      css: `.eq { display: flex; align-items: flex-end; justify-content: center; gap: 5px; width: 100%; height: 100%; }
+        .eq span { display: block; width: 7px; background: #ffd60a; border-radius: 3px; animation: barPulse 0.9s ease-in-out infinite; }
+        .eq span:nth-child(1){ animation-delay: 0s; height: 14px; }
+        .eq span:nth-child(2){ animation-delay: 0.15s; height: 26px; }
+        .eq span:nth-child(3){ animation-delay: 0.3s; height: 38px; }
+        .eq span:nth-child(4){ animation-delay: 0.15s; height: 26px; }
+        .eq span:nth-child(5){ animation-delay: 0s; height: 14px; }
+        @keyframes barPulse { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }`,
+    },
+    width: 120,
+    height: 60,
+    start: 0,
+    length: duracaoTotalAudio,
+    position: 'bottomLeft',
+    offset: { x: 0.04, y: 0.06 },
+  };
+
   const clipsAudio = temAudioSegments
     ? audioSegments.map((s) => ({ asset: { type: 'audio', src: s.url }, start: s.start, length: s.length }))
     : [{ asset: { type: 'audio', src: audioUrl }, start: 0, length: duracaoTotalAudio }];
@@ -167,6 +188,7 @@ export default async function handler(req, res) {
   const timeline = {
     tracks: [
       { clips: [marcaDagua] },
+      { clips: [equalizerVisual] },
       ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
       { clips: clipsVideo },
       { clips: clipsAudio },
