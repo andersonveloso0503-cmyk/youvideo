@@ -1,10 +1,22 @@
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } };
 
+// Sandbox e Produção da Shotstack usam CHAVES DE API DIFERENTES, não é só
+// trocar o link. Resolve os dois a partir do "ambiente" escolhido na tela
+// (ou da configuração antiga por variável de ambiente, se nada for enviado).
+function resolverAmbiente(ambiente) {
+  const modo = ambiente === 'sandbox' || ambiente === 'production' ? ambiente : (process.env.SHOTSTACK_ENV === 'production' ? 'production' : 'sandbox');
+  const env = modo === 'production' ? 'v1' : 'stage';
+  const apiKey = modo === 'production'
+    ? process.env.SHOTSTACK_API_KEY
+    : (process.env.SHOTSTACK_API_KEY_SANDBOX || process.env.SHOTSTACK_API_KEY);
+  return { modo, env, apiKey, base: `https://api.shotstack.io/edit/${env}` };
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET') return checkStatus(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let { audioUrl, audioSegments, cenas, formato, palavras } = req.body;
+  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente } = req.body;
 
   // Quando os dados são grandes demais pra caber numa requisição (medleys
   // com várias músicas), quem chama sobe um JSON no Blob e manda só o link
@@ -19,9 +31,13 @@ export default async function handler(req, res) {
     palavras = extra.palavras;
   }
 
-  if (!process.env.SHOTSTACK_API_KEY) {
+  const { modo, apiKey, base } = resolverAmbiente(ambiente);
+
+  if (!apiKey) {
     return res.status(500).json({
-      error: 'SHOTSTACK_API_KEY não configurada ainda.',
+      error: modo === 'sandbox'
+        ? 'SHOTSTACK_API_KEY_SANDBOX não configurada ainda (pegue a chave de Sandbox no dashboard da Shotstack).'
+        : 'SHOTSTACK_API_KEY não configurada ainda.',
     });
   }
 
@@ -39,9 +55,6 @@ export default async function handler(req, res) {
       error: 'Nenhuma cena com imagem/vídeo pronta ainda (etapa 3 precisa terminar primeiro).',
     });
   }
-
-  const env = process.env.SHOTSTACK_ENV === 'production' ? 'v1' : 'stage';
-  const base = `https://api.shotstack.io/edit/${env}`;
 
   const isVertical = formato === 'short';
   const output = {
@@ -234,7 +247,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.SHOTSTACK_API_KEY,
+        'x-api-key': apiKey,
       },
       body: JSON.stringify({ timeline, output }),
     });
@@ -253,15 +266,14 @@ export default async function handler(req, res) {
 }
 
 async function checkStatus(req, res) {
-  const { id } = req.query;
+  const { id, ambiente } = req.query;
   if (!id) return res.status(400).json({ error: 'Parâmetro id é obrigatório' });
 
-  const env = process.env.SHOTSTACK_ENV === 'production' ? 'v1' : 'stage';
-  const base = `https://api.shotstack.io/edit/${env}`;
+  const { apiKey, base } = resolverAmbiente(ambiente);
 
   try {
     const statusRes = await fetch(`${base}/render/${id}`, {
-      headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY },
+      headers: { 'x-api-key': apiKey },
     });
     const data = await statusRes.json();
     if (!statusRes.ok) throw new Error(data.message || 'Erro ao consultar status');
