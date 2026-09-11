@@ -41,6 +41,7 @@ function BrollSearch() {
         </div>
       </div>
       <button disabled={buscando || !query} onClick={buscar}>
+        {buscando && <span className="spinner" />}
         {buscando ? 'Buscando...' : 'Buscar'}
       </button>
       {erro && <div className="result-box">Erro: {erro}</div>}
@@ -59,15 +60,6 @@ function BrollSearch() {
     </div>
   );
 }
-
-const STEPS = [
-  { key: 'script', label: '1. Roteiro' },
-  { key: 'voice', label: '2. Narração' },
-  { key: 'visual', label: '3. Imagens/Vídeo' },
-  { key: 'assemble', label: '4. Montagem' },
-  { key: 'thumbnail', label: '5. Thumbnail' },
-  { key: 'publish', label: '6. Publicar' },
-];
 
 export default function Home() {
   const [tema, setTema] = useState('');
@@ -243,12 +235,34 @@ export default function Home() {
   return (
     <div className="container">
       <h1>Youvideo</h1>
-      <p className="subtitle">
-        Painel de criação de vídeos bíblicos com IA · <a href="/temas" style={{ color: '#4f7cff' }}>Temas</a> ·{' '}
-        <a href="/agendar" style={{ color: '#4f7cff' }}>Agendar Vídeos</a> ·{' '}
-        <a href="/projetos" style={{ color: '#4f7cff' }}>Meus Projetos</a>
-   {' '} · <a href="/musica" style={{ color: '#4f7cff' }}>Música</a> {' '} · <a href="/musica-fila" style={{ color: '#4f7cff' }}>Fila de Músicas</a>
-      </p>
+      <p className="subtitle">Seu estúdio automático de vídeos bíblicos e música gospel.</p>
+
+      <div className="hub-grid">
+        <a href="/musica" className="hub-tile hub-tile--gold">
+          <div className="hub-tile-title">Música</div>
+          <div className="hub-tile-desc">Uma música só, do áudio até publicar no YouTube</div>
+        </a>
+        <a href="/musica-fila" className="hub-tile hub-tile--gold">
+          <div className="hub-tile-title">Fila de músicas</div>
+          <div className="hub-tile-desc">Suba várias e deixe publicar sozinho, uma por dia</div>
+        </a>
+        <a href="/medley" className="hub-tile hub-tile--gold">
+          <div className="hub-tile-title">Medley</div>
+          <div className="hub-tile-desc">Junte músicas de estilos diferentes numa faixa só</div>
+        </a>
+        <a href="/temas" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">Temas</div>
+          <div className="hub-tile-desc">Banco de ideias pros vídeos narrados</div>
+        </a>
+        <a href="/agendar" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">Agendar vídeos</div>
+          <div className="hub-tile-desc">Fila automática dos vídeos bíblicos narrados</div>
+        </a>
+        <a href="/projetos" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">Meus projetos</div>
+          <div className="hub-tile-desc">Tudo que já foi criado, dos dois canais</div>
+        </a>
+      </div>
 
       <div className="card">
         <h2>Tema do vídeo</h2>
@@ -350,6 +364,7 @@ export default function Home() {
             <VisualResult result={r} />
             {r.arquivos?.some((a) => a.imageUrl && !a.klingTaskId && !a.videoUrl) && (
               <button onClick={animateScenes} disabled={loading === 'visual'}>
+                {loading === 'visual' && <span className="spinner" />}
                 {loading === 'visual' ? 'Animando...' : 'Animar essas cenas (gasta crédito Kling)'}
               </button>
             )}
@@ -402,6 +417,7 @@ export default function Home() {
       <div className="card">
         <h2>Salvar este projeto</h2>
         <button disabled={!results.script || loading === 'salvar'} onClick={salvarProjeto}>
+          {loading === 'salvar' && <span className="spinner" />}
           {loading === 'salvar' ? 'Salvando...' : 'Salvar projeto'}
         </button>
         {status.salvar === 'ok' && <div className="result-box">Salvo! Vê em "Meus Projetos" no topo da página.</div>}
@@ -426,6 +442,7 @@ function StepCard({ n, title, status, loading, disabled, onRun, result, renderRe
         )}
       </h2>
       <button disabled={disabled || loading} onClick={onRun}>
+        {loading && <span className="spinner" />}
         {loading ? 'Gerando...' : 'Executar etapa'}
       </button>
       {result && result.error && (
