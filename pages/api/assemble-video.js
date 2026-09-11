@@ -4,7 +4,20 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return checkStatus(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { audioUrl, audioSegments, cenas, formato, palavras } = req.body;
+  let { audioUrl, audioSegments, cenas, formato, palavras } = req.body;
+
+  // Quando os dados são grandes demais pra caber numa requisição (medleys
+  // com várias músicas), quem chama sobe um JSON no Blob e manda só o link
+  // aqui — a gente busca os dados de verdade a partir dele.
+  if (req.body.dataUrl) {
+    const dataRes = await fetch(req.body.dataUrl);
+    if (!dataRes.ok) return res.status(400).json({ error: 'Não consegui buscar os dados do medley pelo link fornecido' });
+    const extra = await dataRes.json();
+    audioUrl = extra.audioUrl;
+    audioSegments = extra.audioSegments;
+    cenas = extra.cenas;
+    palavras = extra.palavras;
+  }
 
   if (!process.env.SHOTSTACK_API_KEY) {
     return res.status(500).json({

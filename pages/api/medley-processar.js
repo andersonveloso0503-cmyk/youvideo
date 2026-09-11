@@ -1,4 +1,5 @@
 import { getDb } from '../../lib/firebase-admin';
+import { put } from '@vercel/blob';
 
 export default async function handler(req, res) {
   const db = getDb();
@@ -61,11 +62,15 @@ export default async function handler(req, res) {
           cursor += m.duracao;
         }
 
+        const dadosBlob = await put(
+          `medley-dados-${Date.now()}.json`,
+          JSON.stringify({ audioSegments, cenas: cenasCombinadas, palavras: palavrasCombinadas }),
+          { access: 'public', contentType: 'application/json', token: process.env.MEDIA_READ_WRITE_TOKEN }
+        );
+
         const { renderId } = await chamar('/api/assemble-video', {
-          audioSegments,
-          cenas: cenasCombinadas,
+          dataUrl: dadosBlob.url,
           formato: medley.formato,
-          palavras: palavrasCombinadas,
         });
 
         await doc.ref.update({ renderId, status: 'montando' });
