@@ -27,6 +27,7 @@ export default function Medley() {
   const [titulo, setTitulo] = useState('');
   const [estilo, setEstilo] = useState('cinematografico');
   const [formato, setFormato] = useState('longo');
+  const [ambiente, setAmbiente] = useState('sandbox');
   const [textoThumbnail, setTextoThumbnail] = useState('');
   const [medleyAtualId, setMedleyAtualId] = useState(null);
 
@@ -61,7 +62,7 @@ export default function Medley() {
       const res = await fetch('/api/medley-criar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo, estilo, formato, textoThumbnail }),
+        body: JSON.stringify({ titulo, estilo, formato, textoThumbnail, ambiente }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -156,6 +157,17 @@ export default function Medley() {
               </select>
             </div>
           </div>
+
+          <label>Montagem</label>
+          <select value={ambiente} onChange={(e) => setAmbiente(e.target.value)}>
+            <option value="sandbox">Testar (Sandbox — grátis, sai com marca d'água, máximo 10 min)</option>
+            <option value="production">Publicar de verdade (Produção — gasta crédito, sem marca d'água)</option>
+          </select>
+          {ambiente === 'sandbox' && (
+            <p style={{ fontSize: 12, color: '#c9a45c' }}>
+              O Sandbox tem limite de 10 minutos — se o medley passar disso, use Produção pra esse.
+            </p>
+          )}
 
           <label>Texto de destaque pra thumbnail (opcional)</label>
           <input type="text" value={textoThumbnail} onChange={(e) => setTextoThumbnail(e.target.value)} placeholder="Ex: 1 HORA DE LOUVOR" />

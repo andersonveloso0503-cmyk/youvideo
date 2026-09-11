@@ -17,6 +17,7 @@ export default function Musica() {
   const [canal, setCanal] = useState('musica');
   const [estilo, setEstilo] = useState('cinematografico');
   const [formato, setFormato] = useState('longo');
+  const [ambiente, setAmbiente] = useState('sandbox');
   const [letra, setLetra] = useState('');
   const [textoThumbnail, setTextoThumbnail] = useState('');
   const [arquivoAudio, setArquivoAudio] = useState(null);
@@ -94,6 +95,7 @@ export default function Musica() {
         cenas: results.visual.arquivos,
         formato,
         palavras: results.align.palavras,
+        ambiente,
       })
     );
     if (!primeira || !primeira.renderId) return;
@@ -102,7 +104,7 @@ export default function Musica() {
     let tentativas = 0;
     while (tentativas < 40) {
       await new Promise((r) => setTimeout(r, 5000));
-      const check = await fetch(`/api/assemble-video?id=${primeira.renderId}`).then((r) => r.json());
+      const check = await fetch(`/api/assemble-video?id=${primeira.renderId}&ambiente=${ambiente}`).then((r) => r.json());
       if (check.status === 'done') {
         setResults((r) => ({ ...r, assemble: { ...primeira, ...check } }));
         setStatus((s) => ({ ...s, assemble: 'ok' }));
@@ -188,6 +190,12 @@ export default function Musica() {
             </select>
           </div>
         </div>
+
+        <label>Montagem</label>
+        <select value={ambiente} onChange={(e) => setAmbiente(e.target.value)}>
+          <option value="sandbox">Testar (Sandbox — grátis, sai com marca d'água)</option>
+          <option value="production">Publicar de verdade (Produção — gasta crédito, sem marca d'água)</option>
+        </select>
 
         <label>Texto de destaque pra thumbnail (opcional)</label>
         <input type="text" value={textoThumbnail} onChange={(e) => setTextoThumbnail(e.target.value)} placeholder="Ex: GRAÇA SOBRE GRAÇA" />
