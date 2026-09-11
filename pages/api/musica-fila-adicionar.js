@@ -3,7 +3,7 @@ import { getDb } from '../../lib/firebase-admin';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { audioUrl, letra, titulo, estilo, formato, textoThumbnail } = req.body;
+  const { audioUrl, letra, titulo, estilo, formato, textoThumbnail, ambiente } = req.body;
   if (!audioUrl) return res.status(400).json({ error: 'audioUrl é obrigatório (suba o áudio primeiro)' });
   if (!letra || !letra.trim()) return res.status(400).json({ error: 'Letra da música é obrigatória' });
   if (!titulo) return res.status(400).json({ error: 'Título é obrigatório' });
@@ -17,6 +17,7 @@ export default async function handler(req, res) {
       estilo: estilo || 'cinematografico',
       formato: formato || 'longo',
       textoThumbnail: textoThumbnail || '',
+      ambiente: ambiente === 'sandbox' ? 'sandbox' : 'production',
       canal: 'musica',
       status: 'pendente',
       criadoEm: new Date().toISOString(),
