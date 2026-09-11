@@ -22,6 +22,7 @@ export default function MusicaFila() {
   const [titulo, setTitulo] = useState('');
   const [estilo, setEstilo] = useState('cinematografico');
   const [formato, setFormato] = useState('longo');
+  const [ambiente, setAmbiente] = useState('sandbox');
   const [letra, setLetra] = useState('');
   const [textoThumbnail, setTextoThumbnail] = useState('');
   const [arquivoAudio, setArquivoAudio] = useState(null);
@@ -62,7 +63,7 @@ export default function MusicaFila() {
       const res = await fetch('/api/musica-fila-adicionar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioUrl: blob.url, letra, titulo, estilo, formato, textoThumbnail }),
+        body: JSON.stringify({ audioUrl: blob.url, letra, titulo, estilo, formato, textoThumbnail, ambiente }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -115,6 +116,12 @@ export default function MusicaFila() {
             </select>
           </div>
         </div>
+
+        <label>Montagem</label>
+        <select value={ambiente} onChange={(e) => setAmbiente(e.target.value)}>
+          <option value="sandbox">Testar (Sandbox — grátis, sai com marca d'água)</option>
+          <option value="production">Publicar de verdade (Produção — gasta crédito, sem marca d'água)</option>
+        </select>
 
         <label>Texto de destaque pra thumbnail (opcional)</label>
         <input type="text" value={textoThumbnail} onChange={(e) => setTextoThumbnail(e.target.value)} placeholder="Ex: GRAÇA SOBRE GRAÇA" />
