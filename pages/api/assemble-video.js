@@ -129,15 +129,15 @@ export default async function handler(req, res) {
     return clip;
   });
 
-  // Cada palavra vira 1 clipe de legenda pro efeito karaokê. Isso funciona
-  // bem pra 1 música, mas num medley de várias músicas o total de palavras
-  // pode passar de mil — o que faz o pedido de montagem estourar o limite de
-  // tamanho da Shotstack. Acima desse limite, agrupa em blocos (ainda
-  // sincronizados com o tempo certo, só sem o destaque cor a cor).
-  const LIMITE_PALAVRAS_KARAOKE = 500;
+  // Cada "passo" vira 1 clipe de legenda. Numa música normal, o passo é de
+  // 1 palavra (karaokê palavra por palavra). Num medley muito longo, isso
+  // geraria milhares de clipes e estouraria o limite de tamanho da
+  // Shotstack — então o passo aumenta (destaca 2, 3+ palavras de cada vez),
+  // mas o efeito de cor nunca desliga por completo.
+  const ORCAMENTO_CLIPES = 500;
   const TAMANHO_BLOCO = 5;
   const palavrasValidas = (palavras || []).filter((p) => p.start != null && p.end != null && p.end > p.start);
-  const usaKaraokePorPalavra = palavrasValidas.length <= LIMITE_PALAVRAS_KARAOKE;
+  const passo = Math.max(1, Math.ceil(palavrasValidas.length / ORCAMENTO_CLIPES));
   const blocos = [];
   for (let i = 0; i < palavrasValidas.length; i += TAMANHO_BLOCO) {
     blocos.push(palavrasValidas.slice(i, i + TAMANHO_BLOCO));
@@ -151,38 +151,27 @@ export default async function handler(req, res) {
 
   const legendaKaraoke = [];
   for (const bloco of blocos) {
-    if (usaKaraokePorPalavra) {
-      bloco.forEach((palavraAtual, idx) => {
-        // Mostra só as palavras já cantadas até agora dentro do bloco (nunca
-        // as que ainda vão vir), com a atual destacada em amarelo — efeito
-        // karaokê sincronizado de verdade.
-        const html = bloco
-          .slice(0, idx + 1)
-          .map((p, i) =>
-            i === idx
-              ? `<span style="color:#ffd60a">${p.texto}</span>`
-              : `<span style="color:#ffffff">${p.texto}</span>`
-          )
-          .join(' ');
+    for (let i = 0; i < bloco.length; i += passo) {
+      const fimIdx = Math.min(i + passo, bloco.length);
+      // Mostra só as palavras já cantadas até agora dentro do bloco (nunca
+      // as que ainda vão vir), com o grupo atual (1 ou mais palavras,
+      // dependendo do passo) destacado em amarelo.
+      const html = bloco
+        .slice(0, fimIdx)
+        .map((p, idx) =>
+          idx >= i
+            ? `<span style="color:#ffd60a">${p.texto}</span>`
+            : `<span style="color:#ffffff">${p.texto}</span>`
+        )
+        .join(' ');
 
-        legendaKaraoke.push({
-          asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 600 : 1200, height: 100 },
-          start: palavraAtual.start,
-          length: Math.max(palavraAtual.end - palavraAtual.start, 0.12),
-          position: 'bottom',
-          offset: { y: 0.08 },
-        });
-      });
-    } else {
-      // Vídeo muito longo (medley): 1 clipe por bloco inteiro, texto branco
-      // uniforme, ainda no tempo certo — sem gerar milhares de clipes.
-      const html = bloco.map((p) => `<span style="color:#ffffff">${p.texto}</span>`).join(' ');
-      const inicioBloco = bloco[0].start;
-      const fimBloco = bloco[bloco.length - 1].end;
+      const inicioClipe = bloco[i].start;
+      const fimClipe = bloco[fimIdx - 1].end;
+
       legendaKaraoke.push({
         asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 600 : 1200, height: 100 },
-        start: inicioBloco,
-        length: Math.max(fimBloco - inicioBloco, 0.5),
+        start: inicioClipe,
+        length: Math.max(fimClipe - inicioClipe, 0.12),
         position: 'bottom',
         offset: { y: 0.08 },
       });
