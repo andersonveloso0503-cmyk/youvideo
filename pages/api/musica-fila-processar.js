@@ -55,13 +55,14 @@ export default async function handler(req, res) {
           cenas: item.arquivos,
           formato: item.formato,
           palavras: item.palavras,
+          ambiente: item.ambiente || 'production',
         });
         await ref.update({ renderId, status: 'montando' });
         break;
       }
 
       case 'montando': {
-        const checkRes = await fetch(`${baseUrl}/api/assemble-video?id=${item.renderId}`);
+        const checkRes = await fetch(`${baseUrl}/api/assemble-video?id=${item.renderId}&ambiente=${item.ambiente || 'production'}`);
         const check = await checkRes.json();
         if (!checkRes.ok) throw new Error(check.error || 'Erro checando a montagem');
 
