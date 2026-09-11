@@ -233,9 +233,7 @@ export default async function handler(req, res) {
   const timeline = {
     tracks: [
       { clips: [marcaDagua] },
-      // TEMPORARIAMENTE DESATIVADO pra isolar um erro de montagem — o
-      // asset "html5" do equalizador pode não estar sendo aceito.
-      // { clips: [equalizerVisual] },
+      { clips: [equalizerVisual] },
       ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
       { clips: clipsVideo },
       { clips: clipsAudio },
