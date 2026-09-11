@@ -3,7 +3,7 @@ import { getDb } from '../../lib/firebase-admin';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { titulo, estilo, formato, textoThumbnail } = req.body;
+  const { titulo, estilo, formato, textoThumbnail, ambiente } = req.body;
   if (!titulo) return res.status(400).json({ error: 'Título é obrigatório' });
 
   try {
@@ -13,6 +13,7 @@ export default async function handler(req, res) {
       estilo: estilo || 'cinematografico',
       formato: formato || 'longo',
       textoThumbnail: textoThumbnail || '',
+      ambiente: ambiente === 'sandbox' ? 'sandbox' : 'production',
       canal: 'musica',
       musicas: [],
       status: 'coletando',
