@@ -45,6 +45,13 @@ export default async function handler(req, res) {
 
     const comProblema = diagnostico.filter((d) => !d.audio.ok || !d.imagem.ok);
 
+    if (req.query.forcarMontagem === '1') {
+      await ref.update({ status: 'processando', erro: null, renderId: null });
+      return res.status(200).json({
+        mensagem: 'Reiniciei o medley do zero pra montagem — chame /api/medley-processar agora pra gerar um render novo.',
+      });
+    }
+
     if (req.query.corrigir === '1' && comProblema.length) {
       for (const problema of comProblema) {
         if (!problema.audio.ok) {
