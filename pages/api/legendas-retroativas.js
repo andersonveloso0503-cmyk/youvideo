@@ -40,7 +40,12 @@ function getYoutube(refreshToken) {
 async function jaTemLegendaPt(youtube, videoId) {
   try {
     const listaRes = await youtube.captions.list({ part: ['snippet'], videoId });
-    return (listaRes.data.items || []).some((c) => c.snippet.language === 'pt');
+    // Ignora legendas do tipo ASR (geradas automaticamente pelo próprio
+    // YouTube) — essas não contam como "já resolvido", são exatamente a
+    // legenda ruim que queremos substituir por uma oficial.
+    return (listaRes.data.items || []).some(
+      (c) => c.snippet.language === 'pt' && c.snippet.trackKind !== 'ASR'
+    );
   } catch {
     return false;
   }
