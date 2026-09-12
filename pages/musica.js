@@ -123,7 +123,7 @@ export default function Musica() {
 
   const gerarThumbnail = () =>
     runStep('thumbnail', () =>
-      postJson('/api/generate-thumbnail', { tema: titulo, titulo, estilo, textoThumbnail })
+      postJson('/api/generate-thumbnail', { tema: titulo, titulo, estilo, thumbnailTitulo: titulo, thumbnailSubtitulo: textoThumbnail })
     );
 
   const publicar = () =>
@@ -135,6 +135,7 @@ export default function Musica() {
         descricao: `${titulo}\n\n${letra}`,
         tags: ['gospel', 'música cristã', 'louvor'],
         canal,
+        palavras: results.align?.palavras,
       })
     );
 
