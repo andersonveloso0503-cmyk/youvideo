@@ -147,21 +147,25 @@ export default async function handler(req, res) {
     isVertical ? 30 : 40
   }px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;text-align:center;margin:0;line-height:1.15;width:${
     isVertical ? 620 : 1160
-  }px;max-width:${isVertical ? 620 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;-webkit-text-stroke:3px #000;paint-order:stroke fill;text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000,0 4px 6px rgba(0,0,0,0.5)}`;
+  }px;max-width:${isVertical ? 620 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}`;
+
+  const contornoPreto = 'text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000,0 4px 6px rgba(0,0,0,0.5);-webkit-text-stroke:3px #000;';
+  const contornoBranco = 'text-shadow:3px 3px 0 #fff,-3px 3px 0 #fff,3px -3px 0 #fff,-3px -3px 0 #fff;-webkit-text-stroke:3px #fff;';
 
   const legendaKaraoke = [];
   for (const bloco of blocos) {
     for (let i = 0; i < bloco.length; i += passo) {
       const fimIdx = Math.min(i + passo, bloco.length);
       // Mostra só as palavras já cantadas até agora dentro do bloco (nunca
-      // as que ainda vão vir), com o grupo atual (1 ou mais palavras,
-      // dependendo do passo) destacado em amarelo.
+      // as que ainda vão vir). A palavra/grupo atual fica amarela com
+      // contorno preto; as já cantadas ficam pretas com contorno branco
+      // (pra continuar legível mesmo escurecendo).
       const html = bloco
         .slice(0, fimIdx)
         .map((p, idx) =>
           idx >= i
-            ? `<span style="color:#ffd60a">${p.texto}</span>`
-            : `<span style="color:#ffffff">${p.texto}</span>`
+            ? `<span style="color:#FFE100;${contornoPreto}">${p.texto}</span>`
+            : `<span style="color:#000000;${contornoBranco}">${p.texto}</span>`
         )
         .join(' ');
 
