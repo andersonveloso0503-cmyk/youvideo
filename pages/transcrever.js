@@ -4,12 +4,15 @@ import { upload } from '@vercel/blob/client';
 export default function Transcrever() {
   const [arquivo, setArquivo] = useState(null);
   const [enviando, setEnviando] = useState(false);
-  const [texto, setTexto] = useState(null);
+  const [textoFormatado, setTextoFormatado] = useState(null);
+  const [textoCru, setTextoCru] = useState(null);
+  const [mostrarCru, setMostrarCru] = useState(false);
   const [erro, setErro] = useState(null);
 
   async function transcrever() {
     setErro(null);
-    setTexto(null);
+    setTextoFormatado(null);
+    setTextoCru(null);
     if (!arquivo) return setErro('Escolha um arquivo de áudio primeiro');
 
     setEnviando(true);
@@ -26,7 +29,8 @@ export default function Transcrever() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setTexto(data.texto);
+      setTextoFormatado(data.textoFormatado);
+      setTextoCru(data.texto);
     } catch (err) {
       setErro(err.message);
     } finally {
@@ -57,13 +61,20 @@ export default function Transcrever() {
         </button>
 
         {erro && <div className="result-box">Erro: {erro}</div>}
-        {texto && (
+        {textoFormatado && (
           <div className="result-box">
             <p style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>
-              Essa transcrição é automática — pode errar pontuação, acentos ou uma palavra aqui e
-              ali. Revise antes de usar no /medley ou /musica-fila.
+              Já organizado em linhas e com blocos [Verse]/[Chorus]/[Bridge] — confira se bate com o
+              que foi cantado antes de usar. Isso é automático e pode errar aqui e ali.
             </p>
-            <textarea readOnly value={texto} style={{ minHeight: 300 }} />
+            <textarea readOnly value={textoFormatado} style={{ minHeight: 300, fontFamily: 'monospace' }} />
+
+            <button style={{ marginTop: 12 }} onClick={() => setMostrarCru((v) => !v)}>
+              {mostrarCru ? 'Esconder texto cru' : 'Ver texto cru (sem formatação)'}
+            </button>
+            {mostrarCru && (
+              <textarea readOnly value={textoCru} style={{ minHeight: 150, marginTop: 8 }} />
+            )}
           </div>
         )}
       </div>
