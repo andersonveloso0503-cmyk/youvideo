@@ -23,6 +23,19 @@ const STATUS_MEDLEY = {
   erro: 'deu erro',
 };
 
+const PESO_STATUS_MUSICA = { pendente: 0, alinhado: 1, cenas_ok: 2, imagem_ok: 3 };
+
+function calcularProgresso(m) {
+  if (m.status === 'concluido') return 100;
+  if (m.status === 'renderizado') return 95;
+  if (m.status === 'montando') return 88;
+  if (m.status === 'coletando') return 0;
+  if (m.status === 'erro') return null;
+  const totalPassos = (m.totalMusicas || 1) * 3;
+  const passosFeitos = (m.musicasStatus || []).reduce((acc, s) => acc + (PESO_STATUS_MUSICA[s] ?? 0), 0);
+  return Math.min(85, Math.round((passosFeitos / totalPassos) * 85));
+}
+
 export default function Medley() {
   const [titulo, setTitulo] = useState('');
   const [estilo, setEstilo] = useState('cinematografico');
@@ -219,6 +232,18 @@ export default function Medley() {
               {STATUS_MEDLEY[m.status] || m.status}
               {m.erro ? ` — ${m.erro}` : ''}
             </div>
+            {calcularProgresso(m) !== null && m.status !== 'coletando' && (
+              <div style={{ background: '#332c20', borderRadius: 999, height: 8, marginTop: 6, overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${calcularProgresso(m)}%`,
+                    height: '100%',
+                    background: m.status === 'concluido' ? '#4a7a6e' : '#d9a441',
+                    transition: 'width 0.4s ease',
+                  }}
+                />
+              </div>
+            )}
             {m.status === 'processando' && (
               <div style={{ fontSize: 12, color: '#777' }}>
                 {m.musicasStatus.map((s, i) => `#${i + 1}: ${STATUS_MUSICA[s] || s}`).join(' · ')}
