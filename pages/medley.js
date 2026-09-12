@@ -19,7 +19,7 @@ const STATUS_MEDLEY = {
   processando: 'processando as músicas uma por uma',
   montando: 'juntando tudo e montando o vídeo final...',
   renderizado: 'pronto! na fila de publicação',
-  concluido: 'publicado ✅',
+  concluido: 'pronto! entrou na fila de publicação (1 por dia)',
   erro: 'deu erro',
 };
 
