@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return checkStatus(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente } = req.body;
+  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente, marca } = req.body;
 
   // Quando os dados são grandes demais pra caber numa requisição (medleys
   // com várias músicas), quem chama sobe um JSON no Blob e manda só o link
@@ -173,15 +173,15 @@ export default async function handler(req, res) {
         start: inicioClipe,
         length: Math.max(fimClipe - inicioClipe, 0.12),
         position: 'bottom',
-        offset: { y: 0.08 },
+        offset: { y: isVertical ? 0.22 : 0.08 },
       });
     }
   }
 
-  const marcaDagua = {
+  const marcaDagua = marca ? {
     asset: {
       type: 'html',
-      html: `<p>Em Nome de Jesus</p>`,
+      html: `<p>${marca}</p>`,
       css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
         isVertical ? 16 : 18
       }px; font-weight: 600; color: rgba(255,255,255,0.55); text-shadow: 0 1px 3px rgba(0,0,0,0.6); margin: 0; }`,
@@ -192,7 +192,7 @@ export default async function handler(req, res) {
     length: duracaoTotalAudio,
     position: 'topRight',
     offset: { x: -0.03, y: 0.04 },
-  };
+  } : null;
 
   const equalizerVisual = {
     asset: {
@@ -221,7 +221,7 @@ export default async function handler(req, res) {
 
   const timeline = {
     tracks: [
-      { clips: [marcaDagua] },
+      ...(marcaDagua ? [{ clips: [marcaDagua] }] : []),
       { clips: [equalizerVisual] },
       ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
       { clips: clipsVideo },

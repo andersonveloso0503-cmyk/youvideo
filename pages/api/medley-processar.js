@@ -144,7 +144,8 @@ export default async function handler(req, res) {
           tema: medley.titulo,
           titulo: medley.titulo,
           estilo: medley.estilo,
-          textoThumbnail: medley.textoThumbnail,
+          thumbnailTitulo: medley.titulo,
+          thumbnailSubtitulo: medley.textoThumbnail,
         });
 
         // Entrega pronto pra fila normal de publicação (1 por dia), sem

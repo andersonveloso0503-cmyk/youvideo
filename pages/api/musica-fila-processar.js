@@ -71,7 +71,8 @@ export default async function handler(req, res) {
             tema: item.titulo,
             titulo: item.titulo,
             estilo: item.estilo,
-            textoThumbnail: item.textoThumbnail,
+            thumbnailTitulo: item.titulo,
+            thumbnailSubtitulo: item.textoThumbnail,
           });
           await ref.update({
             videoUrl: check.videoUrl,

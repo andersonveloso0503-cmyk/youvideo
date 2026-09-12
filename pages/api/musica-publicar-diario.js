@@ -29,6 +29,7 @@ export default async function handler(req, res) {
         descricao: `${item.titulo}\n\n${item.letra}`,
         tags: ['gospel', 'música cristã', 'louvor'],
         canal: 'musica',
+        palavras: item.palavras,
       }),
     });
     const uploadData = await uploadRes.json();

@@ -70,6 +70,7 @@ export default async function handler(req, res) {
             cenas: item.arquivos,
             formato: item.formato,
             palavras: item.narracao.palavras,
+            marca: 'Em Nome de Jesus',
           });
           await ref.update({ duracaoAlvo, renderId, status: 'montando' });
           break;
@@ -133,6 +134,7 @@ export default async function handler(req, res) {
             cenas: arquivosAtualizados,
             formato: item.formato,
             palavras: item.narracao.palavras,
+            marca: 'Em Nome de Jesus',
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
         } else {
@@ -162,6 +164,7 @@ export default async function handler(req, res) {
                 titulo: item.roteiro.titulo,
                 descricao: item.roteiro.descricao,
                 tags: item.roteiro.tags,
+                palavras: item.narracao.palavras,
               });
             } catch (err) {
               avisoYoutube = `Vídeo pronto, mas não subiu pro YouTube sozinho: ${err.message}`;
