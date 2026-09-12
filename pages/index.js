@@ -172,7 +172,6 @@ export default function Home() {
       cenas: results.visual?.arquivos,
       formato,
       palavras: results.voice?.palavras,
-      marca: 'Em Nome de Jesus',
     });
     if (!primeira || !primeira.renderId) return;
 
@@ -213,7 +212,6 @@ export default function Home() {
       titulo: results.script?.titulo,
       descricao: results.script?.descricao,
       tags: results.script?.tags,
-      palavras: results.voice?.palavras,
     });
 
   const publishTiktok = () =>
@@ -263,6 +261,10 @@ export default function Home() {
         <a href="/projetos" className="hub-tile hub-tile--teal">
           <div className="hub-tile-title">Meus projetos</div>
           <div className="hub-tile-desc">Tudo que já foi criado, dos dois canais</div>
+        </a>
+        <a href="/transcrever" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">Transcrever áudio</div>
+          <div className="hub-tile-desc">Recuperar a letra real cantada de uma música</div>
         </a>
       </div>
 
