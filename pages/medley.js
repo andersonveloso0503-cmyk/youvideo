@@ -224,6 +224,19 @@ export default function Medley() {
                 {m.musicasStatus.map((s, i) => `#${i + 1}: ${STATUS_MUSICA[s] || s}`).join(' · ')}
               </div>
             )}
+            {m.status === 'coletando' && medleyAtualId !== m.id && (
+              <button
+                style={{ marginTop: 8 }}
+                onClick={() => {
+                  setMedleyAtualId(m.id);
+                  setTitulo(m.titulo);
+                  setTotalMusicasAdicionadas(m.totalMusicas);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              >
+                Continuar adicionando / Finalizar
+              </button>
+            )}
           </div>
         ))}
       </div>
