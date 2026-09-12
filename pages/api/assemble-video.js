@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return checkStatus(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente, marca } = req.body;
+  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente } = req.body;
 
   // Quando os dados são grandes demais pra caber numa requisição (medleys
   // com várias músicas), quem chama sobe um JSON no Blob e manda só o link
@@ -135,7 +135,7 @@ export default async function handler(req, res) {
   // Shotstack — então o passo aumenta (destaca 2, 3+ palavras de cada vez),
   // mas o efeito de cor nunca desliga por completo.
   const ORCAMENTO_CLIPES = 500;
-  const TAMANHO_BLOCO = 5;
+  const TAMANHO_BLOCO = 3;
   const palavrasValidas = (palavras || []).filter((p) => p.start != null && p.end != null && p.end > p.start);
   const passo = Math.max(1, Math.ceil(palavrasValidas.length / ORCAMENTO_CLIPES));
   const blocos = [];
@@ -143,11 +143,11 @@ export default async function handler(req, res) {
     blocos.push(palavrasValidas.slice(i, i + TAMANHO_BLOCO));
   }
 
-  const cssLegenda = `p{font-family:'Open Sans',sans-serif;font-size:${
-    isVertical ? 19 : 25
-  }px;font-weight:700;text-align:center;background:#000;padding:8px 14px;border-radius:4px;margin:0;width:${
-    isVertical ? 560 : 1160
-  }px;max-width:${isVertical ? 560 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}`;
+  const cssLegenda = `p{font-family:'Arial Black','Arial Narrow Bold',Impact,sans-serif;font-size:${
+    isVertical ? 30 : 40
+  }px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;text-align:center;margin:0;line-height:1.15;width:${
+    isVertical ? 620 : 1160
+  }px;max-width:${isVertical ? 620 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word;-webkit-text-stroke:3px #000;paint-order:stroke fill;text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000,0 4px 6px rgba(0,0,0,0.5)}`;
 
   const legendaKaraoke = [];
   for (const bloco of blocos) {
@@ -169,19 +169,19 @@ export default async function handler(req, res) {
       const fimClipe = bloco[fimIdx - 1].end;
 
       legendaKaraoke.push({
-        asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 600 : 1200, height: 100 },
+        asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 660 : 1200, height: 160 },
         start: inicioClipe,
         length: Math.max(fimClipe - inicioClipe, 0.12),
         position: 'bottom',
-        offset: { y: isVertical ? 0.22 : 0.08 },
+        offset: { y: 0.16 },
       });
     }
   }
 
-  const marcaDagua = marca ? {
+  const marcaDagua = {
     asset: {
       type: 'html',
-      html: `<p>${marca}</p>`,
+      html: `<p>Em Nome de Jesus</p>`,
       css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
         isVertical ? 16 : 18
       }px; font-weight: 600; color: rgba(255,255,255,0.55); text-shadow: 0 1px 3px rgba(0,0,0,0.6); margin: 0; }`,
@@ -192,7 +192,7 @@ export default async function handler(req, res) {
     length: duracaoTotalAudio,
     position: 'topRight',
     offset: { x: -0.03, y: 0.04 },
-  } : null;
+  };
 
   const equalizerVisual = {
     asset: {
@@ -221,7 +221,7 @@ export default async function handler(req, res) {
 
   const timeline = {
     tracks: [
-      ...(marcaDagua ? [{ clips: [marcaDagua] }] : []),
+      { clips: [marcaDagua] },
       { clips: [equalizerVisual] },
       ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
       { clips: clipsVideo },
