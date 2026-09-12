@@ -26,8 +26,47 @@ export default async function handler(req, res) {
     const transData = await transRes.json();
     if (!transRes.ok) throw new Error(transData.error?.message || 'Erro ao transcrever no Groq');
 
-    return res.status(200).json({ texto: transData.text || '' });
+    const textoCorrido = transData.text || '';
+    const textoFormatado = await formatarComoLetra(textoCorrido);
+
+    return res.status(200).json({ texto: textoCorrido, textoFormatado });
   } catch (err) {
     return res.status(500).json({ error: err.message });
+  }
+}
+
+async function formatarComoLetra(textoCorrido) {
+  if (!textoCorrido.trim()) return '';
+
+  const prompt = `A frase abaixo é a transcrição bruta (tudo corrido, sem pontuação de estrutura) de uma música em português. Organize em linhas curtas, do jeito que uma letra de música normalmente é escrita, E identifique os blocos usando as tags [Verse], [Chorus], [Pre-Chorus], [Bridge] (repita [Chorus] toda vez que o mesmo refrão se repetir).
+
+IMPORTANTE:
+- NÃO invente, resuma ou troque palavras — use exatamente as palavras da transcrição, só reorganizando em linhas e adicionando as tags de bloco.
+- Se não tiver certeza da pontuação exata, é melhor deixar sem do que adivinhar errado.
+- Retorne APENAS o texto formatado, sem nenhuma explicação antes ou depois.
+
+Transcrição:
+${textoCorrido}`;
+
+  try {
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-oss-20b',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_completion_tokens: 2000,
+      }),
+    });
+    const data = await groqRes.json();
+    return data.choices?.[0]?.message?.content?.trim() || textoCorrido;
+  } catch {
+    // Se a formatação falhar por qualquer motivo, ainda devolve o texto cru
+    // (já tratado no fluxo principal) em vez de travar tudo.
+    return textoCorrido;
   }
 }
