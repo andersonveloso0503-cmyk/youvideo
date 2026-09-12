@@ -172,6 +172,7 @@ export default function Home() {
       cenas: results.visual?.arquivos,
       formato,
       palavras: results.voice?.palavras,
+      marca: 'Em Nome de Jesus',
     });
     if (!primeira || !primeira.renderId) return;
 
@@ -212,6 +213,7 @@ export default function Home() {
       titulo: results.script?.titulo,
       descricao: results.script?.descricao,
       tags: results.script?.tags,
+      palavras: results.voice?.palavras,
     });
 
   const publishTiktok = () =>
