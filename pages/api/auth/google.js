@@ -12,7 +12,10 @@ export default function handler(req, res) {
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
-    scope: ['https://www.googleapis.com/auth/youtube.upload'],
+    scope: [
+      'https://www.googleapis.com/auth/youtube.upload',
+      'https://www.googleapis.com/auth/youtube.force-ssl',
+    ],
     // Carrega qual canal está sendo autorizado até o callback, pra saber em
     // qual variável de ambiente salvar o refresh token gerado.
     state: canal || 'apostolos',
