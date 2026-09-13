@@ -26,6 +26,7 @@ export default function MusicaFila() {
   const [letra, setLetra] = useState('');
   const [textoThumbnail, setTextoThumbnail] = useState('');
   const [arquivoAudio, setArquivoAudio] = useState(null);
+  const [sugerindoTitulo, setSugerindoTitulo] = useState(false);
 
   const [enviando, setEnviando] = useState(false);
   const [mensagem, setMensagem] = useState(null);
@@ -46,6 +47,23 @@ export default function MusicaFila() {
     const intervalo = setInterval(carregarFila, 15000);
     return () => clearInterval(intervalo);
   }, []);
+
+  async function sugerirTitulo() {
+    setSugerindoTitulo(true);
+    try {
+      const res = await fetch('/api/sugerir-titulo-musica', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ letra }),
+      });
+      const data = await res.json();
+      if (res.ok && data.titulo) setTitulo(data.titulo);
+    } catch {
+      // silencioso — o usuário pode digitar o título na mão se isso falhar
+    } finally {
+      setSugerindoTitulo(false);
+    }
+  }
 
   async function adicionarNaFila() {
     setMensagem(null);
@@ -136,6 +154,10 @@ export default function MusicaFila() {
           placeholder={'[Verse]\nEle é a luz que não se apaga\n[Chorus]\nGraça sobre graça, é o que Ele me dá'}
           style={{ minHeight: 140, fontFamily: 'monospace', fontSize: 13 }}
         />
+        <button disabled={sugerindoTitulo || !letra.trim()} onClick={sugerirTitulo} style={{ marginTop: 8 }}>
+          {sugerindoTitulo && <span className="spinner" />}
+          {sugerindoTitulo ? 'Pensando...' : 'Sugerir título (baseado na letra)'}
+        </button>
 
         <button disabled={enviando} onClick={adicionarNaFila} style={{ marginTop: 12 }}>
           {enviando ? 'Enviando...' : 'Adicionar à fila'}
@@ -155,9 +177,89 @@ export default function MusicaFila() {
               {STATUS_LABEL[item.status] || item.status}
               {item.erro ? ` — ${item.erro}` : ''}
             </div>
+
+            {item.videoUrl && (
+              <FormatoSwitcher item={item} />
+            )}
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function FormatoSwitcher({ item }) {
+  const [formatoAtivo, setFormatoAtivo] = useState(item.formato);
+  const [videosPorFormato, setVideosPorFormato] = useState({ [item.formato]: item.videoUrl });
+  const [carregando, setCarregando] = useState(null);
+  const [erro, setErro] = useState(null);
+
+  async function trocarFormato(novoFormato) {
+    setErro(null);
+    if (videosPorFormato[novoFormato]) {
+      setFormatoAtivo(novoFormato);
+      return;
+    }
+
+    setCarregando(novoFormato);
+    try {
+      const res = await fetch('/api/reformatar-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ colecao: 'musica_fila', itemId: item.id, novoFormato, ambiente: 'production' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      let tentativas = 0;
+      while (tentativas < 40) {
+        await new Promise((r) => setTimeout(r, 5000));
+        const check = await fetch(`/api/assemble-video?id=${data.renderId}&ambiente=production`).then((r) => r.json());
+        if (check.status === 'done') {
+          setVideosPorFormato((v) => ({ ...v, [novoFormato]: check.videoUrl }));
+          setFormatoAtivo(novoFormato);
+          setCarregando(null);
+          return;
+        }
+        if (check.status === 'failed') throw new Error(check.erro || 'Falha na montagem');
+        tentativas++;
+      }
+      throw new Error('Demorou demais — tenta de novo daqui a pouco.');
+    } catch (err) {
+      setErro(err.message);
+      setCarregando(null);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          style={{ marginTop: 0, opacity: formatoAtivo === 'longo' ? 1 : 0.6 }}
+          disabled={carregando === 'longo'}
+          onClick={() => trocarFormato('longo')}
+        >
+          {carregando === 'longo' && <span className="spinner" />}
+          Horizontal
+        </button>
+        <button
+          style={{ marginTop: 0, opacity: formatoAtivo === 'short' ? 1 : 0.6 }}
+          disabled={carregando === 'short'}
+          onClick={() => trocarFormato('short')}
+        >
+          {carregando === 'short' && <span className="spinner" />}
+          Vertical
+        </button>
+      </div>
+      {erro && <div className="result-box">Erro: {erro}</div>}
+      {videosPorFormato[formatoAtivo] && (
+        <video
+          key={videosPorFormato[formatoAtivo]}
+          src={videosPorFormato[formatoAtivo]}
+          controls
+          style={{ width: '100%', maxWidth: formatoAtivo === 'short' ? 220 : 400, borderRadius: 6, marginTop: 8 }}
+        />
+      )}
     </div>
   );
 }

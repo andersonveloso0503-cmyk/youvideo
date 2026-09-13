@@ -21,6 +21,24 @@ export default function Musica() {
   const [letra, setLetra] = useState('');
   const [textoThumbnail, setTextoThumbnail] = useState('');
   const [arquivoAudio, setArquivoAudio] = useState(null);
+  const [sugerindoTitulo, setSugerindoTitulo] = useState(false);
+
+  async function sugerirTitulo() {
+    setSugerindoTitulo(true);
+    try {
+      const res = await fetch('/api/sugerir-titulo-musica', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ letra }),
+      });
+      const data = await res.json();
+      if (res.ok && data.titulo) setTitulo(data.titulo);
+    } catch {
+      // silencioso
+    } finally {
+      setSugerindoTitulo(false);
+    }
+  }
 
   const [status, setStatus] = useState({});
   const [results, setResults] = useState({});
@@ -132,7 +150,7 @@ export default function Musica() {
         videoUrl: results.assemble?.videoUrl,
         thumbnailUrl: results.thumbnail?.imageUrl,
         titulo,
-        descricao: `${titulo}\n\n${letra}`,
+        descricao: `${titulo} 🙏 Uma música de fé e louvor.\n\n#gospel #louvor #fe #jesus #musicacrista`,
         tags: ['gospel', 'música cristã', 'louvor'],
         canal,
         palavras: results.align?.palavras,
@@ -208,6 +226,10 @@ export default function Musica() {
           placeholder={'[Verse]\nEle é a luz que não se apaga\n[Chorus]\nGraça sobre graça, é o que Ele me dá'}
           style={{ minHeight: 160, fontFamily: 'monospace', fontSize: 13 }}
         />
+        <button disabled={sugerindoTitulo || !letra.trim()} onClick={sugerirTitulo} style={{ marginTop: 8 }}>
+          {sugerindoTitulo && <span className="spinner" />}
+          {sugerindoTitulo ? 'Pensando...' : 'Sugerir título (baseado na letra)'}
+        </button>
       </div>
 
       <StepCard
