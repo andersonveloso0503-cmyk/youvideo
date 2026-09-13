@@ -144,10 +144,10 @@ export default async function handler(req, res) {
   }
 
   const cssLegenda = `p{font-family:'Arial Black','Arial Narrow Bold',Impact,sans-serif;font-size:${
-    isVertical ? 30 : 40
+    isVertical ? 24 : 40
   }px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;text-align:center;margin:0;line-height:1.15;width:${
-    isVertical ? 620 : 1160
-  }px;max-width:${isVertical ? 620 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}`;
+    isVertical ? 520 : 1160
+  }px;max-width:${isVertical ? 520 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}`;
 
   const contornoPreto = 'text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000,0 4px 6px rgba(0,0,0,0.5);-webkit-text-stroke:3px #000;';
   const contornoBranco = 'text-shadow:3px 3px 0 #fff,-3px 3px 0 #fff,3px -3px 0 #fff,-3px -3px 0 #fff;-webkit-text-stroke:3px #fff;';
@@ -173,11 +173,11 @@ export default async function handler(req, res) {
       const fimClipe = bloco[fimIdx - 1].end;
 
       legendaKaraoke.push({
-        asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 660 : 1200, height: 160 },
+        asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 580 : 1200, height: 160 },
         start: inicioClipe,
         length: Math.max(fimClipe - inicioClipe, 0.12),
         position: 'bottom',
-        offset: { y: 0.16 },
+        offset: { y: isVertical ? 0.24 : 0.1 },
       });
     }
   }

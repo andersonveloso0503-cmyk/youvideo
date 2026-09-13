@@ -26,7 +26,7 @@ export default async function handler(req, res) {
         videoUrl: item.videoUrl,
         thumbnailUrl: item.thumbnailUrl,
         titulo: item.titulo,
-        descricao: `${item.titulo}\n\n${item.letra}`,
+        descricao: `${item.titulo} 🙏 Uma música de fé e louvor.\n\n#gospel #louvor #fe #jesus #musicacrista`,
         tags: ['gospel', 'música cristã', 'louvor'],
         canal: 'musica',
         palavras: item.palavras,
