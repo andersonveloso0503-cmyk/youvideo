@@ -32,18 +32,34 @@ export default async function handler(req, res) {
     for (let i = 0; i < musicas.length; i++) {
       const m = musicas[i];
       const audio = await checarUrl(m.audioUrl);
-      const imagem = await checarUrl(m.arquivo?.imageUrl);
+      const imagem = m.arquivo?.imageUrl ? await checarUrl(m.arquivo.imageUrl) : { ok: false, motivo: 'sem imagem (provavelmente bloqueada pela Flux)' };
       diagnostico.push({
         indice: i,
         status: m.status,
         duracao: m.duracao,
         audio,
         imagem,
+        descricaoCena: m.cena?.descricao || null,
         inicioLetra: (m.letra || '').slice(0, 40),
       });
     }
 
     const comProblema = diagnostico.filter((d) => !d.audio.ok || !d.imagem.ok);
+
+    // Permite trocar a descrição da cena de uma música específica direto
+    // pela URL (?indice=0&novaDescricao=...) e já reseta ela pra gerar a
+    // imagem de novo com o texto novo, sem precisar mexer no Firestore.
+    if (req.query.indice != null && req.query.novaDescricao) {
+      const idx = parseInt(req.query.indice, 10);
+      if (!musicas[idx]) return res.status(400).json({ error: `Não existe música com índice ${idx} nesse medley` });
+      musicas[idx].cena = { ...(musicas[idx].cena || {}), descricao: req.query.novaDescricao };
+      musicas[idx].status = 'cenas_ok';
+      delete musicas[idx].arquivo;
+      await ref.update({ musicas, status: 'processando', erro: null });
+      return res.status(200).json({
+        mensagem: `Cena da música #${idx + 1} atualizada. Chame /api/medley-processar pra gerar a imagem nova.`,
+      });
+    }
 
     if (req.query.forcarMontagem === '1') {
       await ref.update({ status: 'processando', erro: null, renderId: null });
