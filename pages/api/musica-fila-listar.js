@@ -12,6 +12,8 @@ export default async function handler(req, res) {
       status: doc.data().status,
       erro: doc.data().erro || null,
       youtubeVideoId: doc.data().youtubeVideoId || null,
+      videoUrl: doc.data().videoUrl || null,
+      thumbnailUrl: doc.data().thumbnailUrl || null,
       criadoEm: doc.data().criadoEm,
     }));
     return res.status(200).json({ fila });
