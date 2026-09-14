@@ -68,12 +68,18 @@ export default function Home() {
   const [duracaoDesejada, setDuracaoDesejada] = useState('420');
   const [vozId, setVozId] = useState('');
   const [vozes, setVozes] = useState(null);
+  const [serieId, setSerieId] = useState('');
+  const [series, setSeries] = useState([]);
 
   useEffect(() => {
     fetch('/api/list-voices')
       .then((r) => r.json())
       .then((data) => setVozes(data.vozes || []))
       .catch(() => setVozes([]));
+    fetch('/api/serie-listar')
+      .then((r) => r.json())
+      .then((data) => setSeries(data.series || []))
+      .catch(() => setSeries([]));
   }, []);
 
   const [status, setStatus] = useState({});
@@ -117,11 +123,13 @@ export default function Home() {
     const numCenas = (results.script?.cenas || []).length || 1;
     const ultimaPalavra = (results.voice?.palavras || []).filter((p) => p.end != null).pop();
     const duracaoAlvo = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
+    const serieSelecionada = series.find((s) => s.id === serieId);
 
     await runStep('visual', '/api/generate-visual', {
       cenas: results.script?.cenas || [],
       estilo,
       formato,
+      imagemReferenciaUrl: serieSelecionada?.imagemReferenciaUrl,
     });
     // guarda a duração calculada pra usar depois, quando o usuário mandar animar
     setDuracaoAlvo(duracaoAlvo);
@@ -203,6 +211,7 @@ export default function Home() {
       estilo,
       thumbnailTitulo: results.script?.thumbnailTitulo,
       thumbnailSubtitulo: results.script?.thumbnailSubtitulo,
+      imagemReferenciaUrl: series.find((s) => s.id === serieId)?.imagemReferenciaUrl,
     });
 
   const publish = () =>
@@ -266,6 +275,10 @@ export default function Home() {
           <div className="hub-tile-title">Transcrever áudio</div>
           <div className="hub-tile-desc">Recuperar a letra real cantada de uma música</div>
         </a>
+        <a href="/series" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">Séries</div>
+          <div className="hub-tile-desc">Personagens com rosto consistente entre vídeos</div>
+        </a>
       </div>
 
       <div className="card">
@@ -314,6 +327,20 @@ export default function Home() {
             </>
           )}
         </select>
+
+        <label>Série (personagem consistente, opcional)</label>
+        <select value={serieId} onChange={(e) => setSerieId(e.target.value)}>
+          <option value="">Nenhuma (personagem novo a cada vídeo)</option>
+          {series.map((s) => (
+            <option key={s.id} value={s.id}>{s.nome}</option>
+          ))}
+        </select>
+        {series.length === 0 && (
+          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+            Nenhuma série criada ainda — <a href="/series" style={{ color: '#4f7cff' }}>criar uma</a>
+          </div>
+        )}
+
         <label>Voz do narrador</label>
         <select value={vozId} onChange={(e) => setVozId(e.target.value)}>
           <option value="">Padrão</option>
