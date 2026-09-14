@@ -151,7 +151,7 @@ export default function Musica() {
         thumbnailUrl: results.thumbnail?.imageUrl,
         titulo,
         descricao: `${titulo} 🙏 Uma música de fé e louvor.\n\n#gospel #louvor #fe #jesus #musicacrista`,
-        tags: ['gospel', 'música cristã', 'louvor'],
+        tags: ['gospel', 'louvor', 'música gospel', 'adoração', 'sertanejo gospel', 'hinos evangélicos', 'louvores antigos', 'playlist gospel'],
         canal,
         palavras: results.align?.palavras,
       })
