@@ -17,7 +17,7 @@ const ESTILOS_VISUAIS = {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { cenas, estilo, formato } = req.body;
+  const { cenas, estilo, formato, imagemReferenciaUrl } = req.body;
   if (!cenas || !cenas.length) return res.status(400).json({ error: 'Nenhuma cena recebida' });
 
   if (!process.env.FLUX_API_KEY) {
@@ -32,7 +32,9 @@ export default async function handler(req, res) {
     const arquivos = [];
 
     for (const cena of cenas) {
-      const promptFinal = `${cena.descricao}, ${estiloPrompt}, personagens bíblicos vestidos com roupas completas da época, composição de cena de vídeo, alta qualidade. Evite: armas, espadas, facas, sangue, ferimentos, nudez, torso nu, violência gráfica.`;
+      const promptFinal = imagemReferenciaUrl
+        ? `Usando o personagem da imagem de referência (mantenha o mesmo rosto, características físicas e identidade dele), coloque-o nesta cena: ${cena.descricao}, ${estiloPrompt}, composição de cena de vídeo, alta qualidade. Evite: armas, espadas, facas, sangue, ferimentos, nudez, torso nu, violência gráfica.`
+        : `${cena.descricao}, ${estiloPrompt}, personagens bíblicos vestidos com roupas completas da época, composição de cena de vídeo, alta qualidade. Evite: armas, espadas, facas, sangue, ferimentos, nudez, torso nu, violência gráfica.`;
 
       const submitRes = await fetch('https://api.bfl.ai/v1/flux-2-pro', {
         method: 'POST',
@@ -45,6 +47,7 @@ export default async function handler(req, res) {
           prompt: promptFinal,
           width: formato === 'short' ? 768 : 1344,
           height: formato === 'short' ? 1344 : 768,
+          ...(imagemReferenciaUrl ? { input_image: imagemReferenciaUrl } : {}),
         }),
       });
 

@@ -3,7 +3,7 @@ import { put } from '@vercel/blob';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { tema, titulo, estilo, thumbnailTitulo, thumbnailSubtitulo } = req.body;
+  const { tema, titulo, estilo, thumbnailTitulo, thumbnailSubtitulo, imagemReferenciaUrl } = req.body;
 
   if (!process.env.FLUX_API_KEY) {
     return res.status(500).json({
@@ -12,11 +12,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const prompt = `Thumbnail profissional de YouTube estilo pôster de filme épico para vídeo bíblico sobre "${titulo || tema}". ${
-      estilo === 'desenho'
-        ? 'Estilo desenho animado vibrante, traço bem definido, cores saturadas.'
-        : 'Fotografia hiper-realista, câmera DSLR, lente 85mm, textura de pele natural com poros visíveis, iluminação dramática (tipo "chiaroscuro"), grão de filme sutil, NÃO parece pintura nem arte digital.'
-    } Retrato de meio-corpo ou close do personagem principal com expressão forte e emocional, olhar direto pra câmera, vestido com roupas completas da época. Fundo com paisagem bíblica dramática ao entardecer (deserto, montanhas, templo ou céu com nuvens douradas), luz de contraluz dourada (golden hour), criando atmosfera épica e cinematográfica. Composição de regra dos terços, alto contraste, cores saturadas e quentes (dourado, âmbar, laranja) que se destacam em miniatura pequena. Deixe a parte superior da imagem com menos detalhe e mais escura/uniforme, para permitir sobrepor texto grande depois. Sem texto sobreposto. Sem marca d'água. Qualidade de pôster de cinema 4K. Evite: armas, espadas, facas, sangue, ferimentos, nudez, torso nu, violência gráfica.`;
+    const prompt = imagemReferenciaUrl
+      ? `Usando o personagem da imagem de referência (mantenha o mesmo rosto e características físicas dele), crie um thumbnail profissional de YouTube estilo pôster de filme épico para vídeo bíblico sobre "${titulo || tema}". Retrato de meio-corpo ou close do personagem com expressão forte e emocional, olhar direto pra câmera, vestido com roupas completas da época. Fundo com paisagem bíblica dramática ao entardecer, luz de contraluz dourada, atmosfera épica e cinematográfica. Alto contraste, cores saturadas e quentes. Deixe a parte superior da imagem com menos detalhe, pra permitir sobrepor texto depois. Sem texto sobreposto. Evite: armas, sangue, nudez, violência gráfica.`
+      : `Thumbnail profissional de YouTube estilo pôster de filme épico para vídeo bíblico sobre "${titulo || tema}". ${
+          estilo === 'desenho'
+            ? 'Estilo desenho animado vibrante, traço bem definido, cores saturadas.'
+            : 'Fotografia hiper-realista, câmera DSLR, lente 85mm, textura de pele natural com poros visíveis, iluminação dramática (tipo "chiaroscuro"), grão de filme sutil, NÃO parece pintura nem arte digital.'
+        } Retrato de meio-corpo ou close do personagem principal com expressão forte e emocional, olhar direto pra câmera, vestido com roupas completas da época. Fundo com paisagem bíblica dramática ao entardecer (deserto, montanhas, templo ou céu com nuvens douradas), luz de contraluz dourada (golden hour), criando atmosfera épica e cinematográfica. Composição de regra dos terços, alto contraste, cores saturadas e quentes (dourado, âmbar, laranja) que se destacam em miniatura pequena. Deixe a parte superior da imagem com menos detalhe e mais escura/uniforme, para permitir sobrepor texto grande depois. Sem texto sobreposto. Sem marca d'água. Qualidade de pôster de cinema 4K. Evite: armas, espadas, facas, sangue, ferimentos, nudez, torso nu, violência gráfica.`;
 
     const submitRes = await fetch('https://api.bfl.ai/v1/flux-2-pro', {
       method: 'POST',
@@ -25,7 +27,12 @@ export default async function handler(req, res) {
         'x-key': process.env.FLUX_API_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, width: 1280, height: 720 }),
+      body: JSON.stringify({
+        prompt,
+        width: 1280,
+        height: 720,
+        ...(imagemReferenciaUrl ? { input_image: imagemReferenciaUrl } : {}),
+      }),
     });
 
     const submitData = await submitRes.json();
