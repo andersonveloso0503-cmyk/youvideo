@@ -42,6 +42,24 @@ export default function Medley() {
   const [formato, setFormato] = useState('longo');
   const [ambiente, setAmbiente] = useState('sandbox');
   const [textoThumbnail, setTextoThumbnail] = useState('');
+  const [sugerindoTitulo, setSugerindoTitulo] = useState(false);
+
+  async function sugerirTitulo() {
+    setSugerindoTitulo(true);
+    try {
+      const res = await fetch('/api/sugerir-titulo-musica', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ letra: '', isMedley: true }),
+      });
+      const data = await res.json();
+      if (res.ok && data.titulo) setTitulo(data.titulo);
+    } catch {
+      // silencioso
+    } finally {
+      setSugerindoTitulo(false);
+    }
+  }
   const [medleyAtualId, setMedleyAtualId] = useState(null);
 
   const [letra, setLetra] = useState('');
@@ -152,6 +170,10 @@ export default function Medley() {
           <h2>1. Criar um novo medley</h2>
           <label>Título do medley</label>
           <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex: Uma hora de louvor" />
+          <button disabled={sugerindoTitulo} onClick={sugerirTitulo} style={{ marginTop: 8 }}>
+            {sugerindoTitulo && <span className="spinner" />}
+            {sugerindoTitulo ? 'Pensando...' : 'Sugerir título (formato coletânea)'}
+          </button>
 
           <div className="row">
             <div>
