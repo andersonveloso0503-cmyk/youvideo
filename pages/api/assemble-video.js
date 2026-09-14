@@ -147,10 +147,7 @@ export default async function handler(req, res) {
     isVertical ? 24 : 40
   }px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;text-align:center;margin:0;line-height:1.15;width:${
     isVertical ? 520 : 1160
-  }px;max-width:${isVertical ? 520 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}`;
-
-  const contornoPreto = 'text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000,0 4px 6px rgba(0,0,0,0.5);-webkit-text-stroke:3px #000;';
-  const contornoBranco = 'text-shadow:3px 3px 0 #fff,-3px 3px 0 #fff,3px -3px 0 #fff,-3px -3px 0 #fff;-webkit-text-stroke:3px #fff;';
+  }px;max-width:${isVertical ? 520 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}.a{color:#FFE100;text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000,0 4px 6px rgba(0,0,0,.5);-webkit-text-stroke:3px #000}.p{color:#000;text-shadow:3px 3px 0 #fff,-3px 3px 0 #fff,3px -3px 0 #fff,-3px -3px 0 #fff;-webkit-text-stroke:3px #fff}`;
 
   const legendaKaraoke = [];
   for (const bloco of blocos) {
@@ -158,15 +155,12 @@ export default async function handler(req, res) {
       const fimIdx = Math.min(i + passo, bloco.length);
       // Mostra só as palavras já cantadas até agora dentro do bloco (nunca
       // as que ainda vão vir). A palavra/grupo atual fica amarela com
-      // contorno preto; as já cantadas ficam pretas com contorno branco
-      // (pra continuar legível mesmo escurecendo).
+      // contorno preto (classe .a); as já cantadas ficam pretas com
+      // contorno branco (classe .p) — usar classes em vez de repetir o
+      // estilo em cada palavra mantém o pedido de montagem bem menor.
       const html = bloco
         .slice(0, fimIdx)
-        .map((p, idx) =>
-          idx >= i
-            ? `<span style="color:#FFE100;${contornoPreto}">${p.texto}</span>`
-            : `<span style="color:#000000;${contornoBranco}">${p.texto}</span>`
-        )
+        .map((p, idx) => `<span class="${idx >= i ? 'a' : 'p'}">${p.texto}</span>`)
         .join(' ');
 
       const inicioClipe = bloco[i].start;
