@@ -1,11 +1,11 @@
 import { list, del } from '@vercel/blob';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  const { maisAntigoQueDias, manterUltimos, confirmar } = req.body;
-  const diasCorte = maisAntigoQueDias || 7;
-  const manter = manterUltimos || 30;
+  const fonte = req.method === 'GET' ? req.query : req.body;
+  const { maisAntigoQueDias, manterUltimos, confirmar } = fonte;
+  const diasCorte = maisAntigoQueDias ? parseInt(maisAntigoQueDias, 10) : 7;
+  const manter = manterUltimos ? parseInt(manterUltimos, 10) : 30;
+  const confirmarBool = confirmar === true || confirmar === 'true' || confirmar === '1';
 
   try {
     let arquivos = [];
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
 
     const totalMB = (paraApagar.reduce((s, a) => s + a.size, 0) / 1024 / 1024).toFixed(1);
 
-    if (!confirmar) {
+    if (!confirmarBool) {
       return res.status(200).json({
         modo: 'simulação (nada foi apagado ainda)',
         totalParaApagar: paraApagar.length,
