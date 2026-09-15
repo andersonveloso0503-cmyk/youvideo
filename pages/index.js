@@ -68,18 +68,12 @@ export default function Home() {
   const [duracaoDesejada, setDuracaoDesejada] = useState('420');
   const [vozId, setVozId] = useState('');
   const [vozes, setVozes] = useState(null);
-  const [serieId, setSerieId] = useState('');
-  const [series, setSeries] = useState([]);
 
   useEffect(() => {
     fetch('/api/list-voices')
       .then((r) => r.json())
       .then((data) => setVozes(data.vozes || []))
       .catch(() => setVozes([]));
-    fetch('/api/serie-listar')
-      .then((r) => r.json())
-      .then((data) => setSeries(data.series || []))
-      .catch(() => setSeries([]));
   }, []);
 
   const [status, setStatus] = useState({});
@@ -123,13 +117,11 @@ export default function Home() {
     const numCenas = (results.script?.cenas || []).length || 1;
     const ultimaPalavra = (results.voice?.palavras || []).filter((p) => p.end != null).pop();
     const duracaoAlvo = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
-    const serieSelecionada = series.find((s) => s.id === serieId);
 
     await runStep('visual', '/api/generate-visual', {
       cenas: results.script?.cenas || [],
       estilo,
       formato,
-      imagemReferenciaUrl: serieSelecionada?.imagemReferenciaUrl,
     });
     // guarda a duração calculada pra usar depois, quando o usuário mandar animar
     setDuracaoAlvo(duracaoAlvo);
@@ -180,6 +172,7 @@ export default function Home() {
       cenas: results.visual?.arquivos,
       formato,
       palavras: results.voice?.palavras,
+      marca: 'Em Nome de Jesus',
     });
     if (!primeira || !primeira.renderId) return;
 
@@ -211,7 +204,6 @@ export default function Home() {
       estilo,
       thumbnailTitulo: results.script?.thumbnailTitulo,
       thumbnailSubtitulo: results.script?.thumbnailSubtitulo,
-      imagemReferenciaUrl: series.find((s) => s.id === serieId)?.imagemReferenciaUrl,
     });
 
   const publish = () =>
@@ -221,6 +213,7 @@ export default function Home() {
       titulo: results.script?.titulo,
       descricao: results.script?.descricao,
       tags: results.script?.tags,
+      palavras: results.voice?.palavras,
     });
 
   const publishTiktok = () =>
@@ -271,14 +264,6 @@ export default function Home() {
           <div className="hub-tile-title">Meus projetos</div>
           <div className="hub-tile-desc">Tudo que já foi criado, dos dois canais</div>
         </a>
-        <a href="/transcrever" className="hub-tile hub-tile--teal">
-          <div className="hub-tile-title">Transcrever áudio</div>
-          <div className="hub-tile-desc">Recuperar a letra real cantada de uma música</div>
-        </a>
-        <a href="/series" className="hub-tile hub-tile--teal">
-          <div className="hub-tile-title">Séries</div>
-          <div className="hub-tile-desc">Personagens com rosto consistente entre vídeos</div>
-        </a>
       </div>
 
       <div className="card">
@@ -327,20 +312,6 @@ export default function Home() {
             </>
           )}
         </select>
-
-        <label>Série (personagem consistente, opcional)</label>
-        <select value={serieId} onChange={(e) => setSerieId(e.target.value)}>
-          <option value="">Nenhuma (personagem novo a cada vídeo)</option>
-          {series.map((s) => (
-            <option key={s.id} value={s.id}>{s.nome}</option>
-          ))}
-        </select>
-        {series.length === 0 && (
-          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-            Nenhuma série criada ainda — <a href="/series" style={{ color: '#4f7cff' }}>criar uma</a>
-          </div>
-        )}
-
         <label>Voz do narrador</label>
         <select value={vozId} onChange={(e) => setVozId(e.target.value)}>
           <option value="">Padrão</option>
@@ -368,7 +339,14 @@ export default function Home() {
         disabled={!tema}
         onRun={generateScript}
         result={results.script}
-        renderResult={(r) => <ScriptResult result={r} />}
+        renderResult={(r) => (
+          <ScriptResult
+            result={r}
+            onNarracaoChange={(novoTexto) =>
+              setResults((res) => ({ ...res, script: { ...res.script, narracao: novoTexto } }))
+            }
+          />
+        )}
       />
 
       <StepCard
@@ -582,14 +560,24 @@ function VoiceResult({ result }) {
   );
 }
 
-function ScriptResult({ result }) {
+function ScriptResult({ result, onNarracaoChange }) {
+  const caracteres = (result.narracao || '').length;
   return (
     <div className="result-box" style={{ whiteSpace: 'normal' }}>
       <p><b>Título:</b> {result.titulo}</p>
       <p><b>Descrição:</b> {result.descricao}</p>
       <p><b>Tags:</b> {(result.tags || []).join(', ')}</p>
-      <p><b>Narração:</b></p>
-      <p style={{ whiteSpace: 'pre-wrap' }}>{result.narracao}</p>
+      <p>
+        <b>Narração</b>{' '}
+        <span style={{ fontSize: 11, color: '#999' }}>
+          ({caracteres} caracteres — edite livremente antes de gerar a voz)
+        </span>
+      </p>
+      <textarea
+        value={result.narracao || ''}
+        onChange={(e) => onNarracaoChange && onNarracaoChange(e.target.value)}
+        style={{ width: '100%', minHeight: 160, fontFamily: 'inherit', fontSize: 'inherit' }}
+      />
       <p><b>Cenas ({(result.cenas || []).length}):</b></p>
       <ol>
         {(result.cenas || []).map((c, i) => (
