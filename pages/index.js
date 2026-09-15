@@ -374,6 +374,13 @@ export default function Home() {
             onNarracaoChange={(novoTexto) =>
               setResults((res) => ({ ...res, script: { ...res.script, narracao: novoTexto } }))
             }
+            onCenaChange={(indice, novoTexto) =>
+              setResults((res) => {
+                const cenas = [...(res.script?.cenas || [])];
+                cenas[indice] = { ...cenas[indice], descricao: novoTexto };
+                return { ...res, script: { ...res.script, cenas } };
+              })
+            }
           />
         )}
       />
@@ -589,7 +596,7 @@ function VoiceResult({ result }) {
   );
 }
 
-function ScriptResult({ result, onNarracaoChange }) {
+function ScriptResult({ result, onNarracaoChange, onCenaChange }) {
   const caracteres = (result.narracao || '').length;
   return (
     <div className="result-box" style={{ whiteSpace: 'normal' }}>
@@ -607,11 +614,20 @@ function ScriptResult({ result, onNarracaoChange }) {
         onChange={(e) => onNarracaoChange && onNarracaoChange(e.target.value)}
         style={{ width: '100%', minHeight: 160, fontFamily: 'inherit', fontSize: 'inherit' }}
       />
-      <p><b>Cenas ({(result.cenas || []).length}):</b></p>
+      <p>
+        <b>Cenas ({(result.cenas || []).length})</b>{' '}
+        <span style={{ fontSize: 11, color: '#999' }}>
+          (edite a descrição se alguma imagem for barrada pelo filtro de conteúdo)
+        </span>
+      </p>
       <ol>
         {(result.cenas || []).map((c, i) => (
           <li key={i} style={{ marginBottom: 8 }}>
-            <i>{c.descricao}</i>
+            <textarea
+              value={c.descricao || ''}
+              onChange={(e) => onCenaChange && onCenaChange(i, e.target.value)}
+              style={{ width: '100%', minHeight: 50, fontFamily: 'inherit', fontSize: 'inherit' }}
+            />
             {c.textoNarrado && <div style={{ color: '#999' }}>"{c.textoNarrado}"</div>}
           </li>
         ))}
