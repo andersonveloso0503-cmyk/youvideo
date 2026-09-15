@@ -16,8 +16,10 @@ async function checarUrl(url) {
 }
 
 export default async function handler(req, res) {
-  const { medleyId } = req.query;
-  if (!medleyId) return res.status(400).json({ error: 'Passe ?medleyId=... na URL' });
+  const medleyId = req.query.medleyId || req.body?.medleyId;
+  if (!medleyId) return res.status(400).json({ error: 'Passe medleyId (na URL ou no corpo)' });
+  const indiceParam = req.query.indice != null ? req.query.indice : req.body?.indice;
+  const novaLetraParam = req.query.novaLetra || req.body?.novaLetra;
 
   try {
     const db = getDb();
@@ -52,10 +54,10 @@ export default async function handler(req, res) {
     // alinhar tudo de novo do zero com a letra corrigida. Use quando a
     // legenda dessincroniza ao longo da música (sinal de que a letra
     // guardada não bate 100% com o que foi realmente cantado).
-    if (req.query.indice != null && req.query.novaLetra) {
-      const idx = parseInt(req.query.indice, 10);
+    if (indiceParam != null && novaLetraParam) {
+      const idx = parseInt(indiceParam, 10);
       if (!musicas[idx]) return res.status(400).json({ error: `Não existe música com índice ${idx} nesse medley` });
-      musicas[idx].letra = req.query.novaLetra;
+      musicas[idx].letra = novaLetraParam;
       musicas[idx].status = 'pendente';
       delete musicas[idx].palavras;
       delete musicas[idx].blocoCompleto;
