@@ -180,6 +180,7 @@ export default function Home() {
       cenas: results.visual?.arquivos,
       formato,
       palavras: results.voice?.palavras,
+      marca: 'Em Nome de Jesus',
     });
     if (!primeira || !primeira.renderId) return;
 
