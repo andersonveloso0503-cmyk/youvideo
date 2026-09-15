@@ -111,6 +111,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
+      ambiente: medley.ambiente || 'production (padrão)',
       totalMusicas: musicas.length,
       comProblema: comProblema.length,
       diagnostico,
