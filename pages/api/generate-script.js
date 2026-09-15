@@ -39,7 +39,7 @@ IMPORTANTE:
   "thumbnailSubtitulo": "frase curta de 4 a 7 palavras que gera curiosidade/mistério e reforça o CTA de clicar, pra aparecer menor logo abaixo do título (ex: 'A HISTÓRIA QUE NINGUÉM CONTOU', 'O QUE A BÍBLIA REVELA SOBRE ELE'), em maiúsculas, em português",
   "descricao": "descrição CURTA e direta para o YouTube, em português: 1 a 2 frases (no máximo 30 palavras) resumindo o vídeo de forma atrativa, sem contar a história inteira nem dar spoiler — só o suficiente pra gerar curiosidade. Depois disso, pule uma linha e coloque de 5 a 8 hashtags relevantes (ex: #biblia #fe #jesus).",
   "tags": ["12 a 15 tags relevantes em português, misturando termos amplos (ex: história bíblica) e específicos (ex: nome do personagem)"],
-  "narracao": "texto completo da narração, em português",
+  "narracao": "texto completo da narração, em português. IMPORTANTE: termine sempre com uma chamada pra ação curta e natural (1-2 frases), variando a forma a cada vídeo — pedindo pra curtir, se inscrever, ativar o sininho e/ou compartilhar, de um jeito que combine com o tom da história (ex: 'Se essa história te tocou, deixa o like, se inscreve e ativa o sininho pra não perder o próximo vídeo da série' ou 'Compartilha esse vídeo com alguém que precisa ouvir isso hoje, e se inscreve aqui pra acompanhar mais histórias como essa'). Não repita sempre a mesma frase.",
   "cenas": [
     { "descricao": "descrição visual da cena para gerar imagem/vídeo", "textoNarrado": "trecho da narração correspondente" }
   ]
