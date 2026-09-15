@@ -93,7 +93,8 @@ export default function Reformatar() {
 
         <label>De onde é esse vídeo</label>
         <select value={colecao} onChange={(e) => setColecao(e.target.value)}>
-          <option value="musica_fila">Música / Medley (youvideo_musica_fila)</option>
+          <option value="musica_fila">Música avulsa (youvideo_musica_fila)</option>
+          <option value="medley">Medley original (youvideo_medley)</option>
           <option value="fila">Vídeo bíblico narrado (youvideo_fila)</option>
         </select>
 
