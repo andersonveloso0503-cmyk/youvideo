@@ -12,7 +12,11 @@ export default async function handler(req, res) {
       body: JSON.stringify(body),
     });
     const data = await r.json();
-    if (!r.ok) throw new Error(data.error || `Erro chamando ${endpoint}`);
+    if (!r.ok) {
+      const erro = new Error(data.error || `Erro chamando ${endpoint}`);
+      erro.detalhes = data; // guarda a resposta inteira (debug temporário)
+      throw erro;
+    }
     return data;
   };
 
@@ -177,6 +181,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ mensagem: 'Nenhum medley pra processar agora.' });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message, detalhes: err.detalhes || null });
   }
 }

@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return checkStatus(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente } = req.body;
+  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente, marca } = req.body;
 
   // Quando os dados são grandes demais pra caber numa requisição (medleys
   // com várias músicas), quem chama sobe um JSON no Blob e manda só o link
@@ -176,10 +176,10 @@ export default async function handler(req, res) {
     }
   }
 
-  const marcaDagua = {
+  const marcaDagua = marca ? {
     asset: {
       type: 'html',
-      html: `<p>Em Nome de Jesus</p>`,
+      html: `<p>${marca}</p>`,
       css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
         isVertical ? 16 : 18
       }px; font-weight: 600; color: rgba(255,255,255,0.55); text-shadow: 0 1px 3px rgba(0,0,0,0.6); margin: 0; }`,
@@ -190,7 +190,7 @@ export default async function handler(req, res) {
     length: duracaoTotalAudio,
     position: 'topRight',
     offset: { x: -0.03, y: 0.04 },
-  };
+  } : null;
 
   const equalizerVisual = {
     asset: {
@@ -219,7 +219,7 @@ export default async function handler(req, res) {
 
   const timeline = {
     tracks: [
-      { clips: [marcaDagua] },
+      ...(marcaDagua ? [{ clips: [marcaDagua] }] : []),
       { clips: [equalizerVisual] },
       ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
       { clips: clipsVideo },
@@ -238,7 +238,18 @@ export default async function handler(req, res) {
     });
 
     const data = await renderRes.json();
-    if (!renderRes.ok) throw new Error(data.message || 'Erro ao iniciar a montagem na Shotstack');
+    if (!renderRes.ok) {
+      // Debug temporário: manda de volta a resposta crua da Shotstack
+      // inteira (status, request id, corpo) e o timeline exato que foi
+      // enviado, pra poder repassar pro suporte deles investigar.
+      return res.status(500).json({
+        error: data.message || 'Erro ao iniciar a montagem na Shotstack',
+        shotstackStatus: renderRes.status,
+        shotstackRequestId: renderRes.headers.get('x-request-id') || renderRes.headers.get('request-id') || null,
+        shotstackResponseCompleta: data,
+        timelineEnviada: { timeline, output },
+      });
+    }
 
     return res.status(200).json({
       status: 'processing',
