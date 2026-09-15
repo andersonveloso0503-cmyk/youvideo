@@ -39,12 +39,33 @@ export default async function handler(req, res) {
         duracao: m.duracao,
         audio,
         imagem,
+        audioUrl: m.audioUrl,
         descricaoCena: m.cena?.descricao || null,
-        inicioLetra: (m.letra || '').slice(0, 40),
+        letraCompleta: m.letra || '',
       });
     }
 
     const comProblema = diagnostico.filter((d) => !d.audio.ok || !d.imagem.ok);
+
+    // Permite trocar a LETRA de uma música específica direto pela URL
+    // (?indice=1&novaLetra=...) — reseta ela pra "pendente", forçando
+    // alinhar tudo de novo do zero com a letra corrigida. Use quando a
+    // legenda dessincroniza ao longo da música (sinal de que a letra
+    // guardada não bate 100% com o que foi realmente cantado).
+    if (req.query.indice != null && req.query.novaLetra) {
+      const idx = parseInt(req.query.indice, 10);
+      if (!musicas[idx]) return res.status(400).json({ error: `Não existe música com índice ${idx} nesse medley` });
+      musicas[idx].letra = req.query.novaLetra;
+      musicas[idx].status = 'pendente';
+      delete musicas[idx].palavras;
+      delete musicas[idx].blocoCompleto;
+      delete musicas[idx].cena;
+      delete musicas[idx].arquivo;
+      await ref.update({ musicas, status: 'processando', erro: null });
+      return res.status(200).json({
+        mensagem: `Letra da música #${idx + 1} atualizada. Chame /api/medley-processar repetidas vezes pra alinhar, gerar cena e imagem de novo.`,
+      });
+    }
 
     // Permite trocar a descrição da cena de uma música específica direto
     // pela URL (?indice=0&novaDescricao=...) e já reseta ela pra gerar a
