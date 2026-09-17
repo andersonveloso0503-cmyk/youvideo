@@ -17,7 +17,26 @@ export default async function handler(req, res) {
     let thumbnailUrl;
     let canal;
 
-    if (colecao === 'medley') {
+    if (colecao === 'projeto') {
+      // Vídeos salvos a partir de telas manuais (ex: /desenho) guardam o
+      // áudio/cenas/palavras direto no próprio documento de youvideo_projects,
+      // sem passar pela fila — reaproveita esses dados direto daqui.
+      const doc = await db.collection('youvideo_projects').doc(itemId).get();
+      if (!doc.exists) return res.status(404).json({ error: 'Projeto não encontrado' });
+      const projeto = doc.data();
+
+      if (!projeto.audioUrl || !projeto.cenas) {
+        return res.status(400).json({
+          error:
+            'Esse projeto não tem áudio/imagens salvos pra reaproveitar (foi salvo antes dessa função existir, ou veio de uma tela antiga). Não dá pra reformatar sem gerar de novo.',
+        });
+      }
+
+      bodyMontagem = { audioUrl: projeto.audioUrl, cenas: projeto.cenas, formato: novoFormato, palavras: projeto.palavras, ambiente: ambiente || 'production' };
+      titulo = projeto.titulo;
+      thumbnailUrl = projeto.thumbnailUrl || null;
+      canal = projeto.canal || 'apostolos';
+    } else if (colecao === 'medley') {
       // O medley guarda cada música separada com seu próprio áudio/cena —
       // remonta a faixa combinada exatamente como o medley-processar.js faz
       // na hora de montar de verdade, com os mesmos offsets acumulados.
