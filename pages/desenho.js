@@ -218,6 +218,11 @@ export default function Desenho() {
       descricao: results.script?.descricao,
       videoUrl: results.assemble?.videoUrl,
       thumbnailUrl: results.thumbnail?.imageUrl,
+      // Guardados pra permitir reformatar esse vídeo (ex: pra vertical)
+      // sem precisar gerar roteiro/voz/imagens de novo depois.
+      audioUrl: results.voice?.audioUrl,
+      cenas: results.visual?.arquivos,
+      palavras: results.voice?.palavras,
     });
 
   return (
