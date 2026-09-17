@@ -4,6 +4,7 @@
 // Depois de resolver, pode apagar este arquivo.
 
 import { getDb } from '../../lib/firebase-admin';
+import { getApps } from 'firebase-admin/app';
 
 export default async function handler(req, res) {
   try {
@@ -16,12 +17,12 @@ export default async function handler(req, res) {
       status: doc.data().status,
     }));
 
-    // Mostra também qual projeto Firebase está sendo usado de verdade
-    const app = db.app;
+    const apps = getApps();
+    const projectId = apps[0]?.options?.projectId || apps[0]?.options?.credential?.projectId || 'não identificado';
 
     return res.status(200).json({
       totalEncontrados: canais.length,
-      projectId: app.options.credential?.projectId || app.options.projectId || 'não identificado',
+      projectId,
       canais,
     });
   } catch (err) {
