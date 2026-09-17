@@ -1,69 +1,55 @@
 import { useState, useEffect } from 'react';
 
-function BrollSearch() {
-  const [query, setQuery] = useState('');
-  const [resultados, setResultados] = useState(null);
-  const [buscando, setBuscando] = useState(false);
-  const [erro, setErro] = useState(null);
+const HISTORIAS = [
+  {
+    nome: 'Noé e a Arca',
+    tema:
+      'Noé e a Arca: Deus vê a maldade dos homens e decide enviar um dilúvio, mas ordena que o justo Noé construa uma arca enorme para salvar sua família e um casal de cada animal. Depois de 40 dias e 40 noites de chuva, Noé solta uma pomba que volta com um ramo de oliveira, sinal de que a terra secou. Deus promete, com um arco-íris, nunca mais destruir a terra com água.',
+  },
+  {
+    nome: 'Davi e Golias',
+    tema:
+      'Davi e Golias: o exército filisteu desafia Israel com o gigante Golias, que ninguém ousa enfrentar por 40 dias. O jovem pastor Davi se oferece pra lutar, recusa a armadura do rei Saul, e enfrenta o gigante armado só com uma funda e cinco pedras, derrubando-o com um único lançamento certeiro na testa.',
+  },
+  {
+    nome: 'Daniel na Cova dos Leões',
+    tema:
+      'Daniel na Cova dos Leões: por inveja, líderes convencem o rei a proibir orar a qualquer um além dele. Daniel continua orando a Deus e é jogado numa cova de leões famintos. Na manhã seguinte, o rei o encontra completamente ileso — um anjo fechou a boca dos leões a noite toda.',
+  },
+  {
+    nome: 'Jonas e a Baleia',
+    tema:
+      'Jonas e a Baleia: Deus manda Jonas pregar em Nínive, mas ele foge de navio na direção contrária. Uma tempestade ameaça o navio, os marinheiros o jogam ao mar, e um grande peixe o engole por três dias. Depois de se arrepender, o peixe o vomita em terra, e Jonas finalmente vai pregar em Nínive.',
+  },
+  {
+    nome: 'José e sua Túnica Colorida',
+    tema:
+      'José e sua Túnica Colorida: José, filho favorito de Jacó, ganha uma túnica especial e conta sonhos em que os irmãos se curvam diante dele, o que gera ciúmes. Os irmãos o vendem como escravo. No Egito, José interpreta sonhos do faraó e é promovido a governador, e anos depois os mesmos irmãos se curvam diante dele buscando comida, exatamente como no sonho.',
+  },
+  {
+    nome: 'Moisés e o Mar Vermelho',
+    tema:
+      'Moisés e o Mar Vermelho: depois de dez pragas, o faraó liberta o povo de Israel, mas se arrepende e manda seu exército atrás deles, encurralando o povo no Mar Vermelho. Deus manda Moisés estender o cajado sobre o mar, que se abre num caminho seco; o povo atravessa em segurança e o exército egípcio se afoga ao tentar seguir.',
+  },
+  {
+    nome: 'O Nascimento de Jesus',
+    tema:
+      'O Nascimento de Jesus: Maria e José viajam a Belém para um recenseamento e, sem lugar na hospedaria, se abrigam num estábulo, onde Jesus nasce numa manjedoura. Anjos anunciam o nascimento a pastores nos campos, que correm para vê-lo, e sábios do Oriente seguem uma estrela até Belém trazendo ouro, incenso e mirra.',
+  },
+  {
+    nome: 'O Filho Pródigo',
+    tema:
+      'O Filho Pródigo: um jovem pede sua herança antecipada e a gasta tudo numa vida de excessos em terra distante. Numa fome forte, ele acaba cuidando de porcos e decide voltar pra casa pra pedir perdão. Mas o pai o vê chegando de longe, corre ao seu encontro, o abraça, e organiza uma festa dizendo que o filho que estava morto voltou à vida.',
+  },
+];
 
-  async function buscar() {
-    if (!query) return;
-    setBuscando(true);
-    setErro(null);
-    try {
-      const res = await fetch('/api/stock-media', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setResultados(data.resultados || []);
-    } catch (err) {
-      setErro(err.message);
-    } finally {
-      setBuscando(false);
-    }
-  }
+export default function Desenho() {
+  const estilo = 'desenho';
+  const [historiaEscolhida, setHistoriaEscolhida] = useState(HISTORIAS[0].nome);
+  const [temaCustom, setTemaCustom] = useState('');
+  const [usarCustom, setUsarCustom] = useState(false);
+  const tema = usarCustom ? temaCustom : (HISTORIAS.find((h) => h.nome === historiaEscolhida)?.tema || '');
 
-  return (
-    <div className="card">
-      <h2>Material de apoio (b-roll, banco livre de direitos)</h2>
-      <label>Buscar (ex: deserto, mar da Galileia, ruínas antigas)</label>
-      <div className="row">
-        <div>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ex: paisagem deserto"
-          />
-        </div>
-      </div>
-      <button disabled={buscando || !query} onClick={buscar}>
-        {buscando && <span className="spinner" />}
-        {buscando ? 'Buscando...' : 'Buscar'}
-      </button>
-      {erro && <div className="result-box">Erro: {erro}</div>}
-      {resultados && (
-        <div className="result-box">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            {resultados.map((r) => (
-              <a key={r.id} href={r.videoUrl} target="_blank" rel="noreferrer" style={{ width: 120 }}>
-                <img src={r.preview} alt="preview" style={{ width: '100%', borderRadius: 6 }} />
-              </a>
-            ))}
-          </div>
-          {!resultados.length && <div style={{ color: '#999' }}>Nada encontrado pra esse termo.</div>}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function Home() {
-  const [tema, setTema] = useState('');
-  const [estilo, setEstilo] = useState('realista');
   const [formato, setFormato] = useState('longo');
   const [duracaoDesejada, setDuracaoDesejada] = useState('420');
   const [vozId, setVozId] = useState('');
@@ -122,7 +108,7 @@ export default function Home() {
   const generateVisual = async () => {
     const numCenas = (results.script?.cenas || []).length || 1;
     const ultimaPalavra = (results.voice?.palavras || []).filter((p) => p.end != null).pop();
-    const duracaoAlvo = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
+    const duracaoAlvoCalc = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
     const serieSelecionada = series.find((s) => s.id === serieId);
 
     await runStep('visual', '/api/generate-visual', {
@@ -131,8 +117,7 @@ export default function Home() {
       formato,
       imagemReferenciaUrl: serieSelecionada?.imagemReferenciaUrl,
     });
-    // guarda a duração calculada pra usar depois, quando o usuário mandar animar
-    setDuracaoAlvo(duracaoAlvo);
+    setDuracaoAlvo(duracaoAlvoCalc);
   };
 
   const animateScenes = async () => {
@@ -224,13 +209,6 @@ export default function Home() {
       tags: results.script?.tags,
     });
 
-  const publishTiktok = () =>
-    runStep('publishTiktok', '/api/tiktok-upload', {
-      videoUrl: results.assemble?.videoUrl,
-      titulo: results.script?.titulo,
-      descricao: results.script?.descricao,
-    });
-
   const salvarProjeto = () =>
     runStep('salvar', '/api/save-project', {
       tema,
@@ -244,64 +222,48 @@ export default function Home() {
 
   return (
     <div className="container">
-      <h1>Youvideo</h1>
-      <p className="subtitle">Seu estúdio automático de vídeos bíblicos e música gospel.</p>
-
-      <div className="hub-grid">
-        <a href="/musica" className="hub-tile hub-tile--gold">
-          <div className="hub-tile-title">Música</div>
-          <div className="hub-tile-desc">Uma música só, do áudio até publicar no YouTube</div>
-        </a>
-        <a href="/musica-fila" className="hub-tile hub-tile--gold">
-          <div className="hub-tile-title">Fila de músicas</div>
-          <div className="hub-tile-desc">Suba várias e deixe publicar sozinho, uma por dia</div>
-        </a>
-        <a href="/medley" className="hub-tile hub-tile--gold">
-          <div className="hub-tile-title">Medley</div>
-          <div className="hub-tile-desc">Junte músicas de estilos diferentes numa faixa só</div>
-        </a>
-        <a href="/temas" className="hub-tile hub-tile--teal">
-          <div className="hub-tile-title">Temas</div>
-          <div className="hub-tile-desc">Banco de ideias pros vídeos narrados</div>
-        </a>
-        <a href="/agendar" className="hub-tile hub-tile--teal">
-          <div className="hub-tile-title">Agendar vídeos</div>
-          <div className="hub-tile-desc">Fila automática dos vídeos bíblicos narrados</div>
-        </a>
-        <a href="/projetos" className="hub-tile hub-tile--teal">
-          <div className="hub-tile-title">Meus projetos</div>
-          <div className="hub-tile-desc">Tudo que já foi criado, dos dois canais</div>
-        </a>
-        <a href="/transcrever" className="hub-tile hub-tile--teal">
-          <div className="hub-tile-title">Transcrever áudio</div>
-          <div className="hub-tile-desc">Recuperar a letra real cantada de uma música</div>
-        </a>
-        <a href="/desenho" className="hub-tile hub-tile--teal">
-          <div className="hub-tile-title">Histórias Animadas</div>
-          <div className="hub-tile-desc">Histórias bíblicas prontas em desenho animado, só escolher e gerar</div>
-        </a>
-        <a href="/series" className="hub-tile hub-tile--teal">
-          <div className="hub-tile-title">Séries</div>
-          <div className="hub-tile-desc">Personagens com rosto consistente entre vídeos</div>
-        </a>
-      </div>
+      <h1>Histórias Animadas</h1>
+      <p className="subtitle">Histórias bíblicas clássicas em desenho animado — escolha uma e gere direto.</p>
+      <p style={{ marginTop: -8 }}>
+        <a href="/" style={{ color: '#4f7cff', fontSize: 13 }}>← voltar pro painel principal</a>
+      </p>
 
       <div className="card">
-        <h2>Tema do vídeo</h2>
-        <label>Sobre o que é o vídeo?</label>
-        <textarea
-          placeholder="Ex: A conversão de Paulo no caminho de Damasco"
-          value={tema}
-          onChange={(e) => setTema(e.target.value)}
-        />
-        <div className="row">
-          <div>
-            <label>Estilo visual</label>
-            <select value={estilo} onChange={(e) => setEstilo(e.target.value)}>
-              <option value="realista">Realista</option>
-              <option value="desenho">Desenho animado</option>
-            </select>
-          </div>
+        <h2>Escolha a história</h2>
+        <label>História bíblica</label>
+        <select
+          value={usarCustom ? '__custom__' : historiaEscolhida}
+          onChange={(e) => {
+            if (e.target.value === '__custom__') {
+              setUsarCustom(true);
+            } else {
+              setUsarCustom(false);
+              setHistoriaEscolhida(e.target.value);
+            }
+          }}
+        >
+          {HISTORIAS.map((h) => (
+            <option key={h.nome} value={h.nome}>{h.nome}</option>
+          ))}
+          <option value="__custom__">Outra história (digitar)</option>
+        </select>
+
+        {usarCustom && (
+          <>
+            <label>Descreva a história</label>
+            <textarea
+              placeholder="Ex: A história de Rute e Noemi"
+              value={temaCustom}
+              onChange={(e) => setTemaCustom(e.target.value)}
+            />
+          </>
+        )}
+
+        <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+          Estilo visual travado em <b>Desenho animado</b> nessa tela.
+        </div>
+
+        <div className="row" style={{ marginTop: 10 }}>
           <div>
             <label>Formato</label>
             <select
@@ -315,23 +277,25 @@ export default function Home() {
               <option value="short">Short</option>
             </select>
           </div>
+          <div>
+            <label>Duração desejada</label>
+            <select value={duracaoDesejada} onChange={(e) => setDuracaoDesejada(e.target.value)}>
+              {formato === 'short' ? (
+                <>
+                  <option value="60">Até 1 minuto</option>
+                  <option value="120">Até 2 minutos</option>
+                  <option value="180">Até 3 minutos (máximo do YouTube)</option>
+                </>
+              ) : (
+                <>
+                  <option value="420">7 minutos</option>
+                  <option value="600">10 minutos</option>
+                  <option value="900">15 minutos</option>
+                </>
+              )}
+            </select>
+          </div>
         </div>
-        <label>Duração desejada</label>
-        <select value={duracaoDesejada} onChange={(e) => setDuracaoDesejada(e.target.value)}>
-          {formato === 'short' ? (
-            <>
-              <option value="60">Até 1 minuto</option>
-              <option value="120">Até 2 minutos</option>
-              <option value="180">Até 3 minutos (máximo do YouTube)</option>
-            </>
-          ) : (
-            <>
-              <option value="420">7 minutos</option>
-              <option value="600">10 minutos</option>
-              <option value="900">15 minutos</option>
-            </>
-          )}
-        </select>
 
         <label>Série (personagem consistente, opcional)</label>
         <select value={serieId} onChange={(e) => setSerieId(e.target.value)}>
@@ -454,16 +418,6 @@ export default function Home() {
         result={results.publish}
       />
 
-      <StepCard
-        n={7}
-        title="Publicar no TikTok"
-        status={status.publishTiktok}
-        loading={loading === 'publishTiktok'}
-        disabled={!results.assemble?.videoUrl}
-        onRun={publishTiktok}
-        result={results.publishTiktok}
-      />
-
       <div className="card">
         <h2>Salvar este projeto</h2>
         <button disabled={!results.script || loading === 'salvar'} onClick={salvarProjeto}>
@@ -473,8 +427,6 @@ export default function Home() {
         {status.salvar === 'ok' && <div className="result-box">Salvo! Vê em "Meus Projetos" no topo da página.</div>}
         {status.salvar === 'error' && <div className="result-box">Erro: {results.salvar?.error}</div>}
       </div>
-
-      <BrollSearch />
     </div>
   );
 }
@@ -535,9 +487,6 @@ function AssembleResult({ result }) {
           Baixar vídeo completo
         </button>
       </div>
-      <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>
-        Baixe e suba manualmente no Kwai ou em qualquer outro app.
-      </div>
     </div>
   );
 }
@@ -589,6 +538,7 @@ function ThumbnailResult({ result }) {
     </div>
   );
 }
+
 function VoiceResult({ result }) {
   if (!result.audioUrl) return <div className="result-box">{result.status || 'processando...'}</div>;
   return (
