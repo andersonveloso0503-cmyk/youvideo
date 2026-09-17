@@ -1,4 +1,4 @@
-export const config = { api: { bodyParser: { sizeLimit: '15mb' } } };
+export const config = { api: { bodyParser: { sizeLimit: '15mb' } }, maxDuration: 300 };
 
 // Sandbox e Produção da Shotstack usam CHAVES DE API DIFERENTES, não é só
 // trocar o link. Resolve os dois a partir do "ambiente" escolhido na tela

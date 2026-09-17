@@ -1,6 +1,14 @@
 import { getDb } from '../../lib/firebase-admin';
 import { put } from '@vercel/blob';
 
+
+// Aumenta o limite de execução da função (padrão é bem curto e cortava
+// respostas de IA mais demoradas no meio). Precisa do plano Pro do
+// Vercel pra valer mais que ~60s.
+export const config = {
+  maxDuration: 300,
+};
+
 export default async function handler(req, res) {
   const db = getDb();
   const baseUrl = `https://${req.headers.host}`;

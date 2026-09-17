@@ -11,6 +11,13 @@ import {
   publicarYoutubePrivado,
 } from '../../lib/pipeline';
 
+// Aumenta o limite de execução da função (padrão é bem curto e cortava a
+// resposta da ElevenLabs no meio pra roteiros mais longos). Precisa do
+// plano Pro do Vercel pra valer mais que ~60s.
+export const config = {
+  maxDuration: 300,
+};
+
 export default async function handler(req, res) {
   const db = getDb();
 

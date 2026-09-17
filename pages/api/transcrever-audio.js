@@ -1,4 +1,4 @@
-export const config = { api: { bodyParser: { sizeLimit: '15mb' } } };
+export const config = { api: { bodyParser: { sizeLimit: '15mb' } }, maxDuration: 300 };
 
 export default async function handler(req, res) {
   const audioUrl = req.method === 'GET' ? req.query.audioUrl : req.body?.audioUrl;
