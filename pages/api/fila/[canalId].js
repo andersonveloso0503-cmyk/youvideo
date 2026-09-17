@@ -1,214 +1,228 @@
-// pages/api/fila/[canalId].js
-//
-// Endpoint genérico de fila: processa 1 vídeo do canal indicado na URL,
-// usando os dados salvos no Firestore (voz, personagem, orçamento,
-// refresh_token do YouTube) em vez de valores fixos.
-//
-// Isso substitui ter um /api/xxx-fila-processar hardcoded por canal —
-// o cron-job.org chama SEMPRE a mesma rota, só trocando o [canalId].
-//
-// IMPORTANTE: as funções gerarRoteiro / gerarVoz / gerarImagens /
-// montarVideo / gerarThumbnail já existem no seu projeto (é a lógica
-// que roda hoje em /musica-fila-processar e no pipeline dos apóstolos).
-// Aqui eu só ORQUESTRO essas chamadas de forma genérica — troque os
-// imports abaixo pelos caminhos reais das suas funções.
+import { getDb } from '../../../lib/firebase-admin';
+import {
+  gerarRoteiro,
+  gerarNarracao,
+  gerarImagens,
+  enviarAnimacao,
+  checarAnimacao,
+  iniciarMontagem,
+  checarMontagem,
+  gerarThumbnail,
+  publicarYoutubePrivado,
+} from '../../../lib/pipeline';
 
-import { db } from "../../../lib/firebase-admin";
-import { google } from "googleapis";
-
-// >>> AJUSTE ESTES IMPORTS para apontar pras suas funções já existentes <<<
-import { gerarRoteiro } from "../../../lib/pipeline/roteiro";
-import { gerarVoz } from "../../../lib/pipeline/voz";
-import { gerarImagensOuVideo } from "../../../lib/pipeline/visual";
-import { montarVideoFinal } from "../../../lib/pipeline/montagem";
-import { gerarThumbnail } from "../../../lib/pipeline/thumbnail";
+// Mesma lógica de máquina de estados do fila-processar.js original, só que:
+// 1. Filtrada por canalId (cada canal tem sua própria fila dentro da mesma
+//    coleção youvideo_fila — os itens têm um campo canalId).
+// 2. Usa a voz do ElevenLabs e o refresh_token do YouTube salvos no
+//    documento do canal, em vez dos valores fixos de variável de ambiente.
+export const config = {
+  maxDuration: 300,
+};
 
 export default async function handler(req, res) {
   const { canalId } = req.query;
+  if (!canalId) return res.status(400).json({ error: 'canalId é obrigatório' });
 
-  if (!canalId) {
-    return res.status(400).json({ error: "canalId é obrigatório" });
-  }
+  const db = getDb();
 
   try {
-    const canalRef = db.collection("canais").doc(canalId);
-    const canalSnap = await canalRef.get();
-
-    if (!canalSnap.exists) {
-      return res.status(404).json({ error: "Canal não encontrado" });
-    }
-
+    const canalSnap = await db.collection('canais').doc(canalId).get();
+    if (!canalSnap.exists) return res.status(404).json({ error: 'Canal não encontrado' });
     const canal = canalSnap.data();
 
-    if (canal.status !== "ativo") {
-      return res.status(200).json({ ok: false, motivo: "Canal não está ativo" });
+    if (canal.status !== 'ativo') {
+      return res.status(200).json({ mensagem: 'Canal não está ativo, nada a processar.' });
     }
 
-    if (!canal.youtubeRefreshToken) {
-      return res
-        .status(400)
-        .json({ error: "Canal ainda não tem YouTube conectado" });
-    }
+    const snapshot = await db
+      .collection('youvideo_fila')
+      .where('canalId', '==', canalId)
+      .where('status', 'not-in', ['concluido', 'erro'])
+      .orderBy('status')
+      .orderBy('criadoEm')
+      .limit(1)
+      .get();
 
-    // 1. Decide se este vídeo de hoje deve ser ANIMADO ou ESTÁTICO,
-    //    respeitando o orçamento (videosAnimadosPorSemana em config)
-    const animarHoje = await decidirSeAnimaHoje(canalRef, canal.config);
+    if (snapshot.empty) return res.status(200).json({ mensagem: 'Fila vazia, nada a processar.' });
 
-    // 2. Gera o roteiro com base no nicho do canal
-    const roteiro = await gerarRoteiro({
-      nicho: canal.nicho,
-      formato: canal.formato,
-    });
+    const doc = snapshot.docs[0];
+    const item = doc.data();
+    const ref = doc.ref;
 
-    // 3. Gera a narração usando a voz fixa daquele canal
-    const audioUrl = await gerarVoz({
-      texto: roteiro.textoNarração,
-      vozId: canal.identidade?.vozElevenLabsId,
-    });
+    const vozId = canal.identidade?.vozElevenLabsId || undefined;
+    const refreshToken = canal.youtubeRefreshToken || undefined;
+    const marcaDagua = canal.nome || undefined;
 
-    // 4. Gera imagens/vídeo, usando o personagem de referência do canal
-    //    (se tiver) pra manter consistência visual
-    const midias = await gerarImagensOuVideo({
-      cenas: roteiro.cenas,
-      personagem: canal.identidade?.temPersonagem
-        ? {
-            nome: canal.identidade.personagemNome,
-            descricao: canal.identidade.personagemDescricao,
+    switch (item.status) {
+      case 'pendente': {
+        const roteiro = await gerarRoteiro({
+          tema: item.tema,
+          estilo: item.estilo,
+          formato: item.formato,
+          duracaoDesejada: item.duracaoDesejada,
+        });
+        await ref.update({ roteiro, status: 'roteiro_ok' });
+        break;
+      }
+
+      case 'roteiro_ok': {
+        const narracao = await gerarNarracao({ texto: item.roteiro.narracao, vozId });
+        await ref.update({ narracao, status: 'voz_ok' });
+        break;
+      }
+
+      case 'voz_ok': {
+        const arquivos = await gerarImagens({
+          cenas: item.roteiro.cenas,
+          estilo: item.estilo,
+          formato: item.formato,
+        });
+        await ref.update({ arquivos, status: 'imagens_ok' });
+        break;
+      }
+
+      case 'imagens_ok': {
+        const numCenas = item.roteiro.cenas.length || 1;
+        const ultimaPalavra = (item.narracao.palavras || []).filter((p) => p.end != null).pop();
+        const duracaoAlvo = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
+
+        if (item.animar === false) {
+          const renderId = await iniciarMontagem({
+            audioUrl: item.narracao.audioUrl,
+            cenas: item.arquivos,
+            formato: item.formato,
+            palavras: item.narracao.palavras,
+            marca: marcaDagua,
+          });
+          await ref.update({ duracaoAlvo, renderId, status: 'montando' });
+          break;
+        }
+
+        const LOTE = 5;
+        const arquivosAnimados = [...item.arquivos];
+        let enviadosNesseLote = 0;
+
+        for (let i = 0; i < arquivosAnimados.length && enviadosNesseLote < LOTE; i++) {
+          const arquivo = arquivosAnimados[i];
+          if (!arquivo.imageUrl || arquivo.klingTaskId || arquivo.avisoVideo) continue;
+          try {
+            const { requestId, statusUrl, responseUrl } = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo);
+            arquivosAnimados[i] = { ...arquivo, klingTaskId: requestId, statusUrl, responseUrl };
+          } catch (err) {
+            arquivosAnimados[i] = { ...arquivo, avisoVideo: err.message };
           }
-        : null,
-      estiloVisual: canal.identidade?.estiloVisual,
-      animar: animarHoje,
-    });
+          enviadosNesseLote++;
+        }
 
-    // 5. Monta o vídeo final (Shotstack), respeitando o ambiente escolhido
-    const videoFinalUrl = await montarVideoFinal({
-      audioUrl,
-      midias,
-      legendaKaraoke: true,
-      ambiente: canal.config?.shotstackAmbiente || "sandbox",
-    });
+        const faltamEnviar = arquivosAnimados.some((a) => a.imageUrl && !a.klingTaskId && !a.avisoVideo);
+        await ref.update({
+          arquivos: arquivosAnimados,
+          duracaoAlvo,
+          status: faltamEnviar ? 'imagens_ok' : 'animando',
+        });
+        break;
+      }
 
-    // 6. Gera thumbnail
-    const thumbnailUrl = await gerarThumbnail({
-      titulo: roteiro.titulo,
-      estiloVisual: canal.identidade?.estiloVisual,
-    });
+      case 'animando': {
+        const arquivosAtualizados = [];
+        let todasProntas = true;
+        for (const arquivo of item.arquivos) {
+          if (!arquivo.klingTaskId || arquivo.videoUrl || arquivo.falhouAnimacao) {
+            arquivosAtualizados.push(arquivo);
+            continue;
+          }
+          try {
+            const check = await checarAnimacao(arquivo.statusUrl, arquivo.responseUrl);
+            if (check.status === 'done') {
+              arquivosAtualizados.push({ ...arquivo, videoUrl: check.videoUrl });
+            } else if (check.status === 'failed') {
+              arquivosAtualizados.push({ ...arquivo, falhouAnimacao: true, avisoVideo: check.error });
+            } else {
+              arquivosAtualizados.push(arquivo);
+              todasProntas = false;
+            }
+          } catch (err) {
+            arquivosAtualizados.push({ ...arquivo, falhouAnimacao: true, avisoVideo: err.message });
+          }
+        }
+        if (todasProntas) {
+          const renderId = await iniciarMontagem({
+            audioUrl: item.narracao.audioUrl,
+            cenas: arquivosAtualizados,
+            formato: item.formato,
+            palavras: item.narracao.palavras,
+            marca: marcaDagua,
+          });
+          await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
+        } else {
+          await ref.update({ arquivos: arquivosAtualizados });
+        }
+        break;
+      }
 
-    // 7. Publica no YouTube usando o refresh_token DESSE canal específico
-    const videoId = await publicarNoYoutube({
-      refreshToken: canal.youtubeRefreshToken,
-      videoUrl: videoFinalUrl,
-      thumbnailUrl,
-      titulo: roteiro.titulo,
-      descricao: roteiro.descricao,
-      tags: roteiro.tags,
-    });
+      case 'montando': {
+        const check = await checarMontagem(item.renderId);
+        if (check.status === 'done') {
+          const thumbnailUrl = await gerarThumbnail({
+            tema: item.tema,
+            titulo: item.roteiro.titulo,
+            estilo: item.estilo,
+            thumbnailTitulo: item.roteiro.thumbnailTitulo,
+            thumbnailSubtitulo: item.roteiro.thumbnailSubtitulo,
+          });
 
-    // 8. Salva o histórico no Firestore
-    await canalRef.collection("videos").add({
-      titulo: roteiro.titulo,
-      youtubeVideoId: videoId,
-      animado: animarHoje,
-      publicadoEm: new Date().toISOString(),
-    });
+          let youtubeVideoId = null;
+          let avisoYoutube = null;
+          if (refreshToken) {
+            try {
+              youtubeVideoId = await publicarYoutubePrivado({
+                videoUrl: check.videoUrl,
+                thumbnailUrl,
+                titulo: item.roteiro.titulo,
+                descricao: item.roteiro.descricao,
+                tags: item.roteiro.tags,
+                palavras: item.narracao.palavras,
+                refreshToken,
+              });
+            } catch (err) {
+              avisoYoutube = `Vídeo pronto, mas não subiu pro YouTube sozinho: ${err.message}`;
+            }
+          } else {
+            avisoYoutube = 'Canal sem YouTube conectado — vídeo ficou pronto mas não foi publicado.';
+          }
 
-    return res.status(200).json({ ok: true, videoId, animado: animarHoje });
+          await db.collection('youvideo_projects').add({
+            canalId,
+            tema: item.tema,
+            estilo: item.estilo,
+            formato: item.formato,
+            titulo: item.roteiro.titulo,
+            descricao: item.roteiro.descricao,
+            videoUrl: check.videoUrl,
+            thumbnailUrl: thumbnailUrl || null,
+            youtubeVideoId: youtubeVideoId || null,
+            avisoYoutube,
+            criadoEm: new Date().toISOString(),
+          });
+          await ref.update({
+            status: 'concluido',
+            videoUrl: check.videoUrl,
+            thumbnailUrl: thumbnailUrl || null,
+            youtubeVideoId: youtubeVideoId || null,
+          });
+        } else if (check.status === 'failed') {
+          await ref.update({ status: 'erro', erro: `Falha na montagem da Shotstack: ${check.erro || 'motivo não informado'}` });
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+
+    return res.status(200).json({ processado: doc.id, statusAnterior: item.status });
   } catch (err) {
-    console.error(`Erro ao processar fila do canal ${canalId}:`, err);
-    return res.status(500).json({ error: "Erro ao processar vídeo da fila" });
+    return res.status(500).json({ error: err.message });
   }
 }
-
-// Controla o orçamento: só anima N vezes por semana, o resto sai estático.
-// Guarda um contador simples no próprio documento do canal.
-async function decidirSeAnimaHoje(canalRef, config) {
-  const limite = config?.videosAnimadosPorSemana ?? 1;
-  const hoje = new Date();
-  const inicioSemana = new Date(hoje);
-  inicioSemana.setDate(hoje.getDate() - hoje.getDay());
-  const chaveSemanaAtual = inicioSemana.toISOString().slice(0, 10);
-
-  const snap = await canalRef.get();
-  const controle = snap.data()?.controleOrcamento || {};
-
-  const jaAnimouEssaSemana =
-    controle.semana === chaveSemanaAtual ? controle.animadosUsados || 0 : 0;
-
-  const podeAnimar = jaAnimouEssaSemana < limite;
-
-  await canalRef.set(
-    {
-      controleOrcamento: {
-        semana: chaveSemanaAtual,
-        animadosUsados: jaAnimouEssaSemana + (podeAnimar ? 1 : 0),
-      },
-    },
-    { merge: true }
-  );
-
-  return podeAnimar;
-}
-
-// Publica o vídeo no YouTube usando o refresh_token salvo no Firestore
-// (em vez de uma variável de ambiente fixa por canal).
-async function publicarNoYoutube({
-  refreshToken,
-  videoUrl,
-  thumbnailUrl,
-  titulo,
-  descricao,
-  tags,
-}) {
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.YOUTUBE_CLIENT_ID,
-    process.env.YOUTUBE_CLIENT_SECRET
-  );
-  oauth2Client.setCredentials({ refresh_token: refreshToken });
-
-  const youtube = google.youtube({ version: "v3", auth: oauth2Client });
-
-  // Baixa o vídeo final pra um stream (necessário pra API do YouTube)
-  const videoRes = await fetch(videoUrl);
-  const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-
-  const uploadRes = await youtube.videos.insert({
-    part: ["snippet", "status"],
-    requestBody: {
-      snippet: { title: titulo, description: descricao, tags },
-      status: { privacyStatus: "public" },
-    },
-    media: {
-      body: bufferToStream(videoBuffer),
-    },
-  });
-
-  const videoId = uploadRes.data.id;
-
-  // Define a thumbnail customizada
-  if (thumbnailUrl) {
-    const thumbRes = await fetch(thumbnailUrl);
-    const thumbBuffer = Buffer.from(await thumbRes.arrayBuffer());
-    await youtube.thumbnails.set({
-      videoId,
-      media: { body: bufferToStream(thumbBuffer) },
-    });
-  }
-
-  return videoId;
-}
-
-function bufferToStream(buffer) {
-  const { Readable } = require("stream");
-  const stream = new Readable();
-  stream.push(buffer);
-  stream.push(null);
-  return stream;
-}
-
-// Next.js precisa disso pra rotas de API que lidam com uploads maiores
-export const config = {
-  api: {
-    bodyParser: false,
-    responseLimit: false,
-  },
-};
