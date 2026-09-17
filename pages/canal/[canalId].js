@@ -136,9 +136,17 @@ export default function PainelCanal() {
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm p-6 space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Canal
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-gray-700">
+              Canal
+            </label>
+            <button
+              onClick={() => router.push("/novo-canal")}
+              className="text-sm text-blue-600 underline"
+            >
+              + Criar novo canal
+            </button>
+          </div>
           <select
             className="input"
             value={canalId || ""}
