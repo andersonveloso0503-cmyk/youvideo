@@ -411,7 +411,19 @@ export default function Home() {
         result={results.visual}
         renderResult={(r) => (
           <>
-            <VisualResult result={r} />
+            <VisualResult
+              result={r}
+              estilo={estilo}
+              formato={formato}
+              imagemReferenciaUrl={series.find((s) => s.id === serieId)?.imagemReferenciaUrl}
+              onRetryCena={(indice, novoArquivo) =>
+                setResults((res) => {
+                  const arquivos = [...(res.visual?.arquivos || [])];
+                  arquivos[indice] = novoArquivo;
+                  return { ...res, visual: { ...res.visual, arquivos } };
+                })
+              }
+            />
             {r.arquivos?.some((a) => a.imageUrl && !a.klingTaskId && !a.videoUrl) && (
               <button onClick={animateScenes} disabled={loading === 'visual'}>
                 {loading === 'visual' && <span className="spinner" />}
@@ -542,7 +554,36 @@ function AssembleResult({ result }) {
   );
 }
 
-function VisualResult({ result }) {
+function VisualResult({ result, onRetryCena, estilo, formato, imagemReferenciaUrl }) {
+  const [textoEdit, setTextoEdit] = useState({});
+  const [tentandoIndice, setTentandoIndice] = useState(null);
+
+  const tentarDeNovo = async (indice, arquivoOriginal) => {
+    setTentandoIndice(indice);
+    try {
+      const res = await fetch('/api/generate-visual-cena', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descricao: textoEdit[indice] ?? arquivoOriginal.cena,
+          textoNarrado: arquivoOriginal.textoNarrado,
+          estilo,
+          formato,
+          imagemReferenciaUrl,
+          start: arquivoOriginal.start,
+          length: arquivoOriginal.length,
+        }),
+      });
+      const novoArquivo = await res.json();
+      if (!res.ok) throw new Error(novoArquivo.error || 'Erro ao tentar de novo');
+      onRetryCena && onRetryCena(indice, novoArquivo);
+    } catch (err) {
+      onRetryCena && onRetryCena(indice, { cena: arquivoOriginal.cena, erro: err.message });
+    } finally {
+      setTentandoIndice(null);
+    }
+  };
+
   return (
     <div className="result-box">
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -553,7 +594,22 @@ function VisualResult({ result }) {
             ) : a.imageUrl ? (
               <img src={a.imageUrl} alt={a.cena} style={{ width: '100%', borderRadius: 6 }} />
             ) : a.erro ? (
-              <div style={{ color: '#ff9d9d', fontSize: 11 }}>{a.erro}</div>
+              <div style={{ color: '#ff9d9d', fontSize: 11 }}>
+                {a.erro}
+                <textarea
+                  value={textoEdit[i] ?? a.cena ?? ''}
+                  onChange={(e) => setTextoEdit((t) => ({ ...t, [i]: e.target.value }))}
+                  style={{ width: '100%', minHeight: 60, fontSize: 11, marginTop: 6, fontFamily: 'inherit' }}
+                />
+                <button
+                  style={{ marginTop: 4, fontSize: 11, padding: '4px 8px' }}
+                  disabled={tentandoIndice === i}
+                  onClick={() => tentarDeNovo(i, a)}
+                >
+                  {tentandoIndice === i && <span className="spinner" />}
+                  {tentandoIndice === i ? 'Gerando...' : 'Tentar de novo'}
+                </button>
+              </div>
             ) : (
               <div style={{ color: '#999' }}>{a.status || 'sem imagem'}</div>
             )}
@@ -563,7 +619,7 @@ function VisualResult({ result }) {
             {a.avisoVideo && (
               <div style={{ fontSize: 11, color: '#ff9d9d' }}>{a.avisoVideo}</div>
             )}
-            <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>{a.cena}</div>
+            {!a.erro && <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>{a.cena}</div>}
           </div>
         ))}
       </div>
