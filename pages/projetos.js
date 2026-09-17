@@ -48,28 +48,34 @@ export default function Projetos() {
 
   async function reformatarParaVertical(p) {
     const id = p.id;
-    setReformatando((prev) => ({ ...prev, [id]: { status: "localizando" } }));
+    setReformatando((prev) => ({ ...prev, [id]: { status: "enviando" } }));
     try {
-      // 1. Acha o item original da fila (áudio/imagens) a partir do tema
-      const locRes = await fetch(`/api/localizar-item-fila?tema=${encodeURIComponent(p.tema)}`);
-      const locData = await locRes.json();
-      if (!locRes.ok) throw new Error(locData.error || "Não achei o item original");
-
-      setReformatando((prev) => ({ ...prev, [id]: { status: "enviando" } }));
-
-      // 2. Manda remontar em formato vertical (short)
-      const res = await fetch("/api/reformatar-video", {
+      // 1ª tentativa: o próprio projeto já guarda áudio/cenas (vídeos salvos
+      // depois da correção do /desenho e telas parecidas)
+      let res = await fetch("/api/reformatar-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          colecao: "fila",
-          itemId: locData.itemId,
-          novoFormato: "short",
-          ambiente: "production",
-        }),
+        body: JSON.stringify({ colecao: "projeto", itemId: id, novoFormato: "short", ambiente: "production" }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao reformatar");
+      let data = await res.json();
+
+      // 2ª tentativa (fallback): projetos antigos, sem os dados salvos —
+      // procura o item original na fila pelo tema
+      if (!res.ok) {
+        setReformatando((prev) => ({ ...prev, [id]: { status: "localizando" } }));
+        const locRes = await fetch(`/api/localizar-item-fila?tema=${encodeURIComponent(p.tema)}`);
+        const locData = await locRes.json();
+        if (!locRes.ok) throw new Error(locData.error || data.error || "Não achei dados pra reformatar esse vídeo");
+
+        setReformatando((prev) => ({ ...prev, [id]: { status: "enviando" } }));
+        res = await fetch("/api/reformatar-video", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ colecao: "fila", itemId: locData.itemId, novoFormato: "short", ambiente: "production" }),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Erro ao reformatar");
+      }
 
       setReformatando((prev) => ({
         ...prev,
