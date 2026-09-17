@@ -13,8 +13,10 @@ export default async function handler(req, res) {
       .map((d) => ({ id: d.id, titulo: d.data().titulo, tema: d.data().tema, criadoEm: d.data().criadoEm }))
       .filter((p) => (p.titulo || '').includes('Noé') || (p.tema || '').includes('Noé') || (p.tema || '').includes('Noe'));
 
-    // Busca em youvideo_fila pelo tema
-    const filaSnap = await db.collection('youvideo_fila').orderBy('criadoEm', 'desc').limit(50).get();
+    // Busca em youvideo_fila com status concluido, sem limite de recência
+    // (os testes recentes dos canais novos podem ter empurrado vídeos
+    // antigos pra fora de uma janela pequena) — escaneia até 500 itens.
+    const filaSnap = await db.collection('youvideo_fila').where('status', '==', 'concluido').limit(500).get();
     const filaItens = filaSnap.docs
       .map((d) => ({
         id: d.id,
