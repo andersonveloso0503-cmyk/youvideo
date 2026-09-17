@@ -33,7 +33,6 @@ export default function PainelCanal() {
   const [processando, setProcessando] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [erroFila, setErroFila] = useState("");
-  const [reformatando, setReformatando] = useState({}); // { [itemId]: { renderId, status, videoUrl } }
 
   const carregarCanal = useCallback(async () => {
     if (!canalId) return;
@@ -133,58 +132,6 @@ export default function PainelCanal() {
     }
   }
 
-  async function reformatarParaVertical(itemId) {
-    setReformatando((prev) => ({ ...prev, [itemId]: { status: "enviando" } }));
-    try {
-      const res = await fetch("/api/reformatar-video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          colecao: "fila",
-          itemId,
-          novoFormato: "short",
-          ambiente: canal?.config?.shotstackAmbiente || "production",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro ao reformatar");
-      setReformatando((prev) => ({
-        ...prev,
-        [itemId]: { status: "processando", renderId: data.renderId },
-      }));
-    } catch (e) {
-      setReformatando((prev) => ({ ...prev, [itemId]: { status: "erro", erro: e.message } }));
-    }
-  }
-
-  async function verificarStatusReformatacao(itemId) {
-    const info = reformatando[itemId];
-    if (!info?.renderId) return;
-    try {
-      const ambiente = canal?.config?.shotstackAmbiente || "production";
-      const res = await fetch(`/api/assemble-video?id=${info.renderId}&ambiente=${ambiente}`);
-      const data = await res.json();
-      if (data.status === "done") {
-        setReformatando((prev) => ({
-          ...prev,
-          [itemId]: { ...prev[itemId], status: "pronto", videoUrl: data.videoUrl },
-        }));
-      } else if (data.status === "failed") {
-        setReformatando((prev) => ({
-          ...prev,
-          [itemId]: { ...prev[itemId], status: "erro", erro: data.erro || "Falha na montagem" },
-        }));
-      } else {
-        setReformatando((prev) => ({
-          ...prev,
-          [itemId]: { ...prev[itemId], status: "processando" },
-        }));
-      }
-    } catch (e) {
-      setReformatando((prev) => ({ ...prev, [itemId]: { ...prev[itemId], status: "erro", erro: e.message } }));
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm p-6 space-y-6">
@@ -281,45 +228,6 @@ export default function PainelCanal() {
                     >
                       Ver no YouTube
                     </a>
-                  )}
-
-                  {item.status === "concluido" && (
-                    <div className="mt-2">
-                      {!reformatando[item.id] && (
-                        <button
-                          onClick={() => reformatarParaVertical(item.id)}
-                          className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700"
-                        >
-                          Reformatar pra vertical (TikTok/Kwai)
-                        </button>
-                      )}
-                      {reformatando[item.id]?.status === "enviando" && (
-                        <p className="text-xs text-gray-400">Enviando pedido de remontagem...</p>
-                      )}
-                      {reformatando[item.id]?.status === "processando" && (
-                        <button
-                          onClick={() => verificarStatusReformatacao(item.id)}
-                          className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700"
-                        >
-                          Ainda montando — clique pra verificar de novo
-                        </button>
-                      )}
-                      {reformatando[item.id]?.status === "erro" && (
-                        <p className="text-xs text-red-600">
-                          Erro: {reformatando[item.id].erro}
-                        </p>
-                      )}
-                      {reformatando[item.id]?.status === "pronto" && (
-                        <a
-                          href={reformatando[item.id].videoUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 inline-block"
-                        >
-                          Vídeo vertical pronto — baixar
-                        </a>
-                      )}
-                    </div>
                   )}
                 </div>
                 <span
