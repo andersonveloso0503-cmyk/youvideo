@@ -3,7 +3,7 @@ import { getDb } from '../../lib/firebase-admin';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { tema, estilo, formato, titulo, descricao, videoUrl, thumbnailUrl, canal } = req.body;
+  const { tema, estilo, formato, titulo, descricao, videoUrl, thumbnailUrl, canal, audioUrl, cenas, palavras } = req.body;
   if (!titulo) return res.status(400).json({ error: 'Nada pra salvar ainda (gere o roteiro primeiro)' });
 
   try {
@@ -17,6 +17,12 @@ export default async function handler(req, res) {
       videoUrl: videoUrl || null,
       thumbnailUrl: thumbnailUrl || null,
       canal: canal || 'apostolos',
+      // Guardados pra permitir remontar o vídeo depois (ex: reformatar pra
+      // vertical) sem precisar gerar tudo de novo. Ficam null em telas que
+      // ainda não mandam esses dados (compatível com o que já existia).
+      audioUrl: audioUrl || null,
+      cenas: cenas || null,
+      palavras: palavras || null,
       criadoEm: new Date().toISOString(),
     });
 
