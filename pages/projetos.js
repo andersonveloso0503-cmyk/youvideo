@@ -17,6 +17,7 @@ export default function Projetos() {
   const [erro, setErro] = useState(null);
   const [arquivosProntos, setArquivosProntos] = useState({});
   const [statusEnvio, setStatusEnvio] = useState({});
+  const [reformatando, setReformatando] = useState({}); // { [projetoId]: { status, renderId, videoUrl, erro } }
 
   useEffect(() => {
     fetch('/api/list-projects')
@@ -44,6 +45,61 @@ export default function Projetos() {
       })
       .catch((err) => setErro(err.message));
   }, []);
+
+  async function reformatarParaVertical(p) {
+    const id = p.id;
+    setReformatando((prev) => ({ ...prev, [id]: { status: "localizando" } }));
+    try {
+      // 1. Acha o item original da fila (áudio/imagens) a partir do tema
+      const locRes = await fetch(`/api/localizar-item-fila?tema=${encodeURIComponent(p.tema)}`);
+      const locData = await locRes.json();
+      if (!locRes.ok) throw new Error(locData.error || "Não achei o item original");
+
+      setReformatando((prev) => ({ ...prev, [id]: { status: "enviando" } }));
+
+      // 2. Manda remontar em formato vertical (short)
+      const res = await fetch("/api/reformatar-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          colecao: "fila",
+          itemId: locData.itemId,
+          novoFormato: "short",
+          ambiente: "production",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao reformatar");
+
+      setReformatando((prev) => ({
+        ...prev,
+        [id]: { status: "processando", renderId: data.renderId },
+      }));
+    } catch (e) {
+      setReformatando((prev) => ({ ...prev, [id]: { status: "erro", erro: e.message } }));
+    }
+  }
+
+  async function verificarStatusReformatacao(id) {
+    const info = reformatando[id];
+    if (!info?.renderId) return;
+    try {
+      const res = await fetch(`/api/assemble-video?id=${info.renderId}&ambiente=production`);
+      const data = await res.json();
+      if (data.status === "done") {
+        setReformatando((prev) => ({ ...prev, [id]: { ...prev[id], status: "pronto", videoUrl: data.videoUrl } }));
+      } else if (data.status === "failed") {
+        setReformatando((prev) => ({
+          ...prev,
+          [id]: { ...prev[id], status: "erro", erro: data.erro || "Falha na montagem" },
+        }));
+      } else {
+        setReformatando((prev) => ({ ...prev, [id]: { ...prev[id], status: "processando" } }));
+      }
+    } catch (e) {
+      setReformatando((prev) => ({ ...prev, [id]: { ...prev[id], status: "erro", erro: e.message } }));
+    }
+  }
 
   return (
     <div className="container">
@@ -110,6 +166,47 @@ export default function Projetos() {
                 <a href={p.videoUrl} target="_blank" rel="noreferrer" style={{ color: '#4f7cff', fontSize: 13 }}>
                   Ou abrir o vídeo direto (tela cheia)
                 </a>
+              </div>
+
+              <div style={{ marginTop: 12, borderTop: '1px solid #333', paddingTop: 10 }}>
+                {!reformatando[p.id] && (
+                  <button onClick={() => reformatarParaVertical(p)} style={{ marginTop: 0 }}>
+                    Reformatar pra vertical (TikTok/Kwai)
+                  </button>
+                )}
+                {reformatando[p.id]?.status === "localizando" && (
+                  <div style={{ fontSize: 12, color: '#999' }}>Localizando dados originais...</div>
+                )}
+                {reformatando[p.id]?.status === "enviando" && (
+                  <div style={{ fontSize: 12, color: '#999' }}>Enviando pedido de remontagem...</div>
+                )}
+                {reformatando[p.id]?.status === "processando" && (
+                  <button onClick={() => verificarStatusReformatacao(p.id)} style={{ marginTop: 0 }}>
+                    Ainda montando — clique pra verificar de novo
+                  </button>
+                )}
+                {reformatando[p.id]?.status === "erro" && (
+                  <div style={{ fontSize: 12, color: '#ff9d9d' }}>Erro: {reformatando[p.id].erro}</div>
+                )}
+                {reformatando[p.id]?.status === "pronto" && (
+                  <>
+                    <video
+                      src={reformatando[p.id].videoUrl}
+                      controls
+                      playsInline
+                      style={{ width: '100%', maxWidth: 220, borderRadius: 6, marginBottom: 8 }}
+                    />
+                    <div>
+                      <a
+                        href={`/api/download-video?url=${encodeURIComponent(reformatando[p.id].videoUrl)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <button style={{ marginTop: 0 }}>Baixar versão vertical</button>
+                      </a>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}
