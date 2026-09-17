@@ -47,6 +47,10 @@ export default function NovoCanal() {
     videosPorDia: 1,
   });
 
+  const [temaTeste, setTemaTeste] = useState("");
+  const [enviandoTeste, setEnviandoTeste] = useState(false);
+  const [resultadoTeste, setResultadoTeste] = useState("");
+
   function atualizar(setFn) {
     return (campo, valor) => setFn((prev) => ({ ...prev, [campo]: valor }));
   }
@@ -130,6 +134,26 @@ export default function NovoCanal() {
       setErro("Não consegui ativar a automação. Confere os dados e tenta de novo.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function adicionarNaFilaTeste() {
+    setEnviandoTeste(true);
+    setResultadoTeste("");
+    try {
+      const res = await fetch("/api/canais/fila-adicionar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ canalId, tema: temaTeste }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro desconhecido");
+      setResultadoTeste(`Adicionado! ID na fila: ${data.id}. Agora acesse a URL da fila (acima) pra processar o primeiro passo.`);
+      setTemaTeste("");
+    } catch (e) {
+      setResultadoTeste(`Erro: ${e.message}`);
+    } finally {
+      setEnviandoTeste(false);
     }
   }
 
@@ -343,6 +367,29 @@ export default function NovoCanal() {
             <div className="bg-gray-100 rounded-lg p-3 text-sm break-all font-mono">
               {config.urlFila || "URL será exibida após ativar"}
             </div>
+
+            <div className="border-t pt-4 mt-4 text-left space-y-3">
+              <p className="text-sm font-medium text-gray-700">
+                Testar agora: adicionar 1 vídeo na fila
+              </p>
+              <input
+                className="input"
+                placeholder="Tema do vídeo, ex: Davi e Golias"
+                value={temaTeste}
+                onChange={(e) => setTemaTeste(e.target.value)}
+              />
+              <button
+                onClick={adicionarNaFilaTeste}
+                disabled={!temaTeste || enviandoTeste}
+                className="w-full py-3 rounded-xl bg-green-600 text-white font-semibold disabled:opacity-50"
+              >
+                {enviandoTeste ? "Adicionando..." : "Adicionar na fila"}
+              </button>
+              {resultadoTeste && (
+                <p className="text-sm text-gray-600 break-all">{resultadoTeste}</p>
+              )}
+            </div>
+
             <BotaoGrande onClick={() => router.push("/")}>
               Ir para o painel
             </BotaoGrande>
