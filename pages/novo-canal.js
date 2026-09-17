@@ -7,7 +7,7 @@
 // (mesmo padrão que /musica, /musica-fila, /medley). Se seu projeto usa
 // App Router (pasta /app), me avisa que eu converto.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 
 const STEPS = [
@@ -54,6 +54,21 @@ export default function NovoCanal() {
   const setIdent = atualizar(setIdentidade);
   const setConf = atualizar(setConfig);
 
+  // Quando a página recarrega vinda da volta do Google (OAuth), o canalId
+  // e o "youtube=conectado" vêm como parâmetros na URL — sem isso, o
+  // wizard reiniciava sempre no Passo 1 porque o estado do React se perde
+  // a cada recarregamento de página.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { canalId: canalIdDaUrl, youtube } = router.query;
+    if (canalIdDaUrl && typeof canalIdDaUrl === "string") {
+      setCanalId(canalIdDaUrl);
+      if (youtube === "conectado") {
+        setStep(2);
+      }
+    }
+  }, [router.isReady, router.query]);
+
   // Passo 1: cria o documento do canal no Firestore (via API route)
   async function criarCanalBasico() {
     setSaving(true);
@@ -78,7 +93,7 @@ export default function NovoCanal() {
   // Passo 2: manda pro fluxo OAuth do Google, levando o canalId no state
   function conectarYoutube() {
     if (!canalId) return;
-    window.location.href = `/api/auth/google?canal=${canalId}`;
+    window.location.href = `/api/youtube/oauth-authorize?canalId=${canalId}`;
   }
 
   // Passo 3 e 4: salva identidade e config, sem sair da tela
