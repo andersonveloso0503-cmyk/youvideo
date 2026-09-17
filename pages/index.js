@@ -248,6 +248,14 @@ export default function Home() {
       <p className="subtitle">Seu estúdio automático de vídeos bíblicos e música gospel.</p>
 
       <div className="hub-grid">
+        <a href="/novo-canal" className="hub-tile hub-tile--gold">
+          <div className="hub-tile-title">Novo canal</div>
+          <div className="hub-tile-desc">Criar um canal novo do zero (wizard guiado)</div>
+        </a>
+        <a href="/canal" className="hub-tile hub-tile--gold">
+          <div className="hub-tile-title">Meus canais</div>
+          <div className="hub-tile-desc">Adicionar temas, ver status e reformatar vídeos por canal</div>
+        </a>
         <a href="/musica" className="hub-tile hub-tile--gold">
           <div className="hub-tile-title">Música</div>
           <div className="hub-tile-desc">Uma música só, do áudio até publicar no YouTube</div>
