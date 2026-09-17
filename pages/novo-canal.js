@@ -78,7 +78,7 @@ export default function NovoCanal() {
   // Passo 2: manda pro fluxo OAuth do Google, levando o canalId no state
   function conectarYoutube() {
     if (!canalId) return;
-    window.location.href = `/api/youtube/oauth-authorize?canalId=${canalId}`;
+    window.location.href = `/api/auth/google?canal=${canalId}`;
   }
 
   // Passo 3 e 4: salva identidade e config, sem sair da tela
