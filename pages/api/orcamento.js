@@ -1,10 +1,8 @@
 // pages/api/orcamento.js
-//
-// AJUSTE NECESSÁRIO: troque o import abaixo pelo caminho real do seu
-// arquivo do Firebase (o mesmo Firestore que o Youvideo já usa pra
-// "Meus Projetos"). Ele precisa exportar `db` (instância do Firestore).
-import { db } from '../../lib/firebase';
+import { getDb } from '../../lib/firebase-admin';
 import { buscarSaldoFal, buscarSaldoFlux, buscarSaldoElevenLabs } from '../../lib/orcamento';
+
+const db = getDb();
 
 // Ajuste estes três valores conforme sua realidade for mudando:
 const ORCAMENTO_MENSAL_PADRAO = 250; // R$ — seu teto mensal combinado
