@@ -2,36 +2,46 @@
 import { useEffect, useState } from 'react';
 
 function corBarra(percentual) {
-  if (percentual === null) return '#999';
-  if (percentual > 50) return '#2e7d32';
-  if (percentual > 20) return '#f9a825';
-  return '#c62828';
+  if (percentual === null) return 'var(--border)';
+  if (percentual > 50) return 'var(--teal)';
+  if (percentual > 20) return 'var(--gold)';
+  return 'var(--terracotta)';
 }
 
 function LinhaServico({ nome, dado }) {
   if (!dado) return null;
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 4 }}>
-        <strong>{nome}</strong>
-        <span style={{ color: '#666' }}>{dado.papel}</span>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        gap: 12,
+        padding: '10px 0',
+        borderTop: '1px solid var(--border)',
+      }}
+    >
+      <div>
+        <div style={{ fontSize: 14, color: 'var(--text)' }}>{nome}</div>
+        {dado.gratis ? (
+          <div style={{ fontSize: 13, color: 'var(--teal)' }}>Grátis / sem custo direto</div>
+        ) : dado.ok === false ? (
+          <div style={{ fontSize: 13, color: '#ff9d8c' }}>Sem saldo agora ({dado.erro})</div>
+        ) : (
+          <div style={{ fontSize: 15, color: 'var(--text)' }}>
+            {dado.saldo !== null && dado.saldo !== undefined ? dado.saldo.toLocaleString('pt-BR') : '—'}{' '}
+            {dado.moeda ?? ''}
+            {dado.manual && (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>
+                (manual, {dado.atualizado_em ? new Date(dado.atualizado_em).toLocaleDateString('pt-BR') : 'nunca atualizado'})
+              </span>
+            )}
+          </div>
+        )}
       </div>
-      {dado.gratis ? (
-        <div style={{ fontSize: 13, color: '#2e7d32' }}>Grátis / sem custo direto</div>
-      ) : dado.ok === false ? (
-        <div style={{ fontSize: 13, color: '#c62828' }}>Não consegui buscar o saldo agora ({dado.erro})</div>
-      ) : (
-        <div style={{ fontSize: 15 }}>
-          {dado.saldo !== null && dado.saldo !== undefined ? dado.saldo.toLocaleString('pt-BR') : '—'}{' '}
-          {dado.moeda ?? ''}
-          {dado.manual && (
-            <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
-              (manual, atualizado{' '}
-              {dado.atualizado_em ? new Date(dado.atualizado_em).toLocaleDateString('pt-BR') : 'nunca'})
-            </span>
-          )}
-        </div>
-      )}
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+        {dado.papel}
+      </div>
     </div>
   );
 }
@@ -74,39 +84,42 @@ export default function PainelOrcamento() {
     carregar();
   }
 
-  if (carregando) return <div style={{ padding: 16 }}>Carregando orçamento…</div>;
-  if (!dados) return <div style={{ padding: 16 }}>Não consegui carregar o orçamento agora.</div>;
+  if (carregando) {
+    return (
+      <div className="card">
+        <span className="spinner spinner--muted" /> Carregando orçamento…
+      </div>
+    );
+  }
+  if (!dados) {
+    return <div className="card">Não consegui carregar o orçamento agora.</div>;
+  }
 
   const percentualRestante = dados.orcamento.mensal
     ? Math.max(0, (dados.orcamento.restante / dados.orcamento.mensal) * 100)
     : null;
 
+  const corRecomendacao = dados.recomendacao === 'animado' ? 'var(--teal-soft)' : 'var(--terracotta-soft)';
+  const textoRecomendacao = dados.recomendacao === 'animado' ? '#8fd6c1' : '#ff9d8c';
+
   return (
-    <div
-      style={{
-        background: '#fff',
-        borderRadius: 12,
-        padding: 20,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-        marginBottom: 24,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>Orçamento do mês</h2>
+    <div className="card">
+      <h2 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>Orçamento do mês</span>
         <button
           onClick={() => setEditando(!editando)}
-          style={{ border: 'none', background: '#eee', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}
+          style={{ marginTop: 0, background: 'var(--border)', color: 'var(--text)', fontSize: 12, padding: '6px 12px' }}
         >
           {editando ? 'Fechar' : 'Atualizar saldo manual'}
         </button>
-      </div>
+      </h2>
 
       <div style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
           <span>Restante: R$ {dados.orcamento.restante.toFixed(2)}</span>
           <span>Teto: R$ {dados.orcamento.mensal.toFixed(2)}</span>
         </div>
-        <div style={{ height: 10, background: '#eee', borderRadius: 6, overflow: 'hidden' }}>
+        <div style={{ height: 8, background: 'var(--border)', borderRadius: 6, overflow: 'hidden' }}>
           <div
             style={{
               width: `${percentualRestante}%`,
@@ -120,82 +133,69 @@ export default function PainelOrcamento() {
 
       <div
         style={{
-          padding: 12,
+          padding: '10px 14px',
           borderRadius: 8,
-          marginBottom: 20,
-          background: dados.recomendacao === 'animado' ? '#e8f5e9' : '#fff3e0',
-          color: dados.recomendacao === 'animado' ? '#2e7d32' : '#e65100',
-          fontWeight: 600,
+          marginBottom: 8,
+          background: corRecomendacao,
+          color: textoRecomendacao,
+          fontSize: 14,
         }}
       >
         {dados.recomendacao === 'animado' ? '✅ Pode animar' : '⚠️ Use vídeo fixo'} — {dados.motivo}
       </div>
 
-      <LinhaServico nome="fal.ai (animação)" dado={dados.servicos.fal} />
-      <LinhaServico nome="Flux (imagens)" dado={dados.servicos.flux} />
-      <LinhaServico nome="ElevenLabs (narração)" dado={dados.servicos.elevenlabs} />
-      <LinhaServico nome="Shotstack (montagem)" dado={dados.servicos.shotstack} />
-      <LinhaServico nome="Suno (música)" dado={dados.servicos.suno} />
-      <LinhaServico nome="Pexels (b-roll)" dado={dados.servicos.pexels} />
-      <LinhaServico nome="Groq (roteiro)" dado={dados.servicos.groq} />
+      <div>
+        <LinhaServico nome="fal.ai (animação)" dado={dados.servicos.fal} />
+        <LinhaServico nome="Flux (imagens)" dado={dados.servicos.flux} />
+        <LinhaServico nome="ElevenLabs (narração)" dado={dados.servicos.elevenlabs} />
+        <LinhaServico nome="Shotstack (montagem)" dado={dados.servicos.shotstack} />
+        <LinhaServico nome="Suno (música)" dado={dados.servicos.suno} />
+        <LinhaServico nome="Pexels (b-roll)" dado={dados.servicos.pexels} />
+        <LinhaServico nome="Groq (roteiro)" dado={dados.servicos.groq} />
+      </div>
 
       {editando && (
-        <form onSubmit={salvarManual} style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 16 }}>
-          <p style={{ fontSize: 13, color: '#666', marginTop: 0 }}>
+        <form onSubmit={salvarManual} style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 0 }}>
             Shotstack e Suno não têm API pública de saldo — dá uma olhada no painel de cada um e digita aqui.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <label style={{ fontSize: 13 }}>
-              Créditos Shotstack
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <div>
+              <label>Créditos Shotstack</label>
               <input
-                type="number"
+                type="text"
                 value={form.shotstack}
                 onChange={(e) => setForm({ ...form, shotstack: e.target.value })}
-                style={{ width: '100%', padding: 6, marginTop: 4 }}
               />
-            </label>
-            <label style={{ fontSize: 13 }}>
-              Músicas restantes Suno
+            </div>
+            <div>
+              <label>Músicas restantes Suno</label>
               <input
-                type="number"
+                type="text"
                 value={form.suno}
                 onChange={(e) => setForm({ ...form, suno: e.target.value })}
-                style={{ width: '100%', padding: 6, marginTop: 4 }}
               />
-            </label>
-            <label style={{ fontSize: 13 }}>
-              Teto mensal (R$)
+            </div>
+          </div>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <div>
+              <label>Teto mensal (R$)</label>
               <input
-                type="number"
+                type="text"
                 value={form.orcamento_mensal}
                 onChange={(e) => setForm({ ...form, orcamento_mensal: e.target.value })}
-                style={{ width: '100%', padding: 6, marginTop: 4 }}
               />
-            </label>
-            <label style={{ fontSize: 13 }}>
-              Já gasto este mês (R$)
+            </div>
+            <div>
+              <label>Já gasto este mês (R$)</label>
               <input
-                type="number"
+                type="text"
                 value={form.gasto_mes_atual}
                 onChange={(e) => setForm({ ...form, gasto_mes_atual: e.target.value })}
-                style={{ width: '100%', padding: 6, marginTop: 4 }}
               />
-            </label>
+            </div>
           </div>
-          <button
-            type="submit"
-            style={{
-              marginTop: 12,
-              padding: '8px 16px',
-              background: '#1976d2',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 8,
-              cursor: 'pointer',
-            }}
-          >
-            Salvar
-          </button>
+          <button type="submit">Salvar</button>
         </form>
       )}
     </div>
