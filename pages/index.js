@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-
+import PainelOrcamento from '../components/PainelOrcamento';
+// ...
+<PainelOrcamento />
 function BrollSearch() {
   const [query, setQuery] = useState('');
   const [resultados, setResultados] = useState(null);
