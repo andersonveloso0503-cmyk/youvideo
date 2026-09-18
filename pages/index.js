@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import PainelOrcamento from '../components/PainelOrcamento';
-// ...
-<PainelOrcamento />
+
 function BrollSearch() {
   const [query, setQuery] = useState('');
   const [resultados, setResultados] = useState(null);
@@ -248,6 +247,8 @@ export default function Home() {
     <div className="container">
       <h1>Youvideo</h1>
       <p className="subtitle">Seu estúdio automático de vídeos bíblicos e música gospel.</p>
+
+      <PainelOrcamento />
 
       <div className="hub-grid">
         <a href="/novo-canal" className="hub-tile hub-tile--gold">
