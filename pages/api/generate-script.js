@@ -70,7 +70,7 @@ IMPORTANTE:
               : []),
           ],
           temperature: tentativaExtra ? 0.4 : 0.8,
-          max_completion_tokens: 8000,
+          max_completion_tokens: 16000,
           response_format: { type: 'json_object' },
         }),
       });

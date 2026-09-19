@@ -5,8 +5,6 @@ import {
   gerarImagens,
   enviarAnimacao,
   checarAnimacao,
-  iniciarMontagem,
-  checarMontagem,
   gerarThumbnail,
   publicarYoutubePrivado,
 } from '../../lib/pipeline';
@@ -20,6 +18,33 @@ export const config = {
 
 export default async function handler(req, res) {
   const db = getDb();
+  const baseUrl = `https://${req.headers.host}`;
+
+  // Usa o MESMO endpoint de montagem que música/medley usam (em vez de uma
+  // cópia separada no lib/pipeline.js), pra qualquer correção futura valer
+  // pros dois de uma vez. Também repassa audioSegments quando a narração
+  // foi dividida em mais de um pedaço (textos longos passam do limite de
+  // caracteres da ElevenLabs numa chamada só).
+  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras }) => {
+    const temVariosPedacos = (audioSegments || []).length > 1;
+    const r = await fetch(`${baseUrl}/api/assemble-video`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        temVariosPedacos ? { audioSegments, cenas, formato, palavras } : { audioUrl, cenas, formato, palavras }
+      ),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Erro ao iniciar a montagem');
+    return data.renderId;
+  };
+
+  const checarMontagemViaApi = async (renderId) => {
+    const r = await fetch(`${baseUrl}/api/assemble-video?id=${renderId}`);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Erro checando a montagem');
+    return data;
+  };
 
   try {
     const snapshot = await db
@@ -72,12 +97,12 @@ export default async function handler(req, res) {
         if (item.animar === false) {
           // Vídeo estático (mais barato): pula a animação e já manda montar
           // direto com as imagens paradas.
-          const renderId = await iniciarMontagem({
+          const renderId = await iniciarMontagemViaApi({
             audioUrl: item.narracao.audioUrl,
+            audioSegments: item.narracao.audioSegments,
             cenas: item.arquivos,
             formato: item.formato,
             palavras: item.narracao.palavras,
-            marca: 'Em Nome de Jesus',
           });
           await ref.update({ duracaoAlvo, renderId, status: 'montando' });
           break;
@@ -136,12 +161,12 @@ export default async function handler(req, res) {
           }
         }
         if (todasProntas) {
-          const renderId = await iniciarMontagem({
+          const renderId = await iniciarMontagemViaApi({
             audioUrl: item.narracao.audioUrl,
+            audioSegments: item.narracao.audioSegments,
             cenas: arquivosAtualizados,
             formato: item.formato,
             palavras: item.narracao.palavras,
-            marca: 'Em Nome de Jesus',
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
         } else {
@@ -151,7 +176,7 @@ export default async function handler(req, res) {
       }
 
       case 'montando': {
-        const check = await checarMontagem(item.renderId);
+        const check = await checarMontagemViaApi(item.renderId);
         if (check.status === 'done') {
           const thumbnailUrl = await gerarThumbnail({
             tema: item.tema,
