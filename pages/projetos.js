@@ -174,6 +174,9 @@ export default function Projetos() {
                 </a>
               </div>
 
+              <PublicarSocialBotao midiaUrl={p.videoUrl} legenda={p.titulo} />
+              {p.narracaoTexto && <VerTextoLegenda texto={p.narracaoTexto} />}
+
               <div style={{ marginTop: 12, borderTop: '1px solid #333', paddingTop: 10 }}>
                 {!reformatando[p.id] && (
                   <button onClick={() => reformatarParaVertical(p)} style={{ marginTop: 0 }}>
@@ -218,6 +221,66 @@ export default function Projetos() {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function PublicarSocialBotao({ midiaUrl, legenda }) {
+  const [publicando, setPublicando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function publicar() {
+    setPublicando(true);
+    setResultado(null);
+    try {
+      const res = await fetch('/api/publicar-social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'video', midiaUrl, legenda }),
+      });
+      const data = await res.json();
+      setResultado(data);
+    } catch (err) {
+      setResultado({ erro: err.message });
+    } finally {
+      setPublicando(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button disabled={publicando} onClick={publicar} style={{ marginTop: 0 }}>
+        {publicando && <span className="spinner" />}
+        {publicando ? 'Publicando...' : 'Publicar no Facebook e Instagram'}
+      </button>
+      {resultado && (
+        <div style={{ fontSize: 12, marginTop: 6 }}>
+          {resultado.facebook?.erro ? (
+            <div style={{ color: '#ff9d9d' }}>Facebook: {resultado.facebook.erro}</div>
+          ) : (
+            <div style={{ color: '#8fd6c1' }}>Facebook: publicado ✓</div>
+          )}
+          {resultado.instagram?.erro ? (
+            <div style={{ color: '#ff9d9d' }}>Instagram: {resultado.instagram.erro}</div>
+          ) : (
+            <div style={{ color: '#8fd6c1' }}>Instagram: publicado ✓</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VerTextoLegenda({ texto }) {
+  const [mostrar, setMostrar] = useState(false);
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button onClick={() => setMostrar((v) => !v)} style={{ marginTop: 0 }}>
+        {mostrar ? 'Esconder texto' : 'Ver texto (pra colar como legenda no YouTube)'}
+      </button>
+      {mostrar && (
+        <textarea readOnly value={texto} style={{ minHeight: 160, marginTop: 8, fontSize: 12 }} />
+      )}
     </div>
   );
 }
