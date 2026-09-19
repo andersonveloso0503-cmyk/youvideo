@@ -179,9 +179,56 @@ export default function OracaoMatinal() {
         {resultado && (
           <div className="result-box">
             <video src={resultado} controls style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
+            <PublicarSocialBotao midiaUrl={resultado} legenda={titulo || tema} />
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PublicarSocialBotao({ midiaUrl, legenda }) {
+  const [publicando, setPublicando] = useState(false);
+  const [resultadoPub, setResultadoPub] = useState(null);
+
+  async function publicar() {
+    setPublicando(true);
+    setResultadoPub(null);
+    try {
+      const res = await fetch('/api/publicar-social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'video', midiaUrl, legenda }),
+      });
+      const data = await res.json();
+      setResultadoPub(data);
+    } catch (err) {
+      setResultadoPub({ erro: err.message });
+    } finally {
+      setPublicando(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button disabled={publicando} onClick={publicar} style={{ marginTop: 0 }}>
+        {publicando && <span className="spinner" />}
+        {publicando ? 'Publicando...' : 'Publicar no Facebook e Instagram'}
+      </button>
+      {resultadoPub && (
+        <div style={{ fontSize: 12, marginTop: 6 }}>
+          {resultadoPub.facebook?.erro ? (
+            <div style={{ color: '#ff9d9d' }}>Facebook: {resultadoPub.facebook.erro}</div>
+          ) : (
+            <div style={{ color: '#8fd6c1' }}>Facebook: publicado ✓</div>
+          )}
+          {resultadoPub.instagram?.erro ? (
+            <div style={{ color: '#ff9d9d' }}>Instagram: {resultadoPub.instagram.erro}</div>
+          ) : (
+            <div style={{ color: '#8fd6c1' }}>Instagram: publicado ✓</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

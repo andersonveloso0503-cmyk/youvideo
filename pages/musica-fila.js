@@ -283,12 +283,61 @@ function FormatoSwitcher({ item }) {
       </div>
       {erro && <div className="result-box">Erro: {erro}</div>}
       {videosPorFormato[formatoAtivo] && (
-        <video
-          key={videosPorFormato[formatoAtivo]}
-          src={videosPorFormato[formatoAtivo]}
-          controls
-          style={{ width: '100%', maxWidth: formatoAtivo === 'short' ? 220 : 400, borderRadius: 6, marginTop: 8 }}
-        />
+        <>
+          <video
+            key={videosPorFormato[formatoAtivo]}
+            src={videosPorFormato[formatoAtivo]}
+            controls
+            style={{ width: '100%', maxWidth: formatoAtivo === 'short' ? 220 : 400, borderRadius: 6, marginTop: 8 }}
+          />
+          <PublicarSocialBotao midiaUrl={videosPorFormato[formatoAtivo]} legenda={item.titulo} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function PublicarSocialBotao({ midiaUrl, legenda }) {
+  const [publicando, setPublicando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function publicar() {
+    setPublicando(true);
+    setResultado(null);
+    try {
+      const res = await fetch('/api/publicar-social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'video', midiaUrl, legenda }),
+      });
+      const data = await res.json();
+      setResultado(data);
+    } catch (err) {
+      setResultado({ erro: err.message });
+    } finally {
+      setPublicando(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button disabled={publicando} onClick={publicar} style={{ marginTop: 0 }}>
+        {publicando && <span className="spinner" />}
+        {publicando ? 'Publicando...' : 'Publicar no Facebook e Instagram'}
+      </button>
+      {resultado && (
+        <div style={{ fontSize: 12, marginTop: 6 }}>
+          {resultado.facebook?.erro ? (
+            <div style={{ color: '#ff9d9d' }}>Facebook: {resultado.facebook.erro}</div>
+          ) : (
+            <div style={{ color: '#8fd6c1' }}>Facebook: publicado ✓</div>
+          )}
+          {resultado.instagram?.erro ? (
+            <div style={{ color: '#ff9d9d' }}>Instagram: {resultado.instagram.erro}</div>
+          ) : (
+            <div style={{ color: '#8fd6c1' }}>Instagram: publicado ✓</div>
+          )}
+        </div>
       )}
     </div>
   );
