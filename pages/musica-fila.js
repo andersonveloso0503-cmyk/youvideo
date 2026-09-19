@@ -31,6 +31,8 @@ export default function MusicaFila() {
   const [enviando, setEnviando] = useState(false);
   const [mensagem, setMensagem] = useState(null);
   const [fila, setFila] = useState([]);
+  const [processandoAgora, setProcessandoAgora] = useState(false);
+  const [mensagemProcessar, setMensagemProcessar] = useState(null);
 
   async function carregarFila() {
     try {
@@ -39,6 +41,23 @@ export default function MusicaFila() {
       setFila(data.fila || []);
     } catch {
       // silencioso — a lista só não atualiza dessa vez
+    }
+  }
+
+  async function processarAgora() {
+    setProcessandoAgora(true);
+    setMensagemProcessar(null);
+    try {
+      const res = await fetch('/api/musica-fila-processar');
+      const data = await res.json();
+      if (data.mensagem) setMensagemProcessar(data.mensagem);
+      else if (data.error) setMensagemProcessar(`Erro: ${data.error}`);
+      else setMensagemProcessar('Avançou uma etapa.');
+      carregarFila();
+    } catch (err) {
+      setMensagemProcessar(`Erro: ${err.message}`);
+    } finally {
+      setProcessandoAgora(false);
     }
   }
 
@@ -168,7 +187,18 @@ export default function MusicaFila() {
       </div>
 
       <div className="card">
-        <h2>Fila atual</h2>
+        <h2 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          Fila atual
+          <button
+            style={{ marginTop: 0, fontSize: 13, padding: '6px 12px' }}
+            disabled={processandoAgora}
+            onClick={processarAgora}
+          >
+            {processandoAgora && <span className="spinner" />}
+            {processandoAgora ? 'Processando...' : '↻ Processar agora'}
+          </button>
+        </h2>
+        {mensagemProcessar && <div className="result-box">{mensagemProcessar}</div>}
         {fila.length === 0 && <p style={{ color: '#999' }}>Nenhuma música na fila ainda.</p>}
         {fila.map((item) => (
           <div key={item.id} style={{ padding: '10px 0', borderBottom: '1px solid #333' }}>
