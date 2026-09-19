@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 
 export default function OracaoMatinal() {
   const [titulo, setTitulo] = useState('');
+  const [tema, setTema] = useState('');
+  const [duracaoDesejada, setDuracaoDesejada] = useState('300');
+  const [gerandoRoteiro, setGerandoRoteiro] = useState(false);
+
   const [texto, setTexto] = useState('');
   const [imagemUrl, setImagemUrl] = useState('');
   const [series, setSeries] = useState([]);
@@ -20,10 +24,31 @@ export default function OracaoMatinal() {
 
   const imagemEscolhida = serieId ? series.find((s) => s.id === serieId)?.imagemReferenciaUrl : imagemUrl;
 
+  async function gerarRoteiro() {
+    setErro(null);
+    if (!tema.trim()) return setErro('Escreva o tema da oração (ex: gratidão, um novo começo, força pra enfrentar o dia)');
+
+    setGerandoRoteiro(true);
+    try {
+      const res = await fetch('/api/gerar-oracao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tema, duracaoDesejada }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setTexto(data.texto);
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setGerandoRoteiro(false);
+    }
+  }
+
   async function gerar() {
     setErro(null);
     setResultado(null);
-    if (!texto.trim()) return setErro('Escreva o texto da oração');
+    if (!texto.trim()) return setErro('Escreva ou gere o texto da oração primeiro');
     if (!imagemEscolhida) return setErro('Escolha uma série ou cole uma URL de imagem');
 
     try {
@@ -57,7 +82,6 @@ export default function OracaoMatinal() {
         return;
       }
 
-      // Vários pedaços: precisa esperar a montagem final juntando tudo.
       setStatus('Juntando os pedaços na sequência certa...');
       let tentativas = 0;
       while (tentativas < 60) {
@@ -89,15 +113,43 @@ export default function OracaoMatinal() {
       </p>
 
       <div className="card">
-        <h2>Criar uma oração com alguém falando</h2>
-        <p style={{ fontSize: 13, color: '#999' }}>
-          Usa uma imagem de referência (do /series ou uma URL sua) + a narração gerada pela
-          ElevenLabs, e sincroniza os lábios com a fala (via D-ID). Textos longos são divididos
-          automaticamente e juntados no fim, sem perder pedaço.
-        </p>
+        <h2>1. Gerar o texto da oração com IA</h2>
+        <label>Tema/foco da oração</label>
+        <input
+          type="text"
+          value={tema}
+          onChange={(e) => setTema(e.target.value)}
+          placeholder="Ex: gratidão pelo novo dia, força pra enfrentar desafios, entregar as preocupações"
+        />
+
+        <label>Duração desejada</label>
+        <select value={duracaoDesejada} onChange={(e) => setDuracaoDesejada(e.target.value)}>
+          <option value="180">3 minutos</option>
+          <option value="300">5 minutos</option>
+          <option value="600">10 minutos</option>
+          <option value="900">15 minutos</option>
+          <option value="1200">20 minutos</option>
+        </select>
+
+        <button disabled={gerandoRoteiro} onClick={gerarRoteiro} style={{ marginTop: 12 }}>
+          {gerandoRoteiro && <span className="spinner" />}
+          {gerandoRoteiro ? 'Escrevendo a oração...' : 'Gerar oração com IA'}
+        </button>
+      </div>
+
+      <div className="card">
+        <h2>2. Revisar o texto (edite à vontade) e escolher o personagem</h2>
 
         <label>Título (opcional, só organização)</label>
         <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex: Oração da manhã de segunda-feira" />
+
+        <label>Texto da oração</label>
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Clique em 'Gerar oração com IA' acima, ou escreva/cole o texto aqui direto"
+          style={{ minHeight: 220 }}
+        />
 
         <label>Personagem (de uma série já criada)</label>
         <select value={serieId} onChange={(e) => setSerieId(e.target.value)}>
@@ -118,17 +170,9 @@ export default function OracaoMatinal() {
           <img src={imagemEscolhida} alt="referência" style={{ width: 120, borderRadius: 8, marginTop: 8 }} />
         )}
 
-        <label>Texto da oração (pode ser longo, até uns 20 minutos)</label>
-        <textarea
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          placeholder="Pai, hoje eu venho a Ti..."
-          style={{ minHeight: 200 }}
-        />
-
         <button disabled={!!status} onClick={gerar} style={{ marginTop: 12 }}>
           {status && <span className="spinner" />}
-          {status || 'Gerar vídeo falado'}
+          {status || '3. Gerar vídeo falado'}
         </button>
 
         {erro && <div className="result-box">Erro: {erro}</div>}
