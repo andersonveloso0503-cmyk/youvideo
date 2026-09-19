@@ -1,4 +1,14 @@
 import { useState } from 'react';
+
+// Encurta um título longo (com gancho/emoji) pra caber como texto pequeno
+// na thumbnail — remove emoji (a fonte usada não desenha eles direito) e
+// pega só as primeiras palavras.
+function tituloCurto(texto) {
+  if (!texto) return '';
+  const semEmoji = texto.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}]/gu, '').trim();
+  return semEmoji.split(/\s+/).slice(0, 5).join(' ');
+}
+
 import { upload } from '@vercel/blob/client';
 
 const CANAIS = [
@@ -141,7 +151,13 @@ export default function Musica() {
 
   const gerarThumbnail = () =>
     runStep('thumbnail', () =>
-      postJson('/api/generate-thumbnail', { tema: titulo, titulo, estilo, thumbnailTitulo: titulo, thumbnailSubtitulo: textoThumbnail })
+      postJson('/api/generate-thumbnail', {
+        tema: titulo,
+        titulo,
+        estilo,
+        thumbnailTitulo: textoThumbnail || tituloCurto(titulo),
+        thumbnailSubtitulo: textoThumbnail ? tituloCurto(titulo) : '',
+      })
     );
 
   const publicar = () =>
