@@ -69,6 +69,8 @@ export default function Medley() {
   const [totalMusicasAdicionadas, setTotalMusicasAdicionadas] = useState(0);
 
   const [medleys, setMedleys] = useState([]);
+  const [processandoAgora, setProcessandoAgora] = useState(false);
+  const [mensagemProcessar, setMensagemProcessar] = useState(null);
 
   async function carregarMedleys() {
     try {
@@ -77,6 +79,24 @@ export default function Medley() {
       setMedleys(data.medleys || []);
     } catch {
       // silencioso
+    }
+  }
+
+  async function processarAgora() {
+    setProcessandoAgora(true);
+    setMensagemProcessar(null);
+    try {
+      const res = await fetch('/api/medley-processar');
+      const data = await res.json();
+      if (data.mensagem) setMensagemProcessar(data.mensagem);
+      else if (data.erro) setMensagemProcessar(`Erro: ${data.erro}`);
+      else if (data.avancou) setMensagemProcessar(`Avançou: ${data.avancou}`);
+      else setMensagemProcessar('Avançou uma etapa.');
+      carregarMedleys();
+    } catch (err) {
+      setMensagemProcessar(`Erro: ${err.message}`);
+    } finally {
+      setProcessandoAgora(false);
     }
   }
 
@@ -245,7 +265,18 @@ export default function Medley() {
       )}
 
       <div className="card">
-        <h2>Medleys</h2>
+        <h2 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          Medleys
+          <button
+            style={{ marginTop: 0, fontSize: 13, padding: '6px 12px' }}
+            disabled={processandoAgora}
+            onClick={processarAgora}
+          >
+            {processandoAgora && <span className="spinner" />}
+            {processandoAgora ? 'Processando...' : '↻ Processar agora'}
+          </button>
+        </h2>
+        {mensagemProcessar && <div className="result-box">{mensagemProcessar}</div>}
         {medleys.length === 0 && <p style={{ color: '#999' }}>Nenhum medley ainda.</p>}
         {medleys.map((m) => (
           <div key={m.id} style={{ padding: '10px 0', borderBottom: '1px solid #333' }}>
