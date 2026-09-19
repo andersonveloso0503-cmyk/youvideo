@@ -1,5 +1,14 @@
 import { getDb } from '../../lib/firebase-admin';
 
+// Encurta um título longo (com gancho/emoji) pra caber como texto pequeno
+// na thumbnail — remove emoji (a fonte usada não desenha eles direito) e
+// pega só as primeiras palavras.
+function tituloCurto(texto) {
+  if (!texto) return '';
+  const semEmoji = texto.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}]/gu, '').trim();
+  return semEmoji.split(/\s+/).slice(0, 5).join(' ');
+}
+
 
 // Aumenta o limite de execução da função (padrão é bem curto e cortava
 // respostas de IA mais demoradas no meio). Precisa do plano Pro do
@@ -79,8 +88,8 @@ export default async function handler(req, res) {
             tema: item.titulo,
             titulo: item.titulo,
             estilo: item.estilo,
-            thumbnailTitulo: item.titulo,
-            thumbnailSubtitulo: item.textoThumbnail,
+            thumbnailTitulo: item.textoThumbnail || tituloCurto(item.titulo),
+            thumbnailSubtitulo: item.textoThumbnail ? tituloCurto(item.titulo) : '',
           });
           await ref.update({
             videoUrl: check.videoUrl,
