@@ -209,6 +209,7 @@ export default async function handler(req, res) {
             formato: item.formato,
             titulo: item.roteiro.titulo,
             descricao: item.roteiro.descricao,
+            narracaoTexto: item.roteiro.narracao,
             videoUrl: check.videoUrl,
             thumbnailUrl: thumbnailUrl || null,
             youtubeVideoId: youtubeVideoId || null,

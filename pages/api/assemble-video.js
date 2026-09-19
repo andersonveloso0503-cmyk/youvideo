@@ -225,10 +225,35 @@ export default async function handler(req, res) {
     ? audioSegments.map((s) => ({ asset: { type: 'audio', src: s.url }, start: s.start, length: s.length }))
     : [{ asset: { type: 'audio', src: audioUrl }, start: 0, length: duracaoTotalAudio }];
 
+  // Tarja de "inscreva-se" — semi-transparente, só 10 segundos, um pouco
+  // antes do vídeo acabar (não no vídeo todo, pra não incomodar).
+  const DURACAO_TARJA = 10;
+  const ANTECEDENCIA_DO_FIM = 15; // termina de aparecer 15s antes do fim
+  const inicioTarja = Math.max(0, duracaoTotalAudio - ANTECEDENCIA_DO_FIM - DURACAO_TARJA);
+  const tarjaInscreva =
+    duracaoTotalAudio > DURACAO_TARJA + 5
+      ? {
+          asset: {
+            type: 'html',
+            html: `<div class="tarja">🔔 Inscreva-se no canal e toque o sininho</div>`,
+            css: `.tarja{font-family:'Arial',sans-serif;font-size:${
+              isVertical ? 26 : 32
+            }px;font-weight:700;color:#fff;background:rgba(0,0,0,0.55);padding:14px 28px;border-radius:8px;text-align:center;white-space:nowrap;}`,
+            width: isVertical ? 620 : 1000,
+            height: 90,
+          },
+          start: inicioTarja,
+          length: DURACAO_TARJA,
+          position: 'bottom',
+          offset: { y: isVertical ? 0.3 : 0.14 },
+        }
+      : null;
+
   const timeline = {
     tracks: [
       { clips: [marcaDagua] },
       { clips: [equalizerVisual] },
+      ...(tarjaInscreva ? [{ clips: [tarjaInscreva] }] : []),
       // Legenda embutida desativada por decisão do Anderson: Kwai, TikTok e
       // YouTube já geram legenda automática própria nas plataformas, então
       // não precisamos mais queimar isso no vídeo (evita todo o trabalho de
