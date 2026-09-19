@@ -1,4 +1,4 @@
-export const config = { api: { bodyParser: { sizeLimit: '15mb' } }, maxDuration: 300 };
+export const config = { api: { bodyParser: { sizeLimit: '15mb' } } };
 
 // Sandbox e Produção da Shotstack usam CHAVES DE API DIFERENTES, não é só
 // trocar o link. Resolve os dois a partir do "ambiente" escolhido na tela
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return checkStatus(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente, marca } = req.body;
+  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente } = req.body;
 
   // Quando os dados são grandes demais pra caber numa requisição (medleys
   // com várias músicas), quem chama sobe um JSON no Blob e manda só o link
@@ -150,6 +150,7 @@ export default async function handler(req, res) {
   }px;max-width:${isVertical ? 520 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}.a{color:#FFE100;text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000,0 4px 6px rgba(0,0,0,.5);-webkit-text-stroke:3px #000}.p{color:#000;text-shadow:3px 3px 0 #fff,-3px 3px 0 #fff,3px -3px 0 #fff,-3px -3px 0 #fff;-webkit-text-stroke:3px #fff}`;
 
   const legendaKaraoke = [];
+  let ultimoFimLegenda = 0;
   for (const bloco of blocos) {
     for (let i = 0; i < bloco.length; i += passo) {
       const fimIdx = Math.min(i + passo, bloco.length);
@@ -163,8 +164,15 @@ export default async function handler(req, res) {
         .map((p, idx) => `<span class="${idx >= i ? 'a' : 'p'}">${p.texto}</span>`)
         .join(' ');
 
-      const inicioClipe = bloco[i].start;
-      const fimClipe = bloco[fimIdx - 1].end;
+      // Trava de segurança: se o alinhamento de alguma música saiu ruim
+      // (palavras com timestamp apertado ou fora de ordem), isso evita que
+      // uma legenda comece antes da anterior terminar (efeito de "atropelo")
+      // ou ultrapasse o fim real do áudio.
+      const inicioClipe = Math.max(bloco[i].start, ultimoFimLegenda);
+      const fimClipeBruto = Math.max(bloco[fimIdx - 1].end, inicioClipe + 0.12);
+      const fimClipe = Math.min(fimClipeBruto, duracaoTotalAudio);
+      if (inicioClipe >= duracaoTotalAudio) continue; // nada a mostrar depois do fim do áudio
+      ultimoFimLegenda = fimClipe;
 
       legendaKaraoke.push({
         asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 580 : 1200, height: 160 },
@@ -176,10 +184,10 @@ export default async function handler(req, res) {
     }
   }
 
-  const marcaDagua = marca ? {
+  const marcaDagua = {
     asset: {
       type: 'html',
-      html: `<p>${marca}</p>`,
+      html: `<p>Em Nome de Jesus</p>`,
       css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
         isVertical ? 16 : 18
       }px; font-weight: 600; color: rgba(255,255,255,0.55); text-shadow: 0 1px 3px rgba(0,0,0,0.6); margin: 0; }`,
@@ -190,7 +198,7 @@ export default async function handler(req, res) {
     length: duracaoTotalAudio,
     position: 'topRight',
     offset: { x: -0.03, y: 0.04 },
-  } : null;
+  };
 
   const equalizerVisual = {
     asset: {
@@ -219,9 +227,13 @@ export default async function handler(req, res) {
 
   const timeline = {
     tracks: [
-      ...(marcaDagua ? [{ clips: [marcaDagua] }] : []),
+      { clips: [marcaDagua] },
       { clips: [equalizerVisual] },
-      ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
+      // Legenda embutida desativada por decisão do Anderson: Kwai, TikTok e
+      // YouTube já geram legenda automática própria nas plataformas, então
+      // não precisamos mais queimar isso no vídeo (evita todo o trabalho de
+      // alinhamento/sincronia e os problemas que vínhamos corrigindo nisso).
+      // ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
       { clips: clipsVideo },
       { clips: clipsAudio },
     ],
@@ -238,18 +250,7 @@ export default async function handler(req, res) {
     });
 
     const data = await renderRes.json();
-    if (!renderRes.ok) {
-      // Debug temporário: manda de volta a resposta crua da Shotstack
-      // inteira (status, request id, corpo) e o timeline exato que foi
-      // enviado, pra poder repassar pro suporte deles investigar.
-      return res.status(500).json({
-        error: data.message || 'Erro ao iniciar a montagem na Shotstack',
-        shotstackStatus: renderRes.status,
-        shotstackRequestId: renderRes.headers.get('x-request-id') || renderRes.headers.get('request-id') || null,
-        shotstackResponseCompleta: data,
-        timelineEnviada: { timeline, output },
-      });
-    }
+    if (!renderRes.ok) throw new Error(data.message || 'Erro ao iniciar a montagem na Shotstack');
 
     return res.status(200).json({
       status: 'processing',
