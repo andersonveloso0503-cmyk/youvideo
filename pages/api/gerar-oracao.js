@@ -1,3 +1,8 @@
+// Groq geralmente responde rápido, mas uma oração de 20 min pode demorar
+// mais que o padrão da Vercel pra gerar — mesma folga usada nos outros
+// endpoints que chamam IA.
+export const maxDuration = 300;
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -7,6 +12,10 @@ export default async function handler(req, res) {
 
   const duracaoSegundos = Number(duracaoDesejada) || 300;
   const palavrasAlvo = Math.round((duracaoSegundos / 60) * 130); // ~130 palavras/min falado, ritmo de oração (mais pausado que narração comum)
+  // Em português, 1 palavra custa em média uns 1,5 token (acentuação e
+  // pontuação pesam). Um teto fixo cortava orações longas (20 min = ~2600
+  // palavras) no meio — agora o teto acompanha o alvo, com folga.
+  const maxTokens = Math.max(4000, Math.round(palavrasAlvo * 2.2));
 
   const prompt = `Escreva uma oração cristã em português, em primeira pessoa, num tom pessoal, caloroso e acolhedor — como se um pastor estivesse guiando uma oração matinal, com pausas naturais e linguagem simples (não erudita).
 
@@ -31,7 +40,7 @@ Responda APENAS com o texto da oração, sem nenhuma explicação antes ou depoi
         model: 'openai/gpt-oss-20b',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.8,
-        max_completion_tokens: 4000,
+        max_completion_tokens: maxTokens,
       }),
     });
     const data = await groqRes.json();
