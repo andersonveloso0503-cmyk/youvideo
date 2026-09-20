@@ -278,6 +278,10 @@ export default function Home() {
           <div className="hub-tile-title">Medley</div>
           <div className="hub-tile-desc">Junte músicas de estilos diferentes numa faixa só</div>
         </a>
+        <a href="/musica-cantada" className="hub-tile hub-tile--gold">
+          <div className="hub-tile-title">Cantor Virtual</div>
+          <div className="hub-tile-desc">Personagem cantando a música, com boca sincronizada (D-ID)</div>
+        </a>
         <a href="/temas" className="hub-tile hub-tile--teal">
           <div className="hub-tile-title">Temas</div>
           <div className="hub-tile-desc">Banco de ideias pros vídeos narrados</div>
