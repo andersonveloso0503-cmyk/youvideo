@@ -2,9 +2,7 @@
 // Aumenta o limite de execução da função (padrão é bem curto e cortava
 // respostas de IA mais demoradas no meio). Precisa do plano Pro do
 // Vercel pra valer mais que ~60s.
-export const config = {
-  maxDuration: 300,
-};
+export const maxDuration = 300;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

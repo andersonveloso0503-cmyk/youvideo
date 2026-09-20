@@ -1,6 +1,7 @@
 import { put } from '@vercel/blob';
 
-export const config = { api: { bodyParser: { sizeLimit: '15mb' } }, maxDuration: 300 };
+export const config = { api: { bodyParser: { sizeLimit: '15mb' } } };
+export const maxDuration = 300;
 
 const ESTILOS_VISUAIS = {
   desenho: 'estilo desenho animado, cores vibrantes, traço consistente, ilustração 2D',

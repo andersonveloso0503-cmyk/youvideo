@@ -108,25 +108,63 @@ export default async function handler(req, res) {
     }
   }
 
+  // O clipe animado da fal.ai (Wan Turbo) sempre sai com duração fixa e
+  // curta (na prática uns 3-5s) — bem menor que a fatia de narração que a
+  // cena precisa cobrir. Sem checar isso, a Shotstack toca o vídeo até
+  // acabar e "congela" parado no último frame pelo resto do tempo. Sonda a
+  // duração real de cada vídeo (mesma técnica do vídeo falado) pra saber
+  // exatamente onde ele termina.
+  const DURACAO_PADRAO_VIDEO_ANIMADO = 5; // usado só se a sonda falhar
+  async function probarDuracaoVideo(url) {
+    try {
+      const probeRes = await fetch(`${base}/probe/${encodeURIComponent(url)}`, { headers: { 'x-api-key': apiKey } });
+      const data = await probeRes.json();
+      const duracao = parseFloat(data?.response?.metadata?.streams?.[0]?.duration);
+      return duracao > 0 ? duracao : null;
+    } catch {
+      return null;
+    }
+  }
+  const duracoesReais = await Promise.all(
+    videosValidos.map((c) => (c.videoUrl ? probarDuracaoVideo(c.videoUrl) : Promise.resolve(null)))
+  );
+
   let inicio = 0;
   let contadorCena = 0;
-  const clipsVideo = videosValidos.map((c) => {
+  const clipsVideo = videosValidos.flatMap((c, idx) => {
     contadorCena++;
     const start = usaTemposExplicitos ? c.start : inicio;
-    const length = usaTemposExplicitos ? c.length : duracaoPorCena;
-    const clip = {
-      asset: c.videoUrl
-        ? { type: 'video', src: c.videoUrl }
-        : { type: 'image', src: c.imageUrl },
-      start,
-      length,
-      fit: 'cover',
-      // Cenas sem animação real ganham um zoom lento (efeito Ken Burns),
-      // alternando pra dentro/fora — dá sensação de movimento sem custo.
-      ...(!c.videoUrl ? { effect: contadorCena % 2 === 0 ? 'zoomIn' : 'zoomOut' } : {}),
-    };
+    const lengthFatia = usaTemposExplicitos ? c.length : duracaoPorCena;
     if (!usaTemposExplicitos) inicio += duracaoPorCena;
-    return clip;
+
+    if (!c.videoUrl) {
+      // Cena 100% estática: zoom lento (Ken Burns), alternando pra
+      // dentro/fora — dá sensação de movimento sem custo.
+      return [{
+        asset: { type: 'image', src: c.imageUrl },
+        start,
+        length: lengthFatia,
+        fit: 'cover',
+        effect: contadorCena % 2 === 0 ? 'zoomIn' : 'zoomOut',
+      }];
+    }
+
+    // Cena animada: toca o vídeo até seu fim real e, se sobrar tempo da
+    // fatia, completa com a mesma imagem de referência + zoom em vez de
+    // deixar o vídeo congelado parado.
+    const duracaoReal = Math.min(duracoesReais[idx] || DURACAO_PADRAO_VIDEO_ANIMADO, lengthFatia);
+    const clipes = [{ asset: { type: 'video', src: c.videoUrl }, start, length: duracaoReal, fit: 'cover' }];
+    const sobra = lengthFatia - duracaoReal;
+    if (sobra > 0.2 && c.imageUrl) {
+      clipes.push({
+        asset: { type: 'image', src: c.imageUrl },
+        start: start + duracaoReal,
+        length: sobra,
+        fit: 'cover',
+        effect: contadorCena % 2 === 0 ? 'zoomOut' : 'zoomIn',
+      });
+    }
+    return clipes;
   });
 
   // Cada "passo" vira 1 clipe de legenda. Numa música normal, o passo é de

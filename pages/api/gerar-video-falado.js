@@ -1,9 +1,7 @@
 import { put } from '@vercel/blob';
 
-export const config = {
-  api: { bodyParser: { sizeLimit: '15mb' } },
-  maxDuration: 300,
-};
+export const config = { api: { bodyParser: { sizeLimit: '15mb' } } };
+export const maxDuration = 300;
 
 export default async function handler(req, res) {
   if (req.method === 'GET') return checarMontagem(req, res);
