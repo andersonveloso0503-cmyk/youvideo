@@ -167,59 +167,54 @@ export default async function handler(req, res) {
     return clipes;
   });
 
-  // Cada "passo" vira 1 clipe de legenda. Numa música normal, o passo é de
-  // 1 palavra (karaokê palavra por palavra). Num medley muito longo, isso
-  // geraria milhares de clipes e estouraria o limite de tamanho da
-  // Shotstack — então o passo aumenta (destaca 2, 3+ palavras de cada vez),
-  // mas o efeito de cor nunca desliga por completo.
-  const ORCAMENTO_CLIPES = 500;
-  const TAMANHO_BLOCO = 3;
+  // A Shotstack recusa (Payload Too Large) qualquer pedido de render acima
+  // de ~390KB — antes disso, legenda palavra a palavra em textos longos
+  // (orações de vários minutos, medleys grandes) estourava esse limite
+  // fácil. O "ORCAMENTO_CLIPES" de antes não tinha efeito real (ficava
+  // sempre preso em blocos de 3 palavras); agora o tamanho do bloco (quantas
+  // palavras aparecem e são destacadas juntas) cresce de verdade conforme o
+  // texto fica mais longo, mantendo o número de clipes de legenda sempre
+  // dentro de um teto seguro.
+  const ORCAMENTO_CLIPES = 220;
   const palavrasValidas = (palavras || []).filter((p) => p.start != null && p.end != null && p.end > p.start);
-  const passo = Math.max(1, Math.ceil(palavrasValidas.length / ORCAMENTO_CLIPES));
+  const tamanhoBloco = Math.max(3, Math.ceil(palavrasValidas.length / ORCAMENTO_CLIPES));
   const blocos = [];
-  for (let i = 0; i < palavrasValidas.length; i += TAMANHO_BLOCO) {
-    blocos.push(palavrasValidas.slice(i, i + TAMANHO_BLOCO));
+  for (let i = 0; i < palavrasValidas.length; i += tamanhoBloco) {
+    blocos.push(palavrasValidas.slice(i, i + tamanhoBloco));
   }
 
-  const cssLegenda = `p{font-family:'Arial Black','Arial Narrow Bold',Impact,sans-serif;font-size:${
+  // CSS bem mais enxuto que antes (era repetido por inteiro em CADA clipe de
+  // legenda — a maior fonte de peso do pedido de render).
+  const cssLegenda = `p{font-family:Impact,'Arial Black',sans-serif;font-size:${
     isVertical ? 24 : 40
-  }px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;text-align:center;margin:0;line-height:1.6;width:${
+  }px;font-weight:900;text-transform:uppercase;text-align:center;margin:0;line-height:1.6;width:${
     isVertical ? 520 : 1160
-  }px;max-width:${isVertical ? 520 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}.p{color:#fff;text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000;-webkit-text-stroke:2px #000}.a{color:#fff;text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000;-webkit-text-stroke:2px #000;background:#8B2FC9;padding:4px 12px;border-radius:8px;box-decoration-break:clone;-webkit-box-decoration-break:clone}`;
+  }px}.p,.a{color:#fff;text-shadow:2px 2px #000,-2px 2px #000,2px -2px #000,-2px -2px #000}.a{background:#8B2FC9;padding:4px 10px;border-radius:8px;box-decoration-break:clone;-webkit-box-decoration-break:clone}`;
 
   const legendaKaraoke = [];
   let ultimoFimLegenda = 0;
   for (const bloco of blocos) {
-    for (let i = 0; i < bloco.length; i += passo) {
-      const fimIdx = Math.min(i + passo, bloco.length);
-      // Mostra só as palavras já cantadas até agora dentro do bloco (nunca
-      // as que ainda vão vir). A palavra/grupo atual ganha uma caixinha
-      // colorida atrás (classe .a); as já cantadas ficam só brancas com
-      // contorno preto (classe .p) — usar classes em vez de repetir o
-      // estilo em cada palavra mantém o pedido de montagem bem menor.
-      const html = bloco
-        .slice(0, fimIdx)
-        .map((p, idx) => `<span class="${idx >= i ? 'a' : 'p'}">${p.texto}</span>`)
-        .join(' ');
+    // Cada bloco agora é 1 clipe só, com todas as palavras dele destacadas
+    // juntas (deixou de ter sub-passos de destaque dentro do bloco — era
+    // isso que gerava clipes demais sem necessidade).
+    const html = bloco.map((p) => `<span class="a">${p.texto}</span>`).join(' ');
 
-      // Trava de segurança: se o alinhamento de alguma música saiu ruim
-      // (palavras com timestamp apertado ou fora de ordem), isso evita que
-      // uma legenda comece antes da anterior terminar (efeito de "atropelo")
-      // ou ultrapasse o fim real do áudio.
-      const inicioClipe = Math.max(bloco[i].start, ultimoFimLegenda);
-      const fimClipeBruto = Math.max(bloco[fimIdx - 1].end, inicioClipe + 0.12);
-      const fimClipe = Math.min(fimClipeBruto, duracaoTotalAudio);
-      if (inicioClipe >= duracaoTotalAudio) continue; // nada a mostrar depois do fim do áudio
-      ultimoFimLegenda = fimClipe;
+    // Trava de segurança: se o alinhamento saiu ruim (palavras com timestamp
+    // apertado ou fora de ordem), isso evita que uma legenda comece antes da
+    // anterior terminar (efeito de "atropelo") ou ultrapasse o fim do áudio.
+    const inicioClipe = Math.max(bloco[0].start, ultimoFimLegenda);
+    const fimClipeBruto = Math.max(bloco[bloco.length - 1].end, inicioClipe + 0.12);
+    const fimClipe = Math.min(fimClipeBruto, duracaoTotalAudio);
+    if (inicioClipe >= duracaoTotalAudio) continue; // nada a mostrar depois do fim do áudio
+    ultimoFimLegenda = fimClipe;
 
-      legendaKaraoke.push({
-        asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 580 : 1200, height: 160 },
-        start: inicioClipe,
-        length: Math.max(fimClipe - inicioClipe, 0.12),
-        position: 'bottom',
-        offset: { y: isVertical ? 0.24 : 0.1 },
-      });
-    }
+    legendaKaraoke.push({
+      asset: { type: 'html', html: `<p>${html}</p>`, css: cssLegenda, width: isVertical ? 580 : 1200, height: 160 },
+      start: inicioClipe,
+      length: Math.max(fimClipe - inicioClipe, 0.12),
+      position: 'bottom',
+      offset: { y: isVertical ? 0.24 : 0.1 },
+    });
   }
 
   const marcaDagua = {
