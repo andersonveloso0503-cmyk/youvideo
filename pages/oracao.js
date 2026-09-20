@@ -97,8 +97,14 @@ export default function Oracao() {
     });
 
   const assembleVideo = async () => {
+    // Narrações longas viram vários pedaços de áudio (audioSegments) — sem
+    // mandar isso aqui, só o primeiro pedaço entrava no vídeo final e a
+    // narração parava no meio mesmo com o roteiro do tamanho certo.
+    const temVariosPedacos = (results.voice?.audioSegments || []).length > 1;
     const primeira = await runStep('assemble', '/api/assemble-video', {
-      audioUrl: results.voice?.audioUrl,
+      ...(temVariosPedacos
+        ? { audioSegments: results.voice.audioSegments }
+        : { audioUrl: results.voice?.audioUrl }),
       cenas: results.visual?.arquivos,
       formato: 'longo',
       palavras: results.voice?.palavras,
