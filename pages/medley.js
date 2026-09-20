@@ -71,6 +71,8 @@ export default function Medley() {
   const [medleys, setMedleys] = useState([]);
   const [processandoAgora, setProcessandoAgora] = useState(false);
   const [mensagemProcessar, setMensagemProcessar] = useState(null);
+  const [publicandoId, setPublicandoId] = useState(null);
+  const [mensagemPublicar, setMensagemPublicar] = useState({});
 
   async function carregarMedleys() {
     try {
@@ -97,6 +99,26 @@ export default function Medley() {
       setMensagemProcessar(`Erro: ${err.message}`);
     } finally {
       setProcessandoAgora(false);
+    }
+  }
+
+  async function publicarAgora(id) {
+    setPublicandoId(id);
+    setMensagemPublicar((m) => ({ ...m, [id]: null }));
+    try {
+      const res = await fetch('/api/musica-publicar-diario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao publicar');
+      setMensagemPublicar((m) => ({ ...m, [id]: `Publicado! ${data.publicado}` }));
+      carregarMedleys();
+    } catch (err) {
+      setMensagemPublicar((m) => ({ ...m, [id]: `Erro: ${err.message}` }));
+    } finally {
+      setPublicandoId(null);
     }
   }
 
@@ -300,6 +322,19 @@ export default function Medley() {
             {m.status === 'processando' && (
               <div style={{ fontSize: 12, color: '#777' }}>
                 {m.musicasStatus.map((s, i) => `#${i + 1}: ${STATUS_MUSICA[s] || s}`).join(' · ')}
+              </div>
+            )}
+            {m.status === 'renderizado' && (
+              <div style={{ marginTop: 8 }}>
+                <button disabled={publicandoId === m.id} onClick={() => publicarAgora(m.id)}>
+                  {publicandoId === m.id && <span className="spinner" />}
+                  {publicandoId === m.id ? 'Publicando...' : '🚀 Publicar agora'}
+                </button>
+                {mensagemPublicar[m.id] && (
+                  <div style={{ fontSize: 12, marginTop: 4, color: mensagemPublicar[m.id].startsWith('Erro') ? '#ff9d9d' : '#8fd19e' }}>
+                    {mensagemPublicar[m.id]}
+                  </div>
+                )}
               </div>
             )}
             {m.status === 'coletando' && medleyAtualId !== m.id && (
