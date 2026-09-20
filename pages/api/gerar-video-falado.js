@@ -21,10 +21,14 @@ export default async function handler(req, res) {
   try {
     // 1) Gera um vídeo falado por pedaço de áudio (a D-ID só aceita um
     // áudio por chamada, então uma narração longa vira vários vídeos
-    // curtos aqui).
+    // curtos aqui). O tempo de espera pela D-ID é dividido entre os
+    // pedaços, dentro do teto de 300s (maxDuration) da função, com margem
+    // pro resto do trabalho (baixar cada vídeo, subir no Blob, e no caso
+    // de múltiplos pedaços, ainda montar tudo na Shotstack no final).
+    const orcamentoPorPedacoMs = Math.floor(240000 / Math.max(segmentos.length, 1));
     const clipesUrls = [];
     for (const seg of segmentos) {
-      const videoUrl = await gerarTalkDID(imagemUrl, seg.url);
+      const videoUrl = await gerarTalkDID(imagemUrl, seg.url, orcamentoPorPedacoMs);
       clipesUrls.push(videoUrl);
     }
 
@@ -69,7 +73,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function gerarTalkDID(imagemUrl, audioUrl) {
+async function gerarTalkDID(imagemUrl, audioUrl, orcamentoMs) {
   const submitRes = await fetch('https://api.d-id.com/talks', {
     method: 'POST',
     headers: { Authorization: `Basic ${process.env.DID_API_KEY}`, 'Content-Type': 'application/json' },
@@ -79,13 +83,22 @@ async function gerarTalkDID(imagemUrl, audioUrl) {
   if (!submitRes.ok) throw new Error(submitData.description || submitData.message || 'Erro ao enviar pedido à D-ID');
 
   const talkId = submitData.id;
+  // Sobe o teto de espera pra aproveitar melhor o maxDuration (300s) da
+  // função, com uma margem de segurança pro resto do trabalho (baixar o
+  // vídeo e subir no nosso Blob). Se tiver mais de 1 pedaço de áudio, cada
+  // um ganha uma fatia proporcional desse orçamento, senão a soma dos
+  // pedaços estoura o limite total da função.
+  const ORCAMENTO_ESPERA_MS = orcamentoMs || 240000;
+  const inicioEspera = Date.now();
   let resultUrl = null;
-  for (let tentativas = 0; tentativas < 60; tentativas++) {
+  let ultimoStatus = null;
+  while (Date.now() - inicioEspera < ORCAMENTO_ESPERA_MS) {
     await new Promise((r) => setTimeout(r, 3000));
     const statusRes = await fetch(`https://api.d-id.com/talks/${talkId}`, {
       headers: { Authorization: `Basic ${process.env.DID_API_KEY}` },
     });
     const statusData = await statusRes.json();
+    ultimoStatus = statusData.status;
     if (statusData.status === 'done') {
       resultUrl = statusData.result_url;
       break;
@@ -94,7 +107,10 @@ async function gerarTalkDID(imagemUrl, audioUrl) {
       throw new Error(statusData.error?.description || 'A D-ID não conseguiu gerar esse pedaço (imagem ruim ou áudio incompatível?)');
     }
   }
-  if (!resultUrl) throw new Error('Tempo esgotado esperando a D-ID terminar um dos pedaços');
+  if (!resultUrl) {
+    const segundos = Math.round((Date.now() - inicioEspera) / 1000);
+    throw new Error(`Tempo esgotado esperando a D-ID terminar um dos pedaços (esperei ${segundos}s, último status: "${ultimoStatus || 'desconhecido'}"). Pode ser fila cheia na D-ID — tenta de novo em alguns minutos.`);
+  }
 
   // O link da D-ID expira em 24h — baixa e guarda no nosso próprio Blob.
   const videoRes = await fetch(resultUrl);
