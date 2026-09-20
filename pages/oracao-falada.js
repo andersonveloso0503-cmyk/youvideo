@@ -120,17 +120,44 @@ export default function OracaoMatinal() {
       const vozData = await vozRes.json();
       if (!vozRes.ok) throw new Error(vozData.error);
 
-      // Sem D-ID: nada de boca sincronizada — usa a imagem do personagem
-      // parada, com zoom lento (Ken Burns), narração por cima e legenda
-      // karaoke — o mesmo tratamento que as outras séries do painel já
-      // usam. Mais barato, mais rápido, sem depender de crédito externo.
-      setStatus('Montando o vídeo (imagem + zoom + legenda)...');
+      // Sem D-ID: em vez de deixar a imagem parada do personagem a oração
+      // inteira (fica sem relação com o que está sendo narrado), divide o
+      // texto em cenas e gera uma imagem por cena — mantendo o mesmo
+      // personagem, mas ilustrando de verdade o que está sendo dito em
+      // cada trecho (o mesmo tratamento das outras séries do painel).
+      setStatus('Dividindo o texto em cenas...');
+      const cenasRes = await fetch('/api/gerar-cenas-oracao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto, estilo: 'realista', temPersonagem: true }),
+      });
+      const cenasData = await cenasRes.json();
+      if (!cenasRes.ok) throw new Error(cenasData.error);
+
+      setStatus(`Gerando ${cenasData.cenas.length} imagens de cena (isso pode levar alguns minutos)...`);
+      const visualRes = await fetch('/api/generate-visual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cenas: cenasData.cenas,
+          estilo: 'realista',
+          formato: 'longo',
+          imagemReferenciaUrl: imagemEscolhida,
+        }),
+      });
+      const visualData = await visualRes.json();
+      if (!visualRes.ok) throw new Error(visualData.error);
+
+      const cenasProntas = (visualData.arquivos || []).filter((a) => a.imageUrl);
+      if (!cenasProntas.length) throw new Error('Nenhuma cena foi gerada com sucesso (todas bloqueadas pelo filtro de conteúdo?)');
+
+      setStatus('Montando o vídeo (cenas + zoom + legenda)...');
       const montaRes = await fetch('/api/assemble-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           audioSegments: vozData.audioSegments,
-          cenas: [{ imageUrl: imagemEscolhida }],
+          cenas: cenasProntas,
           formato: 'longo',
           palavras: vozData.palavras,
         }),
@@ -233,7 +260,7 @@ export default function OracaoMatinal() {
 
         <button disabled={!!status} onClick={gerarSemDID} style={{ marginTop: 8, background: '#2f3a4f' }}>
           {status && <span className="spinner" />}
-          {status || 'Gerar sem D-ID (imagem parada + zoom, sem custo extra)'}
+          {status || 'Gerar sem D-ID (cenas ilustradas + zoom, sem custo de D-ID)'}
         </button>
 
         {erro && <div className="result-box">Erro: {erro}</div>}
