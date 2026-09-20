@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import PainelOrcamento from '../components/PainelOrcamento';
 
 function BrollSearch() {
   const [query, setQuery] = useState('');
@@ -175,14 +176,12 @@ export default function Home() {
   };
 
   const assembleVideo = async () => {
-    const temVariosPedacos = (results.voice?.audioSegments || []).length > 1;
     const primeira = await runStep('assemble', '/api/assemble-video', {
-      ...(temVariosPedacos
-        ? { audioSegments: results.voice.audioSegments }
-        : { audioUrl: results.voice?.audioUrl }),
+      audioUrl: results.voice?.audioUrl,
       cenas: results.visual?.arquivos,
       formato,
       palavras: results.voice?.palavras,
+      marca: 'Em Nome de Jesus',
     });
     if (!primeira || !primeira.renderId) return;
 
@@ -233,6 +232,13 @@ export default function Home() {
       descricao: results.script?.descricao,
     });
 
+  const publishSocial = () =>
+    runStep('publishSocial', '/api/publicar-social', {
+      tipo: 'video',
+      midiaUrl: results.assemble?.videoUrl,
+      legenda: results.script?.descricao,
+    });
+
   const salvarProjeto = () =>
     runStep('salvar', '/api/save-project', {
       tema,
@@ -249,7 +255,17 @@ export default function Home() {
       <h1>Youvideo</h1>
       <p className="subtitle">Seu estúdio automático de vídeos bíblicos e música gospel.</p>
 
+      <PainelOrcamento />
+
       <div className="hub-grid">
+        <a href="/novo-canal" className="hub-tile hub-tile--gold">
+          <div className="hub-tile-title">Novo canal</div>
+          <div className="hub-tile-desc">Criar um canal novo do zero (wizard guiado)</div>
+        </a>
+        <a href="/canal" className="hub-tile hub-tile--gold">
+          <div className="hub-tile-title">Meus canais</div>
+          <div className="hub-tile-desc">Adicionar temas, ver status e reformatar vídeos por canal</div>
+        </a>
         <a href="/musica" className="hub-tile hub-tile--gold">
           <div className="hub-tile-title">Música</div>
           <div className="hub-tile-desc">Uma música só, do áudio até publicar no YouTube</div>
@@ -278,13 +294,17 @@ export default function Home() {
           <div className="hub-tile-title">Transcrever áudio</div>
           <div className="hub-tile-desc">Recuperar a letra real cantada de uma música</div>
         </a>
+        <a href="/desenho" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">Histórias Animadas</div>
+          <div className="hub-tile-desc">Histórias bíblicas prontas em desenho animado, só escolher e gerar</div>
+        </a>
+        <a href="/oracao" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">Orações Matinais</div>
+          <div className="hub-tile-desc">Oração calma com 1 imagem em loop, pra ouvir de manhã</div>
+        </a>
         <a href="/series" className="hub-tile hub-tile--teal">
           <div className="hub-tile-title">Séries</div>
           <div className="hub-tile-desc">Personagens com rosto consistente entre vídeos</div>
-        </a>
-        <a href="/oracao-falada" className="hub-tile hub-tile--teal">
-          <div className="hub-tile-title">Vídeo falado</div>
-          <div className="hub-tile-desc">Oração com alguém falando de verdade (lábios sincronizados)</div>
         </a>
       </div>
 
@@ -331,7 +351,6 @@ export default function Home() {
               <option value="420">7 minutos</option>
               <option value="600">10 minutos</option>
               <option value="900">15 minutos</option>
-              <option value="1200">20 minutos</option>
             </>
           )}
         </select>
@@ -376,7 +395,21 @@ export default function Home() {
         disabled={!tema}
         onRun={generateScript}
         result={results.script}
-        renderResult={(r) => <ScriptResult result={r} />}
+        renderResult={(r) => (
+          <ScriptResult
+            result={r}
+            onNarracaoChange={(novoTexto) =>
+              setResults((res) => ({ ...res, script: { ...res.script, narracao: novoTexto } }))
+            }
+            onCenaChange={(indice, novoTexto) =>
+              setResults((res) => {
+                const cenas = [...(res.script?.cenas || [])];
+                cenas[indice] = { ...cenas[indice], descricao: novoTexto };
+                return { ...res, script: { ...res.script, cenas } };
+              })
+            }
+          />
+        )}
       />
 
       <StepCard
@@ -400,7 +433,19 @@ export default function Home() {
         result={results.visual}
         renderResult={(r) => (
           <>
-            <VisualResult result={r} />
+            <VisualResult
+              result={r}
+              estilo={estilo}
+              formato={formato}
+              imagemReferenciaUrl={series.find((s) => s.id === serieId)?.imagemReferenciaUrl}
+              onRetryCena={(indice, novoArquivo) =>
+                setResults((res) => {
+                  const arquivos = [...(res.visual?.arquivos || [])];
+                  arquivos[indice] = novoArquivo;
+                  return { ...res, visual: { ...res.visual, arquivos } };
+                })
+              }
+            />
             {r.arquivos?.some((a) => a.imageUrl && !a.klingTaskId && !a.videoUrl) && (
               <button onClick={animateScenes} disabled={loading === 'visual'}>
                 {loading === 'visual' && <span className="spinner" />}
@@ -451,6 +496,40 @@ export default function Home() {
         disabled={!results.assemble?.videoUrl}
         onRun={publishTiktok}
         result={results.publishTiktok}
+      />
+
+      <StepCard
+        n={8}
+        title="Publicar no Facebook e Instagram"
+        status={status.publishSocial}
+        loading={loading === 'publishSocial'}
+        disabled={!results.assemble?.videoUrl}
+        onRun={publishSocial}
+        result={results.publishSocial}
+        renderResult={(r) => (
+          <div style={{ fontSize: 13 }}>
+            {r.facebook?.erro ? (
+              <div style={{ color: '#ff9d8c' }}>Facebook: {r.facebook.erro}</div>
+            ) : (
+              <div style={{ color: 'var(--teal)' }}>
+                Facebook: publicado —{' '}
+                <a href={r.facebook?.url} target="_blank" rel="noreferrer">
+                  ver post
+                </a>
+              </div>
+            )}
+            {r.instagram?.erro ? (
+              <div style={{ color: '#ff9d8c' }}>Instagram: {r.instagram.erro}</div>
+            ) : (
+              <div style={{ color: 'var(--teal)' }}>
+                Instagram: publicado —{' '}
+                <a href={r.instagram?.url} target="_blank" rel="noreferrer">
+                  ver post
+                </a>
+              </div>
+            )}
+          </div>
+        )}
       />
 
       <div className="card">
@@ -531,7 +610,36 @@ function AssembleResult({ result }) {
   );
 }
 
-function VisualResult({ result }) {
+function VisualResult({ result, onRetryCena, estilo, formato, imagemReferenciaUrl }) {
+  const [textoEdit, setTextoEdit] = useState({});
+  const [tentandoIndice, setTentandoIndice] = useState(null);
+
+  const tentarDeNovo = async (indice, arquivoOriginal) => {
+    setTentandoIndice(indice);
+    try {
+      const res = await fetch('/api/generate-visual-cena', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descricao: textoEdit[indice] ?? arquivoOriginal.cena,
+          textoNarrado: arquivoOriginal.textoNarrado,
+          estilo,
+          formato,
+          imagemReferenciaUrl,
+          start: arquivoOriginal.start,
+          length: arquivoOriginal.length,
+        }),
+      });
+      const novoArquivo = await res.json();
+      if (!res.ok) throw new Error(novoArquivo.error || 'Erro ao tentar de novo');
+      onRetryCena && onRetryCena(indice, novoArquivo);
+    } catch (err) {
+      onRetryCena && onRetryCena(indice, { cena: arquivoOriginal.cena, erro: err.message });
+    } finally {
+      setTentandoIndice(null);
+    }
+  };
+
   return (
     <div className="result-box">
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -542,7 +650,22 @@ function VisualResult({ result }) {
             ) : a.imageUrl ? (
               <img src={a.imageUrl} alt={a.cena} style={{ width: '100%', borderRadius: 6 }} />
             ) : a.erro ? (
-              <div style={{ color: '#ff9d9d', fontSize: 11 }}>{a.erro}</div>
+              <div style={{ color: '#ff9d9d', fontSize: 11 }}>
+                {a.erro}
+                <textarea
+                  value={textoEdit[i] ?? a.cena ?? ''}
+                  onChange={(e) => setTextoEdit((t) => ({ ...t, [i]: e.target.value }))}
+                  style={{ width: '100%', minHeight: 60, fontSize: 11, marginTop: 6, fontFamily: 'inherit' }}
+                />
+                <button
+                  style={{ marginTop: 4, fontSize: 11, padding: '4px 8px' }}
+                  disabled={tentandoIndice === i}
+                  onClick={() => tentarDeNovo(i, a)}
+                >
+                  {tentandoIndice === i && <span className="spinner" />}
+                  {tentandoIndice === i ? 'Gerando...' : 'Tentar de novo'}
+                </button>
+              </div>
             ) : (
               <div style={{ color: '#999' }}>{a.status || 'sem imagem'}</div>
             )}
@@ -552,7 +675,7 @@ function VisualResult({ result }) {
             {a.avisoVideo && (
               <div style={{ fontSize: 11, color: '#ff9d9d' }}>{a.avisoVideo}</div>
             )}
-            <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>{a.cena}</div>
+            {!a.erro && <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>{a.cena}</div>}
           </div>
         ))}
       </div>
@@ -590,19 +713,38 @@ function VoiceResult({ result }) {
   );
 }
 
-function ScriptResult({ result }) {
+function ScriptResult({ result, onNarracaoChange, onCenaChange }) {
+  const caracteres = (result.narracao || '').length;
   return (
     <div className="result-box" style={{ whiteSpace: 'normal' }}>
       <p><b>Título:</b> {result.titulo}</p>
       <p><b>Descrição:</b> {result.descricao}</p>
       <p><b>Tags:</b> {(result.tags || []).join(', ')}</p>
-      <p><b>Narração:</b></p>
-      <p style={{ whiteSpace: 'pre-wrap' }}>{result.narracao}</p>
-      <p><b>Cenas ({(result.cenas || []).length}):</b></p>
+      <p>
+        <b>Narração</b>{' '}
+        <span style={{ fontSize: 11, color: '#999' }}>
+          ({caracteres} caracteres — edite livremente antes de gerar a voz)
+        </span>
+      </p>
+      <textarea
+        value={result.narracao || ''}
+        onChange={(e) => onNarracaoChange && onNarracaoChange(e.target.value)}
+        style={{ width: '100%', minHeight: 160, fontFamily: 'inherit', fontSize: 'inherit' }}
+      />
+      <p>
+        <b>Cenas ({(result.cenas || []).length})</b>{' '}
+        <span style={{ fontSize: 11, color: '#999' }}>
+          (edite a descrição se alguma imagem for barrada pelo filtro de conteúdo)
+        </span>
+      </p>
       <ol>
         {(result.cenas || []).map((c, i) => (
           <li key={i} style={{ marginBottom: 8 }}>
-            <i>{c.descricao}</i>
+            <textarea
+              value={c.descricao || ''}
+              onChange={(e) => onCenaChange && onCenaChange(i, e.target.value)}
+              style={{ width: '100%', minHeight: 50, fontFamily: 'inherit', fontSize: 'inherit' }}
+            />
             {c.textoNarrado && <div style={{ color: '#999' }}>"{c.textoNarrado}"</div>}
           </li>
         ))}

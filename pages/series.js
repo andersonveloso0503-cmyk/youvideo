@@ -57,8 +57,7 @@ export default function Series() {
     <div className="container">
       <h1>Séries de personagens</h1>
       <p className="subtitle">
-        <a href="/" style={{ color: '#4f7cff' }}>← painel</a> ·{' '}
-        <a href="/oracao-falada" style={{ color: '#4f7cff' }}>Vídeo falado</a>
+        <a href="/" style={{ color: '#4f7cff' }}>← painel</a>
       </p>
 
       <div className="card">
