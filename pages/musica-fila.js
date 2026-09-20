@@ -33,6 +33,8 @@ export default function MusicaFila() {
   const [fila, setFila] = useState([]);
   const [processandoAgora, setProcessandoAgora] = useState(false);
   const [mensagemProcessar, setMensagemProcessar] = useState(null);
+  const [publicandoId, setPublicandoId] = useState(null);
+  const [mensagemPublicar, setMensagemPublicar] = useState({});
 
   async function carregarFila() {
     try {
@@ -58,6 +60,26 @@ export default function MusicaFila() {
       setMensagemProcessar(`Erro: ${err.message}`);
     } finally {
       setProcessandoAgora(false);
+    }
+  }
+
+  async function publicarAgora(id) {
+    setPublicandoId(id);
+    setMensagemPublicar((m) => ({ ...m, [id]: null }));
+    try {
+      const res = await fetch('/api/musica-publicar-diario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao publicar');
+      setMensagemPublicar((m) => ({ ...m, [id]: `Publicado! ${data.publicado}` }));
+      carregarFila();
+    } catch (err) {
+      setMensagemPublicar((m) => ({ ...m, [id]: `Erro: ${err.message}` }));
+    } finally {
+      setPublicandoId(null);
     }
   }
 
@@ -207,6 +229,20 @@ export default function MusicaFila() {
               {STATUS_LABEL[item.status] || item.status}
               {item.erro ? ` — ${item.erro}` : ''}
             </div>
+
+            {item.status === 'renderizado' && (
+              <div style={{ marginTop: 8 }}>
+                <button disabled={publicandoId === item.id} onClick={() => publicarAgora(item.id)}>
+                  {publicandoId === item.id && <span className="spinner" />}
+                  {publicandoId === item.id ? 'Publicando...' : '🚀 Publicar agora'}
+                </button>
+                {mensagemPublicar[item.id] && (
+                  <div style={{ fontSize: 12, marginTop: 4, color: mensagemPublicar[item.id].startsWith('Erro') ? '#ff9d9d' : '#8fd19e' }}>
+                    {mensagemPublicar[item.id]}
+                  </div>
+                )}
+              </div>
+            )}
 
             {item.videoUrl && (
               <FormatoSwitcher item={item} />
