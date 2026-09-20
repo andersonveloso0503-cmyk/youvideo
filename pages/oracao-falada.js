@@ -104,6 +104,62 @@ export default function OracaoMatinal() {
     }
   }
 
+  async function gerarSemDID() {
+    setErro(null);
+    setResultado(null);
+    if (!texto.trim()) return setErro('Escreva ou gere o texto da oração primeiro');
+    if (!imagemEscolhida) return setErro('Escolha uma série ou cole uma URL de imagem');
+
+    try {
+      setStatus('Gerando a narração...');
+      const vozRes = await fetch('/api/generate-voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto }),
+      });
+      const vozData = await vozRes.json();
+      if (!vozRes.ok) throw new Error(vozData.error);
+
+      // Sem D-ID: nada de boca sincronizada — usa a imagem do personagem
+      // parada, com zoom lento (Ken Burns), narração por cima e legenda
+      // karaoke — o mesmo tratamento que as outras séries do painel já
+      // usam. Mais barato, mais rápido, sem depender de crédito externo.
+      setStatus('Montando o vídeo (imagem + zoom + legenda)...');
+      const montaRes = await fetch('/api/assemble-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioSegments: vozData.audioSegments,
+          cenas: [{ imageUrl: imagemEscolhida }],
+          formato: 'longo',
+          palavras: vozData.palavras,
+        }),
+      });
+      const montaData = await montaRes.json();
+      if (!montaRes.ok) throw new Error(montaData.error);
+
+      setStatus('Renderizando na Shotstack (pode levar 1-2 minutos)...');
+      let tentativas = 0;
+      while (tentativas < 60) {
+        await new Promise((r) => setTimeout(r, 5000));
+        const check = await fetch(`/api/assemble-video?id=${montaData.renderId}`).then((r) => r.json());
+        if (check.status === 'done') {
+          setResultado(check.videoUrl);
+          setStatus(null);
+          return;
+        }
+        if (check.status === 'failed') {
+          throw new Error(`A montagem falhou na Shotstack: ${check.erro || 'motivo não informado'}`);
+        }
+        tentativas++;
+      }
+      throw new Error('Demorou demais pra renderizar — confira depois manualmente.');
+    } catch (err) {
+      setErro(err.message);
+      setStatus(null);
+    }
+  }
+
   return (
     <div className="container">
       <h1>Oração matinal falada</h1>
@@ -172,7 +228,12 @@ export default function OracaoMatinal() {
 
         <button disabled={!!status} onClick={gerar} style={{ marginTop: 12 }}>
           {status && <span className="spinner" />}
-          {status || '3. Gerar vídeo falado'}
+          {status || '3. Gerar vídeo falado (D-ID, boca sincronizada)'}
+        </button>
+
+        <button disabled={!!status} onClick={gerarSemDID} style={{ marginTop: 8, background: '#2f3a4f' }}>
+          {status && <span className="spinner" />}
+          {status || 'Gerar sem D-ID (imagem parada + zoom, sem custo extra)'}
         </button>
 
         {erro && <div className="result-box">Erro: {erro}</div>}
