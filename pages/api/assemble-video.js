@@ -145,9 +145,9 @@ export default async function handler(req, res) {
 
   const cssLegenda = `p{font-family:'Arial Black','Arial Narrow Bold',Impact,sans-serif;font-size:${
     isVertical ? 24 : 40
-  }px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;text-align:center;margin:0;line-height:1.15;width:${
+  }px;font-weight:900;text-transform:uppercase;letter-spacing:0.5px;text-align:center;margin:0;line-height:1.6;width:${
     isVertical ? 520 : 1160
-  }px;max-width:${isVertical ? 520 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}.a{color:#FFE100;text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000,0 4px 6px rgba(0,0,0,.5);-webkit-text-stroke:3px #000}.p{color:#000;text-shadow:3px 3px 0 #fff,-3px 3px 0 #fff,3px -3px 0 #fff,-3px -3px 0 #fff;-webkit-text-stroke:3px #fff}`;
+  }px;max-width:${isVertical ? 520 : 1160}px;box-sizing:border-box;word-wrap:break-word;overflow-wrap:break-word}.p{color:#fff;text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000;-webkit-text-stroke:2px #000}.a{color:#fff;text-shadow:3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000;-webkit-text-stroke:2px #000;background:#8B2FC9;padding:4px 12px;border-radius:8px;box-decoration-break:clone;-webkit-box-decoration-break:clone}`;
 
   const legendaKaraoke = [];
   let ultimoFimLegenda = 0;
@@ -155,9 +155,9 @@ export default async function handler(req, res) {
     for (let i = 0; i < bloco.length; i += passo) {
       const fimIdx = Math.min(i + passo, bloco.length);
       // Mostra só as palavras já cantadas até agora dentro do bloco (nunca
-      // as que ainda vão vir). A palavra/grupo atual fica amarela com
-      // contorno preto (classe .a); as já cantadas ficam pretas com
-      // contorno branco (classe .p) — usar classes em vez de repetir o
+      // as que ainda vão vir). A palavra/grupo atual ganha uma caixinha
+      // colorida atrás (classe .a); as já cantadas ficam só brancas com
+      // contorno preto (classe .p) — usar classes em vez de repetir o
       // estilo em cada palavra mantém o pedido de montagem bem menor.
       const html = bloco
         .slice(0, fimIdx)
@@ -254,11 +254,12 @@ export default async function handler(req, res) {
       { clips: [marcaDagua] },
       { clips: [equalizerVisual] },
       ...(tarjaInscreva ? [{ clips: [tarjaInscreva] }] : []),
-      // Legenda embutida desativada por decisão do Anderson: Kwai, TikTok e
-      // YouTube já geram legenda automática própria nas plataformas, então
-      // não precisamos mais queimar isso no vídeo (evita todo o trabalho de
-      // alinhamento/sincronia e os problemas que vínhamos corrigindo nisso).
-      // ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
+      // Legenda embutida reativada por pedido do Anderson: fora do Kwai e
+      // do TikTok (que geram legenda própria ao editar no app), as outras
+      // plataformas (YouTube, Instagram, Facebook) não legendam sozinhas
+      // quando o vídeo entra pela API — então continuamos precisando
+      // queimar isso no vídeo.
+      ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
       { clips: clipsVideo },
       { clips: clipsAudio },
     ],
