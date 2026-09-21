@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return checkStatus(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente } = req.body;
+  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente, marca } = req.body;
 
   // Quando os dados são grandes demais pra caber numa requisição (medleys
   // com várias músicas), quem chama sobe um JSON no Blob e manda só o link
@@ -217,10 +217,10 @@ export default async function handler(req, res) {
     });
   }
 
-  const marcaDagua = {
+  const marcaDagua = marca ? {
     asset: {
       type: 'html',
-      html: `<p>Em Nome de Jesus</p>`,
+      html: `<p>${marca}</p>`,
       css: `p { font-family: 'Open Sans', sans-serif; font-size: ${
         isVertical ? 16 : 18
       }px; font-weight: 600; color: rgba(255,255,255,0.55); text-shadow: 0 1px 3px rgba(0,0,0,0.6); margin: 0; }`,
@@ -231,7 +231,7 @@ export default async function handler(req, res) {
     length: duracaoTotalAudio,
     position: 'topRight',
     offset: { x: -0.03, y: 0.04 },
-  };
+  } : null;
 
   const equalizerVisual = {
     asset: {
@@ -259,7 +259,8 @@ export default async function handler(req, res) {
     : [{ asset: { type: 'audio', src: audioUrl }, start: 0, length: duracaoTotalAudio }];
 
   // Tarja de "inscreva-se" — semi-transparente, só 10 segundos, um pouco
-  // antes do vídeo acabar (não no vídeo todo, pra não incomodar).
+  // antes do vídeo acabar (não no vídeo todo, pra não incomodar). Fica
+  // menor e mais embaixo do que a legenda, pra não se sobrepor a ela.
   const DURACAO_TARJA = 10;
   const ANTECEDENCIA_DO_FIM = 15; // termina de aparecer 15s antes do fim
   const inicioTarja = Math.max(0, duracaoTotalAudio - ANTECEDENCIA_DO_FIM - DURACAO_TARJA);
@@ -270,21 +271,21 @@ export default async function handler(req, res) {
             type: 'html',
             html: `<div class="tarja">🔔 Inscreva-se no canal e toque o sininho</div>`,
             css: `.tarja{font-family:'Arial',sans-serif;font-size:${
-              isVertical ? 26 : 32
-            }px;font-weight:700;color:#fff;background:rgba(0,0,0,0.55);padding:14px 28px;border-radius:8px;text-align:center;white-space:nowrap;}`,
-            width: isVertical ? 620 : 1000,
-            height: 90,
+              isVertical ? 15 : 20
+            }px;font-weight:700;color:#fff;background:rgba(0,0,0,0.55);padding:6px 14px;border-radius:6px;text-align:center;white-space:nowrap;}`,
+            width: isVertical ? 480 : 780,
+            height: 48,
           },
           start: inicioTarja,
           length: DURACAO_TARJA,
           position: 'bottom',
-          offset: { y: isVertical ? 0.3 : 0.14 },
+          offset: { y: isVertical ? 0.1 : 0.04 },
         }
       : null;
 
   const timeline = {
     tracks: [
-      { clips: [marcaDagua] },
+      ...(marcaDagua ? [{ clips: [marcaDagua] }] : []),
       { clips: [equalizerVisual] },
       ...(tarjaInscreva ? [{ clips: [tarjaInscreva] }] : []),
       // Legenda embutida reativada por pedido do Anderson: fora do Kwai e
