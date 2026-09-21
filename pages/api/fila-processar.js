@@ -72,7 +72,10 @@ export default async function handler(req, res) {
       }
 
       case 'roteiro_ok': {
-        const narracao = await gerarNarracao({ texto: item.roteiro.narracao });
+        const narracao = await gerarNarracao({
+          texto: item.roteiro.narracao,
+          modelo: item.modelo || process.env.ELEVENLABS_MODELO_PADRAO,
+        });
         await ref.update({ narracao, status: 'voz_ok' });
         break;
       }
