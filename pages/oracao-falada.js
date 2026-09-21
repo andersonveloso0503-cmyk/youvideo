@@ -14,6 +14,7 @@ export default function OracaoMatinal() {
   const [status, setStatus] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [erro, setErro] = useState(null);
+  const [modeloVoz, setModeloVoz] = useState('eleven');
 
   useEffect(() => {
     fetch('/api/serie-listar')
@@ -56,7 +57,7 @@ export default function OracaoMatinal() {
       const vozRes = await fetch('/api/generate-voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texto }),
+        body: JSON.stringify({ texto, modelo: modeloVoz === 'flash' ? 'flash' : undefined }),
       });
       const vozData = await vozRes.json();
       if (!vozRes.ok) throw new Error(vozData.error);
@@ -115,7 +116,7 @@ export default function OracaoMatinal() {
       const vozRes = await fetch('/api/generate-voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texto }),
+        body: JSON.stringify({ texto, modelo: modeloVoz === 'flash' ? 'flash' : undefined }),
       });
       const vozData = await vozRes.json();
       if (!vozRes.ok) throw new Error(vozData.error);
@@ -212,6 +213,12 @@ export default function OracaoMatinal() {
           <option value="600">10 minutos</option>
           <option value="900">15 minutos</option>
           <option value="1200">20 minutos</option>
+        </select>
+
+        <label>Modelo de voz</label>
+        <select value={modeloVoz} onChange={(e) => setModeloVoz(e.target.value)}>
+          <option value="eleven">Eleven (mais expressivo, 1 crédito/caractere)</option>
+          <option value="flash">Flash (mais econômico, 0,5 crédito/caractere — rende o dobro)</option>
         </select>
 
         <button disabled={gerandoRoteiro} onClick={gerarRoteiro} style={{ marginTop: 12 }}>

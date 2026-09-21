@@ -42,6 +42,7 @@ export default function Oracao() {
 
   const [duracaoDesejada, setDuracaoDesejada] = useState('420'); // 7 min, dentro da faixa 5-10 min
   const [vozId, setVozId] = useState('');
+  const [modeloVoz, setModeloVoz] = useState('eleven');
   const [vozes, setVozes] = useState(null);
 
   useEffect(() => {
@@ -85,6 +86,7 @@ export default function Oracao() {
     runStep('voice', '/api/generate-voice', {
       texto: results.script?.narracao || '',
       vozId,
+      modelo: modeloVoz === 'flash' ? 'flash' : undefined,
     });
 
   // Só 1 imagem (a descrição vem pronta do roteiro) — sem lista de cenas,
@@ -221,6 +223,12 @@ export default function Oracao() {
               {v.nome} {v.genero ? `(${v.genero})` : ''}
             </option>
           ))}
+        </select>
+
+        <label>Modelo de voz</label>
+        <select value={modeloVoz} onChange={(e) => setModeloVoz(e.target.value)}>
+          <option value="eleven">Eleven (mais expressivo, 1 crédito/caractere)</option>
+          <option value="flash">Flash (mais econômico, 0,5 crédito/caractere — rende o dobro)</option>
         </select>
       </div>
 
