@@ -65,9 +65,49 @@ export default function MusicaCantada() {
           <div className="result-box">
             <video src={videoUrl} controls style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
             <PublicarSocialBotao midiaUrl={videoUrl} legenda={titulo} />
+            <SalvarProjetoBotao titulo={titulo} videoUrl={videoUrl} />
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function SalvarProjetoBotao({ titulo, videoUrl }) {
+  const [salvando, setSalvando] = useState(false);
+  const [status, setStatus] = useState(null);
+
+  async function salvar() {
+    setSalvando(true);
+    setStatus(null);
+    try {
+      const res = await fetch('/api/save-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titulo: titulo || 'Cantor Virtual (sem título)',
+          videoUrl,
+          canal: 'musica',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao salvar');
+      setStatus('ok');
+    } catch (err) {
+      setStatus(`Erro: ${err.message}`);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button disabled={salvando} onClick={salvar} style={{ marginTop: 0 }}>
+        {salvando && <span className="spinner" />}
+        {salvando ? 'Salvando...' : 'Salvar projeto'}
+      </button>
+      {status === 'ok' && <div style={{ fontSize: 12, marginTop: 6, color: '#8fd6c1' }}>Salvo! Vê em "Meus Projetos" no topo do painel.</div>}
+      {status && status !== 'ok' && <div style={{ fontSize: 12, marginTop: 6, color: '#ff9d9d' }}>{status}</div>}
     </div>
   );
 }
