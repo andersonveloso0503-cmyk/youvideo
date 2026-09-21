@@ -280,7 +280,7 @@ export default function Home() {
         </a>
         <a href="/musica-cantada" className="hub-tile hub-tile--gold">
           <div className="hub-tile-title">Cantor Virtual</div>
-          <div className="hub-tile-desc">Personagem cantando a música, com boca sincronizada (D-ID)</div>
+          <div className="hub-tile-desc">Sobe o vídeo do personagem cantando (gerado no Musicful/ilovesong.ai) e publica</div>
         </a>
         <a href="/temas" className="hub-tile hub-tile--teal">
           <div className="hub-tile-title">Temas</div>
