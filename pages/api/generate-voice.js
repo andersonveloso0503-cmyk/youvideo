@@ -13,8 +13,13 @@ const TAMANHO_MAX_PEDACO = 4500;
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { texto, vozId } = req.body;
+  const { texto, vozId, modelo } = req.body;
   if (!texto) return res.status(400).json({ error: 'Texto da narração é obrigatório' });
+
+  // 'flash' custa metade do crédito da ElevenLabs (0,5 por caractere, em
+  // vez de 1) e ainda suporta português — um pouco menos expressivo, mas
+  // rende o dobro do mesmo saldo de créditos.
+  const MODEL_ID = modelo === 'flash' ? 'eleven_flash_v2_5' : 'eleven_multilingual_v2';
 
   if (!process.env.ELEVENLABS_API_KEY) {
     return res.status(500).json({
@@ -42,7 +47,7 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             text: pedacos[i],
-            model_id: 'eleven_multilingual_v2',
+            model_id: MODEL_ID,
           }),
         }
       );
