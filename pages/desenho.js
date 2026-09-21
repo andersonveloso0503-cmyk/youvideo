@@ -53,6 +53,7 @@ export default function Desenho() {
   const [formato, setFormato] = useState('longo');
   const [duracaoDesejada, setDuracaoDesejada] = useState('420');
   const [vozId, setVozId] = useState('');
+  const [modeloVoz, setModeloVoz] = useState('eleven');
   const [vozes, setVozes] = useState(null);
   const [serieId, setSerieId] = useState('');
   const [series, setSeries] = useState([]);
@@ -103,6 +104,7 @@ export default function Desenho() {
     runStep('voice', '/api/generate-voice', {
       texto: results.script?.narracao || '',
       vozId,
+      modelo: modeloVoz === 'flash' ? 'flash' : undefined,
     });
 
   const generateVisual = async () => {
@@ -323,6 +325,12 @@ export default function Desenho() {
               {v.nome} {v.genero ? `(${v.genero})` : ''}
             </option>
           ))}
+        </select>
+
+        <label>Modelo de voz</label>
+        <select value={modeloVoz} onChange={(e) => setModeloVoz(e.target.value)}>
+          <option value="eleven">Eleven (mais expressivo, 1 crédito/caractere)</option>
+          <option value="flash">Flash (mais econômico, 0,5 crédito/caractere — rende o dobro)</option>
         </select>
         {vozId && vozes?.find((v) => v.id === vozId)?.preview && (
           <audio
