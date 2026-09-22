@@ -304,6 +304,10 @@ export default function Home() {
           <div className="hub-tile-title">Histórias Animadas</div>
           <div className="hub-tile-desc">Histórias bíblicas prontas em desenho animado, só escolher e gerar</div>
         </a>
+        <a href="/cortes-comicos" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">Cortes Cômicos</div>
+          <div className="hub-tile-desc">Situações engraçadas com personagens bíblicos, em desenho animado, formato Short</div>
+        </a>
         <a href="/oracao" className="hub-tile hub-tile--teal">
           <div className="hub-tile-title">Orações Matinais</div>
           <div className="hub-tile-desc">Oração calma com 1 imagem em loop, pra ouvir de manhã</div>
