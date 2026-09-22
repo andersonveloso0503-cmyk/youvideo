@@ -43,6 +43,12 @@ const SITUACOES = [
   },
 ];
 
+const VOZ_TIPO_LABEL = {
+  normal: 'Normal',
+  grave: 'Grave (imponente)',
+  aguda: 'Aguda (cômica/animal)',
+};
+
 export default function CortesComicos() {
   const estilo = 'desenho';
   const formato = 'short';
@@ -53,17 +59,11 @@ export default function CortesComicos() {
   const tema = usarCustom ? temaCustom : (SITUACOES.find((h) => h.nome === situacaoEscolhida)?.tema || '');
 
   const [duracaoDesejada, setDuracaoDesejada] = useState('60');
-  const [vozId, setVozId] = useState('');
   const [modeloVoz, setModeloVoz] = useState('eleven');
-  const [vozes, setVozes] = useState(null);
   const [serieId, setSerieId] = useState('');
   const [series, setSeries] = useState([]);
 
   useEffect(() => {
-    fetch('/api/list-voices')
-      .then((r) => r.json())
-      .then((data) => setVozes(data.vozes || []))
-      .catch(() => setVozes([]));
     fetch('/api/serie-listar')
       .then((r) => r.json())
       .then((data) => setSeries(data.series || []))
@@ -101,17 +101,31 @@ export default function CortesComicos() {
   const generateScript = () =>
     runStep('script', '/api/generate-script-comico', { tema, estilo, formato, duracaoDesejada });
 
-  const generateVoice = () =>
-    runStep('voice', '/api/generate-voice', {
-      texto: results.script?.narracao || '',
-      vozId,
+  const generateVoice = async () => {
+    const cenas = results.script?.cenas || [];
+    const falas = cenas.map((c) => ({ personagem: c.personagem, texto: c.textoNarrado, vozTipo: c.vozTipo }));
+
+    const voiceData = await runStep('voice', '/api/generate-voice-dialogo', {
+      falas,
       modelo: modeloVoz === 'flash' ? 'flash' : undefined,
     });
+    if (!voiceData) return;
+
+    // Cola o tempo exato de cada fala na cena correspondente, na mesma
+    // ordem — é isso que faz a imagem/vídeo de cada cena bater certinho
+    // com o começo e o fim de quem está falando ali.
+    const cenasComTempo = voiceData.cenasComTempo || [];
+    setResults((r) => {
+      const cenasAtualizadas = (r.script?.cenas || []).map((c, i) => ({
+        ...c,
+        start: cenasComTempo[i]?.start,
+        length: cenasComTempo[i]?.length,
+      }));
+      return { ...r, script: { ...r.script, cenas: cenasAtualizadas } };
+    });
+  };
 
   const generateVisual = async () => {
-    const numCenas = (results.script?.cenas || []).length || 1;
-    const ultimaPalavra = (results.voice?.palavras || []).filter((p) => p.end != null).pop();
-    const duracaoAlvoCalc = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
     const serieSelecionada = series.find((s) => s.id === serieId);
 
     await runStep('visual', '/api/generate-visual', {
@@ -120,7 +134,12 @@ export default function CortesComicos() {
       formato,
       imagemReferenciaUrl: serieSelecionada?.imagemReferenciaUrl,
     });
-    setDuracaoAlvo(duracaoAlvoCalc);
+
+    // Duração média (usada só como alvo pro clipe animado da fal.ai — a
+    // montagem final respeita o tempo real de cada fala de qualquer jeito).
+    const numCenas = (results.script?.cenas || []).length || 1;
+    const duracaoTotal = (results.script?.cenas || []).reduce((soma, c) => soma + (c.length || 0), 0);
+    setDuracaoAlvo(duracaoTotal ? duracaoTotal / numCenas : undefined);
   };
 
   const animateScenes = async () => {
@@ -164,7 +183,7 @@ export default function CortesComicos() {
 
   const assembleVideo = async () => {
     const primeira = await runStep('assemble', '/api/assemble-video', {
-      audioUrl: results.voice?.audioUrl,
+      audioSegments: results.voice?.audioSegments,
       cenas: results.visual?.arquivos,
       formato,
       palavras: results.voice?.palavras,
@@ -229,7 +248,7 @@ export default function CortesComicos() {
   return (
     <div className="container">
       <h1>Cortes Cômicos Bíblicos</h1>
-      <p className="subtitle">Situações engraçadas com personagens bíblicos, em desenho animado, formato Short — pra publicar no canal Em Nome de Jesus.</p>
+      <p className="subtitle">Situações engraçadas com personagens bíblicos, em desenho animado, formato Short, com vozes diferentes por personagem — pra publicar no canal Em Nome de Jesus.</p>
       <p style={{ marginTop: -8 }}>
         <a href="/" style={{ color: '#4f7cff', fontSize: 13 }}>← voltar pro painel principal</a>
       </p>
@@ -266,7 +285,7 @@ export default function CortesComicos() {
         )}
 
         <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-          Estilo visual travado em <b>Desenho animado</b> e formato travado em <b>Short</b> nessa tela.
+          Estilo visual travado em <b>Desenho animado</b> e formato travado em <b>Short</b> nessa tela. A voz de cada personagem é escolhida automaticamente entre as vozes da sua conta ElevenLabs.
         </div>
 
         <div className="row" style={{ marginTop: 10 }}>
@@ -293,34 +312,16 @@ export default function CortesComicos() {
           </div>
         )}
 
-        <label>Voz do narrador</label>
-        <select value={vozId} onChange={(e) => setVozId(e.target.value)}>
-          <option value="">Padrão</option>
-          {vozes?.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.nome} {v.genero ? `(${v.genero})` : ''}
-            </option>
-          ))}
-        </select>
-
         <label>Modelo de voz</label>
         <select value={modeloVoz} onChange={(e) => setModeloVoz(e.target.value)}>
           <option value="eleven">Eleven (mais expressivo, 1 crédito/caractere)</option>
           <option value="flash">Flash (mais econômico, 0,5 crédito/caractere — rende o dobro)</option>
         </select>
-        {vozId && vozes?.find((v) => v.id === vozId)?.preview && (
-          <audio
-            src={vozes.find((v) => v.id === vozId).preview}
-            controls
-            style={{ width: '100%', marginTop: 8 }}
-          />
-        )}
-        {vozes === null && <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>Carregando vozes...</div>}
       </div>
 
       <StepCard
         n={1}
-        title="Roteiro (título, descrição, tags, narração)"
+        title="Roteiro (falas por personagem, título, descrição, tags)"
         status={status.script}
         loading={loading === 'script'}
         disabled={!tema}
@@ -329,13 +330,10 @@ export default function CortesComicos() {
         renderResult={(r) => (
           <ScriptResult
             result={r}
-            onNarracaoChange={(novoTexto) =>
-              setResults((res) => ({ ...res, script: { ...res.script, narracao: novoTexto } }))
-            }
-            onCenaChange={(indice, novoTexto) =>
+            onFalaChange={(indice, campo, valor) =>
               setResults((res) => {
                 const cenas = [...(res.script?.cenas || [])];
-                cenas[indice] = { ...cenas[indice], descricao: novoTexto };
+                cenas[indice] = { ...cenas[indice], [campo]: valor };
                 return { ...res, script: { ...res.script, cenas } };
               })
             }
@@ -345,13 +343,13 @@ export default function CortesComicos() {
 
       <StepCard
         n={2}
-        title="Narração (voz)"
+        title="Vozes (uma por personagem, com pitch automático)"
         status={status.voice}
         loading={loading === 'voice'}
-        disabled={!results.script?.narracao}
+        disabled={!results.script?.cenas?.length}
         onRun={generateVoice}
         result={results.voice}
-        renderResult={(r) => <VoiceResult result={r} />}
+        renderResult={(r) => <VoiceResult result={r} cenas={results.script?.cenas} />}
       />
 
       <StepCard
@@ -359,7 +357,7 @@ export default function CortesComicos() {
         title="Imagens dos personagens e cenas"
         status={status.visual}
         loading={loading === 'visual'}
-        disabled={!results.script}
+        disabled={!results.voice?.audioSegments?.length}
         onRun={generateVisual}
         result={results.visual}
         renderResult={(r) => (
@@ -584,51 +582,76 @@ function ThumbnailResult({ result }) {
   );
 }
 
-function VoiceResult({ result }) {
-  if (!result.audioUrl) return <div className="result-box">{result.status || 'processando...'}</div>;
+function VoiceResult({ result, cenas }) {
+  if (!result.audioSegments?.length) return <div className="result-box">{result.status || 'processando...'}</div>;
   return (
     <div className="result-box">
-      <audio src={result.audioUrl} controls style={{ width: '100%' }} />
+      {result.audioSegments.map((seg, i) => (
+        <div key={i} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid #333' }}>
+          <div style={{ fontSize: 12, color: '#4f7cff', marginBottom: 4 }}>
+            <b>{seg.personagem}</b>
+            {cenas?.[i]?.vozTipo && cenas[i].vozTipo !== 'normal' && (
+              <span style={{ color: '#999' }}> — voz {VOZ_TIPO_LABEL[cenas[i].vozTipo] || cenas[i].vozTipo}</span>
+            )}
+          </div>
+          <audio src={seg.url} controls style={{ width: '100%' }} />
+        </div>
+      ))}
       <div style={{ fontSize: 11, color: '#999', marginTop: 6 }}>
-        {(result.palavras || []).length} palavras com timing sincronizado
+        {(result.palavras || []).length} palavras com timing sincronizado no total
       </div>
     </div>
   );
 }
 
-function ScriptResult({ result, onNarracaoChange, onCenaChange }) {
-  const caracteres = (result.narracao || '').length;
+function ScriptResult({ result, onFalaChange }) {
   return (
     <div className="result-box" style={{ whiteSpace: 'normal' }}>
       <p><b>Título:</b> {result.titulo}</p>
       <p><b>Descrição:</b> {result.descricao}</p>
       <p><b>Tags:</b> {(result.tags || []).join(', ')}</p>
       <p>
-        <b>Narração</b>{' '}
+        <b>Falas ({(result.cenas || []).length})</b>{' '}
         <span style={{ fontSize: 11, color: '#999' }}>
-          ({caracteres} caracteres — edite livremente antes de gerar a voz)
-        </span>
-      </p>
-      <textarea
-        value={result.narracao || ''}
-        onChange={(e) => onNarracaoChange && onNarracaoChange(e.target.value)}
-        style={{ width: '100%', minHeight: 160, fontFamily: 'inherit', fontSize: 'inherit' }}
-      />
-      <p>
-        <b>Cenas ({(result.cenas || []).length})</b>{' '}
-        <span style={{ fontSize: 11, color: '#999' }}>
-          (edite a descrição se alguma imagem for barrada pelo filtro de conteúdo)
+          (edite quem fala, o texto, o tipo de voz e a descrição visual antes de gerar as vozes)
         </span>
       </p>
       <ol>
         {(result.cenas || []).map((c, i) => (
-          <li key={i} style={{ marginBottom: 8 }}>
+          <li key={i} style={{ marginBottom: 14 }}>
+            <div className="row" style={{ marginBottom: 4 }}>
+              <div>
+                <input
+                  type="text"
+                  value={c.personagem || ''}
+                  onChange={(e) => onFalaChange && onFalaChange(i, 'personagem', e.target.value)}
+                  placeholder="Quem fala (ex: Narrador, Golias...)"
+                  style={{ fontWeight: 600 }}
+                />
+              </div>
+              <div>
+                <select
+                  value={c.vozTipo || 'normal'}
+                  onChange={(e) => onFalaChange && onFalaChange(i, 'vozTipo', e.target.value)}
+                >
+                  <option value="normal">Voz normal</option>
+                  <option value="grave">Voz grave (imponente)</option>
+                  <option value="aguda">Voz aguda (cômica/animal)</option>
+                </select>
+              </div>
+            </div>
             <textarea
-              value={c.descricao || ''}
-              onChange={(e) => onCenaChange && onCenaChange(i, e.target.value)}
+              value={c.textoNarrado || ''}
+              onChange={(e) => onFalaChange && onFalaChange(i, 'textoNarrado', e.target.value)}
+              placeholder="O que essa pessoa fala"
               style={{ width: '100%', minHeight: 50, fontFamily: 'inherit', fontSize: 'inherit' }}
             />
-            {c.textoNarrado && <div style={{ color: '#999' }}>"{c.textoNarrado}"</div>}
+            <textarea
+              value={c.descricao || ''}
+              onChange={(e) => onFalaChange && onFalaChange(i, 'descricao', e.target.value)}
+              placeholder="Descrição visual da cena"
+              style={{ width: '100%', minHeight: 40, fontFamily: 'inherit', fontSize: 11, color: '#999', marginTop: 4 }}
+            />
           </li>
         ))}
       </ol>
