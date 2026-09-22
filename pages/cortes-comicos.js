@@ -142,13 +142,47 @@ export default function CortesComicos() {
     setDuracaoAlvo(duracaoTotal ? duracaoTotal / numCenas : undefined);
   };
 
+  // O clipe animado da fal.ai (Wan Turbo) sempre sai com uns 3-5s de
+  // duração fixa, não importa quanto tempo a fala precise cobrir. Quando a
+  // fala é mais longa que isso, o vídeo termina e a montagem preenche o
+  // resto com zoom parado na mesma imagem — o corte de "andando -> parado
+  // de repente" no meio da fala é o que dá aquela sensação de dessincronia.
+  // Pra falas longas, é melhor nem animar: fica só o zoom do início ao fim,
+  // sem esse corte no meio.
+  const LIMITE_ANIMACAO_SEGUNDOS = 5;
+
   const animateScenes = async () => {
+    const todosArquivos = results.visual?.arquivos || [];
+    const indicesCurtos = [];
+    const arquivosCurtos = [];
+    todosArquivos.forEach((a, i) => {
+      if (!a.length || a.length <= LIMITE_ANIMACAO_SEGUNDOS) {
+        arquivosCurtos.push(a);
+        indicesCurtos.push(i);
+      }
+    });
+
+    if (!arquivosCurtos.length) {
+      alert('Todas as falas dessa vez são mais longas que o clipe animado consegue cobrir — vão ficar só com zoom, sem animação, pra não travar no meio.');
+      return;
+    }
+
     const primeiro = await runStep('visual', '/api/animate-scenes', {
-      arquivos: results.visual?.arquivos || [],
+      arquivos: arquivosCurtos,
       formato,
       duracaoAlvo,
     });
     if (!primeiro) return;
+
+    const mesclar = () => {
+      const combinados = [...todosArquivos];
+      indicesCurtos.forEach((indiceOriginal, i) => {
+        combinados[indiceOriginal] = primeiro.arquivos[i];
+      });
+      return combinados;
+    };
+
+    setResults((r) => ({ ...r, visual: { arquivos: mesclar() } }));
 
     const pendentes = (primeiro.arquivos || []).filter((a) => a.klingTaskId);
     if (!pendentes.length) return;
@@ -174,7 +208,7 @@ export default function CortesComicos() {
         }
       }
 
-      setResults((r) => ({ ...r, visual: { arquivos: primeiro.arquivos } }));
+      setResults((r) => ({ ...r, visual: { arquivos: mesclar() } }));
       if (todasProntas) break;
       tentativas++;
     }
@@ -376,10 +410,15 @@ export default function CortesComicos() {
               }
             />
             {r.arquivos?.some((a) => a.imageUrl && !a.klingTaskId && !a.videoUrl) && (
-              <button onClick={animateScenes} disabled={loading === 'visual'}>
-                {loading === 'visual' && <span className="spinner" />}
-                {loading === 'visual' ? 'Animando...' : 'Animar essas cenas (gasta crédito Kling)'}
-              </button>
+              <>
+                <button onClick={animateScenes} disabled={loading === 'visual'}>
+                  {loading === 'visual' && <span className="spinner" />}
+                  {loading === 'visual' ? 'Animando...' : 'Animar essas cenas (gasta crédito Kling)'}
+                </button>
+                <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+                  Falas com mais de {LIMITE_ANIMACAO_SEGUNDOS}s ficam só com zoom (sem animação), pra não travar no meio.
+                </div>
+              </>
             )}
           </>
         )}
