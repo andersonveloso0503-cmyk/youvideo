@@ -28,6 +28,7 @@ export default function Musica() {
   const [estilo, setEstilo] = useState('cinematografico');
   const [formato, setFormato] = useState('longo');
   const [ambiente, setAmbiente] = useState('sandbox');
+  const [motorRender, setMotorRender] = useState('shotstack');
   const [letra, setLetra] = useState('');
   const [textoThumbnail, setTextoThumbnail] = useState('');
   const [arquivoAudio, setArquivoAudio] = useState(null);
@@ -124,6 +125,7 @@ export default function Musica() {
         formato,
         palavras: results.align.palavras,
         ambiente,
+        motor: motorRender,
       })
     );
     if (!primeira || !primeira.renderId) return;
@@ -231,6 +233,17 @@ export default function Musica() {
           <option value="sandbox">Testar (Sandbox — grátis, sai com marca d'água)</option>
           <option value="production">Publicar de verdade (Produção — gasta crédito, sem marca d'água)</option>
         </select>
+
+        <label>Motor de montagem do vídeo</label>
+        <select value={motorRender} onChange={(e) => setMotorRender(e.target.value)}>
+          <option value="shotstack">Shotstack (de sempre)</option>
+          <option value="json2video">JSON2Video (teste — mais barato)</option>
+        </select>
+        {motorRender === 'json2video' && (
+          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+            Ainda em teste: sem o efeito de equalizador, e a opção Sandbox/Produção acima não vale pro JSON2Video (ele não tem esse conceito).
+          </div>
+        )}
 
         <label>Texto de destaque pra thumbnail (opcional)</label>
         <input type="text" value={textoThumbnail} onChange={(e) => setTextoThumbnail(e.target.value)} placeholder="Ex: GRAÇA SOBRE GRAÇA" />

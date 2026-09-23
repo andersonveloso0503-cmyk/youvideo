@@ -69,6 +69,7 @@ export default function Home() {
   const [duracaoDesejada, setDuracaoDesejada] = useState('420');
   const [vozId, setVozId] = useState('');
   const [modeloVoz, setModeloVoz] = useState('eleven');
+  const [motorRender, setMotorRender] = useState('shotstack');
   const [vozes, setVozes] = useState(null);
   const [serieId, setSerieId] = useState('');
   const [series, setSeries] = useState([]);
@@ -184,6 +185,7 @@ export default function Home() {
       formato,
       palavras: results.voice?.palavras,
       marca: 'Em Nome de Jesus',
+      motor: motorRender,
     });
     if (!primeira || !primeira.renderId) return;
 
@@ -393,6 +395,17 @@ export default function Home() {
           <option value="eleven">Eleven (mais expressivo, 1 crédito/caractere)</option>
           <option value="flash">Flash (mais econômico, 0,5 crédito/caractere — rende o dobro)</option>
         </select>
+
+        <label>Motor de montagem do vídeo</label>
+        <select value={motorRender} onChange={(e) => setMotorRender(e.target.value)}>
+          <option value="shotstack">Shotstack (de sempre)</option>
+          <option value="json2video">JSON2Video (teste — mais barato)</option>
+        </select>
+        {motorRender === 'json2video' && (
+          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+            Ainda em teste: sem o efeito de equalizador, e a legenda usa o estilo nativo do JSON2Video (visual um pouco diferente da Shotstack).
+          </div>
+        )}
         {vozId && vozes?.find((v) => v.id === vozId)?.preview && (
           <audio
             src={vozes.find((v) => v.id === vozId).preview}
