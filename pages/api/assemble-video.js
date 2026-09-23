@@ -443,7 +443,18 @@ async function renderizarComJson2Video({
       body: JSON.stringify(movie),
     });
     const data = await renderRes.json();
-    if (!data.success) throw new Error(data.message || 'Erro ao iniciar a montagem no JSON2Video');
+    if (!data.success) {
+      // Debug temporário: manda de volta o JSON exato que foi enviado, pra
+      // dar pra ver o que fez o JSON2Video calcular um custo maior do que
+      // deveria pra um vídeo curto.
+      return res.status(500).json({
+        error: data.message || 'Erro ao iniciar a montagem no JSON2Video',
+        json2videoStatusCode: renderRes.status,
+        movieEnviado: movie,
+        duracaoTotalCalculada: duracaoTotalAudio,
+        somaDasCenasSegundos: scenes.reduce((soma, s) => soma + (s.duration || 0), 0),
+      });
+    }
 
     // Prefixo "j2v:" no id pra checkStatus saber qual motor consultar depois,
     // sem precisar de mais nada salvo em lugar nenhum.
