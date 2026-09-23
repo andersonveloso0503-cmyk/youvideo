@@ -65,7 +65,7 @@ export default function Musica() {
       return data;
     } catch (err) {
       setStatus((s) => ({ ...s, [key]: 'error' }));
-      setResults((r) => ({ ...r, [key]: { error: err.message } }));
+      setResults((r) => ({ ...r, [key]: { error: err.message, ...(err.detalhes || {}) } }));
       return null;
     } finally {
       setLoading(null);
@@ -79,7 +79,11 @@ export default function Musica() {
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Falha na etapa');
+    if (!res.ok) {
+      const erro = new Error(data.error || 'Falha na etapa');
+      erro.detalhes = data; // guarda a resposta inteira (debug)
+      throw erro;
+    }
     return data;
   }
 
@@ -404,7 +408,20 @@ function StepCard({ n, title, status, loading, disabled, onRun, result, renderRe
       <button disabled={disabled || loading} onClick={onRun}>
         {loading ? 'Gerando...' : 'Executar etapa'}
       </button>
-      {result && result.error && <div className="result-box">Erro: {result.error}</div>}
+      {result && result.error && (
+        <div className="result-box">
+          Erro: {result.error}
+          {Object.keys(result).some((k) => k !== 'error') && (
+            <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11, marginTop: 8, opacity: 0.8 }}>
+              {JSON.stringify(
+                Object.fromEntries(Object.entries(result).filter(([k]) => k !== 'error')),
+                null,
+                2
+              )}
+            </pre>
+          )}
+        </div>
+      )}
       {result && !result.error && renderResult && renderResult(result)}
     </div>
   );

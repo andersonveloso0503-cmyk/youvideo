@@ -85,7 +85,11 @@ export default function Desenho() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Falha na etapa');
+      if (!res.ok) {
+        setStatus((s) => ({ ...s, [key]: 'error' }));
+        setResults((r) => ({ ...r, [key]: { error: data.error || 'Falha na etapa', ...data } }));
+        return null;
+      }
       setResults((r) => ({ ...r, [key]: data }));
       setStatus((s) => ({ ...s, [key]: 'ok' }));
       return data;
@@ -486,7 +490,18 @@ function StepCard({ n, title, status, loading, disabled, onRun, result, renderRe
         {loading ? 'Gerando...' : 'Executar etapa'}
       </button>
       {result && result.error && (
-        <div className="result-box">Erro: {result.error}</div>
+        <div className="result-box">
+          Erro: {result.error}
+          {Object.keys(result).some((k) => k !== 'error') && (
+            <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11, marginTop: 8, opacity: 0.8 }}>
+              {JSON.stringify(
+                Object.fromEntries(Object.entries(result).filter(([k]) => k !== 'error')),
+                null,
+                2
+              )}
+            </pre>
+          )}
+        </div>
       )}
       {result && !result.error && renderResult && renderResult(result)}
       {result && !result.error && !renderResult && (
