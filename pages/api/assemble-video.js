@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') return checkStatus(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente, marca } = req.body;
+  let { audioUrl, audioSegments, cenas, formato, palavras, ambiente, marca, motor } = req.body;
 
   // Quando os dados são grandes demais pra caber numa requisição (medleys
   // com várias músicas), quem chama sobe um JSON no Blob e manda só o link
@@ -33,7 +33,11 @@ export default async function handler(req, res) {
 
   const { modo, apiKey, base } = resolverAmbiente(ambiente);
 
-  if (!apiKey) {
+  // Só exige a chave da Shotstack se ela for realmente usada pra renderizar
+  // (o JSON2Video, escolhido como motor, não precisa dela — mesmo que o
+  // código ainda use a Shotstack só pra sondar duração de vídeo animado,
+  // isso já falha de forma silenciosa e cai num valor padrão).
+  if (!apiKey && motor !== 'json2video') {
     return res.status(500).json({
       error: modo === 'sandbox'
         ? 'SHOTSTACK_API_KEY_SANDBOX não configurada ainda (pegue a chave de Sandbox no dashboard da Shotstack).'
@@ -167,6 +171,23 @@ export default async function handler(req, res) {
     return clipes;
   });
 
+  // ── Motor alternativo: JSON2Video ──────────────────────────────────────
+  // Reaproveita todo o cálculo de tempo por cena feito acima (clipsVideo),
+  // só muda como isso vira o JSON final e pra onde é enviado.
+  if (motor === 'json2video') {
+    return await renderizarComJson2Video({
+      res,
+      clipsVideo,
+      audioUrl,
+      audioSegments,
+      temAudioSegments,
+      palavras,
+      marca,
+      isVertical,
+      duracaoTotalAudio,
+    });
+  }
+
   // A Shotstack recusa (Payload Too Large) qualquer pedido de render acima
   // de ~390KB — antes disso, legenda palavra a palavra em textos longos
   // (orações de vários minutos, medleys grandes) estourava esse limite
@@ -296,9 +317,168 @@ export default async function handler(req, res) {
   }
 }
 
+function gerarSRT(palavras) {
+  if (!palavras || !palavras.length) return null;
+  const paraTempo = (s) => {
+    const h = String(Math.floor(s / 3600)).padStart(2, '0');
+    const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+    const sec = String(Math.floor(s % 60)).padStart(2, '0');
+    const ms = String(Math.round((s % 1) * 1000)).padStart(3, '0');
+    return `${h}:${m}:${sec},${ms}`;
+  };
+  const TAMANHO_BLOCO = 3;
+  const validas = palavras.filter((p) => p.start != null && p.end != null && p.end > p.start);
+  const blocos = [];
+  for (let i = 0; i < validas.length; i += TAMANHO_BLOCO) blocos.push(validas.slice(i, i + TAMANHO_BLOCO));
+  return blocos
+    .map((bloco, idx) => {
+      const inicio = bloco[0].start;
+      const fim = bloco[bloco.length - 1].end;
+      const texto = bloco.map((p) => p.texto).join(' ');
+      return `${idx + 1}\n${paraTempo(inicio)} --> ${paraTempo(fim)}\n${texto}\n`;
+    })
+    .join('\n');
+}
+
+// Monta e envia o vídeo pro JSON2Video em vez da Shotstack. Recebe as
+// mesmas cenas já com tempo calculado (clipsVideo) — só traduz pro
+// formato de "scenes" sequenciais do JSON2Video, que são bem mais simples
+// (cada cena dura X segundos, sem precisar de start/offset absolutos).
+async function renderizarComJson2Video({
+  res,
+  clipsVideo,
+  audioUrl,
+  audioSegments,
+  temAudioSegments,
+  palavras,
+  marca,
+  isVertical,
+  duracaoTotalAudio,
+}) {
+  const apiKey = process.env.JSON2VIDEO_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'JSON2VIDEO_API_KEY não configurada ainda (pegue em json2video.com/dashboard/apikeys).' });
+  }
+
+  try {
+    // Cada clipe vira sua própria cena — o JSON2Video encadeia as cenas
+    // sequencialmente sozinho, sem precisar de posição absoluta.
+    const scenes = clipsVideo.map((clip) => ({
+      duration: clip.length,
+      elements: [
+        {
+          type: clip.asset.type, // 'image' ou 'video', já no formato certo
+          src: clip.asset.src,
+          duration: clip.length,
+        },
+      ],
+    }));
+
+    // Legenda: sobe um .srt no Blob e usa o elemento nativo "subtitles" do
+    // JSON2Video, que já sincroniza sozinho — bem mais simples do que a
+    // legenda manual palavra-por-palavra que fazemos na Shotstack.
+    const elements = [];
+    const srt = gerarSRT(palavras);
+    let srtUrl = null;
+    if (srt) {
+      const { put } = await import('@vercel/blob');
+      const blobSrt = await put(`legenda-${Date.now()}.srt`, srt, {
+        access: 'public',
+        contentType: 'text/plain',
+        token: process.env.MEDIA_READ_WRITE_TOKEN,
+      });
+      srtUrl = blobSrt.url;
+    }
+
+    if (temAudioSegments) {
+      for (const seg of audioSegments) {
+        elements.push({ type: 'audio', src: seg.url, start: seg.start });
+      }
+    } else if (audioUrl) {
+      elements.push({ type: 'audio', src: audioUrl });
+    }
+
+    if (srtUrl) {
+      elements.push({
+        type: 'subtitles',
+        src: srtUrl,
+        settings: {
+          'font-family': 'Arial',
+          'font-size': isVertical ? '60' : '46',
+          'font-weight': '900',
+          'all-caps': true,
+          'word-color': '#8B2FC9',
+          'outline-color': '#000000',
+          'outline-width': 6,
+          position: 'bottom-center',
+          'max-words-per-line': 3,
+        },
+      });
+    }
+
+    if (marca) {
+      elements.push({
+        type: 'text',
+        text: marca,
+        position: 'top-right',
+        settings: {
+          'font-family': 'Inter',
+          'font-size': isVertical ? '16px' : '18px',
+          color: 'rgba(255,255,255,0.55)',
+          'font-weight': '600',
+        },
+      });
+    }
+
+    const movie = {
+      width: isVertical ? 1080 : 1920,
+      height: isVertical ? 1920 : 1080,
+      scenes,
+      elements,
+    };
+
+    const renderRes = await fetch('https://api.json2video.com/v2/movies', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify(movie),
+    });
+    const data = await renderRes.json();
+    if (!data.success) throw new Error(data.message || 'Erro ao iniciar a montagem no JSON2Video');
+
+    // Prefixo "j2v:" no id pra checkStatus saber qual motor consultar depois,
+    // sem precisar de mais nada salvo em lugar nenhum.
+    return res.status(200).json({
+      status: 'processing',
+      renderId: `j2v:${data.project}`,
+      aviso: 'Montagem enviada pro JSON2Video — pode levar de 1 a alguns minutos.',
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 async function checkStatus(req, res) {
   const { id, ambiente } = req.query;
   if (!id) return res.status(400).json({ error: 'Parâmetro id é obrigatório' });
+
+  if (id.startsWith('j2v:')) {
+    const project = id.slice(4);
+    try {
+      const statusRes = await fetch(`https://api.json2video.com/v2/movies?project=${project}`, {
+        headers: { 'x-api-key': process.env.JSON2VIDEO_API_KEY },
+      });
+      const data = await statusRes.json();
+      if (!data.success) throw new Error(data.message || 'Erro ao consultar status no JSON2Video');
+      const status = data.movie.status === 'done' ? 'done' : data.movie.status === 'error' ? 'failed' : data.movie.status;
+      return res.status(200).json({
+        status,
+        videoUrl: data.movie.url || null,
+        erro: status === 'failed' ? data.movie.message || 'Motivo não informado pelo JSON2Video' : undefined,
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
   const { apiKey, base } = resolverAmbiente(ambiente);
 
