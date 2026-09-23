@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { upload } from '@vercel/blob/client';
 
 async function compartilhar(arquivo, titulo, setStatus) {
   try {
@@ -18,6 +19,57 @@ export default function Projetos() {
   const [arquivosProntos, setArquivosProntos] = useState({});
   const [statusEnvio, setStatusEnvio] = useState({});
   const [reformatando, setReformatando] = useState({}); // { [projetoId]: { status, renderId, videoUrl, erro } }
+
+  const [tituloExterno, setTituloExterno] = useState('');
+  const [arquivoExterno, setArquivoExterno] = useState(null);
+  const [enviandoExterno, setEnviandoExterno] = useState(false);
+  const [erroExterno, setErroExterno] = useState(null);
+
+  function recarregarProjetos() {
+    fetch('/api/list-projects')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        setProjetos(data.projetos || []);
+      })
+      .catch((err) => setErro(err.message));
+  }
+
+  async function adicionarProjetoExterno() {
+    setErroExterno(null);
+    if (!arquivoExterno) return setErroExterno('Escolha o arquivo de vídeo primeiro.');
+    if (!tituloExterno) return setErroExterno('Dá um título pra esse vídeo.');
+
+    setEnviandoExterno(true);
+    try {
+      const blob = await upload(arquivoExterno.name, arquivoExterno, {
+        access: 'public',
+        handleUploadUrl: '/api/video-upload',
+      });
+
+      const res = await fetch('/api/save-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titulo: tituloExterno,
+          videoUrl: blob.url,
+          estilo: 'externo',
+          formato: 'externo',
+          descricao: 'Vídeo trazido de fora (não gerado pelo Youvideo)',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao salvar o projeto');
+
+      setTituloExterno('');
+      setArquivoExterno(null);
+      recarregarProjetos();
+    } catch (err) {
+      setErroExterno(err.message);
+    } finally {
+      setEnviandoExterno(false);
+    }
+  }
 
   useEffect(() => {
     fetch('/api/list-projects')
@@ -116,6 +168,23 @@ export default function Projetos() {
 
       {erro && <div className="card">Erro: {erro}</div>}
       {!projetos && !erro && <div className="card">Carregando...</div>}
+
+      <div className="card">
+        <h2>Trazer projeto de fora</h2>
+        <p style={{ fontSize: 13, color: '#aaa' }}>
+          Sobe um vídeo já pronto (feito fora do Youvideo) pra ele aparecer aqui embaixo com os mesmos botões de publicar.
+        </p>
+        <label>Título</label>
+        <input type="text" value={tituloExterno} onChange={(e) => setTituloExterno(e.target.value)} placeholder="Ex: Vídeo feito no CapCut" />
+        <label>Arquivo de vídeo</label>
+        <input type="file" accept="video/*" onChange={(e) => setArquivoExterno(e.target.files?.[0] || null)} />
+        <button disabled={enviandoExterno} onClick={adicionarProjetoExterno} style={{ marginTop: 10 }}>
+          {enviandoExterno && <span className="spinner" />}
+          {enviandoExterno ? 'Enviando...' : 'Adicionar aos meus projetos'}
+        </button>
+        {erroExterno && <div className="result-box">Erro: {erroExterno}</div>}
+      </div>
+
       {projetos && !projetos.length && <div className="card">Nenhum projeto salvo ainda.</div>}
 
       {projetos?.map((p) => (
@@ -175,6 +244,7 @@ export default function Projetos() {
               </div>
 
               <PublicarSocialBotao midiaUrl={p.videoUrl} legenda={p.titulo} />
+              <PublicarTiktokBotao videoUrl={p.videoUrl} titulo={p.titulo} descricao={p.descricao} />
               {p.narracaoTexto && <VerTextoLegenda texto={p.narracaoTexto} />}
 
               <div style={{ marginTop: 12, borderTop: '1px solid #333', paddingTop: 10 }}>
@@ -267,6 +337,41 @@ function PublicarSocialBotao({ midiaUrl, legenda }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function PublicarTiktokBotao({ videoUrl, titulo, descricao }) {
+  const [publicando, setPublicando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function publicar() {
+    setPublicando(true);
+    setResultado(null);
+    try {
+      const res = await fetch('/api/tiktok-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl, titulo, descricao }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao publicar no TikTok');
+      setResultado({ ok: true });
+    } catch (err) {
+      setResultado({ erro: err.message });
+    } finally {
+      setPublicando(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button disabled={publicando} onClick={publicar} style={{ marginTop: 0 }}>
+        {publicando && <span className="spinner" />}
+        {publicando ? 'Publicando...' : 'Publicar no TikTok'}
+      </button>
+      {resultado?.erro && <div style={{ fontSize: 12, marginTop: 6, color: '#ff9d9d' }}>TikTok: {resultado.erro}</div>}
+      {resultado?.ok && <div style={{ fontSize: 12, marginTop: 6, color: '#8fd6c1' }}>TikTok: publicado ✓</div>}
     </div>
   );
 }
