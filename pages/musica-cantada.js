@@ -40,8 +40,10 @@ export default function MusicaCantada() {
 
       <TesteBaratoReplicate />
 
+      <TesteAvancadoReplicate />
+
       <div className="card">
-        <h2>2. Ou gere o vídeo cantando fora do Youvideo</h2>
+        <h2>3. Ou gere o vídeo cantando fora do Youvideo</h2>
         <p style={{ color: '#9aa4b2', fontSize: 14, lineHeight: 1.5 }}>
           Se o teste acima não ficou bom o suficiente, dá pra gerar num site pago com mais qualidade
           (foto do personagem + áudio da música, escolha o tipo "Singing"):
@@ -54,7 +56,7 @@ export default function MusicaCantada() {
       </div>
 
       <div className="card">
-        <h2>3. Subir o vídeo pronto</h2>
+        <h2>4. Subir o vídeo pronto</h2>
 
         <label>Título (opcional, só organização)</label>
         <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex: Fé Que Levanta" />
@@ -182,6 +184,117 @@ function TesteBaratoReplicate() {
         <div className="result-box">
           <video src={resultadoUrl} controls style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
           <p style={{ color: '#8fd6c1', fontSize: 13 }}>✅ Teste pronto — dá pra baixar e avaliar a qualidade.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Teste avançado (Replicate, modelo bytedance/omni-human): a pessoa se mexe
+// de verdade — corpo, gestos, cabeça — tipo o efeito do MusicLab. Bem mais
+// caro que o teste barato (cobra por segundo de vídeo gerado), então só faz
+// sentido usar depois que o teste barato já convenceu que vale investir.
+function TesteAvancadoReplicate() {
+  const [imagemArquivo, setImagemArquivo] = useState(null);
+  const [audioArquivo, setAudioArquivo] = useState(null);
+  const [confirmado, setConfirmado] = useState(false);
+
+  const [rodando, setRodando] = useState(false);
+  const [statusMsg, setStatusMsg] = useState('');
+  const [resultadoUrl, setResultadoUrl] = useState('');
+  const [erro, setErro] = useState(null);
+
+  async function gerarTeste() {
+    setErro(null);
+    setResultadoUrl('');
+    if (!imagemArquivo) return setErro('Escolha uma foto/imagem do personagem.');
+    if (!audioArquivo) return setErro('Escolha o áudio da música (recorte um trecho curto, até 30s).');
+    if (!confirmado) return setErro('Marque a caixinha confirmando que você sabe que esse teste é pago por segundo de vídeo.');
+
+    setRodando(true);
+    try {
+      setStatusMsg('Enviando a imagem...');
+      const imagemBlob = await upload(imagemArquivo.name, imagemArquivo, {
+        access: 'public',
+        handleUploadUrl: '/api/imagem-upload',
+      });
+
+      setStatusMsg('Enviando o áudio...');
+      const audioBlob = await upload(audioArquivo.name, audioArquivo, {
+        access: 'public',
+        handleUploadUrl: '/api/musica-audio-upload',
+      });
+
+      setStatusMsg('Iniciando o teste avançado no Replicate (pode demorar mais que o barato)...');
+      const iniciarRes = await fetch('/api/cantor-virtual-avancado', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imagemUrl: imagemBlob.url, audioUrl: audioBlob.url }),
+      });
+      const iniciarData = await iniciarRes.json();
+      if (!iniciarRes.ok) throw new Error(iniciarData.erro || 'Erro ao iniciar o teste');
+
+      const { id } = iniciarData;
+      const fim = Date.now() + 15 * 60 * 1000; // até 15 min de espera
+      while (Date.now() < fim) {
+        const checkRes = await fetch(`/api/cantor-virtual-avancado?id=${id}`);
+        const checkData = await checkRes.json();
+        if (!checkRes.ok) throw new Error(checkData.erro || 'Erro checando o teste');
+        if (checkData.pronto) {
+          setResultadoUrl(checkData.url);
+          setStatusMsg('');
+          return;
+        }
+        setStatusMsg(
+          checkData.status === 'starting'
+            ? 'Ligando a máquina de IA (pode levar alguns minutos)...'
+            : 'Gerando o vídeo — a pessoa se movendo na cena (mais demorado que o teste barato)...'
+        );
+        await sleep(8000);
+      }
+      throw new Error('Demorou demais. Tente de novo.');
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setRodando(false);
+    }
+  }
+
+  return (
+    <div className="card" style={{ border: '1px solid #4f7cff' }}>
+      <h2>2. 🎬 Teste avançado — pessoa se movendo na cena (tipo MusicLab)</h2>
+      <p style={{ color: '#9aa4b2', fontSize: 14, lineHeight: 1.5 }}>
+        Esse aqui já se aproxima do efeito do MusicLab: a pessoa se mexe de verdade (corpo, cabeça, gestos) no
+        ritmo da música, não é só a boca. Usa o modelo <strong>bytedance/omni-human</strong> no Replicate.
+      </p>
+      <p style={{ color: '#ff9d9d', fontSize: 13, lineHeight: 1.5 }}>
+        ⚠️ <strong>Esse teste é pago de verdade</strong>: custa cerca de <strong>US$ 0,14 por segundo</strong> de
+        vídeo gerado (uns R$0,75/s no câmbio de hoje). Um teste de 15 segundos fica em torno de <strong>R$11</strong>;
+        o áudio precisa ter no máximo 30 segundos. Recorte um trechinho curto da música antes de subir aqui.
+      </p>
+
+      <label>Foto/imagem do personagem</label>
+      <input type="file" accept="image/*" onChange={(e) => setImagemArquivo(e.target.files?.[0] || null)} />
+
+      <label>Áudio da música (recorte até 30s)</label>
+      <input type="file" accept="audio/*" onChange={(e) => setAudioArquivo(e.target.files?.[0] || null)} />
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontWeight: 'normal' }}>
+        <input type="checkbox" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} style={{ width: 'auto' }} />
+        Sei que esse teste é pago por segundo de vídeo e quero gerar mesmo assim
+      </label>
+
+      <button disabled={rodando || !imagemArquivo || !audioArquivo || !confirmado} onClick={gerarTeste} style={{ marginTop: 8 }}>
+        {rodando && <span className="spinner" />}
+        {rodando ? 'Gerando teste avançado...' : 'Gerar vídeo de teste avançado'}
+      </button>
+
+      {statusMsg && <p style={{ color: '#9aa4b2', fontSize: 13, marginTop: 8 }}>{statusMsg}</p>}
+      {erro && <div className="result-box">Erro: {erro}</div>}
+      {resultadoUrl && (
+        <div className="result-box">
+          <video src={resultadoUrl} controls style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
+          <p style={{ color: '#8fd6c1', fontSize: 13 }}>✅ Teste avançado pronto — compara com o teste barato e decide se vale o custo.</p>
         </div>
       )}
     </div>
