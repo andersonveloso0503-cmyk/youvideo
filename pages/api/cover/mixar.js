@@ -7,11 +7,11 @@ import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import ffmpegStatic from 'ffmpeg-static';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 
 export const config = { maxDuration: 300 };
 
-const FFMPEG = process.env.FFMPEG_PATH || ffmpegStatic;
+const FFMPEG = process.env.FFMPEG_PATH || ffmpegInstaller.path;
 const PREFIXO = 'cover/projetos/';
 
 function rodarFfmpeg(args) {
