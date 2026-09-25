@@ -2,6 +2,7 @@
 # Disparado pelo Youvideo (pages/api/cover/gratis.js). Os resultados vão para o Vercel Blob.
 # Não imprimimos links nem tokens no log, porque o log de repositório público é visível.
 name: Separar voz e instrumental (grátis)
+run-name: separar ${{ github.event.client_payload.jobId || 'manual' }}
 
 on:
   repository_dispatch:
@@ -22,7 +23,7 @@ concurrency:
 jobs:
   separar:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 300
     env:
       AUDIO_URL: ${{ github.event.client_payload.audioUrl || inputs.audioUrl }}
       TITULO: ${{ github.event.client_payload.titulo || inputs.titulo }}
@@ -43,28 +44,49 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Instalar ferramentas
-        run: |
-          which ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
-          pip install -q torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
-          pip install -q -r .github/scripts/requirements-demucs.txt
-          mkdir -p /tmp/up && cd /tmp/up && npm init -y >/dev/null && npm i -s @vercel/blob@0.27.0
+      - name: Preparar envio pro Vercel Blob
+        run: mkdir -p /tmp/up && cd /tmp/up && npm init -y >/dev/null && npm i -s @vercel/blob@0.27.0
 
       - name: Avisar que começou
         run: node .github/scripts/salvar-separacao.mjs status rodando
 
-      - name: Baixar música
+      - name: Instalar separador
+        run: |
+          which ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+          pip install -q torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -q -r .github/scripts/requirements-demucs.txt
+
+      - name: Baixar e cortar em partes de 10 minutos
         run: |
           curl -sSfL "$AUDIO_URL" -o /tmp/musica_in
-          ffmpeg -hide_banner -loglevel error -y -i /tmp/musica_in -ac 2 -ar 44100 /tmp/musica.wav
+          mkdir -p /tmp/partes
+          ffmpeg -hide_banner -loglevel error -y -i /tmp/musica_in -vn -ac 2 -ar 44100 -f segment -segment_time 600 -c:a pcm_s16le /tmp/partes/p_%03d.wav
+          ls /tmp/partes | wc -l
 
-      - name: Separar (Demucs)
-        run: python -m demucs --two-stems=vocals -n htdemucs --mp3 --mp3-bitrate 192 -o /tmp/out /tmp/musica.wav
+      - name: Separar (Demucs), parte por parte
+        run: |
+          TOTAL=$(ls /tmp/partes/*.wav | wc -l)
+          N=0
+          for P in /tmp/partes/*.wav; do
+            N=$((N+1))
+            node .github/scripts/salvar-separacao.mjs status "parte-${N}-de-${TOTAL}" || true
+            python -m demucs --two-stems=vocals -n htdemucs -d cpu -o /tmp/out "$P"
+          done
+
+      - name: Juntar as partes
+        run: |
+          : > /tmp/lista_inst.txt; : > /tmp/lista_voz.txt
+          for P in /tmp/partes/*.wav; do
+            B=$(basename "$P" .wav)
+            echo "file '/tmp/out/htdemucs/$B/no_vocals.wav'" >> /tmp/lista_inst.txt
+            echo "file '/tmp/out/htdemucs/$B/vocals.wav'" >> /tmp/lista_voz.txt
+          done
+          ffmpeg -hide_banner -loglevel error -y -f concat -safe 0 -i /tmp/lista_inst.txt -c:a libmp3lame -b:a 192k /tmp/instrumental.mp3
+          ffmpeg -hide_banner -loglevel error -y -f concat -safe 0 -i /tmp/lista_voz.txt -c:a libmp3lame -b:a 192k /tmp/voz.mp3
 
       - name: Salvar resultado
-        run: node .github/scripts/salvar-separacao.mjs pronto /tmp/out/htdemucs/musica/no_vocals.mp3 /tmp/out/htdemucs/musica/vocals.mp3
+        run: node .github/scripts/salvar-separacao.mjs pronto /tmp/instrumental.mp3 /tmp/voz.mp3
 
       - name: Avisar erro
         if: failure()
         run: node .github/scripts/salvar-separacao.mjs status erro || true
-
