@@ -395,21 +395,44 @@ export default function CoverIA() {
     setSepFila((f) => f.filter((it) => it.id !== id));
   }
 
+  function duracaoSegundos(file) {
+    return new Promise((ok) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const a = new Audio();
+        a.preload = 'metadata';
+        a.onloadedmetadata = () => { URL.revokeObjectURL(url); ok(a.duration || 0); };
+        a.onerror = () => { URL.revokeObjectURL(url); ok(0); };
+        a.src = url;
+        setTimeout(() => ok(0), 8000);
+      } catch { ok(0); }
+    });
+  }
+
   async function processarItem(it) {
     try {
+      if (sepModo === 'rapido') {
+        const seg = await duracaoSegundos(it.file);
+        if (seg > 20 * 60) throw new Error(`Áudio longo (${Math.round(seg / 60)} min): no modo Rápido custaria caro e pode falhar. Use o modo 🆓 Grátis, que corta em partes.`);
+      }
       atualizarItem(it.id, { status: 'rodando', msg: 'Enviando', erro: '' });
       const url = await enviarArquivo(it.file);
       if (sepModo === 'gratis') {
         const titulo = it.nome.replace(/\.[^.]+$/, '');
         const { jobId } = await api('/api/cover/gratis', { method: 'POST', body: JSON.stringify({ audioUrl: url, titulo }) });
-        const textos = { 'na-fila': 'Na fila do GitHub (pode levar 1-2 min pra começar)', rodando: 'Separando no GitHub (5-10 min)' };
-        const fim = Date.now() + 50 * 60 * 1000;
+        const fim = Date.now() + 5 * 60 * 60 * 1000;
         while (Date.now() < fim) {
           await sleep(10000);
           const d = await api(`/api/cover/gratis?id=${jobId}`);
           if (d.status === 'pronto' && d.projeto) { atualizarItem(it.id, { status: 'pronto', msg: '', resultado: d.projeto }); return; }
           if (d.status === 'erro') throw new Error(d.erro || 'O GitHub não conseguiu separar esta música. Veja a aba Actions do repositório.');
-          atualizarItem(it.id, { msg: textos[d.status] || 'Processando' });
+          let msg = 'Na fila do GitHub (pode levar 1-2 min pra começar)';
+          if (d.status === 'rodando') {
+            msg = d.partes > 1
+              ? `Separando no GitHub: parte ${d.parte} de ${d.partes} (≈ 10 min cada; pode fechar a tela, sai no Histórico)`
+              : 'Separando no GitHub (5-15 min; pode fechar a tela, sai no Histórico)';
+          }
+          atualizarItem(it.id, { msg });
         }
         throw new Error('Demorou demais no GitHub. Veja se aparece no Histórico mais tarde.');
       }
