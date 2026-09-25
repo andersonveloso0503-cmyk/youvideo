@@ -137,7 +137,12 @@ async function treinarESalvarVoz({ vozAudioUrl, nome, estilo, presetId, descrica
 
 async function enviarArquivo(file) {
   const nome = `cover/uploads/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-  const blob = await upload(nome, file, { access: 'public', handleUploadUrl: '/api/cover/upload' });
+  if (file.size > 500 * 1024 * 1024) throw new Error('Arquivo acima de 500 MB. Converta para MP3 antes de enviar.');
+  const blob = await upload(nome, file, {
+    access: 'public',
+    handleUploadUrl: '/api/cover/upload',
+    multipart: file.size > 30 * 1024 * 1024, // arquivos grandes vão em partes
+  });
   return blob.url;
 }
 
@@ -403,7 +408,7 @@ export default function CoverIA() {
           await sleep(10000);
           const d = await api(`/api/cover/gratis?id=${jobId}`);
           if (d.status === 'pronto' && d.projeto) { atualizarItem(it.id, { status: 'pronto', msg: '', resultado: d.projeto }); return; }
-          if (d.status === 'erro') throw new Error('O GitHub não conseguiu separar esta música. Veja a aba Actions do repositório.');
+          if (d.status === 'erro') throw new Error(d.erro || 'O GitHub não conseguiu separar esta música. Veja a aba Actions do repositório.');
           atualizarItem(it.id, { msg: textos[d.status] || 'Processando' });
         }
         throw new Error('Demorou demais no GitHub. Veja se aparece no Histórico mais tarde.');
