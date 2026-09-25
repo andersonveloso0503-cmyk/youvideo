@@ -210,6 +210,13 @@ export default function CoverIA() {
 
   // histórico
   const [projetos, setProjetos] = useState([]);
+
+  // separador
+  const [sepMusica, setSepMusica] = useState(null);
+  const [sepEnviando, setSepEnviando] = useState(false);
+  const [sepMsg, setSepMsg] = useState('');
+  const [sepResultado, setSepResultado] = useState(null);
+  const [sepErro, setSepErro] = useState('');
   const [carregandoProjetos, setCarregandoProjetos] = useState(false);
 
   const rodando = typeof etapa === 'number';
@@ -366,10 +373,39 @@ export default function CoverIA() {
   const presetsDoEstilo = PRESETS.filter((p) => p.estilo === estilo);
   const personalizadasDoEstilo = vozes.filter((v) => v.estilo === estilo && !v.presetId);
 
+  async function escolherSepMusica(file) {
+    if (!file) return;
+    setSepEnviando(true); setSepResultado(null); setSepErro('');
+    try {
+      const url = await enviarArquivo(file);
+      setSepMusica({ url, nome: file.name });
+    } catch (e) {
+      mostrarAviso('Falha ao enviar a música: ' + e.message, 'erro');
+    } finally { setSepEnviando(false); }
+  }
+
+  async function separarMusica() {
+    if (!sepMusica) return;
+    setSepResultado(null); setSepErro('');
+    try {
+      setSepMsg('Separando voz e instrumental');
+      const { voz, instrumentos } = await separar(sepMusica.url, (m) => setSepMsg(`Separando voz e instrumental (${m})`));
+      if (!instrumentos.length) throw new Error('A separação não devolveu o instrumental.');
+      setSepMsg('Juntando o instrumental e salvando');
+      const d = await api('/api/cover/mixar', {
+        method: 'POST',
+        body: JSON.stringify({ tipo: 'separar', vozUrl: voz, instrumentosUrls: instrumentos, titulo: sepMusica.nome.replace(/\.[^.]+$/, '') }),
+      });
+      setSepResultado(d.projeto);
+    } catch (e) {
+      setSepErro(e.message);
+    } finally { setSepMsg(''); }
+  }
+
   function Downloads({ p }) {
     return (
       <div className="cv-downloads">
-        {[['🎤 Cover completo', p.coverUrl], ['🎹 Só instrumental', p.instrumentalUrl], ['🗣️ Só a voz nova', p.vozUrl]].filter(([, url]) => url).map(([rotulo, url]) => (
+        {[['🎤 Cover completo', p.coverUrl], ['🎹 Só instrumental', p.instrumentalUrl], [p.tipo === 'separar' ? '🗣️ Só a voz original' : '🗣️ Só a voz nova', p.vozUrl]].filter(([, url]) => url).map(([rotulo, url]) => (
           <div key={rotulo} className="cv-down-item">
             <span>{rotulo}</span>
             <audio controls preload="none" src={url} className="cv-audio" />
@@ -399,7 +435,7 @@ export default function CoverIA() {
         </header>
 
         <nav className="cv-abas">
-          {[['cover', '🎵 Fazer cover'], ['vozes', '🗂️ Biblioteca de vozes'], ['historico', '📜 Covers gerados']].map(([id, nome]) => (
+          {[['cover', '🎵 Fazer cover'], ['separar', '✂️ Só separar'], ['vozes', '🗂️ Biblioteca de vozes'], ['historico', '📜 Histórico']].map(([id, nome]) => (
             <button key={id} className={`cv-aba ${aba === id ? 'cv-aba-ativa' : ''}`} onClick={() => setAba(id)}>{nome}</button>
           ))}
         </nav>
@@ -502,6 +538,34 @@ export default function CoverIA() {
           </>
         )}
 
+        {/* ───────── ABA: SÓ SEPARAR ───────── */}
+        {aba === 'separar' && (
+          <>
+            <section className="cv-secao">
+              <h2>✂️ Separar voz e instrumental</h2>
+              <p className="cv-dica">Sem trocar a voz: você recebe só o instrumental (playback) e só a voz original. Custa perto de R$1 por música e leva de 1 a 3 minutos.</p>
+              <label className={`cv-upload ${sepEnviando || sepMsg ? 'cv-desab' : ''}`}>
+                <input type="file" accept="audio/*" disabled={sepEnviando || !!sepMsg} onChange={(e) => escolherSepMusica(e.target.files[0])} />
+                {sepEnviando ? <><span className="cv-spin" /> Enviando música...</> : sepMusica ? `✓ ${sepMusica.nome} (toque para trocar)` : '📁 Escolher música (MP3, WAV, M4A)'}
+              </label>
+              {sepMusica && <audio controls preload="none" src={sepMusica.url} className="cv-audio" />}
+            </section>
+
+            <button className="cv-btn-grande" disabled={!sepMusica || sepEnviando || !!sepMsg} onClick={separarMusica}>
+              {sepMsg ? <><span className="cv-spin" /> {sepMsg}...</> : '✂️ Separar (≈ R$1)'}
+            </button>
+
+            {sepErro && <div className="cv-aviso cv-aviso-erro">❌ {sepErro}</div>}
+
+            {sepResultado && (
+              <section className="cv-secao cv-resultado">
+                <h2>✅ Separado: {sepResultado.titulo}</h2>
+                <Downloads p={sepResultado} />
+              </section>
+            )}
+          </>
+        )}
+
         {/* ───────── ABA: BIBLIOTECA ───────── */}
         {aba === 'vozes' && (
           <>
@@ -563,13 +627,13 @@ export default function CoverIA() {
         {/* ───────── ABA: HISTÓRICO ───────── */}
         {aba === 'historico' && (
           <section className="cv-secao">
-            <h2>📜 Covers gerados</h2>
+            <h2>📜 Histórico</h2>
             {carregandoProjetos && <div className="cv-carregando"><span className="cv-spin" /> Carregando...</div>}
-            {!carregandoProjetos && !projetos.length && <p className="cv-dica">Nenhum cover ainda.</p>}
+            {!carregandoProjetos && !projetos.length && <p className="cv-dica">Nada gerado ainda.</p>}
             {projetos.map((p) => (
               <div key={p.id} className="cv-projeto">
                 <strong>{p.titulo}</strong>
-                <small>{p.vozNome} · {new Date(p.criadoEm).toLocaleString('pt-BR')}</small>
+                <small>{p.tipo === 'separar' ? '✂️ Só separado' : `🎤 ${p.vozNome}`} · {new Date(p.criadoEm).toLocaleString('pt-BR')}</small>
                 <Downloads p={p} />
               </div>
             ))}
