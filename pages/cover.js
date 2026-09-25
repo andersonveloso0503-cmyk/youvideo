@@ -212,11 +212,9 @@ export default function CoverIA() {
   const [projetos, setProjetos] = useState([]);
 
   // separador
-  const [sepMusica, setSepMusica] = useState(null);
-  const [sepEnviando, setSepEnviando] = useState(false);
-  const [sepMsg, setSepMsg] = useState('');
-  const [sepResultado, setSepResultado] = useState(null);
-  const [sepErro, setSepErro] = useState('');
+  const [sepFila, setSepFila] = useState([]); // { id, nome, file, status, msg, resultado, erro }
+  const [sepRodando, setSepRodando] = useState(false);
+  const [sepModo, setSepModo] = useState('rapido'); // 'rapido' (fal.ai) | 'gratis' (GitHub Actions)
   const [carregandoProjetos, setCarregandoProjetos] = useState(false);
 
   const rodando = typeof etapa === 'number';
@@ -373,33 +371,67 @@ export default function CoverIA() {
   const presetsDoEstilo = PRESETS.filter((p) => p.estilo === estilo);
   const personalizadasDoEstilo = vozes.filter((v) => v.estilo === estilo && !v.presetId);
 
-  async function escolherSepMusica(file) {
-    if (!file) return;
-    setSepEnviando(true); setSepResultado(null); setSepErro('');
-    try {
-      const url = await enviarArquivo(file);
-      setSepMusica({ url, nome: file.name });
-    } catch (e) {
-      mostrarAviso('Falha ao enviar a música: ' + e.message, 'erro');
-    } finally { setSepEnviando(false); }
+  function adicionarNaFila(files) {
+    const novos = Array.from(files || []).map((file) => ({
+      id: `${Date.now()}${Math.random().toString(36).slice(2, 7)}`,
+      nome: file.name,
+      file,
+      status: 'aguardando',
+      msg: '',
+    }));
+    if (novos.length) setSepFila((f) => [...f, ...novos]);
   }
 
-  async function separarMusica() {
-    if (!sepMusica) return;
-    setSepResultado(null); setSepErro('');
+  function atualizarItem(id, campos) {
+    setSepFila((f) => f.map((it) => (it.id === id ? { ...it, ...campos } : it)));
+  }
+
+  function tirarDaFila(id) {
+    setSepFila((f) => f.filter((it) => it.id !== id));
+  }
+
+  async function processarItem(it) {
     try {
-      setSepMsg('Separando voz e instrumental');
-      const { voz, instrumentos } = await separar(sepMusica.url, (m) => setSepMsg(`Separando voz e instrumental (${m})`));
+      atualizarItem(it.id, { status: 'rodando', msg: 'Enviando', erro: '' });
+      const url = await enviarArquivo(it.file);
+      if (sepModo === 'gratis') {
+        const titulo = it.nome.replace(/\.[^.]+$/, '');
+        const { jobId } = await api('/api/cover/gratis', { method: 'POST', body: JSON.stringify({ audioUrl: url, titulo }) });
+        const textos = { 'na-fila': 'Na fila do GitHub (pode levar 1-2 min pra começar)', rodando: 'Separando no GitHub (5-10 min)' };
+        const fim = Date.now() + 50 * 60 * 1000;
+        while (Date.now() < fim) {
+          await sleep(10000);
+          const d = await api(`/api/cover/gratis?id=${jobId}`);
+          if (d.status === 'pronto' && d.projeto) { atualizarItem(it.id, { status: 'pronto', msg: '', resultado: d.projeto }); return; }
+          if (d.status === 'erro') throw new Error('O GitHub não conseguiu separar esta música. Veja a aba Actions do repositório.');
+          atualizarItem(it.id, { msg: textos[d.status] || 'Processando' });
+        }
+        throw new Error('Demorou demais no GitHub. Veja se aparece no Histórico mais tarde.');
+      }
+      atualizarItem(it.id, { msg: 'Separando voz e instrumental' });
+      const { voz, instrumentos } = await separar(url, (m) => atualizarItem(it.id, { msg: `Separando (${m})` }));
       if (!instrumentos.length) throw new Error('A separação não devolveu o instrumental.');
-      setSepMsg('Juntando o instrumental e salvando');
+      atualizarItem(it.id, { msg: 'Salvando' });
       const d = await api('/api/cover/mixar', {
         method: 'POST',
-        body: JSON.stringify({ tipo: 'separar', vozUrl: voz, instrumentosUrls: instrumentos, titulo: sepMusica.nome.replace(/\.[^.]+$/, '') }),
+        body: JSON.stringify({ tipo: 'separar', vozUrl: voz, instrumentosUrls: instrumentos, titulo: it.nome.replace(/\.[^.]+$/, '') }),
       });
-      setSepResultado(d.projeto);
+      atualizarItem(it.id, { status: 'pronto', msg: '', resultado: d.projeto });
     } catch (e) {
-      setSepErro(e.message);
-    } finally { setSepMsg(''); }
+      atualizarItem(it.id, { status: 'erro', msg: '', erro: e.message });
+    }
+  }
+
+  async function separarTodas() {
+    const pendentes = sepFila.filter((it) => it.status === 'aguardando' || it.status === 'erro');
+    if (!pendentes.length) return;
+    setSepRodando(true);
+    // 2 músicas ao mesmo tempo
+    let i = 0;
+    const trabalhador = async () => { while (i < pendentes.length) { const it = pendentes[i++]; await processarItem(it); } };
+    await Promise.all([trabalhador(), trabalhador()]);
+    setSepRodando(false);
+    mostrarAviso('Fila terminada!');
   }
 
   function Downloads({ p }) {
@@ -539,32 +571,51 @@ export default function CoverIA() {
         )}
 
         {/* ───────── ABA: SÓ SEPARAR ───────── */}
-        {aba === 'separar' && (
-          <>
-            <section className="cv-secao">
-              <h2>✂️ Separar voz e instrumental</h2>
-              <p className="cv-dica">Sem trocar a voz: você recebe só o instrumental (playback) e só a voz original. Custa perto de R$1 por música e leva de 1 a 3 minutos.</p>
-              <label className={`cv-upload ${sepEnviando || sepMsg ? 'cv-desab' : ''}`}>
-                <input type="file" accept="audio/*" disabled={sepEnviando || !!sepMsg} onChange={(e) => escolherSepMusica(e.target.files[0])} />
-                {sepEnviando ? <><span className="cv-spin" /> Enviando música...</> : sepMusica ? `✓ ${sepMusica.nome} (toque para trocar)` : '📁 Escolher música (MP3, WAV, M4A)'}
-              </label>
-              {sepMusica && <audio controls preload="none" src={sepMusica.url} className="cv-audio" />}
-            </section>
-
-            <button className="cv-btn-grande" disabled={!sepMusica || sepEnviando || !!sepMsg} onClick={separarMusica}>
-              {sepMsg ? <><span className="cv-spin" /> {sepMsg}...</> : '✂️ Separar (≈ R$1)'}
-            </button>
-
-            {sepErro && <div className="cv-aviso cv-aviso-erro">❌ {sepErro}</div>}
-
-            {sepResultado && (
-              <section className="cv-secao cv-resultado">
-                <h2>✅ Separado: {sepResultado.titulo}</h2>
-                <Downloads p={sepResultado} />
+        {aba === 'separar' && (() => {
+          const pendentes = sepFila.filter((it) => it.status === 'aguardando' || it.status === 'erro').length;
+          const prontas = sepFila.filter((it) => it.status === 'pronto').length;
+          return (
+            <>
+              <section className="cv-secao">
+                <h2>✂️ Separar voz e instrumental</h2>
+                <p className="cv-dica">Sem trocar a voz: cada música vira só o instrumental (playback) e só a voz original. Pode escolher várias de uma vez.</p>
+                <div className="cv-opcoes">
+                  {[['rapido', '⚡ Rápido', '≈ R$1 por música · 1-2 min'], ['gratis', '🆓 Grátis', 'pelo GitHub · 5-10 min por música']].map(([id, nome, dica]) => (
+                    <button key={id} className={`cv-opcao ${sepModo === id ? 'cv-opcao-ativa' : ''}`} disabled={sepRodando} onClick={() => setSepModo(id)}>
+                      <strong>{nome}</strong><small>{dica}</small>
+                    </button>
+                  ))}
+                </div>
+                <label className={`cv-upload ${sepRodando ? 'cv-desab' : ''}`}>
+                  <input type="file" accept="audio/*" multiple disabled={sepRodando} onChange={(e) => { adicionarNaFila(e.target.files); e.target.value = ''; }} />
+                  📁 Escolher músicas (pode selecionar várias)
+                </label>
+                {!!sepFila.length && (
+                  <p className="cv-dica">{sepFila.length} na fila · {prontas} pronta(s){pendentes ? ` · ${pendentes} esperando` : ''}</p>
+                )}
               </section>
-            )}
-          </>
-        )}
+
+              <button className="cv-btn-grande" disabled={!pendentes || sepRodando} onClick={separarTodas}>
+                {sepRodando ? <><span className="cv-spin" /> Separando... (deixe a tela aberta)</> : `✂️ Separar ${pendentes || ''} música${pendentes === 1 ? '' : 's'} ${sepModo === 'gratis' ? '(grátis)' : `(≈ R$${pendentes || 1})`}`}
+              </button>
+
+              {sepFila.map((it) => (
+                <section key={it.id} className={`cv-secao ${it.status === 'pronto' ? 'cv-resultado' : ''}`}>
+                  <div className="cv-cartao-topo">
+                    <strong>{it.status === 'pronto' ? '✅' : it.status === 'erro' ? '❌' : it.status === 'rodando' ? '⏳' : '🕒'} {it.nome}</strong>
+                    {!sepRodando && it.status !== 'rodando' && (
+                      <button className="cv-btn cv-btn-perigo" onClick={() => tirarDaFila(it.id)}>Tirar</button>
+                    )}
+                  </div>
+                  {it.status === 'aguardando' && <p className="cv-dica">Esperando na fila</p>}
+                  {it.status === 'rodando' && <div className="cv-carregando"><span className="cv-spin" /> {it.msg}...</div>}
+                  {it.status === 'erro' && <p className="cv-dica" style={{ color: 'var(--erro)' }}>{it.erro} (toque em Separar para tentar de novo)</p>}
+                  {it.status === 'pronto' && it.resultado && <Downloads p={it.resultado} />}
+                </section>
+              ))}
+            </>
+          );
+        })()}
 
         {/* ───────── ABA: BIBLIOTECA ───────── */}
         {aba === 'vozes' && (
@@ -633,7 +684,7 @@ export default function CoverIA() {
             {projetos.map((p) => (
               <div key={p.id} className="cv-projeto">
                 <strong>{p.titulo}</strong>
-                <small>{p.tipo === 'separar' ? '✂️ Só separado' : `🎤 ${p.vozNome}`} · {new Date(p.criadoEm).toLocaleString('pt-BR')}</small>
+                <small>{p.tipo === 'separar' ? (p.gratis ? '✂️ Só separado (grátis)' : '✂️ Só separado') : `🎤 ${p.vozNome}`} · {new Date(p.criadoEm).toLocaleString('pt-BR')}</small>
                 <Downloads p={p} />
               </div>
             ))}
