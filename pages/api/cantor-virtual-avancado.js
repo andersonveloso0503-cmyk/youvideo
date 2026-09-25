@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       if (!imagemUrl) return res.status(400).json({ erro: 'Faltou a foto/imagem do personagem.' });
       if (!audioUrl) return res.status(400).json({ erro: 'Faltou o áudio da música.' });
 
-      const input = { image_url: imagemUrl, audio_url: audioUrl };
+      const input = { image: imagemUrl, audio: audioUrl };
 
       const version = await versaoAtual(MODELO, headers);
       const r = await fetch('https://api.replicate.com/v1/predictions', {
