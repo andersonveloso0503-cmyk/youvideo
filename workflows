@@ -1,1 +1,70 @@
-!!
+# Separação GRÁTIS de voz e instrumental (Demucs) usando os minutos gratuitos do GitHub Actions.
+# Disparado pelo Youvideo (pages/api/cover/gratis.js). Os resultados vão para o Vercel Blob.
+# Não imprimimos links nem tokens no log, porque o log de repositório público é visível.
+name: Separar voz e instrumental (grátis)
+
+on:
+  repository_dispatch:
+    types: [separar]
+  workflow_dispatch:
+    inputs:
+      audioUrl:
+        description: 'Link público do áudio (teste manual)'
+        required: true
+      titulo:
+        description: 'Título'
+        required: false
+        default: 'Teste manual'
+
+concurrency:
+  group: separar-${{ github.event.client_payload.jobId || github.run_id }}
+
+jobs:
+  separar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AUDIO_URL: ${{ github.event.client_payload.audioUrl || inputs.audioUrl }}
+      TITULO: ${{ github.event.client_payload.titulo || inputs.titulo }}
+      JOB_ID: ${{ github.event.client_payload.jobId || github.run_id }}
+      BLOB_TOKEN: ${{ secrets.MEDIA_READ_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements-demucs.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar ferramentas
+        run: |
+          which ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+          pip install -q torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -q -r .github/scripts/requirements-demucs.txt
+          mkdir -p /tmp/up && cd /tmp/up && npm init -y >/dev/null && npm i -s @vercel/blob@0.27.0
+
+      - name: Avisar que começou
+        run: node .github/scripts/salvar-separacao.mjs status rodando
+
+      - name: Baixar música
+        run: |
+          curl -sSfL "$AUDIO_URL" -o /tmp/musica_in
+          ffmpeg -hide_banner -loglevel error -y -i /tmp/musica_in -ac 2 -ar 44100 /tmp/musica.wav
+
+      - name: Separar (Demucs)
+        run: python -m demucs --two-stems=vocals -n htdemucs --mp3 --mp3-bitrate 192 -o /tmp/out /tmp/musica.wav
+
+      - name: Salvar resultado
+        run: node .github/scripts/salvar-separacao.mjs pronto /tmp/out/htdemucs/musica/no_vocals.mp3 /tmp/out/htdemucs/musica/vocals.mp3
+
+      - name: Avisar erro
+        if: failure()
+        run: node .github/scripts/salvar-separacao.mjs status erro || true
+
