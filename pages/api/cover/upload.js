@@ -15,7 +15,7 @@ export default async function handler(req, res) {
           'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave',
           'audio/mp4', 'audio/x-m4a', 'audio/m4a', 'audio/aac', 'audio/ogg', 'audio/flac', 'audio/webm',
         ],
-        maximumSizeInBytes: 60 * 1024 * 1024, // 60 MB
+        maximumSizeInBytes: 500 * 1024 * 1024, // 500 MB
         addRandomSuffix: true,
       }),
       onUploadCompleted: async () => {},
