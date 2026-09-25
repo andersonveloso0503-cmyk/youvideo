@@ -106,16 +106,33 @@ async function separar(audioUrl, aoAtualizar) {
   return { voz, instrumentos };
 }
 
-async function trocarVoz(vozUrl, amostraUrl, tom, aoAtualizar) {
-  const { id } = await api('/api/cover/replicate', { method: 'POST', body: JSON.stringify({ vozUrl, amostraUrl, tom }) });
-  const fim = Date.now() + 25 * 60 * 1000;
+async function rodarReplicate(corpo, msgRodando, aoAtualizar, minutos) {
+  const { id } = await api('/api/cover/replicate', { method: 'POST', body: JSON.stringify(corpo) });
+  const fim = Date.now() + minutos * 60 * 1000;
   while (Date.now() < fim) {
     const d = await api(`/api/cover/replicate?id=${id}`);
     if (d.pronto) return d.url;
-    aoAtualizar && aoAtualizar(d.status === 'starting' ? 'ligando a máquina de IA (pode levar 1-2 min)' : 'cantando com a voz nova');
-    await sleep(5000);
+    aoAtualizar && aoAtualizar(d.status === 'starting' ? 'ligando a máquina de IA (pode levar 1-3 min)' : msgRodando);
+    await sleep(8000);
   }
-  throw new Error('A troca de voz demorou demais. Tente de novo.');
+  throw new Error('Demorou demais no Replicate. Tente de novo.');
+}
+
+// Treina a voz (RVC) a partir de um áudio só com voz e salva na biblioteca
+async function treinarESalvarVoz({ vozAudioUrl, nome, estilo, presetId, descricao, origem }, aoAtualizar) {
+  aoAtualizar('Preparando a voz para o treino');
+  const prep = await api('/api/cover/vozes', { method: 'POST', body: JSON.stringify({ etapa: 'preparar', audioUrl: vozAudioUrl }) });
+  const modeloTempUrl = await rodarReplicate(
+    { acao: 'treinar', datasetUrl: prep.datasetUrl },
+    `Treinando a voz com ${prep.segundos}s de canto (10-20 min, deixe a tela aberta)`,
+    aoAtualizar, 60,
+  );
+  aoAtualizar('Salvando na biblioteca');
+  const d = await api('/api/cover/vozes', {
+    method: 'POST',
+    body: JSON.stringify({ etapa: 'salvar', nome, estilo, presetId, descricao, origem, amostraUrl: prep.amostraUrl, modeloTempUrl, datasetUrl: prep.datasetUrl }),
+  });
+  return d.voz;
 }
 
 async function enviarArquivo(file) {
@@ -131,7 +148,7 @@ function CartaoVoz({ titulo, descricao, dica, voz, selecionada, criandoMsg, onSe
     <div className={`cv-cartao ${selecionada ? 'cv-sel' : ''}`}>
       <div className="cv-cartao-topo">
         <strong>{titulo}</strong>
-        {voz && <span className="cv-tag">{voz.origem === 'enviada' ? 'enviada' : 'pronta'}</span>}
+        {voz && <span className="cv-tag">{!voz.modeloUrl ? 'refazer' : voz.origem === 'enviada' ? 'enviada' : 'pronta'}</span>}
       </div>
       {descricao && <p className="cv-desc">{descricao}</p>}
       {dica && !voz && <p className="cv-dica">💡 {dica}</p>}
@@ -142,14 +159,14 @@ function CartaoVoz({ titulo, descricao, dica, voz, selecionada, criandoMsg, onSe
         <div className="cv-carregando"><span className="cv-spin" /> {criandoMsg}</div>
       ) : (
         <div className="cv-botoes">
-          {voz && onSelecionar && (
+          {voz && voz.modeloUrl && onSelecionar && (
             <button className={`cv-btn ${selecionada ? 'cv-btn-ok' : 'cv-btn-pri'}`} onClick={onSelecionar}>
               {selecionada ? '✓ Selecionada' : 'Usar esta voz'}
             </button>
           )}
           {onCriar && (
             <button className={`cv-btn ${voz ? 'cv-btn-sec' : 'cv-btn-pri'}`} onClick={onCriar}>
-              {voz ? '↻ Refazer voz' : '✨ Criar voz (≈ R$0,50)'}
+              {voz ? '↻ Refazer voz' : '✨ Criar voz (≈ R$3 a R$6)'}
             </button>
           )}
           {voz && onApagar && <button className="cv-btn cv-btn-perigo" onClick={onApagar}>Apagar</button>}
@@ -233,16 +250,21 @@ export default function CoverIA() {
     const prompt = `${est.base}, ${promptVoz}, ${SUFIXO}`.slice(0, 300);
     try {
       setCriandoMsg(chave, 'Compondo um trecho cantado...');
-      const job = await api('/api/cover/fal', { method: 'POST', body: JSON.stringify({ tipo: 'gerarVoz', prompt, letra: LETRAS[estiloId] }) });
+      const letra = `${LETRAS[estiloId]}\n${LETRAS[estiloId]}\n${LETRAS[estiloId].replace('[verse]', '[bridge]')}`;
+      const job = await api('/api/cover/fal', { method: 'POST', body: JSON.stringify({ tipo: 'gerarVoz', prompt, letra }) });
       const r = await aguardarFal(job, (m) => setCriandoMsg(chave, `Compondo um trecho cantado (${m})...`));
       const musicaUrl = acharUrl(r);
       if (!musicaUrl) throw new Error('O gerador de música não devolveu áudio.');
       setCriandoMsg(chave, 'Separando só a voz...');
       const { voz } = await separar(musicaUrl, (m) => setCriandoMsg(chave, `Separando só a voz (${m})...`));
-      setCriandoMsg(chave, 'Salvando na biblioteca...');
-      const d = await api('/api/cover/vozes', { method: 'POST', body: JSON.stringify({ nome, estilo: estiloId, presetId, descricao, audioUrl: voz, origem: 'gerada' }) });
+      const antiga = presetId ? vozes.find((v) => v.presetId === presetId) : null;
+      const nova = await treinarESalvarVoz(
+        { vozAudioUrl: voz, nome, estilo: estiloId, presetId, descricao, origem: 'gerada' },
+        (m) => setCriandoMsg(chave, `${m}...`),
+      );
+      if (antiga) await api(`/api/cover/vozes?id=${antiga.id}`, { method: 'DELETE' }).catch(() => {});
       await carregarVozes();
-      if (aba === 'cover' && estiloId === estilo) setVozSel(d.voz.id);
+      if (aba === 'cover' && estiloId === estilo) setVozSel(nova.id);
       mostrarAviso(`Voz "${nome}" criada! Ouça a amostra.`);
     } catch (e) {
       mostrarAviso('Não deu pra criar a voz: ' + e.message, 'erro');
@@ -273,8 +295,10 @@ export default function CoverIA() {
         const { voz } = await separar(url, (m) => setCriandoMsg(chave, `Separando só a voz (${m})...`));
         url = voz;
       }
-      setCriandoMsg(chave, 'Salvando na biblioteca...');
-      await api('/api/cover/vozes', { method: 'POST', body: JSON.stringify({ nome: amostraNome.trim(), estilo: amostraEstilo, presetId: null, descricao: 'Amostra enviada', audioUrl: url, origem: 'enviada' }) });
+      await treinarESalvarVoz(
+        { vozAudioUrl: url, nome: amostraNome.trim(), estilo: amostraEstilo, presetId: null, descricao: 'Voz enviada', origem: 'enviada' },
+        (m) => setCriandoMsg(chave, `${m}...`),
+      );
       await carregarVozes();
       mostrarAviso(`Voz "${amostraNome.trim()}" salva!`);
       setAmostraArq(null); setAmostraNome(''); setConfirmoVoz(false);
@@ -311,17 +335,19 @@ export default function CoverIA() {
     if (!musica || !vozSelecionada) return;
     setResultado(null); setErroCover('');
     try {
-      setEtapa(0); setEtapaMsg('enviando');
-      const { voz, instrumentos } = await separar(musica.url, setEtapaMsg);
-      if (!instrumentos.length) throw new Error('A separação não devolveu o instrumental.');
+      setEtapa(0); setEtapaMsg('começando');
+      let coverTempUrl = null;
+      await rodarReplicate(
+        { acao: 'cover', musicaUrl: musica.url, modeloUrl: vozSelecionada.modeloUrl, tom: oitava, volumeVoz },
+        'separando voz e instrumental e cantando com a voz nova',
+        (m) => { setEtapa(m.startsWith('ligando') ? 0 : 1); setEtapaMsg(m); },
+        30,
+      ).then((u) => { coverTempUrl = u; });
 
-      setEtapa(1); setEtapaMsg('começando');
-      const vozNova = await trocarVoz(voz, vozSelecionada.amostraUrl, oitava, setEtapaMsg);
-
-      setEtapa(2); setEtapaMsg('juntando voz e instrumental');
+      setEtapa(2); setEtapaMsg('salvando o áudio');
       const d = await api('/api/cover/mixar', {
         method: 'POST',
-        body: JSON.stringify({ vozUrl: vozNova, instrumentosUrls: instrumentos, volumeVoz, titulo, vozNome: vozSelecionada.nome, estilo }),
+        body: JSON.stringify({ coverTempUrl, titulo, vozNome: vozSelecionada.nome, estilo }),
       });
       setResultado(d.projeto);
       setEtapa('pronto');
@@ -336,14 +362,14 @@ export default function CoverIA() {
     catch { mostrarAviso('Não consegui copiar. Segure no link para copiar.', 'erro'); }
   }
 
-  const ETAPAS = ['Separando voz e instrumental', 'Trocando a voz', 'Mixando a música final'];
+  const ETAPAS = ['Ligando a máquina de IA', 'Separando e cantando com a voz nova', 'Salvando o cover'];
   const presetsDoEstilo = PRESETS.filter((p) => p.estilo === estilo);
   const personalizadasDoEstilo = vozes.filter((v) => v.estilo === estilo && !v.presetId);
 
   function Downloads({ p }) {
     return (
       <div className="cv-downloads">
-        {[['🎤 Cover completo', p.coverUrl], ['🎹 Só instrumental', p.instrumentalUrl], ['🗣️ Só a voz nova', p.vozUrl]].map(([rotulo, url]) => (
+        {[['🎤 Cover completo', p.coverUrl], ['🎹 Só instrumental', p.instrumentalUrl], ['🗣️ Só a voz nova', p.vozUrl]].filter(([, url]) => url).map(([rotulo, url]) => (
           <div key={rotulo} className="cv-down-item">
             <span>{rotulo}</span>
             <audio controls preload="none" src={url} className="cv-audio" />
@@ -423,7 +449,7 @@ export default function CoverIA() {
                   ))}
                 </div>
               )}
-              <p className="cv-dica">Vozes com ✨ ainda não foram criadas: toque em "Criar voz" (leva 1-3 min). Para vozes próprias, use a aba Biblioteca.</p>
+              <p className="cv-dica">Vozes com ✨ ainda não foram criadas: toque em "Criar voz". A voz é treinada uma vez só (10-20 min, deixe a tela aberta) e fica salva pra sempre.</p>
             </section>
 
             <section className="cv-secao">
@@ -460,7 +486,7 @@ export default function CoverIA() {
                     </div>
                   );
                 })}
-                {rodando && <p className="cv-dica">Leva de 3 a 8 minutos. Pode deixar a tela aberta.</p>}
+                {rodando && <p className="cv-dica">Leva de 3 a 8 minutos. Deixe a tela aberta.</p>}
               </div>
             )}
 
@@ -488,12 +514,12 @@ export default function CoverIA() {
               <textarea className="cv-input" rows={3} placeholder="Descreva a voz (ex: voz masculina grave, rouca, calma, estilo contador de causos)" value={novaDesc} onChange={(e) => setNovaDesc(e.target.value)} />
               {criando.personalizada
                 ? <div className="cv-carregando"><span className="cv-spin" /> {criando.personalizada}</div>
-                : <button className="cv-btn-grande" onClick={criarPersonalizada}>✨ Criar voz (≈ R$0,50)</button>}
+                : <button className="cv-btn-grande" onClick={criarPersonalizada}>✨ Criar voz (≈ R$3 a R$6)</button>}
             </section>
 
             <section className="cv-secao">
               <h2>📤 Enviar amostra de voz</h2>
-              <p className="cv-dica">Ex.: um trecho do seu Cantor Nova Frequência feito no Suno ou no ilovesong. Use 10 a 30 segundos cantados, sem muito eco.</p>
+              <p className="cv-dica">Ex.: um trecho do seu Cantor Nova Frequência feito no Suno ou no ilovesong. Use de 1 a 5 minutos cantados (mínimo 30 segundos), sem muito eco. Quanto mais canto, melhor a voz. O treino leva 10-20 min.</p>
               <label className="cv-upload">
                 <input type="file" accept="audio/*" onChange={(e) => setAmostraArq(e.target.files[0] || null)} />
                 {amostraArq ? `✓ ${amostraArq.name}` : '📁 Escolher áudio'}
