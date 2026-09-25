@@ -2,11 +2,14 @@
 // (permite subir músicas grandes, acima do limite de 4,5 MB da Vercel)
 import { handleUpload } from '@vercel/blob/client';
 
+const BLOB_TOKEN = process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
+
 export default async function handler(req, res) {
   try {
     const jsonResponse = await handleUpload({
       body: req.body,
       request: req,
+      token: BLOB_TOKEN,
       onBeforeGenerateToken: async () => ({
         allowedContentTypes: [
           'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave',

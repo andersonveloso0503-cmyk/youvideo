@@ -11,6 +11,7 @@ import os from 'os';
 import path from 'path';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 
+const BLOB_TOKEN = process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
 export const config = { maxDuration: 120 };
 
 const FFMPEG = process.env.FFMPEG_PATH || ffmpegInstaller.path;
@@ -27,7 +28,7 @@ function rodarFfmpeg(args) {
 }
 
 async function listarVozes() {
-  const { blobs } = await list({ prefix: PREFIXO, limit: 1000 });
+  const { blobs } = await list({ prefix: PREFIXO, limit: 1000, token: BLOB_TOKEN });
   const vozes = await Promise.all(blobs.map(async (b) => {
     try {
       const r = await fetch(b.url, { cache: 'no-store' });
@@ -67,7 +68,7 @@ export default async function handler(req, res) {
 
         const id = `${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
         const amostra = await put(`cover/vozes/amostras/${id}.mp3`, await fs.readFile(saida), {
-          access: 'public', contentType: 'audio/mpeg', addRandomSuffix: true,
+          access: 'public', contentType: 'audio/mpeg', addRandomSuffix: true, token: BLOB_TOKEN,
         });
 
         const voz = {
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
           criadoEm: Date.now(),
         };
         await put(`${PREFIXO}${id}.json`, JSON.stringify(voz), {
-          access: 'public', contentType: 'application/json', addRandomSuffix: false,
+          access: 'public', contentType: 'application/json', addRandomSuffix: false, allowOverwrite: true, token: BLOB_TOKEN,
         });
         return res.status(200).json({ voz });
       } finally {
@@ -92,10 +93,10 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const { id } = req.query;
       if (!id || !/^[a-z0-9]+$/i.test(id)) return res.status(400).json({ erro: 'id inválido.' });
-      const { blobs } = await list({ prefix: `${PREFIXO}${id}` });
+      const { blobs } = await list({ prefix: `${PREFIXO}${id}`, token: BLOB_TOKEN });
       if (!blobs.length) return res.status(404).json({ erro: 'Voz não encontrada.' });
       const meta = await (await fetch(blobs[0].url, { cache: 'no-store' })).json().catch(() => ({}));
-      await del([blobs[0].url, meta.amostraUrl].filter(Boolean));
+      await del([blobs[0].url, meta.amostraUrl].filter(Boolean), { token: BLOB_TOKEN });
       return res.status(200).json({ ok: true });
     }
 

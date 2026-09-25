@@ -9,6 +9,7 @@ import os from 'os';
 import path from 'path';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 
+const BLOB_TOKEN = process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
 export const config = { maxDuration: 300 };
 
 const FFMPEG = process.env.FFMPEG_PATH || ffmpegInstaller.path;
@@ -34,7 +35,7 @@ async function baixar(url, destino) {
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
-      const { blobs } = await list({ prefix: PREFIXO, limit: 1000 });
+      const { blobs } = await list({ prefix: PREFIXO, limit: 1000, token: BLOB_TOKEN });
       const recentes = blobs.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt)).slice(0, 50);
       const projetos = await Promise.all(recentes.map(async (b) => {
         try { return await (await fetch(b.url, { cache: 'no-store' })).json(); } catch { return null; }
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
 
       const id = `${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
       const base = `cover/resultados/${id}`;
-      const opts = { access: 'public', contentType: 'audio/mpeg', addRandomSuffix: true };
+      const opts = { access: 'public', contentType: 'audio/mpeg', addRandomSuffix: true, token: BLOB_TOKEN };
       const [c, i, v] = await Promise.all([
         put(`${base}/cover.mp3`, await fs.readFile(saidaCover), opts),
         put(`${base}/instrumental.mp3`, await fs.readFile(saidaInst), opts),
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
         criadoEm: Date.now(),
       };
       await put(`${PREFIXO}${id}.json`, JSON.stringify(projeto), {
-        access: 'public', contentType: 'application/json', addRandomSuffix: false,
+        access: 'public', contentType: 'application/json', addRandomSuffix: false, allowOverwrite: true, token: BLOB_TOKEN,
       });
       return res.status(200).json({ projeto });
     } finally {
