@@ -42,8 +42,12 @@ export default function MusicaCantada() {
 
       <TesteAvancadoReplicate />
 
+      <TesteKlingReplicate />
+
+      <TesteVisionStory />
+
       <div className="card">
-        <h2>3. Ou gere o vídeo cantando fora do Youvideo</h2>
+        <h2>5. Ou gere o vídeo cantando fora do Youvideo</h2>
         <p style={{ color: '#9aa4b2', fontSize: 14, lineHeight: 1.5 }}>
           Se o teste acima não ficou bom o suficiente, dá pra gerar num site pago com mais qualidade
           (foto do personagem + áudio da música, escolha o tipo "Singing"):
@@ -56,7 +60,7 @@ export default function MusicaCantada() {
       </div>
 
       <div className="card">
-        <h2>4. Subir o vídeo pronto</h2>
+        <h2>6. Subir o vídeo pronto</h2>
 
         <label>Título (opcional, só organização)</label>
         <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex: Fé Que Levanta" />
@@ -295,6 +299,203 @@ function TesteAvancadoReplicate() {
         <div className="result-box">
           <video src={resultadoUrl} controls style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
           <p style={{ color: '#8fd6c1', fontSize: 13 }}>✅ Teste avançado pronto — compara com o teste barato e decide se vale o custo.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Teste com kwaivgi/kling-lip-sync — diferente dos outros dois: não anima
+// uma foto parada, precisa de um VÍDEO curto (2-10s) de uma pessoa já
+// existente, e troca a sincronia da boca pra bater com o áudio novo.
+function TesteKlingReplicate() {
+  const [videoArquivo, setVideoArquivo] = useState(null);
+  const [audioArquivo, setAudioArquivo] = useState(null);
+
+  const [rodando, setRodando] = useState(false);
+  const [statusMsg, setStatusMsg] = useState('');
+  const [resultadoUrl, setResultadoUrl] = useState('');
+  const [erro, setErro] = useState(null);
+
+  async function gerarTeste() {
+    setErro(null);
+    setResultadoUrl('');
+    if (!videoArquivo) return setErro('Escolha um vídeo curto (2-10s) de uma pessoa — não é foto, é vídeo mesmo.');
+    if (!audioArquivo) return setErro('Escolha o áudio da música (até 5MB).');
+
+    setRodando(true);
+    try {
+      setStatusMsg('Enviando o vídeo...');
+      const videoBlob = await upload(videoArquivo.name, videoArquivo, {
+        access: 'public',
+        handleUploadUrl: '/api/video-upload',
+      });
+
+      setStatusMsg('Enviando o áudio...');
+      const audioBlob = await upload(audioArquivo.name, audioArquivo, {
+        access: 'public',
+        handleUploadUrl: '/api/musica-audio-upload',
+      });
+
+      setStatusMsg('Iniciando o teste no Replicate...');
+      const iniciarRes = await fetch('/api/cantor-virtual-kling', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl: videoBlob.url, audioUrl: audioBlob.url }),
+      });
+      const iniciarData = await iniciarRes.json();
+      if (!iniciarRes.ok) throw new Error(iniciarData.erro || 'Erro ao iniciar o teste');
+
+      const { id } = iniciarData;
+      const fim = Date.now() + 10 * 60 * 1000;
+      while (Date.now() < fim) {
+        const checkRes = await fetch(`/api/cantor-virtual-kling?id=${id}`);
+        const checkData = await checkRes.json();
+        if (!checkRes.ok) throw new Error(checkData.erro || 'Erro checando o teste');
+        if (checkData.pronto) {
+          setResultadoUrl(checkData.url);
+          setStatusMsg('');
+          return;
+        }
+        setStatusMsg(checkData.status === 'starting' ? 'Ligando a máquina de IA...' : 'Sincronizando a boca com o áudio...');
+        await sleep(6000);
+      }
+      throw new Error('Demorou demais. Tente de novo.');
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setRodando(false);
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2>3. 🎤 Teste Kling Lip-Sync (precisa de vídeo, não só foto)</h2>
+      <p style={{ color: '#9aa4b2', fontSize: 14, lineHeight: 1.5 }}>
+        Esse modelo (kwaivgi/kling-lip-sync) não anima foto parada — ele pega um <strong>vídeo já existente</strong> de
+        alguém (2 a 10 segundos, .mp4 ou .mov, até 100MB) e troca a sincronia da boca pra bater com a música nova.
+        Se você não tiver um videozinho assim ainda, pula esse teste por enquanto.
+      </p>
+
+      <label>Vídeo curto (2-10s) de uma pessoa</label>
+      <input type="file" accept="video/*" onChange={(e) => setVideoArquivo(e.target.files?.[0] || null)} />
+
+      <label>Áudio da música (até 5MB)</label>
+      <input type="file" accept="audio/*" onChange={(e) => setAudioArquivo(e.target.files?.[0] || null)} />
+
+      <button disabled={rodando || !videoArquivo || !audioArquivo} onClick={gerarTeste} style={{ marginTop: 8 }}>
+        {rodando && <span className="spinner" />}
+        {rodando ? 'Gerando teste...' : 'Gerar vídeo de teste'}
+      </button>
+
+      {statusMsg && <p style={{ color: '#9aa4b2', fontSize: 13, marginTop: 8 }}>{statusMsg}</p>}
+      {erro && <div className="result-box">Erro: {erro}</div>}
+      {resultadoUrl && (
+        <div className="result-box">
+          <video src={resultadoUrl} controls style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
+          <p style={{ color: '#8fd6c1', fontSize: 13 }}>✅ Teste pronto.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Opção VisionStory — serviço externo (não é Replicate) especializado em
+// "Music Video": foto + música -> vídeo cantando com movimento de cena.
+// Precisa da variável VISIONSTORY_API_KEY na Vercel (chave grátis em
+// developers.visionstory.ai/api-keys, com 10 créditos de teste).
+function TesteVisionStory() {
+  const [imagemArquivo, setImagemArquivo] = useState(null);
+  const [audioArquivo, setAudioArquivo] = useState(null);
+
+  const [rodando, setRodando] = useState(false);
+  const [statusMsg, setStatusMsg] = useState('');
+  const [resultadoUrl, setResultadoUrl] = useState('');
+  const [erro, setErro] = useState(null);
+
+  async function gerarTeste() {
+    setErro(null);
+    setResultadoUrl('');
+    if (!imagemArquivo) return setErro('Escolha uma foto/imagem do personagem.');
+    if (!audioArquivo) return setErro('Escolha o áudio da música.');
+
+    setRodando(true);
+    try {
+      setStatusMsg('Enviando a imagem...');
+      const imagemBlob = await upload(imagemArquivo.name, imagemArquivo, {
+        access: 'public',
+        handleUploadUrl: '/api/imagem-upload',
+      });
+
+      setStatusMsg('Enviando o áudio...');
+      const audioBlob = await upload(audioArquivo.name, audioArquivo, {
+        access: 'public',
+        handleUploadUrl: '/api/musica-audio-upload',
+      });
+
+      setStatusMsg('Iniciando o teste no VisionStory...');
+      const iniciarRes = await fetch('/api/cantor-virtual-visionstory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imagemUrl: imagemBlob.url, audioUrl: audioBlob.url }),
+      });
+      const iniciarData = await iniciarRes.json();
+      if (!iniciarRes.ok) throw new Error(iniciarData.erro || 'Erro ao iniciar o teste');
+
+      const { id } = iniciarData;
+      const fim = Date.now() + 10 * 60 * 1000;
+      while (Date.now() < fim) {
+        const checkRes = await fetch(`/api/cantor-virtual-visionstory?id=${id}`);
+        const checkData = await checkRes.json();
+        if (!checkRes.ok) throw new Error(checkData.erro || 'Erro checando o teste');
+        if (checkData.pronto) {
+          setResultadoUrl(checkData.url);
+          setStatusMsg('');
+          return;
+        }
+        setStatusMsg('Gerando o vídeo no VisionStory...');
+        await sleep(6000);
+      }
+      throw new Error('Demorou demais. Tente de novo.');
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setRodando(false);
+    }
+  }
+
+  return (
+    <div className="card">
+      <h2>4. 🎬 Teste VisionStory (Music Video — foto + música)</h2>
+      <p style={{ color: '#9aa4b2', fontSize: 14, lineHeight: 1.5 }}>
+        Serviço externo especializado exatamente nisso: foto + música → vídeo cantando com movimento de cena. Tem
+        10 créditos grátis (uns 30s de teste) antes de cobrar.
+      </p>
+      <p style={{ color: '#9aa4b2', fontSize: 13, lineHeight: 1.5 }}>
+        Precisa configurar a variável <code>VISIONSTORY_API_KEY</code> na Vercel primeiro (crie a chave grátis em{' '}
+        <a href="https://developers.visionstory.ai/api-keys" target="_blank" rel="noreferrer" style={{ color: '#4f7cff' }}>
+          developers.visionstory.ai/api-keys
+        </a>
+        ). Sem isso, o botão abaixo vai dar erro avisando que falta a chave.
+      </p>
+
+      <label>Foto/imagem do personagem</label>
+      <input type="file" accept="image/*" onChange={(e) => setImagemArquivo(e.target.files?.[0] || null)} />
+
+      <label>Áudio da música</label>
+      <input type="file" accept="audio/*" onChange={(e) => setAudioArquivo(e.target.files?.[0] || null)} />
+
+      <button disabled={rodando || !imagemArquivo || !audioArquivo} onClick={gerarTeste} style={{ marginTop: 8 }}>
+        {rodando && <span className="spinner" />}
+        {rodando ? 'Gerando teste...' : 'Gerar vídeo de teste'}
+      </button>
+
+      {statusMsg && <p style={{ color: '#9aa4b2', fontSize: 13, marginTop: 8 }}>{statusMsg}</p>}
+      {erro && <div className="result-box">Erro: {erro}</div>}
+      {resultadoUrl && (
+        <div className="result-box">
+          <video src={resultadoUrl} controls style={{ width: '100%', maxWidth: 400, borderRadius: 6 }} />
+          <p style={{ color: '#8fd6c1', fontSize: 13 }}>✅ Teste pronto.</p>
         </div>
       )}
     </div>
