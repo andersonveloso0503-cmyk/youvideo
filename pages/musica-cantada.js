@@ -337,11 +337,20 @@ function TesteKlingReplicate() {
         handleUploadUrl: '/api/musica-audio-upload',
       });
 
+      setStatusMsg('Cortando o áudio automaticamente (o Kling só aceita até 5MB e poucos segundos)...');
+      const corteRes = await fetch('/api/cortar-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioUrl: audioBlob.url, segundos: 8 }),
+      });
+      const corteData = await corteRes.json();
+      if (!corteRes.ok) throw new Error(corteData.erro || 'Erro ao cortar o áudio');
+
       setStatusMsg('Iniciando o teste no Replicate...');
       const iniciarRes = await fetch('/api/cantor-virtual-kling', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrl: videoBlob.url, audioUrl: audioBlob.url }),
+        body: JSON.stringify({ videoUrl: videoBlob.url, audioUrl: corteData.url }),
       });
       const iniciarData = await iniciarRes.json();
       if (!iniciarRes.ok) throw new Error(iniciarData.erro || 'Erro ao iniciar o teste');
@@ -376,11 +385,15 @@ function TesteKlingReplicate() {
         alguém (2 a 10 segundos, .mp4 ou .mov, até 100MB) e troca a sincronia da boca pra bater com a música nova.
         Se você não tiver um videozinho assim ainda, pula esse teste por enquanto.
       </p>
+      <p style={{ color: '#9aa4b2', fontSize: 13, lineHeight: 1.5 }}>
+        Pode subir a música inteira — o Youvideo corta os primeiros 8 segundos automaticamente antes de enviar
+        (o Kling só aceita áudio curto e até 5MB, não precisa cortar na mão).
+      </p>
 
       <label>Vídeo curto (2-10s) de uma pessoa</label>
       <input type="file" accept="video/*" onChange={(e) => setVideoArquivo(e.target.files?.[0] || null)} />
 
-      <label>Áudio da música (até 5MB)</label>
+      <label>Áudio da música (pode ser o arquivo inteiro — cortamos aqui)</label>
       <input type="file" accept="audio/*" onChange={(e) => setAudioArquivo(e.target.files?.[0] || null)} />
 
       <button disabled={rodando || !videoArquivo || !audioArquivo} onClick={gerarTeste} style={{ marginTop: 8 }}>
