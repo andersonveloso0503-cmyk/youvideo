@@ -5,6 +5,17 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Aceita tanto segundos direto ("90") quanto minuto:segundo ("1:30").
+function paraSegundos(txt) {
+  if (!txt) return 0;
+  const s = String(txt).trim();
+  if (s.includes(':')) {
+    const [m, sec] = s.split(':').map((n) => parseInt(n, 10) || 0);
+    return m * 60 + sec;
+  }
+  return parseInt(s, 10) || 0;
+}
+
 export default function MusicaCantada() {
   const [titulo, setTitulo] = useState('');
   const [arquivoVideo, setArquivoVideo] = useState(null);
@@ -311,7 +322,7 @@ function TesteAvancadoReplicate() {
 function TesteKlingReplicate() {
   const [videoArquivo, setVideoArquivo] = useState(null);
   const [audioArquivo, setAudioArquivo] = useState(null);
-  const [inicioCorte, setInicioCorte] = useState(0);
+  const [inicioCorte, setInicioCorte] = useState('');
   const [duracaoCorte, setDuracaoCorte] = useState(8);
 
   const [rodando, setRodando] = useState(false);
@@ -352,7 +363,7 @@ function TesteKlingReplicate() {
       const corteRes = await fetch('/api/cortar-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioUrl: audioBlob.url, segundos: Number(duracaoCorte) || 8, inicio: Number(inicioCorte) || 0 }),
+        body: JSON.stringify({ audioUrl: audioBlob.url, segundos: Number(duracaoCorte) || 8, inicio: paraSegundos(inicioCorte) }),
       });
       const corteData = await corteRes.json();
       if (!corteRes.ok) throw new Error(corteData.erro || 'Erro ao cortar o áudio');
@@ -408,14 +419,12 @@ function TesteKlingReplicate() {
       <label>Áudio da música (pode ser o arquivo inteiro — cortamos aqui)</label>
       <input type="file" accept="audio/*" onChange={(e) => setAudioArquivo(e.target.files?.[0] || null)} />
 
-      <label>Começar o corte a partir do segundo (pula a introdução e pega direto a voz)</label>
+      <label>Começar o corte a partir de (pula a introdução e pega direto a voz)</label>
       <input
-        type="number"
-        min="0"
-        step="1"
+        type="text"
         value={inicioCorte}
         onChange={(e) => setInicioCorte(e.target.value)}
-        placeholder="Ex: 20 (se a voz só começa lá pelos 20s)"
+        placeholder="Ex: 1:30 ou 90 (os dois valem 1 minuto e 30s)"
       />
 
       <label>Duração do corte (máximo 10s — limite do próprio Kling)</label>
