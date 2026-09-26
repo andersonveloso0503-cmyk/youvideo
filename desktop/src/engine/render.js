@@ -84,6 +84,36 @@ function dividirEmVideos(musicas, { duracaoMaxMin, limiteMusicaSeg, crossfade = 
   return grupos;
 }
 
+function dividirEmQuantidade(musicas, n, { limiteMusicaSeg = 0, crossfade = 0 } = {}) {
+  // Divide em n vídeos seguindo a ordem da lista, deixando os vídeos com tempos o mais parecidos possível
+  const dur = musicas.map((m) => (limiteMusicaSeg ? Math.min(m.duracao, limiteMusicaSeg) : m.duracao));
+  const k = Math.max(1, Math.min(n, musicas.length));
+  const tam = musicas.length;
+  const soma = [0];
+  dur.forEach((d, i) => soma.push(soma[i] + d));
+  const tempo = (a, b) => soma[b] - soma[a] - crossfade * (b - a - 1); // músicas a..b-1
+  const INF = Infinity;
+  const custo = Array.from({ length: k + 1 }, () => new Array(tam + 1).fill(INF));
+  const corte = Array.from({ length: k + 1 }, () => new Array(tam + 1).fill(0));
+  custo[0][0] = 0;
+  for (let g = 1; g <= k; g++) {
+    for (let b = g; b <= tam; b++) {
+      for (let a = g - 1; a < b; a++) {
+        const c = Math.max(custo[g - 1][a], tempo(a, b));
+        if (c < custo[g][b]) { custo[g][b] = c; corte[g][b] = a; }
+      }
+    }
+  }
+  const grupos = [];
+  let b = tam;
+  for (let g = k; g >= 1; g--) {
+    const a = corte[g][b];
+    grupos.unshift(musicas.slice(a, b));
+    b = a;
+  }
+  return grupos;
+}
+
 function formatarTempo(seg) {
   seg = Math.max(0, Math.floor(seg));
   const h = Math.floor(seg / 3600);
@@ -547,6 +577,7 @@ module.exports = {
   FPS,
   dimensoes,
   dividirEmVideos,
+  dividirEmQuantidade,
   formatarTempo,
   prepararAudio,
   prepararFundos,

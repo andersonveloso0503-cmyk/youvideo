@@ -98,11 +98,16 @@ class Fila extends EventEmitter {
     const musicas = projeto.musicas.filter((m) => m.duracao > 0);
     if (!musicas.length) throw new Error('Selecione pelo menos uma música.');
     const curto = projeto.formato.tipo === 'curto';
-    const grupos = R.dividirEmVideos(musicas, {
-      duracaoMaxMin: curto ? Number(projeto.formato.duracaoMaxMin) || 1 : Number(projeto.formato.duracaoMaxMin) || 0,
-      limiteMusicaSeg: Number(projeto.formato.limiteMusicaSeg) || 0,
-      crossfade: Number(projeto.audio?.crossfade) || 0,
-    });
+    const qtd = curto ? 0 : Number(projeto.formato.qtdVideos) || 0;
+    const opcoes = { limiteMusicaSeg: Number(projeto.formato.limiteMusicaSeg) || 0, crossfade: Number(projeto.audio?.crossfade) || 0 };
+    const grupos = qtd
+      ? R.dividirEmQuantidade(musicas, qtd, opcoes)
+      : R.dividirEmVideos(musicas, {
+          duracaoMaxMin: curto ? Number(projeto.formato.duracaoMaxMin) || 1 : Number(projeto.formato.duracaoMaxMin) || 0,
+          ...opcoes,
+        });
+    // Com quantidade escolhida, a duração máxima não corta nada
+    if (qtd) projeto = { ...projeto, formato: { ...projeto.formato, duracaoMaxMin: '' } };
     const lote = crypto.randomBytes(4).toString('hex');
     const criados = grupos.map((grupo, i) => {
       const sufixo = grupos.length > 1 ? (curto ? ` - ${grupo[0].titulo}` : ` - Parte ${i + 1}`) : '';

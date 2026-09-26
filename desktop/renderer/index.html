@@ -239,6 +239,10 @@
         </select>
       </div>
       <div class="campo">
+        <label title="Divide as músicas em vídeos com tempos parecidos">Quantos vídeos</label>
+        <select id="selQtdVideos"></select>
+      </div>
+      <div class="campo">
         <label title="Se passar disso, divide em vários vídeos">Duração máx. por vídeo</label>
         <div class="linha-unidade"><input type="number" min="0" id="inDuracaoMax" placeholder="∞" /><span>min</span></div>
       </div>
@@ -253,6 +257,7 @@
         <span class="chip" id="resumoDuracao">0:00</span>
       </div>
       <p class="gerar-dica" id="dicaGerar">Adicione músicas para começar</p>
+      <p class="gerar-dica tempos" id="dicaTempos"></p>
       <button class="btn-gerar" id="btnGerar" disabled>
         <svg viewBox="0 0 24 24"><path d="M4 14v-4M8 18V6M12 15V9M16 20V4M20 13v-2" /></svg>
         GERAR VÍDEO

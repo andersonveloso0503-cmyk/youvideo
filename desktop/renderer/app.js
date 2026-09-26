@@ -34,7 +34,7 @@ const PADRAO = {
   textura: { granulado: 0, vinheta: true, escurecer: 15 },
   audio: { somenteInstrumental: false, crossfade: 2, normalizar: false },
   legenda: { ativo: false, idioma: 'pt', posicao: 'baixo', tamanho: 100, cor: '#ffffff', mostrarNome: true },
-  formato: { tipo: 'longo', resolucao: '1080', duracaoMaxMin: '', limiteMusicaSeg: '' },
+  formato: { tipo: 'longo', resolucao: '1080', qtdVideos: '', duracaoMaxMin: '', limiteMusicaSeg: '' },
   saida: { pasta: '', nome: '' },
   publicar: {
     ativo: false, canalId: '', titulo: '', descricao: '', tags: '', privacidade: 'private', incluirTracklist: true,
@@ -92,12 +92,48 @@ function salvarDepois() {
 function selecionadas() { return P.musicas.filter((m) => m.selecionada); }
 
 // Mesma regra do motor: divide em vários vídeos pela duração máxima
+function dividirEmQuantidade(musicas, n, { limiteMusicaSeg = 0, crossfade = 0 } = {}) {
+  // Divide em n vídeos seguindo a ordem da lista, deixando os vídeos com tempos o mais parecidos possível
+  const dur = musicas.map((m) => (limiteMusicaSeg ? Math.min(m.duracao, limiteMusicaSeg) : m.duracao));
+  const k = Math.max(1, Math.min(n, musicas.length));
+  const tam = musicas.length;
+  const soma = [0];
+  dur.forEach((d, i) => soma.push(soma[i] + d));
+  const tempo = (a, b) => soma[b] - soma[a] - crossfade * (b - a - 1); // músicas a..b-1
+  const INF = Infinity;
+  const custo = Array.from({ length: k + 1 }, () => new Array(tam + 1).fill(INF));
+  const corte = Array.from({ length: k + 1 }, () => new Array(tam + 1).fill(0));
+  custo[0][0] = 0;
+  for (let g = 1; g <= k; g++) {
+    for (let b = g; b <= tam; b++) {
+      for (let a = g - 1; a < b; a++) {
+        const c = Math.max(custo[g - 1][a], tempo(a, b));
+        if (c < custo[g][b]) { custo[g][b] = c; corte[g][b] = a; }
+      }
+    }
+  }
+  const grupos = [];
+  let b = tam;
+  for (let g = k; g >= 1; g--) {
+    const a = corte[g][b];
+    grupos.unshift(musicas.slice(a, b));
+    b = a;
+  }
+  return grupos;
+}
+
 function dividir(musicas) {
   const curto = P.formato.tipo === 'curto';
   const maxMin = Number(P.formato.duracaoMaxMin) || (curto ? 1 : 0);
   const max = maxMin ? maxMin * 60 : Infinity;
   const lim = Number(P.formato.limiteMusicaSeg) || 0;
   const cf = Number(P.audio.crossfade) || 0;
+  const qtd = curto ? 0 : Number(P.formato.qtdVideos) || 0;
+  if (qtd && musicas.length) {
+    const grupos = dividirEmQuantidade(musicas, qtd, { limiteMusicaSeg: lim, crossfade: cf });
+    const duracoes = grupos.map((g) => g.reduce((a, m, i) => a + (lim ? Math.min(m.duracao, lim) : m.duracao) - (i ? cf : 0), 0));
+    return { grupos, duracoes };
+  }
   const grupos = [];
   let atual = [], total = 0;
   for (const m of musicas) {
@@ -113,6 +149,28 @@ function dividir(musicas) {
     return Math.min(t, max);
   });
   return { grupos, duracoes };
+}
+
+// Opções do "Quantos vídeos" (1 até o número de músicas selecionadas)
+function atualizarQtdVideos(nMusicas) {
+  const sel = $('#selQtdVideos');
+  const curto = P.formato.tipo === 'curto';
+  sel.disabled = curto;
+  const max = Math.max(1, Math.min(30, nMusicas));
+  const atual = String(P.formato.qtdVideos || '');
+  const chave = `${max}|${curto}`;
+  if (sel.dataset.chave !== chave) {
+    sel.dataset.chave = chave;
+    sel.innerHTML = '';
+    const add = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); };
+    add('', curto ? '1 por música' : 'Pela duração máx.');
+    for (let i = 1; i <= max; i++) add(String(i), i === 1 ? '1 vídeo (tudo junto)' : i === max && max === nMusicas ? `${i} vídeos (1 por música)` : `${i} vídeos`);
+  }
+  if (Number(atual) > max) P.formato.qtdVideos = '';
+  sel.value = curto ? '' : String(P.formato.qtdVideos || '');
+  const usaQtd = !curto && Number(P.formato.qtdVideos) > 0;
+  $('#inDuracaoMax').disabled = usaQtd;
+  $('#inDuracaoMax').placeholder = usaQtd ? '—' : '∞';
 }
 
 // ---------- Músicas ----------
@@ -188,11 +246,18 @@ function atualizarResumo() {
   const somaVideo = duracoes.reduce((a, b) => a + b, 0);
   $('#resumoVideos').textContent = `${grupos.length} vídeo${grupos.length === 1 ? '' : 's'}`;
   $('#resumoDuracao').textContent = grupos.length ? `≈ ${tempoCurto(somaVideo)} de vídeo` : '0 min';
+  atualizarQtdVideos(sel.length);
+  const dicaTempos = $('#dicaTempos');
+  if (grupos.length > 1) {
+    const mostrar = duracoes.slice(0, 6).map((d) => tempoCurto(d)).join(' · ') + (duracoes.length > 6 ? ' …' : '');
+    dicaTempos.textContent = `Tempo de cada vídeo: ${mostrar}`;
+    dicaTempos.title = duracoes.map((d, i) => `Vídeo ${i + 1}: ${tempo(d)} (${grupos[i].length} música${grupos[i].length > 1 ? 's' : ''})`).join('\n');
+  } else dicaTempos.textContent = '';
   const btn = $('#btnGerar');
   btn.disabled = !sel.length;
   let dica = '';
   if (!sel.length) dica = 'Selecione músicas para começar';
-  else if (grupos.length > 1) dica = P.formato.tipo === 'curto' ? `Um Short por música (até ${Number(P.formato.duracaoMaxMin) || 1} min cada)` : `Dividido pela duração máxima de ${P.formato.duracaoMaxMin} min`;
+  else if (grupos.length > 1) dica = P.formato.tipo === 'curto' ? `Um Short por música (até ${Number(P.formato.duracaoMaxMin) || 1} min cada)` : Number(P.formato.qtdVideos) ? `Dividido em ${grupos.length} vídeos com tempos parecidos` : `Dividido pela duração máxima de ${P.formato.duracaoMaxMin} min`;
   else if (P.publicar.ativo) dica = 'Vai publicar no YouTube quando terminar';
   else dica = 'O vídeo é gerado aqui no seu PC';
   if (P.audio.somenteInstrumental && !config.temFal) dica = '⚠ Falta a chave da fal.ai (Configurações)';
@@ -739,6 +804,7 @@ function ligarTudo() {
     ligarCampo('#inLimiteMusica', fm, 'limiteMusicaSeg'),
   );
   $('#selCanal').onchange = (e) => { P.publicar.canalId = e.target.value; salvarDepois(); };
+  $('#selQtdVideos').onchange = (e) => { P.formato.qtdVideos = e.target.value; salvarDepois(); };
   $('#corLivre').oninput = (e) => { P.efeito.cor = e.target.value; renderCores('#cores', CORES, P.efeito, 'cor'); renderEstilos(); salvarDepois(); };
   $('#sGranulado').addEventListener('input', () => { $('#notaGranulado').classList.toggle('alerta', P.textura.granulado > 0); });
   $('#notaGranulado').classList.toggle('alerta', P.textura.granulado > 0);

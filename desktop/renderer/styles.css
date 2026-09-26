@@ -369,3 +369,27 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px;
 .btn-atualizar:disabled { animation: none; opacity: .8; cursor: progress; }
 @keyframes pulsar { 0%, 100% { box-shadow: 0 0 0 0 rgba(217,164,65,.35); } 50% { box-shadow: 0 0 0 6px rgba(217,164,65,0); } }
 .grade-estilos { grid-template-columns: repeat(3, 1fr); }
+
+#selQtdVideos { width: 170px; }
+#selQtdVideos:disabled, input:disabled { opacity: .45; cursor: not-allowed; }
+.gerar-dica.tempos { color: var(--ouro); margin-top: -4px; max-width: 340px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gerar-dica.tempos:empty { display: none; }
+/* Rodapé mais compacto (cabe o campo "Quantos vídeos") */
+.rodape { gap: 10px; }
+.grupo { gap: 9px; padding: 6px 10px 10px; }
+.linha-pasta input { width: 110px; }
+.linha-nome input { width: 130px; }
+#selResolucao { width: 128px; }
+#selQtdVideos { width: 150px; }
+.linha-unidade input { width: 58px; }
+.gerar { min-width: 230px; }
+.gerar-dica { max-width: 260px; text-align: right; }
+.gerar-dica.tempos { max-width: 260px; }
+.btn-gerar { padding: 13px 22px; white-space: nowrap; }
+@media (max-width: 1400px) {
+  .linha-pasta input { width: 90px; }
+  .linha-nome input { width: 100px; }
+  #selResolucao { width: 112px; }
+  #selQtdVideos { width: 128px; }
+  .campo > label { font-size: 9.5px; }
+}
