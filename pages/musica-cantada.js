@@ -312,6 +312,7 @@ function TesteKlingReplicate() {
   const [videoArquivo, setVideoArquivo] = useState(null);
   const [audioArquivo, setAudioArquivo] = useState(null);
   const [inicioCorte, setInicioCorte] = useState(0);
+  const [duracaoCorte, setDuracaoCorte] = useState(8);
 
   const [rodando, setRodando] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
@@ -336,7 +337,7 @@ function TesteKlingReplicate() {
       const ajusteRes = await fetch('/api/ajustar-video-kling', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrl: videoBlob.url, segundos: 8 }),
+        body: JSON.stringify({ videoUrl: videoBlob.url, segundos: Number(duracaoCorte) || 8 }),
       });
       const ajusteData = await ajusteRes.json();
       if (!ajusteRes.ok) throw new Error(ajusteData.erro || 'Erro ao ajustar o vídeo');
@@ -351,7 +352,7 @@ function TesteKlingReplicate() {
       const corteRes = await fetch('/api/cortar-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioUrl: audioBlob.url, segundos: 8, inicio: Number(inicioCorte) || 0 }),
+        body: JSON.stringify({ audioUrl: audioBlob.url, segundos: Number(duracaoCorte) || 8, inicio: Number(inicioCorte) || 0 }),
       });
       const corteData = await corteRes.json();
       if (!corteRes.ok) throw new Error(corteData.erro || 'Erro ao cortar o áudio');
@@ -415,6 +416,16 @@ function TesteKlingReplicate() {
         value={inicioCorte}
         onChange={(e) => setInicioCorte(e.target.value)}
         placeholder="Ex: 20 (se a voz só começa lá pelos 20s)"
+      />
+
+      <label>Duração do corte (máximo 10s — limite do próprio Kling)</label>
+      <input
+        type="number"
+        min="2"
+        max="10"
+        step="1"
+        value={duracaoCorte}
+        onChange={(e) => setDuracaoCorte(e.target.value)}
       />
 
       <button disabled={rodando || !videoArquivo || !audioArquivo} onClick={gerarTeste} style={{ marginTop: 8 }}>
