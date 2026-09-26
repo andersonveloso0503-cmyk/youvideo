@@ -292,6 +292,10 @@ export default function Home() {
           <div className="hub-tile-title">Cantor Virtual</div>
           <div className="hub-tile-desc">Sobe o vídeo do personagem cantando (gerado no Musicful/ilovesong.ai) e publica</div>
         </a>
+        <a href="/compilador" className="hub-tile hub-tile--gold">
+          <div className="hub-tile-title">Compilador (app de PC)</div>
+          <div className="hub-tile-desc">Compilações de horas com onda de áudio, legenda e publicação em vários canais — gera no seu PC</div>
+        </a>
         <a href="/cover" className="hub-tile hub-tile--gold">
           <div className="hub-tile-title">Cover IA</div>
           <div className="hub-tile-desc">Separa voz e instrumental e canta a música com uma voz de IA por estilo</div>

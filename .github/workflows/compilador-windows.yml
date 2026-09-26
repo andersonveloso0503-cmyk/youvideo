@@ -1,0 +1,70 @@
+# Gera o instalador do Youvideo Compilador (app de PC) para Windows.
+# Roda sozinho quando algo muda na pasta desktop/ ou manualmente pela aba Actions.
+# O .exe fica disponível em Releases (compilador-vX.Y.Z) e também como artefato da execução.
+name: Compilador - instalador Windows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/compilador-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: compilador-windows
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Conferir ffmpeg
+        run: node -e "const f=require('ffmpeg-static');console.log(f);require('child_process').execFileSync(f,['-hide_banner','-filters'],{stdio:['ignore','ignore','inherit']})"
+
+      - name: Gerar instalador
+        run: npx electron-builder --win nsis --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Ler versão
+        id: versao
+        shell: bash
+        run: echo "v=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Guardar como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: Youvideo-Compilador-Setup-${{ steps.versao.outputs.v }}
+          path: desktop/dist/*.exe
+          retention-days: 30
+
+      - name: Publicar em Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: compilador-v${{ steps.versao.outputs.v }}
+          name: Youvideo Compilador ${{ steps.versao.outputs.v }}
+          body: |
+            Instalador do Youvideo Compilador para Windows.
+            Baixe o arquivo **Youvideo-Compilador-Setup-${{ steps.versao.outputs.v }}.exe** abaixo e execute.
+            Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo** (o app não tem certificado pago de assinatura).
+          files: desktop/dist/*.exe
+          make_latest: false

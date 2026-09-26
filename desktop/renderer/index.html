@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: blob: https:; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'" />
+  <title>Youvideo Compilador</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Topo -->
+  <header class="topo">
+    <div class="marca">
+      <div class="marca-icone" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M4 14v-4M8 18V6M12 15V9M16 20V4M20 13v-2" /></svg>
+      </div>
+      <div class="marca-texto"><span class="marca-nome">Youvideo</span><span class="marca-sub">Compilador</span></div>
+    </div>
+    <nav class="topo-acoes">
+      <button class="btn-topo" id="btnCanais">
+        <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M10 9.5v5l4.5-2.5z" class="cheio"/></svg>
+        Contas YouTube <span class="contador" id="qtdCanais">0</span>
+      </button>
+      <button class="btn-topo" id="btnConfig">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        Configurações
+      </button>
+      <button class="btn-topo discreto" id="btnPainel">Painel web ↗</button>
+    </nav>
+    <div class="topo-status">
+      <span class="chip" id="chipEncoder" title="Como o vídeo está sendo codificado">—</span>
+      <span class="chip chip-cpu" title="Uso do processador agora"><span class="cpu-barra"><i id="cpuBarra"></i></span><span id="cpuTexto">CPU 0%</span></span>
+      <span class="chip discreto" id="versao">v1.0.0</span>
+    </div>
+  </header>
+
+  <main class="area">
+    <!-- 1. Músicas -->
+    <section class="coluna col-musicas" id="colMusicas">
+      <div class="coluna-titulo"><span class="passo">1</span><h2>Músicas</h2></div>
+      <div class="linha-busca">
+        <input id="buscaMusica" type="search" placeholder="Filtrar músicas..." />
+        <button class="btn-icone" id="btnPastaMusicas" title="Adicionar uma pasta inteira">
+          <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        </button>
+        <button class="btn-primario-sm" id="btnAddMusicas">+ Músicas</button>
+      </div>
+      <p class="resumo" id="resumoMusicas">Nenhuma música ainda</p>
+      <div class="linha-acoes">
+        <button class="btn-mini" id="btnTudo">Tudo</button>
+        <button class="btn-mini" id="btnNenhum">Nenhum</button>
+        <button class="btn-mini perigo" id="btnRemoverSel">Remover</button>
+        <button class="btn-mini destaque" id="btnEmbaralhar">⇄ Embaralhar</button>
+      </div>
+      <ol class="lista-musicas" id="listaMusicas"></ol>
+      <div class="vazio" id="vazioMusicas">
+        <p><strong>Arraste suas músicas aqui</strong></p>
+        <p>mp3, wav, m4a, flac… ou uma pasta inteira</p>
+      </div>
+    </section>
+
+    <!-- 2. Prévia e fundos -->
+    <section class="coluna col-previa">
+      <div class="coluna-titulo"><span class="passo">2</span><h2>Fundo e prévia</h2><span class="dica-titulo" id="dicaFundos">nenhum fundo</span></div>
+      <div class="palco" id="palco">
+        <div class="moldura" id="moldura">
+          <canvas id="previa"></canvas>
+          <span class="etiqueta-previa" id="etiquetaPrevia">PRÉVIA · 16:9</span>
+          <button class="btn-play-previa" id="btnPlayPrevia" title="Ouvir a música selecionada com o efeito">▶</button>
+        </div>
+      </div>
+      <div class="miniaturas" id="miniaturas"></div>
+      <button class="zona-fundo" id="btnAddFundo">
+        <strong>+ Adicionar imagem ou vídeo</strong>
+        <span>Arraste ou clique · cada imagem aparece durante uma música</span>
+      </button>
+    </section>
+
+    <!-- 3. Ajustes -->
+    <section class="coluna col-ajustes">
+      <div class="abas" role="tablist">
+        <button class="aba ativa" data-aba="efeitos">Efeitos</button>
+        <button class="aba" data-aba="textos">Textos</button>
+        <button class="aba" data-aba="audio">Áudio</button>
+        <button class="aba" data-aba="publicar">Publicar</button>
+      </div>
+
+      <div class="painel-aba ativa" id="aba-efeitos">
+        <div class="cartao">
+          <h3>Onda de áudio</h3>
+          <div class="grade-estilos" id="gradeEstilos"></div>
+          <label class="rotulo">Cor</label>
+          <div class="cores" id="cores"></div>
+          <div class="linha-botoes">
+            <label class="btn-mini com-cor">Escolher cor<input type="color" id="corLivre" value="#d9a441" /></label>
+            <button class="btn-mini" id="btnCorImagem">Cor da imagem</button>
+          </div>
+          <div class="sliders">
+            <div class="slider"><label>Largura <b id="vLargura"></b></label><input type="range" min="10" max="100" id="sLargura" /></div>
+            <div class="slider"><label>Intensidade <b id="vIntensidade"></b></label><input type="range" min="0" max="100" id="sIntensidade" /></div>
+            <div class="slider"><label>Posição horizontal <b id="vPosX"></b></label><input type="range" min="0" max="100" id="sPosX" /></div>
+            <div class="slider"><label>Posição vertical <b id="vPosY"></b></label><input type="range" min="0" max="100" id="sPosY" /></div>
+            <div class="slider inteiro"><label>Opacidade <b id="vOpacidade"></b></label><input type="range" min="10" max="100" id="sOpacidade" /></div>
+          </div>
+        </div>
+        <div class="cartao">
+          <h3>Fundo</h3>
+          <div class="segmentado" id="segEnquadramento">
+            <button data-v="preencher">Preencher a tela</button>
+            <button data-v="desfoque">Inteira + desfoque</button>
+          </div>
+          <div class="sliders">
+            <div class="slider"><label>Escurecer <b id="vEscurecer"></b></label><input type="range" min="0" max="100" id="sEscurecer" /></div>
+            <div class="slider"><label>Granulado <b id="vGranulado"></b></label><input type="range" min="0" max="100" id="sGranulado" /></div>
+          </div>
+          <label class="interruptor"><input type="checkbox" id="cVinheta" /><span></span> Vinheta nas bordas</label>
+          <p class="nota" id="notaGranulado">Granulado deixa a geração mais lenta.</p>
+        </div>
+      </div>
+
+      <div class="painel-aba" id="aba-textos">
+        <div class="cartao">
+          <h3>Nome da música</h3>
+          <label class="interruptor"><input type="checkbox" id="cMostrarNome" /><span></span> Mostrar o nome no início de cada música</label>
+        </div>
+        <div class="cartao">
+          <h3>Legenda da letra</h3>
+          <label class="interruptor"><input type="checkbox" id="cLegenda" /><span></span> Gerar legenda automática (Groq)</label>
+          <div class="campos-legenda" id="camposLegenda">
+            <label class="rotulo">Idioma da música</label>
+            <select id="selIdioma">
+              <option value="pt">Português</option>
+              <option value="en">Inglês</option>
+              <option value="es">Espanhol</option>
+              <option value="auto">Detectar sozinho</option>
+            </select>
+            <label class="rotulo">Posição</label>
+            <div class="segmentado" id="segPosLegenda">
+              <button data-v="cima">Em cima</button>
+              <button data-v="meio">Meio</button>
+              <button data-v="baixo">Embaixo</button>
+            </div>
+            <div class="sliders">
+              <div class="slider inteiro"><label>Tamanho <b id="vTamLegenda"></b></label><input type="range" min="60" max="160" id="sTamLegenda" /></div>
+            </div>
+            <label class="rotulo">Cor do texto</label>
+            <div class="cores" id="coresLegenda"></div>
+            <p class="nota">Com "só instrumental" ligado, a letra é lida da voz separada — fica bem mais precisa.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="painel-aba" id="aba-audio">
+        <div class="cartao">
+          <h3>Voz e instrumental</h3>
+          <label class="interruptor"><input type="checkbox" id="cInstrumental" /><span></span> Só instrumental (tirar a voz)</label>
+          <p class="nota">Usa a separação da fal.ai (a mesma do /cover). Cada música é separada uma vez só e fica guardada no PC.</p>
+        </div>
+        <div class="cartao">
+          <h3>Transição e volume</h3>
+          <div class="sliders">
+            <div class="slider inteiro"><label>Transição entre músicas <b id="vCrossfade"></b></label><input type="range" min="0" max="10" step="1" id="sCrossfade" /></div>
+          </div>
+          <label class="interruptor"><input type="checkbox" id="cNormalizar" /><span></span> Igualar o volume das músicas</label>
+        </div>
+      </div>
+
+      <div class="painel-aba" id="aba-publicar">
+        <div class="cartao">
+          <label class="interruptor forte"><input type="checkbox" id="cPublicar" /><span></span> Publicar no YouTube quando terminar</label>
+          <div id="camposPublicar">
+            <label class="rotulo">Canal</label>
+            <div class="linha-canal">
+              <select id="selCanal"></select>
+              <button class="btn-mini" id="btnConectarCanal">+ Canal</button>
+            </div>
+            <label class="rotulo">Título</label>
+            <input id="inTitulo" maxlength="100" placeholder="Ex.: Louvores para orar · 3 horas" />
+            <label class="rotulo">Descrição</label>
+            <textarea id="inDescricao" rows="4" placeholder="Texto que vai na descrição do vídeo"></textarea>
+            <label class="interruptor"><input type="checkbox" id="cTracklist" /><span></span> Lista de músicas com minutagem na descrição</label>
+            <label class="rotulo">Tags (separe com vírgula)</label>
+            <input id="inTags" placeholder="louvor, gospel, adoração" />
+            <label class="rotulo">Visibilidade</label>
+            <div class="segmentado" id="segPrivacidade">
+              <button data-v="private">Privado</button>
+              <button data-v="unlisted">Não listado</button>
+              <button data-v="public">Público</button>
+            </div>
+            <label class="interruptor"><input type="checkbox" id="cAgendar" /><span></span> Agendar publicação</label>
+            <div class="agendar" id="camposAgendar">
+              <label class="rotulo">Primeiro vídeo em</label>
+              <input type="datetime-local" id="inAgendarInicio" />
+              <label class="rotulo">Quando gerar vários, um a cada</label>
+              <div class="linha-horas"><input type="number" id="inIntervalo" min="1" max="720" /> <span>horas</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Fila -->
+  <section class="fila">
+    <div class="fila-rotulo"><span>FILA</span><b id="qtdFila">0</b></div>
+    <div class="fila-cartoes" id="filaCartoes"><p class="fila-vazia">Os vídeos que você mandar gerar aparecem aqui.</p></div>
+    <button class="btn-mini" id="btnLimparFila">Limpar prontos</button>
+  </section>
+
+  <!-- Rodapé -->
+  <footer class="rodape">
+    <fieldset class="grupo">
+      <legend>Saída</legend>
+      <div class="campo">
+        <label>Pasta</label>
+        <div class="linha-pasta"><input id="inPasta" readonly placeholder="Pasta Vídeos" /><button class="btn-icone" id="btnPasta" title="Escolher pasta"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></div>
+      </div>
+      <div class="campo">
+        <label>Nome do arquivo</label>
+        <div class="linha-nome"><input id="inNome" placeholder="compilacao" /><span>.mp4</span></div>
+      </div>
+    </fieldset>
+    <fieldset class="grupo">
+      <legend>Formato</legend>
+      <div class="campo">
+        <label>Tipo</label>
+        <div class="segmentado compacto" id="segTipo">
+          <button data-v="longo">▭ Longo</button>
+          <button data-v="curto">▯ Shorts</button>
+        </div>
+      </div>
+      <div class="campo">
+        <label>Resolução</label>
+        <select id="selResolucao">
+          <option value="720">720p (mais leve)</option>
+          <option value="1080">1080p (Full HD)</option>
+          <option value="1440">1440p (2K)</option>
+          <option value="2160">2160p (4K, pesado)</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label title="Se passar disso, divide em vários vídeos">Duração máx. por vídeo</label>
+        <div class="linha-unidade"><input type="number" min="0" id="inDuracaoMax" placeholder="∞" /><span>min</span></div>
+      </div>
+      <div class="campo">
+        <label title="Corta cada música nesse tempo (com fade)">Limitar cada música</label>
+        <div class="linha-unidade"><input type="number" min="0" id="inLimiteMusica" placeholder="toda" /><span>seg</span></div>
+      </div>
+    </fieldset>
+    <div class="gerar">
+      <div class="gerar-resumo">
+        <span class="chip forte" id="resumoVideos">0 vídeos</span>
+        <span class="chip" id="resumoDuracao">0:00</span>
+      </div>
+      <p class="gerar-dica" id="dicaGerar">Adicione músicas para começar</p>
+      <button class="btn-gerar" id="btnGerar" disabled>
+        <svg viewBox="0 0 24 24"><path d="M4 14v-4M8 18V6M12 15V9M16 20V4M20 13v-2" /></svg>
+        GERAR VÍDEO
+      </button>
+    </div>
+  </footer>
+
+  <!-- Modal: Contas YouTube -->
+  <dialog class="modal" id="modalCanais">
+    <div class="modal-topo"><h2>Contas do YouTube</h2><button class="fechar" data-fechar>×</button></div>
+    <p class="modal-texto">Cada canal é autorizado uma vez. Depois disso o app publica direto, sem pedir login de novo.</p>
+    <ul class="lista-canais" id="listaCanais"></ul>
+    <div class="modal-acoes">
+      <button class="btn-primario" id="btnAutorizarCanal">Conectar canal pelo navegador</button>
+    </div>
+    <details class="avancado">
+      <summary>Já tenho um refresh token (da Vercel)</summary>
+      <p class="modal-texto">Cole aqui o valor de <code>YOUTUBE_REFRESH_TOKEN</code> ou <code>YOUTUBE_REFRESH_TOKEN_MUSICA</code>. Ele precisa ter sido gerado com o mesmo Client ID das Configurações.</p>
+      <div class="linha-canal"><input id="inToken" placeholder="1//0h..." /><button class="btn-mini" id="btnSalvarToken">Conectar</button></div>
+    </details>
+    <p class="modal-erro" id="erroCanais"></p>
+  </dialog>
+
+  <!-- Modal: Configurações -->
+  <dialog class="modal largo" id="modalConfig">
+    <div class="modal-topo"><h2>Configurações</h2><button class="fechar" data-fechar>×</button></div>
+    <div class="grade-config">
+      <div>
+        <h3>Desempenho</h3>
+        <div class="opcoes-modo" id="opcoesModo">
+          <label><input type="radio" name="modo" value="leve" /><span><b>Leve</b>Usa metade do processador. Dá pra usar o PC enquanto gera.</span></label>
+          <label><input type="radio" name="modo" value="normal" /><span><b>Normal</b>Equilíbrio entre velocidade e PC livre.</span></label>
+          <label><input type="radio" name="modo" value="maximo" /><span><b>Máximo</b>Mais rápido. Pode gerar mais de um vídeo ao mesmo tempo.</span></label>
+        </div>
+        <div class="campo-config" id="campoSimultaneos">
+          <label>Vídeos ao mesmo tempo (modo Máximo)</label>
+          <select id="cfgSimultaneos"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+        </div>
+        <div class="campo-config">
+          <label>Codificador de vídeo</label>
+          <select id="cfgEncoder">
+            <option value="auto">Automático (usa placa de vídeo se tiver)</option>
+            <option value="libx264">Só processador</option>
+            <option value="h264_qsv">Intel Quick Sync</option>
+            <option value="h264_nvenc">NVIDIA</option>
+            <option value="h264_amf">AMD</option>
+          </select>
+          <small id="encoderDetectado"></small>
+        </div>
+      </div>
+      <div>
+        <h3>Chaves (as mesmas do Youvideo na Vercel)</h3>
+        <div class="campo-config"><label>fal.ai — <code>FAL_KEY</code> (separar voz)</label><input id="cfgFal" placeholder="cole a chave" /></div>
+        <div class="campo-config"><label>Groq — <code>GROQ_API_KEY</code> (legenda)</label><input id="cfgGroq" placeholder="cole a chave" /></div>
+        <div class="campo-config"><label>Google — <code>GOOGLE_CLIENT_ID</code></label><input id="cfgClientId" placeholder="xxxx.apps.googleusercontent.com" /></div>
+        <div class="campo-config"><label>Google — <code>GOOGLE_CLIENT_SECRET</code></label><input id="cfgClientSecret" placeholder="GOCSPX-..." /></div>
+        <div class="campo-config"><label>Google — <code>GOOGLE_REDIRECT_URI</code> (só para tokens colados)</label><input id="cfgRedirect" placeholder="https://youvideors2.vercel.app/api/auth/callback" /></div>
+        <p class="nota">Para o botão "Conectar canal pelo navegador" funcionar, adicione este endereço nos URIs de redirecionamento do cliente OAuth no Google Cloud: <code id="redirectLocal">http://127.0.0.1:53682/callback</code></p>
+        <p class="nota">As chaves ficam guardadas só neste PC, criptografadas pelo Windows.</p>
+      </div>
+    </div>
+    <div class="modal-acoes"><button class="btn-primario" id="btnSalvarConfig">Salvar</button></div>
+  </dialog>
+
+  <div class="aviso" id="aviso"></div>
+  <audio id="audioPrevia" preload="auto"></audio>
+  <script src="app.js"></script>
+</body>
+</html>
