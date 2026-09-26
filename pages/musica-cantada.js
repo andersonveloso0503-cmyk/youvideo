@@ -331,6 +331,15 @@ function TesteKlingReplicate() {
         handleUploadUrl: '/api/video-upload',
       });
 
+      setStatusMsg('Ajustando o vídeo automaticamente (resolução e duração exigidas pelo Kling)...');
+      const ajusteRes = await fetch('/api/ajustar-video-kling', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl: videoBlob.url, segundos: 8 }),
+      });
+      const ajusteData = await ajusteRes.json();
+      if (!ajusteRes.ok) throw new Error(ajusteData.erro || 'Erro ao ajustar o vídeo');
+
       setStatusMsg('Enviando o áudio...');
       const audioBlob = await upload(audioArquivo.name, audioArquivo, {
         access: 'public',
@@ -350,7 +359,7 @@ function TesteKlingReplicate() {
       const iniciarRes = await fetch('/api/cantor-virtual-kling', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrl: videoBlob.url, audioUrl: corteData.url }),
+        body: JSON.stringify({ videoUrl: ajusteData.url, audioUrl: corteData.url }),
       });
       const iniciarData = await iniciarRes.json();
       if (!iniciarRes.ok) throw new Error(iniciarData.erro || 'Erro ao iniciar o teste');
@@ -386,8 +395,9 @@ function TesteKlingReplicate() {
         Se você não tiver um videozinho assim ainda, pula esse teste por enquanto.
       </p>
       <p style={{ color: '#9aa4b2', fontSize: 13, lineHeight: 1.5 }}>
-        Pode subir a música inteira — o Youvideo corta os primeiros 8 segundos automaticamente antes de enviar
-        (o Kling só aceita áudio curto e até 5MB, não precisa cortar na mão).
+        Pode subir o vídeo e a música do jeito que estiverem — o Youvideo ajusta a resolução do vídeo, corta os
+        primeiros 8 segundos de ambos e comprime o áudio automaticamente antes de enviar (o Kling exige vídeo
+        entre 512-2160px de largura, até 10s, e áudio até 5MB — não precisa mexer em nada na mão).
       </p>
 
       <label>Vídeo curto (2-10s) de uma pessoa</label>
