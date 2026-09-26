@@ -359,3 +359,13 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px;
   #selResolucao { width: 120px; }
   .btn-gerar { padding: 12px 20px; }
 }
+
+.btn-atualizar {
+  background: var(--ouro-suave); border: 1px solid rgba(217, 164, 65, 0.6); color: var(--ouro);
+  border-radius: 99px; padding: 5px 12px; font-weight: 700; font-size: 12px;
+  animation: pulsar 2.4s ease-in-out infinite;
+}
+.btn-atualizar:hover { background: var(--ouro); color: #1c1811; }
+.btn-atualizar:disabled { animation: none; opacity: .8; cursor: progress; }
+@keyframes pulsar { 0%, 100% { box-shadow: 0 0 0 0 rgba(217,164,65,.35); } 50% { box-shadow: 0 0 0 6px rgba(217,164,65,0); } }
+.grade-estilos { grid-template-columns: repeat(3, 1fr); }

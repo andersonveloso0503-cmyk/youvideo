@@ -5,11 +5,17 @@ const fs = require('fs');
 const os = require('os');
 const { Store } = require('./src/store');
 const { Fila } = require('./src/engine/fila');
-const { probe, detectarEncoder } = require('./src/engine/ffmpeg');
+const { probe, rodar, detectarEncoder } = require('./src/engine/ffmpeg');
 const YT = require('./src/engine/youtube');
 
-const EXT_AUDIO = ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'wma', 'mp4', 'webm'];
-const EXT_FUNDO = ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'mp4', 'mov', 'webm', 'mkv', 'avi'];
+const { EXT_IMAGEM } = require('./src/engine/render');
+
+const EXT_AUDIO = ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'oga', 'opus', 'wma', 'aif', 'aiff', 'amr', 'ac3', 'mka', 'm4b', 'mpga', 'wv', 'ape', 'mp4', 'webm', 'mkv', 'mov'];
+// Qualquer imagem: o que o ffmpeg não abrir direto (ex.: SVG) é convertido pela própria tela do app
+const EXT_IMG = [...EXT_IMAGEM.map((e) => e.slice(1)), 'gif', 'svg', 'heic', 'heif'];
+const EXT_VIDEO = ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v', 'wmv', 'flv', '3gp', 'mpg', 'mpeg', 'ts', 'mts'];
+const EXT_FUNDO = [...EXT_IMG, ...EXT_VIDEO];
+const REPO = 'andersonveloso0503-cmyk/youvideo';
 
 let janela;
 let store;
@@ -188,7 +194,7 @@ app.whenReady().then(() => {
     const r = await dialog.showOpenDialog(janela, {
       title: 'Adicionar músicas',
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Áudio', extensions: EXT_AUDIO }],
+      filters: [{ name: 'Áudio', extensions: EXT_AUDIO }, { name: 'Todos os arquivos', extensions: ['*'] }],
     });
     return r.canceled ? [] : infoMusicas(r.filePaths);
   });
@@ -202,7 +208,12 @@ app.whenReady().then(() => {
     const r = await dialog.showOpenDialog(janela, {
       title: 'Adicionar imagem ou vídeo de fundo',
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Imagens e vídeos', extensions: EXT_FUNDO }],
+      filters: [
+        { name: 'Imagens e vídeos', extensions: EXT_FUNDO },
+        { name: 'Imagens', extensions: EXT_IMG },
+        { name: 'Vídeos', extensions: EXT_VIDEO },
+        { name: 'Todos os arquivos', extensions: ['*'] },
+      ],
     });
     return r.canceled ? [] : r.filePaths;
   });
@@ -215,6 +226,70 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('abrir:link', (_e, url) => {
     if (/^https?:\/\//.test(url)) shell.openExternal(url);
+  });
+
+  // Confere se o ffmpeg consegue abrir cada fundo. O que ele não abrir, a tela converte para PNG.
+  ipcMain.handle('midia:checarFundos', async (_e, caminhos) => {
+    const saida = [];
+    for (const c of caminhos || []) {
+      try {
+        // Tenta decodificar 1 quadro de verdade (o ffprobe às vezes "lê" formatos que o ffmpeg não desenha, como SVG)
+        await rodar(['-i', c, '-frames:v', '1', '-f', 'null', '-']).promise;
+        saida.push({ arquivo: c, ok: true });
+      } catch {
+        saida.push({ arquivo: c, ok: false });
+      }
+    }
+    return saida;
+  });
+  ipcMain.handle('midia:salvarImagem', (_e, { original, bytes }) => {
+    const pasta = path.join(app.getPath('userData'), 'cache', 'imagens');
+    fs.mkdirSync(pasta, { recursive: true });
+    const nome = `${path.basename(original, path.extname(original)).replace(/[^\w\- ]/g, '').slice(0, 60) || 'imagem'}_${Date.now().toString(36)}.png`;
+    const destino = path.join(pasta, nome);
+    fs.writeFileSync(destino, Buffer.from(bytes));
+    return destino;
+  });
+
+  // ---------- Atualização automática ----------
+  ipcMain.handle('app:verificarAtualizacao', async () => {
+    try {
+      const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30`, { headers: { 'User-Agent': 'youvideo-compilador' } });
+      if (!r.ok) return null;
+      const lista = await r.json();
+      const rel = lista.find((x) => String(x.tag_name).startsWith('compilador-v') && !x.draft);
+      const exe = rel && rel.assets.find((a) => a.name.endsWith('.exe'));
+      if (!rel || !exe) return null;
+      const nova = rel.tag_name.replace('compilador-v', '');
+      const comparar = (a, b) => {
+        const pa = a.split('.').map(Number);
+        const pb = b.split('.').map(Number);
+        for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+        return 0;
+      };
+      if (comparar(nova, app.getVersion()) <= 0) return null;
+      return { versao: nova, url: exe.browser_download_url, tamanho: exe.size, notas: rel.body || '' };
+    } catch {
+      return null;
+    }
+  });
+  ipcMain.handle('app:atualizar', async (_e, { url, tamanho }) => {
+    if (!/^https:\/\/github\.com\/andersonveloso0503-cmyk\/youvideo\/releases\/download\//.test(url)) throw new Error('Link de atualização inválido.');
+    const destino = path.join(os.tmpdir(), `Youvideo-Compilador-Setup-${Date.now()}.exe`);
+    const r = await fetch(url, { headers: { 'User-Agent': 'youvideo-compilador' } });
+    if (!r.ok || !r.body) throw new Error(`Não consegui baixar a atualização (${r.status}).`);
+    const arquivo = fs.createWriteStream(destino);
+    let baixado = 0;
+    for await (const pedaco of r.body) {
+      arquivo.write(pedaco);
+      baixado += pedaco.length;
+      enviar('app:progressoAtualizacao', tamanho ? baixado / tamanho : 0);
+    }
+    await new Promise((res) => arquivo.end(res));
+    // Abre o instalador e fecha o app para ele poder substituir os arquivos
+    require('child_process').spawn(destino, [], { detached: true, stdio: 'ignore' }).unref();
+    setTimeout(() => app.exit(0), 800);
+    return true;
   });
 
   // ---------- Canais do YouTube ----------

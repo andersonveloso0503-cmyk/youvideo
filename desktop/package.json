@@ -1,7 +1,7 @@
 {
   "name": "youvideo-compilador",
   "productName": "Youvideo Compilador",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Compilações de músicas com onda de áudio, legenda e publicação no YouTube — gera tudo no próprio PC.",
   "author": "Anderson Veloso",
   "main": "main.js",

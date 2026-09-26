@@ -6,7 +6,8 @@ const os = require('os');
 const { probe, rodar } = require('./ffmpeg');
 
 const FPS = 24;
-const EXT_IMAGEM = ['.jpg', '.jpeg', '.png', '.webp', '.bmp'];
+// Imagens que o ffmpeg abre direto (JFIF do Gemini/WhatsApp é JPEG com outro nome)
+const EXT_IMAGEM = ['.jpg', '.jpeg', '.jfif', '.jpe', '.pjpeg', '.pjp', '.png', '.webp', '.bmp', '.tif', '.tiff', '.avif', '.ico', '.tga', '.ppm', '.jxl'];
 
 const RESOLUCOES = {
   '720': [1280, 720],
@@ -253,9 +254,12 @@ async function prepararFundos({ fundos, W, H, enquadramento, textura, timeline, 
       dur = 15;
       args = ['-loop', '1', '-t', String(dur), '-i', item, '-filter_complex', filtroEnquadrar(W, H, enquadramento, estatico), ...comum, saida];
     } else {
-      const info = await probe(item);
-      dur = Math.min(info.duracao || 30, 300); // no máximo 5 min por vídeo de fundo
-      args = ['-t', String(dur), '-i', item, '-filter_complex', filtroEnquadrar(W, H, enquadramento, [`fps=${FPS}`, estatico].filter(Boolean).join(',')), ...comum, saida];
+      // Vídeo ou GIF. GIF (animado ou parado) não informa duração: repete por 15 s
+      const info = await probe(item).catch(() => ({ duracao: 0 }));
+      const semDuracao = !(info.duracao > 0.5);
+      dur = semDuracao ? 15 : Math.min(info.duracao, 300); // no máximo 5 min por vídeo de fundo
+      const entrada = semDuracao ? ['-stream_loop', '-1', '-t', String(dur), '-i', item] : ['-t', String(dur), '-i', item];
+      args = [...entrada, '-filter_complex', filtroEnquadrar(W, H, enquadramento, [`fps=${FPS}`, estatico].filter(Boolean).join(',')), ...comum, saida];
     }
     const r = rodar(args, { duracaoTotal: dur, modo, onProgresso: (p) => onProgresso && onProgresso((i + p) / lista.length) });
     registrarCancelar && registrarCancelar(r.cancelar);
@@ -299,14 +303,49 @@ function escreverListaImagens(imagens, timeline, total, dir) {
   return { lista };
 }
 
-/** Filtro da onda de áudio conforme o estilo escolhido. */
-function filtroVisualizador(efeito, W, H) {
+/** Cria os mapas (xmap/ymap) que "enrolam" o espectro num círculo — o ffmpeg só faz a consulta, fica leve. */
+function criarMapasPolares(dir, S, A, B, r0, r1) {
+  const cab = Buffer.from(`P5\n${S} ${S}\n65535\n`);
+  const xm = Buffer.alloc(S * S * 2);
+  const ym = Buffer.alloc(S * S * 2);
+  const c = (S - 1) / 2;
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const dx = x - c;
+      const dy = y - c;
+      const r = Math.hypot(dx, dy) / (S / 2);
+      let a = Math.atan2(dx, -dy); // 0 = topo, sentido horário
+      if (a < 0) a += 2 * Math.PI;
+      let sx = Math.min(A - 1, Math.floor((a / (2 * Math.PI)) * A));
+      let sy;
+      if (r < r0 || r > r1) {
+        sx = 65535;
+        sy = 65535;
+      } else sy = Math.min(B - 1, Math.floor((1 - (r - r0) / (r1 - r0)) * B));
+      const i = (y * S + x) * 2;
+      xm.writeUInt16BE(sx, i);
+      ym.writeUInt16BE(sy, i);
+    }
+  }
+  const xmap = path.join(dir, 'xmap.pgm');
+  const ymap = path.join(dir, 'ymap.pgm');
+  fs.writeFileSync(xmap, Buffer.concat([cab, xm]));
+  fs.writeFileSync(ymap, Buffer.concat([cab, ym]));
+  return [xmap, ymap];
+}
+
+/**
+ * Filtro da onda de áudio conforme o estilo escolhido.
+ * `primeiraEntrada` = número da próxima entrada livre do ffmpeg (para os mapas do círculo).
+ */
+function filtroVisualizador(efeito, W, H, dir, primeiraEntrada = 2) {
   const estilo = efeito?.estilo || 'onda';
   if (estilo === 'nenhum') return null;
   const cor = hexParaFfmpeg(efeito.cor);
   const [r, g, b] = [cor.slice(2, 4), cor.slice(4, 6), cor.slice(6, 8)].map((x) => (parseInt(x, 16) / 255).toFixed(3));
   const num = (v, pad) => (v === undefined || v === null || v === '' || isNaN(Number(v)) ? pad : Number(v));
-  const larg = par(W * Math.max(10, Math.min(100, num(efeito.largura, 60))) / 100);
+  const pctLarg = Math.max(10, Math.min(100, num(efeito.largura, 60)));
+  const larg = par((W * pctLarg) / 100);
   const ganho = (0.4 + (Math.max(0, Math.min(100, num(efeito.intensidade, 70))) / 100) * 3.6).toFixed(2);
   const opac = (Math.max(0, Math.min(100, num(efeito.opacidade, 90))) / 100).toFixed(2);
   const menor = Math.min(W, H);
@@ -315,17 +354,51 @@ function filtroVisualizador(efeito, W, H) {
   // colorido e ampliado.
   let alt;
   let desenho;
+  let quadrado = false;
+  const entradasExtras = [];
   const hw = (v) => par(v / 2);
+  const onda = (w, h, extra) => `showwaves=s=${hw(w)}x${hw(h)}:${extra}:colors=white:rate=${FPS},format=rgba`;
+  const espectro = (w, h) => `showfreqs=s=${w}x${h}:mode=bar:fscale=log:ascale=cbrt:win_size=2048:averaging=2:colors=white:rate=${FPS},format=rgba`;
+
   switch (estilo) {
     case 'barras':
-    case 'barras_espelho': {
-      alt = par(menor * (estilo === 'barras' ? 0.22 : 0.3));
-      const altBarra = estilo === 'barras' ? alt : par(alt / 2);
-      desenho = `showfreqs=s=${hw(larg)}x${hw(altBarra)}:mode=bar:fscale=log:ascale=cbrt:win_size=2048:averaging=2:colors=white:rate=${FPS},format=rgba`;
-      if (estilo === 'barras_espelho') desenho += `,split[b1][b2];[b2]vflip[b3];[b1][b3]vstack`;
+      alt = par(menor * 0.22);
+      desenho = espectro(hw(larg), hw(alt));
+      break;
+    case 'barras_espelho':
+      alt = par(menor * 0.3);
+      desenho = `${espectro(hw(larg), hw(alt / 2))},split[b1][b2];[b2]vflip[b3];[b1][b3]vstack`;
+      break;
+    case 'reflexo': {
+      // Barras com reflexo apagadinho embaixo, como num piso brilhante
+      alt = par(menor * 0.3);
+      const hb = hw((alt * 2) / 3);
+      desenho = `${espectro(hw(larg), hb)},split[r1][r2];[r2]vflip,crop=iw:${par(hb / 2)}:0:0,colorchannelmixer=aa=0.3[r3];[r1][r3]vstack`;
+      break;
+    }
+    case 'circulo':
+    case 'anel_duplo': {
+      // Espectro enrolado em círculo (espelhado para ficar simétrico)
+      quadrado = true;
+      alt = par(menor * (pctLarg / 100) * 0.85);
+      const S = hw(alt);
+      const A = 720;
+      const duplo = estilo === 'anel_duplo';
+      const B = duplo ? 60 : 90;
+      const [xmap, ymap] = criarMapasPolares(dir, S, A * 2, duplo ? B * 2 : B, duplo ? 0.35 : 0.5, 1);
+      entradasExtras.push('-i', xmap, '-i', ymap);
+      const i1 = primeiraEntrada;
+      const i2 = primeiraEntrada + 1;
+      let fonte = `${espectro(A, B)},split[c1][c2];[c2]hflip[c3];[c1][c3]hstack`;
+      if (duplo) fonte += `,split[d1][d2];[d2]vflip[d3];[d1][d3]vstack`;
+      desenho =
+        `${fonte},format=rgba[csrc];` +
+        `[${i1}:v]loop=loop=-1:size=1:start=0[cxm];[${i2}:v]loop=loop=-1:size=1:start=0[cym];` +
+        `[csrc][cxm][cym]remap=fill=black@0,format=rgba`;
       break;
     }
     case 'nuvem':
+      quadrado = true;
       alt = par(menor * 0.42);
       desenho = `avectorscope=s=${hw(alt)}x${hw(alt)}:mode=lissajous:draw=line:scale=sqrt:zoom=1.2:rf=35:gf=35:bf=35:af=35:rate=${FPS},format=rgba,hue=s=0`;
       break;
@@ -335,24 +408,36 @@ function filtroVisualizador(efeito, W, H) {
       break;
     case 'linha':
       alt = par(menor * 0.2);
-      desenho = `showwaves=s=${hw(larg)}x${hw(alt)}:mode=p2p:scale=sqrt:draw=full:colors=white:rate=${FPS},format=rgba`;
+      desenho = onda(larg, alt, 'mode=p2p:scale=sqrt:draw=full');
       break;
     case 'pontos':
       alt = par(menor * 0.2);
-      desenho = `showwaves=s=${hw(larg)}x${hw(alt)}:mode=point:scale=sqrt:colors=white:rate=${FPS},format=rgba`;
+      desenho = onda(larg, alt, 'mode=point:scale=sqrt');
+      break;
+    case 'classico':
+    case 'classico_og': {
+      // Barrinhas grossas da forma de onda (desenha estreito e estica sem suavizar)
+      alt = par(menor * 0.22);
+      const escalaOnda = estilo === 'classico' ? 'sqrt' : 'lin';
+      desenho = `showwaves=s=${par(larg / 10)}x${hw(alt)}:mode=line:scale=${escalaOnda}:draw=full:colors=white:rate=${FPS},format=rgba,scale=${hw(larg)}:${hw(alt)}:flags=neighbor`;
+      break;
+    }
+    case 'onda_og':
+      alt = par(menor * 0.22);
+      desenho = onda(larg, alt, 'mode=cline:scale=lin:draw=full');
       break;
     default: // onda
       alt = par(menor * 0.22);
-      desenho = `showwaves=s=${hw(larg)}x${hw(alt)}:mode=cline:scale=sqrt:draw=full:colors=white:rate=${FPS},format=rgba`;
+      desenho = onda(larg, alt, 'mode=cline:scale=sqrt:draw=full');
   }
-  const largFinal = estilo === 'nuvem' ? alt : larg;
+  const largFinal = quadrado ? alt : larg;
   const x = Math.round(Math.max(0, Math.min(W - largFinal, (W * num(efeito.posX, 50)) / 100 - largFinal / 2)));
   const y = Math.round(Math.max(0, Math.min(H - alt, (H * num(efeito.posY, 85)) / 100 - alt / 2)));
   const cadeia =
     `volume=${ganho},aformat=channel_layouts=stereo,${desenho},` +
     `colorchannelmixer=rr=${r}:rg=0:rb=0:gr=0:gg=${g}:gb=0:br=0:bg=0:bb=${b}:aa=${opac},` +
     `format=yuva420p,scale=${largFinal}:${alt}:flags=bilinear`;
-  return { cadeia, x, y };
+  return { cadeia, x, y, entradasExtras };
 }
 
 /** Gera o arquivo .ass com nome das músicas e legenda da letra. */
@@ -429,8 +514,9 @@ async function renderizarFinal({ fundo, audioArquivo, total, W, H, efeito, textu
   }
   let atual = Number(textura?.granulado) > 0 ? 'bgg' : 'bg';
 
-  const vis = filtroVisualizador(efeito, W, H);
+  const vis = filtroVisualizador(efeito, W, H, dir, 2);
   if (vis) {
+    args.push(...vis.entradasExtras);
     partes.push(`[1:a]${vis.cadeia}[onda]`);
     partes.push(`[${atual}][onda]overlay=${vis.x}:${vis.y}:format=yuv420:shortest=1[comonda]`);
     atual = 'comonda';
@@ -468,4 +554,5 @@ module.exports = {
   renderizarFinal,
   argsEncoder,
   ehImagem,
+  EXT_IMAGEM,
 };

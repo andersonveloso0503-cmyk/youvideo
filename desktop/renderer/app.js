@@ -3,20 +3,26 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
 const ESTILOS = [
-  { id: 'onda', nome: 'Onda' },
-  { id: 'linha', nome: 'Linha' },
-  { id: 'pontos', nome: 'Pontos' },
-  { id: 'onda_dupla', nome: 'Onda dupla' },
+  { id: 'classico', nome: 'Clássico' },
+  { id: 'classico_og', nome: 'Clássico OG' },
   { id: 'barras', nome: 'Barras' },
+  { id: 'circulo', nome: 'Círculo' },
+  { id: 'onda', nome: 'Onda' },
+  { id: 'onda_og', nome: 'Onda OG' },
+  { id: 'linha', nome: 'Linha' },
+  { id: 'reflexo', nome: 'Reflexo' },
+  { id: 'anel_duplo', nome: 'Anel duplo' },
+  { id: 'onda_dupla', nome: 'Onda dupla' },
   { id: 'barras_espelho', nome: 'Espelho' },
+  { id: 'pontos', nome: 'Pontos' },
   { id: 'nuvem', nome: 'Nuvem' },
   { id: 'nenhum', nome: 'Nenhum' },
 ];
 const CORES = ['#ffffff', '#d9a441', '#ffd23f', '#22d3ee', '#ec4899', '#4ade80', '#a78bfa', '#3b82f6', '#ef4444', '#b1432f'];
 const CORES_LEGENDA = ['#ffffff', '#ffd23f', '#d9a441', '#22d3ee', '#4ade80', '#f472b6'];
-const EXT_IMG = ['jpg', 'jpeg', 'png', 'webp', 'bmp'];
-const EXT_VID = ['mp4', 'mov', 'webm', 'mkv', 'avi'];
-const EXT_AUD = ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'wma'];
+const EXT_IMG = ['jpg', 'jpeg', 'jfif', 'jpe', 'pjpeg', 'pjp', 'png', 'webp', 'bmp', 'gif', 'tif', 'tiff', 'avif', 'ico', 'svg', 'heic', 'heif', 'tga', 'jxl'];
+const EXT_VID = ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v', 'wmv', 'flv', '3gp', 'mpg', 'mpeg', 'ts', 'mts'];
+const EXT_AUD = ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'oga', 'opus', 'wma', 'aif', 'aiff', 'amr', 'ac3', 'mka', 'm4b', 'mpga', 'wv', 'ape'];
 
 const PADRAO = {
   nome: '',
@@ -67,7 +73,7 @@ function urlArquivo(p) {
   return 'file:///' + partes.map((x, i) => (i === 0 && /^[A-Za-z]:$/.test(x) ? x : encodeURIComponent(x))).join('/').replace(/^\/+/, '');
 }
 function ext(p) { return p.split('.').pop().toLowerCase(); }
-function ehImagem(p) { return EXT_IMG.includes(ext(p)); }
+function ehImagem(p) { return EXT_IMG.includes(ext(p)) || !EXT_VID.includes(ext(p)); }
 function avisar(txt, erro = false) {
   const a = $('#aviso');
   a.textContent = txt;
@@ -243,8 +249,48 @@ function midiaDoFundo(p) {
   cacheMidia.set(p, el);
   return el;
 }
-function adicionarFundos(lista) {
-  const novos = lista.filter((p) => !P.fundos.includes(p) && [...EXT_IMG, ...EXT_VID].includes(ext(p)));
+// Converte pela própria tela (Chromium) uma imagem que o ffmpeg não abre, salvando como PNG
+function converterImagem(arquivo) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = async () => {
+      try {
+        const max = 4096;
+        const esc = Math.min(1, max / Math.max(img.naturalWidth || 1920, img.naturalHeight || 1080));
+        const c = document.createElement('canvas');
+        c.width = Math.round((img.naturalWidth || 1920) * esc);
+        c.height = Math.round((img.naturalHeight || 1080) * esc);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        resolve(await window.api.midia.salvarImagem({ original: arquivo, bytes }));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    img.onerror = () => reject(new Error('formato não suportado'));
+    img.src = urlArquivo(arquivo);
+  });
+}
+
+async function adicionarFundos(lista) {
+  const candidatos = lista.filter((p) => !P.fundos.includes(p));
+  if (!candidatos.length) return;
+  const checados = await window.api.midia.checarFundos(candidatos);
+  const novos = [];
+  const falhas = [];
+  for (const c of checados) {
+    if (c.ok) { novos.push(c.arquivo); continue; }
+    try {
+      novos.push(await converterImagem(c.arquivo));
+    } catch {
+      falhas.push(c.arquivo.split(/[\\/]/).pop());
+    }
+  }
+  if (falhas.length) {
+    const heic = falhas.some((f) => /\.(heic|heif)$/i.test(f));
+    avisar(`Não consegui abrir: ${falhas.join(', ')}${heic ? ' — foto HEIC do iPhone: salve como JPG antes' : ''}`, true);
+  }
   P.fundos.push(...novos);
   if (novos.length) P.fundoAtivo = P.fundos.length - novos.length;
   renderFundos();
@@ -345,7 +391,10 @@ function desenharVisual(W, H, t) {
   if (e.estilo === 'onda_dupla') alt = menor * 0.28;
   if (e.estilo === 'linha' || e.estilo === 'pontos') alt = menor * 0.2;
   if (e.estilo === 'nuvem') alt = menor * 0.42;
-  const lf = e.estilo === 'nuvem' ? alt : larg;
+  if (e.estilo === 'reflexo') alt = menor * 0.3;
+  const circular = e.estilo === 'circulo' || e.estilo === 'anel_duplo';
+  if (circular) alt = menor * (e.largura / 100) * 0.85;
+  const lf = e.estilo === 'nuvem' || circular ? alt : larg;
   const x0 = Math.max(0, Math.min(W - lf, (W * e.posX) / 100 - lf / 2));
   const y0 = Math.max(0, Math.min(H - alt, (H * e.posY) / 100 - alt / 2));
   ctx.save();
@@ -355,7 +404,51 @@ function desenharVisual(W, H, t) {
   const N = 360;
   const passo = bufTempo.length / N;
 
-  if (e.estilo === 'onda' || e.estilo === 'onda_dupla') {
+  const linear = e.estilo === 'onda_og' || e.estilo === 'classico_og';
+  const esc2 = (v) => (linear ? Math.max(-1, Math.min(1, v * ganho * 0.8)) : escala(v));
+  if (e.estilo === 'classico' || e.estilo === 'classico_og' || e.estilo === 'onda_og') {
+    const meio = y0 + alt / 2;
+    const n = e.estilo === 'onda_og' ? N : 180;
+    for (let i = 0; i < n; i++) {
+      const v = esc2(bufTempo[Math.floor(i * (bufTempo.length / n))]) * (alt / 2);
+      if (e.estilo === 'onda_og') ctx.fillRect(x0 + (i / n) * larg, meio - Math.abs(v), Math.max(1, larg / n + 0.6), Math.max(1, Math.abs(v) * 2));
+      else ctx.fillRect(x0 + (i / n) * larg, v < 0 ? meio : meio - v, Math.max(1, menor / 500), Math.max(1, Math.abs(v)));
+    }
+  } else if (circular) {
+    const cx = x0 + alt / 2, cy = y0 + alt / 2;
+    const duplo = e.estilo === 'anel_duplo';
+    const R = alt / 2;
+    const r0 = R * (duplo ? 0.675 : 0.5);
+    const faixa = duplo ? R * 0.325 : R * 0.5;
+    const nb = 180;
+    ctx.lineWidth = Math.max(1.5, (2 * Math.PI * r0) / nb * 0.55);
+    ctx.beginPath();
+    for (let i = 0; i < nb; i++) {
+      const k = i < nb / 2 ? i : nb - 1 - i; // espelhado para ficar simétrico
+      const idx = Math.floor(Math.pow(k / (nb / 2), 1.8) * 500) + 1;
+      const v = Math.min(1, Math.cbrt(bufFreq[idx] / 255) * Math.min(1.5, 0.45 + e.intensidade / 100)) * faixa;
+      const a = (i / nb) * Math.PI * 2 - Math.PI / 2;
+      const [c, s] = [Math.cos(a), Math.sin(a)];
+      const de = duplo ? r0 - v : r0;
+      ctx.moveTo(cx + c * de, cy + s * de);
+      ctx.lineTo(cx + c * (r0 + v), cy + s * (r0 + v));
+    }
+    ctx.stroke();
+  } else if (e.estilo === 'reflexo') {
+    const nb = 72;
+    const bw = larg / nb;
+    const hMax = (alt * 2) / 3;
+    const base = y0 + hMax;
+    for (let i = 0; i < nb; i++) {
+      const idx = Math.floor(Math.pow(i / nb, 1.8) * 500) + 1;
+      const h = Math.min(1, Math.cbrt(bufFreq[idx] / 255) * Math.min(1.6, 0.5 + e.intensidade / 100)) * hMax;
+      ctx.fillRect(x0 + i * bw + bw * 0.12, base - h, bw * 0.76, h);
+      ctx.save();
+      ctx.globalAlpha *= 0.3;
+      ctx.fillRect(x0 + i * bw + bw * 0.12, base, bw * 0.76, Math.min(h, alt - hMax));
+      ctx.restore();
+    }
+  } else if (e.estilo === 'onda' || e.estilo === 'onda_dupla') {
     const faixas = e.estilo === 'onda_dupla' ? [[bufL, y0, alt / 2], [bufR, y0 + alt / 2, alt / 2]] : [[bufTempo, y0, alt]];
     for (const [buf, yy, hh] of faixas) {
       const meio = yy + hh / 2;
@@ -492,7 +585,23 @@ function renderEstilos() {
     g.fillStyle = g.strokeStyle = P.efeito.estilo === s.id ? P.efeito.cor : '#9c8f79';
     g.lineWidth = 3;
     const f = (x) => Math.sin(x * 0.35) * Math.sin(x * 0.07 + 1) * 18;
-    if (s.id === 'onda' || s.id === 'onda_dupla') {
+    if (s.id === 'classico' || s.id === 'classico_og') {
+      for (let x = 4; x < 104; x += 3) { const v = f(x) * (s.id === 'classico' ? 1.1 : 0.8); g.fillRect(x, v < 0 ? 24 : 24 - v, 1.5, Math.abs(v) + 1); }
+    } else if (s.id === 'onda_og') {
+      for (let x = 4; x < 104; x += 2) { const v = Math.abs(f(x)) * Math.abs(Math.sin(x * 0.9)); g.fillRect(x, 24 - v, 2, v * 2 + 1); }
+    } else if (s.id === 'circulo' || s.id === 'anel_duplo') {
+      const duplo = s.id === 'anel_duplo';
+      g.lineWidth = 1.6; g.beginPath();
+      for (let i = 0; i < 48; i++) {
+        const a = (i / 48) * Math.PI * 2; const v = 3 + 7 * Math.abs(Math.sin(i * 0.8));
+        const r0 = duplo ? 12 : 10; const de = duplo ? r0 - v * 0.5 : r0;
+        g.moveTo(54 + Math.cos(a) * de, 24 + Math.sin(a) * de); g.lineTo(54 + Math.cos(a) * (r0 + v), 24 + Math.sin(a) * (r0 + v));
+      }
+      g.stroke();
+    } else if (s.id === 'reflexo') {
+      for (let i = 0; i < 14; i++) { const h = (0.25 + 0.75 * Math.abs(Math.sin(i * 1.7 + 0.6))) * 26; g.globalAlpha = 1; g.fillRect(6 + i * 7, 32 - h, 5, h); g.globalAlpha = 0.3; g.fillRect(6 + i * 7, 32, 5, Math.min(h, 14)); }
+      g.globalAlpha = 1;
+    } else if (s.id === 'onda' || s.id === 'onda_dupla') {
       const faixas = s.id === 'onda' ? [[24, 20]] : [[13, 10], [35, 10]];
       for (const [m, a] of faixas) for (let x = 4; x < 104; x += 3) { const v = Math.abs(f(x)) / 18 * a; g.fillRect(x, m - v, 2, v * 2 + 1); }
     } else if (s.id === 'linha' || s.id === 'pontos') {
@@ -788,6 +897,26 @@ async function iniciar() {
   });
 
   window.api.ao('fila:mudou', (j) => { jobs = j; renderFila(); });
+  // Atualização automática: confere se tem versão nova no GitHub
+  const checarAtualizacao = async () => {
+    const nova = await window.api.app.verificarAtualizacao();
+    const b = $('#btnAtualizar');
+    if (!nova || !b.hidden) return;
+    b.hidden = false;
+    b.textContent = `⬆ Atualizar para v${nova.versao}`;
+    b.title = nova.notas || '';
+    b.onclick = async () => {
+      const rodando = jobs.some((j) => RODANDO.includes(j.status));
+      if (rodando && !confirm('Tem vídeo sendo gerado. Atualizar agora vai interromper. Continuar?')) return;
+      if (!rodando && !confirm(`Baixar e instalar a versão ${nova.versao}? O app fecha e o instalador abre — é só clicar em avançar. Suas configurações e canais continuam.`)) return;
+      b.disabled = true;
+      try { await window.api.app.atualizar({ url: nova.url, tamanho: nova.tamanho }); }
+      catch (e) { b.disabled = false; b.textContent = `⬆ Atualizar para v${nova.versao}`; avisar(msgErro(e), true); }
+    };
+  };
+  window.api.ao('app:progressoAtualizacao', (p) => { $('#btnAtualizar').textContent = `Baixando ${Math.round(p * 100)}%`; });
+  setTimeout(checarAtualizacao, 4000);
+  setInterval(checarAtualizacao, 3 * 3600 * 1000);
   window.api.ao('sistema:cpu', (v) => {
     $('#cpuTexto').textContent = `CPU ${v}%`;
     const b = $('#cpuBarra');
