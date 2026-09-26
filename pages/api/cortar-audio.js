@@ -3,7 +3,9 @@
 // kling-lip-sync, por exemplo, só aceita áudio de até 5MB). Roda o corte
 // aqui mesmo no servidor com ffmpeg, sem precisar editar o arquivo na mão.
 //
-// POST { audioUrl, segundos }  -> { url, segundos }
+// POST { audioUrl, segundos, inicio }  -> { url, segundos, inicio }
+// "inicio" (em segundos) deixa pular a introdução instrumental e cortar já
+// em cima do trecho com voz.
 
 import { put } from '@vercel/blob';
 import { spawn } from 'child_process';
@@ -36,6 +38,7 @@ export default async function handler(req, res) {
 
   // Trava entre 2 e 10s (limite do kling-lip-sync pro vídeo base).
   const segundos = Math.max(2, Math.min(10, Number(req.body?.segundos) || 8));
+  const inicio = Math.max(0, Number(req.body?.inicio) || 0);
 
   const pasta = await fs.mkdtemp(path.join(os.tmpdir(), 'corte-'));
   try {
@@ -48,6 +51,7 @@ export default async function handler(req, res) {
     // Mono, 96kbps — um corte de até 10s fica bem abaixo de 1MB, com folga
     // enorme do limite de 5MB, mas ainda com qualidade suficiente pro teste.
     await rodarFfmpeg([
+      '-ss', String(inicio),
       '-i', entrada,
       '-t', String(segundos),
       '-ac', '1',
@@ -63,7 +67,7 @@ export default async function handler(req, res) {
       token: BLOB_TOKEN,
     });
 
-    return res.status(200).json({ url: blob.url, segundos, tamanhoBytes: buffer.length });
+    return res.status(200).json({ url: blob.url, segundos, inicio, tamanhoBytes: buffer.length });
   } catch (e) {
     return res.status(500).json({ erro: e.message });
   } finally {

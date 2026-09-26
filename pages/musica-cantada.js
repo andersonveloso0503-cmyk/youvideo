@@ -311,6 +311,7 @@ function TesteAvancadoReplicate() {
 function TesteKlingReplicate() {
   const [videoArquivo, setVideoArquivo] = useState(null);
   const [audioArquivo, setAudioArquivo] = useState(null);
+  const [inicioCorte, setInicioCorte] = useState(0);
 
   const [rodando, setRodando] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
@@ -350,7 +351,7 @@ function TesteKlingReplicate() {
       const corteRes = await fetch('/api/cortar-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioUrl: audioBlob.url, segundos: 8 }),
+        body: JSON.stringify({ audioUrl: audioBlob.url, segundos: 8, inicio: Number(inicioCorte) || 0 }),
       });
       const corteData = await corteRes.json();
       if (!corteRes.ok) throw new Error(corteData.erro || 'Erro ao cortar o áudio');
@@ -405,6 +406,16 @@ function TesteKlingReplicate() {
 
       <label>Áudio da música (pode ser o arquivo inteiro — cortamos aqui)</label>
       <input type="file" accept="audio/*" onChange={(e) => setAudioArquivo(e.target.files?.[0] || null)} />
+
+      <label>Começar o corte a partir do segundo (pula a introdução e pega direto a voz)</label>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        value={inicioCorte}
+        onChange={(e) => setInicioCorte(e.target.value)}
+        placeholder="Ex: 20 (se a voz só começa lá pelos 20s)"
+      />
 
       <button disabled={rodando || !videoArquivo || !audioArquivo} onClick={gerarTeste} style={{ marginTop: 8 }}>
         {rodando && <span className="spinner" />}
