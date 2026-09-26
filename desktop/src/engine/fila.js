@@ -30,6 +30,17 @@ function girar(lista, n) {
   return [...lista.slice(k), ...lista.slice(0, k)];
 }
 
+// Quando divide em vários vídeos e os fundos são só imagens, cada música leva
+// a imagem da mesma posição (música 1 → imagem 1, música 2 → imagem 2...).
+// Assim cada vídeo sai com a sua própria capa. Com vídeos de fundo, só gira a ordem.
+function fundosDaParte(fundos, todas, grupo, i) {
+  if (!fundos.length) return fundos;
+  if (fundos.every((f) => R.ehImagem(f))) {
+    return [...new Set(grupo.map((m) => fundos[todas.indexOf(m) % fundos.length]))];
+  }
+  return girar(fundos, i);
+}
+
 class Fila extends EventEmitter {
   constructor({ dirDados, fontsDir, obterConfig, obterCanal }) {
     super();
@@ -106,7 +117,7 @@ class Fila extends EventEmitter {
         etapa: 'Aguardando na fila',
         progresso: 0,
         // Com vários vídeos, cada um começa por um fundo diferente
-        projeto: { ...projeto, musicas: grupo, fundos: girar(projeto.fundos || [], i) },
+        projeto: { ...projeto, musicas: grupo, fundos: fundosDaParte(projeto.fundos || [], musicas, grupo, i) },
         sufixo,
       };
       this.jobs.push(job);
