@@ -213,6 +213,8 @@ class Fila extends EventEmitter {
     try {
       // Confere se os arquivos ainda existem
       for (const m of p.musicas) if (!fs.existsSync(m.arquivo)) throw new Error(`Música não encontrada: ${m.arquivo}`);
+      // Confere a pasta de saída logo no começo (antes de gastar tempo gerando)
+      const pasta = pastaDeSaida(p.saida?.pasta);
 
       // 1) Separar voz/instrumental
       const musicas = p.musicas.map((m) => ({ ...m, arquivoOriginal: m.arquivo, arquivoVoz: null }));
@@ -287,8 +289,6 @@ class Fila extends EventEmitter {
       // 6) Renderizar
       checar();
       const progR = etapa('renderizando', 'Gerando vídeo');
-      const pasta = p.saida?.pasta && fs.existsSync(p.saida.pasta) ? p.saida.pasta : path.join(os.homedir(), 'Videos');
-      fs.mkdirSync(pasta, { recursive: true });
       const saida = caminhoLivre(pasta, nomeSeguro((p.saida?.nome || p.nome || 'compilacao') + (job.sufixo || '')));
       const temporario = path.join(dir, 'final.mp4');
       const encoder = cfg.encoder && cfg.encoder !== 'auto' ? cfg.encoder : await detectarEncoder();
@@ -381,6 +381,30 @@ class Fila extends EventEmitter {
       throw e;
     }
   }
+}
+
+// Devolve uma pasta onde dá pra gravar. Aceita raiz de disco (E:\\).
+// Se a pasta escolhida não existir ou não deixar gravar, explica o motivo.
+function pastaDeSaida(escolhida) {
+  const pasta = escolhida ? path.resolve(escolhida) : path.join(os.homedir(), 'Videos');
+  const ehRaiz = path.parse(pasta).root === pasta;
+  if (!fs.existsSync(pasta)) {
+    if (ehRaiz) throw new Error(`O disco ${pasta} não foi encontrado. Ele está conectado? Escolha outra pasta em Saída.`);
+    try {
+      fs.mkdirSync(pasta, { recursive: true });
+    } catch (e) {
+      throw new Error(`Não consegui criar a pasta ${pasta} (${e.code || e.message}). Escolha outra pasta em Saída.`);
+    }
+  }
+  // Teste de gravação
+  const teste = path.join(pasta, `.youvideo-teste-${process.pid}`);
+  try {
+    fs.writeFileSync(teste, 'ok');
+    fs.rmSync(teste, { force: true });
+  } catch (e) {
+    throw new Error(`O Windows não deixou gravar em ${pasta} (${e.code || e.message}). Crie uma pasta dentro dele (ex.: ${path.join(pasta, 'Videos')}) e escolha ela em Saída.`);
+  }
+  return pasta;
 }
 
 function moverArquivo(de, para) {
