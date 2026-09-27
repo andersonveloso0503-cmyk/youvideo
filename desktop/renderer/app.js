@@ -1106,7 +1106,6 @@ async function iniciar() {
       : `Tirar ${jobs.length} item(ns) da fila?\n\nOs vídeos que já ficaram prontos continuam na pasta.`;
     if (confirm(msg)) window.api.fila.limpar(true);
   };
-  $('#btnPainel').onclick = () => window.api.abrir.link('https://youvideors2.vercel.app');
   $$('.aba').forEach((a) => (a.onclick = () => trocarAba(a.dataset.aba)));
 
   // Modais
@@ -1129,7 +1128,7 @@ async function iniciar() {
   };
   $('#btnConfig').onclick = () => abrirConfig();
   $('#btnSubir').onclick = () => Subir.abrir();
-  $('#btnBiblioteca').onclick = () => Biblioteca.abrir();
+  $('#btnBiblioteca').onclick = () => Biblioteca.abrir({ recarregar: true });
   $('#btnTestarCentral').onclick = async () => {
     const r = $('#resCentral');
     r.textContent = 'Testando...';

@@ -1,5 +1,5 @@
 // Youvideo Compilador — processo principal (janela, arquivos, fila e YouTube)
-const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, powerSaveBlocker, nativeTheme } = require('electron');
+const { app, BrowserWindow, WebContentsView, session, ipcMain, dialog, shell, safeStorage, powerSaveBlocker, nativeTheme } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -36,6 +36,73 @@ function fontsDir() {
   return p.replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
 }
 
+// ---------- Aba "Criar": as ferramentas do Youvideo abertas dentro do app ----------
+let vistaCriar = null;
+let vistaNoAr = false;
+
+function baseYouvideo() {
+  return String(store.ler().centralUrl || 'https://youvideors2.vercel.app').replace(/\/+$/, '');
+}
+
+function criarVista() {
+  if (vistaCriar) return vistaCriar;
+  const sessao = session.fromPartition('persist:youvideo');
+  // Downloads feitos nas telas do Youvideo vão para a pasta de vídeos escolhida no app
+  sessao.on('will-download', (_e, item) => {
+    const pasta = store.ler().ultimoProjeto?.saida?.pasta || app.getPath('videos');
+    let destino = path.join(pasta, item.getFilename());
+    for (let i = 2; fs.existsSync(destino); i++) destino = path.join(pasta, item.getFilename().replace(/(\.\w+)?$/, ` (${i})$1`));
+    item.setSavePath(destino);
+    enviar('criar:download', { estado: 'baixando', nome: item.getFilename() });
+    item.on('updated', () => {
+      const t = item.getTotalBytes();
+      if (t) enviar('criar:download', { estado: 'baixando', nome: item.getFilename(), x: item.getReceivedBytes() / t });
+    });
+    item.once('done', (_ev, estado) => enviar('criar:download', { estado, nome: item.getFilename(), arquivo: destino }));
+  });
+  vistaCriar = new WebContentsView({ webPreferences: { session: sessao, contextIsolation: true, sandbox: true } });
+  vistaCriar.setBackgroundColor('#15130f');
+  const wc = vistaCriar.webContents;
+  const mesmoSite = (url) => {
+    try {
+      return new URL(url).origin === new URL(baseYouvideo()).origin;
+    } catch {
+      return false;
+    }
+  };
+  // Links do próprio Youvideo abrem aqui dentro; o resto (YouTube, Google...) no navegador
+  wc.setWindowOpenHandler(({ url }) => {
+    if (mesmoSite(url) && !/\/api\/(auth|download)/.test(url)) wc.loadURL(url);
+    else if (/^https?:\/\//.test(url)) {
+      if (/\/api\/download/.test(url)) wc.downloadURL(url);
+      else shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+  const avisarNavegacao = () =>
+    enviar('criar:navegou', { url: wc.getURL(), titulo: wc.getTitle(), voltar: wc.navigationHistory.canGoBack() });
+  wc.on('did-navigate', avisarNavegacao);
+  wc.on('did-navigate-in-page', avisarNavegacao);
+  wc.on('page-title-updated', avisarNavegacao);
+  wc.on('did-start-loading', () => enviar('criar:carregando', true));
+  wc.on('did-stop-loading', () => enviar('criar:carregando', false));
+  wc.on('did-fail-load', (_e, codigo, desc, url, principal) => {
+    if (principal && codigo !== -3) enviar('criar:erro', `Não consegui abrir o Youvideo (${desc}). Confira a internet.`);
+  });
+  return vistaCriar;
+}
+
+function mostrarVista(visivel) {
+  if (!vistaCriar || !janela) return;
+  if (visivel && !vistaNoAr) {
+    janela.contentView.addChildView(vistaCriar);
+    vistaNoAr = true;
+  } else if (!visivel && vistaNoAr) {
+    janela.contentView.removeChildView(vistaCriar);
+    vistaNoAr = false;
+  }
+}
+
 function criarJanela() {
   nativeTheme.themeSource = 'dark';
   janela = new BrowserWindow({
@@ -62,6 +129,7 @@ function criarJanela() {
       await new Promise((r) => setTimeout(r, 1200));
       const img = await janela.webContents.capturePage();
       fs.writeFileSync(process.env.COMPILADOR_CAPTURA, img.toPNG());
+      if (vistaCriar && vistaNoAr) fs.writeFileSync(process.env.COMPILADOR_CAPTURA + '.vista.png', (await vistaCriar.webContents.capturePage()).toPNG());
       app.exit(0);
     }, 2500));
   }
@@ -364,6 +432,26 @@ app.whenReady().then(() => {
     await rodar(['-framerate', '24', '-i', path.join(pasta, 'q%04d.png'), '-c:v', 'png', '-pix_fmt', 'rgba', saida]).promise;
     for (const f of fs.readdirSync(pasta)) if (f.endsWith('.png')) fs.rmSync(path.join(pasta, f), { force: true });
     return saida;
+  });
+
+  // ---------- Aba Criar ----------
+  ipcMain.handle('criar:abrir', (_e, { rota, limites }) => {
+    const v = criarVista();
+    if (limites) v.setBounds(limites);
+    mostrarVista(true);
+    v.webContents.loadURL(baseYouvideo() + (rota || '/'));
+    return true;
+  });
+  ipcMain.handle('criar:limites', (_e, limites) => {
+    if (vistaCriar && limites) vistaCriar.setBounds(limites);
+  });
+  ipcMain.handle('criar:visivel', (_e, v) => mostrarVista(!!v));
+  ipcMain.handle('criar:acao', (_e, acao) => {
+    if (!vistaCriar) return;
+    const wc = vistaCriar.webContents;
+    if (acao === 'voltar' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
+    if (acao === 'recarregar') wc.reload();
+    if (acao === 'navegador') shell.openExternal(wc.getURL());
   });
 
   // ---------- Central Youvideo (Biblioteca e Agenda das redes) ----------

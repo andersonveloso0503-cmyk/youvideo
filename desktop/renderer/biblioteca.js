@@ -518,7 +518,7 @@ const Biblioteca = (() => {
     q('#bibAgendar').onclick = agendar;
   }
 
-  async function abrir() {
+  async function abrir(opcoes = {}) {
     ligar();
     const amanha = new Date();
     amanha.setDate(amanha.getDate() + 1);
@@ -526,7 +526,7 @@ const Biblioteca = (() => {
     q('#bibData').min = hojeISO();
     q('#modalBib').showModal();
     trocarAba(B.aba);
-    if (!B.carregado) await carregar();
+    if (!B.carregado || opcoes.recarregar) await carregar();
     else renderGrade();
   }
 

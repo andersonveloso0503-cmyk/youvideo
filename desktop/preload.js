@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('api', {
   app: { verificarAtualizacao: chamar('app:verificarAtualizacao'), atualizar: chamar('app:atualizar') },
   abrir: { pasta: chamar('abrir:pasta'), link: chamar('abrir:link') },
   botao: { existe: chamar('botao:existe'), salvar: chamar('botao:salvar') },
+  criar: { abrir: chamar('criar:abrir'), limites: chamar('criar:limites'), visivel: chamar('criar:visivel'), acao: chamar('criar:acao') },
   central: {
     biblioteca: chamar('central:biblioteca'),
     categoria: chamar('central:categoria'),
@@ -52,7 +53,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   caminhoDoArquivo: (file) => webUtils.getPathForFile(file),
   ao: (canal, fn) => {
-    const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso'];
+    const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download'];
     if (!permitidos.includes(canal)) return;
     ipcRenderer.on(canal, (_e, dados) => fn(dados));
   },
