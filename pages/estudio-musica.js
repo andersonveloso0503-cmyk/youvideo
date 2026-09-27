@@ -52,7 +52,25 @@ function fmtTempo(s) {
 }
 
 function nomeMotor(m) {
+  if (m === 'medley') return 'Medley';
   return m === 'lyria' ? 'Lyria' : 'ElevenLabs';
+}
+
+const MEDLEY_PADRAO = [
+  { estiloId: 'gospel', tema: '' },
+  { estiloId: 'sertanejo', tema: '' },
+  { estiloId: 'forro', tema: '' },
+  { estiloId: 'pagode', tema: '' },
+];
+
+// Roda tarefas com no máximo N ao mesmo tempo
+async function emLotes(itens, n, fn) {
+  const res = new Array(itens.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, itens.length) }, async () => {
+    while (i < itens.length) { const k = i++; res[k] = await fn(itens[k], k); }
+  }));
+  return res;
 }
 
 function arquivoNome(t, ext = 'mp3') {
@@ -91,6 +109,17 @@ export default function EstudioMusica() {
   const [escrevendo, setEscrevendo] = useState(false);
   const [gerando, setGerando] = useState([]); // [{ chave, motor, inicio, erro }]
   const [aviso, setAviso] = useState('');
+
+  // Medley
+  const [medTitulo, setMedTitulo] = useState('');
+  const [medTema, setMedTema] = useState('');
+  const [medFaixas, setMedFaixas] = useState(MEDLEY_PADRAO);
+  const [crossfade, setCrossfade] = useState(3);
+  const [medProgresso, setMedProgresso] = useState(null); // { titulo, etapas: [{nome, status}], fase, erro }
+
+  // Seleção para juntar
+  const [selecionando, setSelecionando] = useState(false);
+  const [selecao, setSelecao] = useState([]); // ids em ordem
 
   // Biblioteca
   const [musicas, setMusicas] = useState([]);
@@ -230,6 +259,107 @@ export default function EstudioMusica() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // ── Medley: gera N músicas e junta ──
+  async function criarMedley() {
+    setAviso('');
+    if (medFaixas.length < 2) { setAviso('Coloque pelo menos 2 músicas no medley.'); return; }
+    if (!medTema.trim() && medFaixas.some((f) => !f.tema.trim())) {
+      setAviso('Escreva o tema geral do medley (ou um tema em cada música).');
+      return;
+    }
+    const motorMed = motor === 'comparar' ? 'elevenlabs' : motor;
+    const grupoId = `m${Date.now()}`;
+    const tituloMed = medTitulo.trim() || `Medley ${medFaixas.map((f) => ESTILOS.find((e) => e.id === f.estiloId)?.nome.split(' ')[0]).join(', ')}`;
+    const etapas = medFaixas.map((f, i) => ({ nome: `${i + 1}. ${ESTILOS.find((e) => e.id === f.estiloId)?.nome}`, status: 'esperando' }));
+    setMedProgresso({ titulo: tituloMed, etapas, fase: 'musicas', erro: '' });
+    const marcar = (k, status) => setMedProgresso((p) => p && ({ ...p, etapas: p.etapas.map((e, i) => (i === k ? { ...e, status } : e)) }));
+
+    try {
+      const prontas = await emLotes(medFaixas, 2, async (f, k) => {
+        const est = ESTILOS.find((e) => e.id === f.estiloId) || ESTILOS[0];
+        marcar(k, 'escrevendo a letra…');
+        const l = await api('/api/estudio/letra', {
+          method: 'POST',
+          body: JSON.stringify({ acao: 'letra', tema: f.tema.trim() || medTema, estilo: est.nome, voz: VOZES.find((v) => v.id === voz)?.nome }),
+        });
+        marcar(k, 'criando a música…');
+        const d = await api('/api/estudio/gerar', {
+          method: 'POST',
+          body: JSON.stringify({
+            motor: motorMed,
+            modo: 'personalizado',
+            titulo: l.titulo || `${tituloMed} ${k + 1}`,
+            letra: l.letra,
+            estilo: est.base,
+            voz,
+            instrumental: false,
+            duracaoSeg: duracao,
+            grupoId,
+            versao: k + 1,
+          }),
+        });
+        setMusicas((ms) => [d.musica, ...ms]);
+        marcar(k, 'pronta ✓');
+        return { ...d.musica, estiloNome: est.nome };
+      });
+
+      setMedProgresso((p) => ({ ...p, fase: 'juntando' }));
+      const d = await api('/api/estudio/juntar', {
+        method: 'POST',
+        body: JSON.stringify({ titulo: tituloMed, faixas: prontas, crossfade }),
+      });
+      setMusicas((ms) => [d.musica, ...ms]);
+      setMedProgresso(null);
+      setAberta(d.musica.id);
+      setAviso(`Medley "${tituloMed}" pronto! As músicas separadas também ficaram na biblioteca.`);
+    } catch (e) {
+      setMedProgresso((p) => p && ({ ...p, erro: e.message }));
+    }
+  }
+
+  function alternarSelecao(id) {
+    setSelecao((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+
+  async function juntarSelecionadas() {
+    const faixas = selecao.map((id) => musicas.find((m) => m.id === id)).filter(Boolean);
+    if (faixas.length < 2) { setAviso('Selecione pelo menos 2 músicas.'); return; }
+    const t = window.prompt('Título do medley:', `Medley com ${faixas.length} músicas`);
+    if (t === null) return;
+    setMedProgresso({ titulo: t, etapas: faixas.map((f, i) => ({ nome: `${i + 1}. ${f.titulo}`, status: 'pronta ✓' })), fase: 'juntando', erro: '' });
+    try {
+      const d = await api('/api/estudio/juntar', { method: 'POST', body: JSON.stringify({ titulo: t, faixas, crossfade }) });
+      setMusicas((ms) => [d.musica, ...ms]);
+      setMedProgresso(null);
+      setSelecao([]);
+      setSelecionando(false);
+      setAberta(d.musica.id);
+    } catch (e) {
+      setMedProgresso((p) => p && ({ ...p, erro: e.message }));
+    }
+  }
+
+  function mandarParaMedleyCanal(m) {
+    const faixas = m.faixas || [];
+    if (faixas.some((f) => !f.letra || !f.letra.trim())) {
+      setAviso('O Medley do canal precisa da letra de todas as músicas, e alguma faixa está sem letra.');
+      return;
+    }
+    if (!window.confirm(`Mandar "${m.titulo}" (${faixas.length} músicas) para o Medley do canal? Ele vira vídeo e entra na fila de publicação.`)) return;
+    comTrabalho(m.id, 'Mandando para o Medley do canal…', async (msg) => {
+      const c = await api('/api/medley-criar', {
+        method: 'POST',
+        body: JSON.stringify({ titulo: m.titulo, estilo: 'cinematografico', formato: 'longo', textoThumbnail: (m.titulo || '').toUpperCase().slice(0, 40), ambiente: 'production' }),
+      });
+      for (let i = 0; i < faixas.length; i++) {
+        msg(`Enviando música ${i + 1} de ${faixas.length}…`);
+        await api('/api/medley-adicionar-musica', { method: 'POST', body: JSON.stringify({ medleyId: c.id, audioUrl: faixas[i].audioUrl, letra: faixas[i].letra }) });
+      }
+      await api('/api/medley-finalizar', { method: 'POST', body: JSON.stringify({ medleyId: c.id }) });
+      setAviso(`"${m.titulo}" foi para o Medley do canal. Acompanhe o vídeo na tela Medley.`);
+    });
+  }
+
   // ── Player ──
   function tocar(m) {
     const a = audioRef.current;
@@ -332,6 +462,7 @@ export default function EstudioMusica() {
     if (filtro === 'favoritas' && !m.favorito) return false;
     if (filtro === 'elevenlabs' && m.motor !== 'elevenlabs') return false;
     if (filtro === 'lyria' && m.motor !== 'lyria') return false;
+    if (filtro === 'medley' && m.tipo !== 'medley') return false;
     if (busca && !`${m.titulo} ${m.estilo} ${m.descricao}`.toLowerCase().includes(busca.toLowerCase())) return false;
     return true;
   });
@@ -359,7 +490,65 @@ export default function EstudioMusica() {
             <div className="est-abas">
               <button className={modo === 'simples' ? 'on' : ''} onClick={() => setModo('simples')}>Simples</button>
               <button className={modo === 'personalizado' ? 'on' : ''} onClick={() => setModo('personalizado')}>Personalizado</button>
+              <button className={modo === 'medley' ? 'on' : ''} onClick={() => setModo('medley')}>Medley</button>
             </div>
+
+            {modo === 'medley' ? (
+              <>
+                <label className="est-rot">Título do medley</label>
+                <input value={medTitulo} onChange={(e) => setMedTitulo(e.target.value)} placeholder="Ex: 1 HORA DE LOUVOR — Sertanejo, Forró e Pagode Pra Deus" />
+
+                <label className="est-rot">Tema geral</label>
+                <textarea rows={3} value={medTema} onChange={(e) => setMedTema(e.target.value)} placeholder="Ex: gratidão a Deus e esperança no dia a dia" />
+
+                <label className="est-rot">Músicas ({medFaixas.length})</label>
+                <div className="est-faixas">
+                  {medFaixas.map((f, i) => (
+                    <div key={i} className="est-faixa">
+                      <span className="est-faixa-n">{i + 1}</span>
+                      <div className="est-faixa-campos">
+                        <select value={f.estiloId} onChange={(e) => setMedFaixas((fs) => fs.map((x, k) => (k === i ? { ...x, estiloId: e.target.value } : x)))}>
+                          {ESTILOS.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                        </select>
+                        <input value={f.tema} onChange={(e) => setMedFaixas((fs) => fs.map((x, k) => (k === i ? { ...x, tema: e.target.value } : x)))} placeholder="Tema próprio (opcional)" />
+                      </div>
+                      <button className="est-faixa-x" disabled={medFaixas.length <= 2} onClick={() => setMedFaixas((fs) => fs.filter((_, k) => k !== i))}>✕</button>
+                    </div>
+                  ))}
+                </div>
+                {medFaixas.length < 10 && (
+                  <button className="est-btn-sec est-add" onClick={() => setMedFaixas((fs) => [...fs, { estiloId: ESTILOS[fs.length % ESTILOS.length].id, tema: '' }])}>+ Adicionar música</button>
+                )}
+
+                <label className="est-rot">Voz</label>
+                <div className="est-chips">
+                  {VOZES.map((v) => (
+                    <button key={v.id} className={voz === v.id ? 'on' : ''} onClick={() => setVoz(v.id)}>{v.nome}</button>
+                  ))}
+                </div>
+
+                <label className="est-rot">Duração de cada música: {fmtTempo(duracao)}</label>
+                <input type="range" min={60} max={300} step={15} value={duracao} onChange={(e) => setDuracao(+e.target.value)} />
+
+                <label className="est-rot">Transição entre músicas: {crossfade}s</label>
+                <input type="range" min={0} max={8} step={1} value={crossfade} onChange={(e) => setCrossfade(+e.target.value)} />
+
+                <label className="est-rot">Motor de IA</label>
+                <div className="est-motores">
+                  {MOTORES.filter((m) => m.id !== 'comparar').map((m) => (
+                    <button key={m.id} className={motor === m.id ? 'on' : ''} onClick={() => setMotor(m.id)}>
+                      <strong>{m.nome}</strong>
+                      <small>{m.id === 'lyria' ? '~R$0,50-1 por música' : '~R$3-5 por música'}</small>
+                    </button>
+                  ))}
+                </div>
+
+                <button className="est-criar-btn" disabled={!!medProgresso} onClick={criarMedley}>
+                  🎶 Criar medley ({medFaixas.length} músicas · ~{fmtTempo(medFaixas.length * duracao)})
+                </button>
+                <small className="est-nota">A IA escreve cada letra, cria cada música e junta tudo num MP3 só. Leva uns 3 a 8 minutos. Deixe a tela aberta.</small>
+              </>
+            ) : (<>
 
             {modo === 'simples' ? (
               <>
@@ -449,6 +638,7 @@ export default function EstudioMusica() {
               🎵 Criar música
             </button>
             <small className="est-nota">Cada clique gera 2 versões. Leva de 30 s a 2 min.</small>
+            </>)}
           </section>
 
           {/* ───────── Biblioteca ───────── */}
@@ -458,10 +648,41 @@ export default function EstudioMusica() {
               <input className="est-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar…" />
             </div>
             <div className="est-chips est-filtros">
-              {[['todas', 'Todas'], ['favoritas', '★ Favoritas'], ['elevenlabs', 'ElevenLabs'], ['lyria', 'Lyria']].map(([id, nome]) => (
+              {[['todas', 'Todas'], ['favoritas', '★ Favoritas'], ['medley', 'Medleys'], ['elevenlabs', 'ElevenLabs'], ['lyria', 'Lyria']].map(([id, nome]) => (
                 <button key={id} className={filtro === id ? 'on' : ''} onClick={() => setFiltro(id)}>{nome}</button>
               ))}
+              <button className={`est-juntar-toggle ${selecionando ? 'on' : ''}`} onClick={() => { setSelecionando(!selecionando); setSelecao([]); }}>
+                {selecionando ? 'Cancelar seleção' : '🔗 Juntar músicas'}
+              </button>
             </div>
+
+            {selecionando && (
+              <div className="est-selbar">
+                <span>{selecao.length ? `${selecao.length} selecionadas, na ordem em que você clicou` : 'Clique nas músicas na ordem em que devem tocar'}</span>
+                <button className="est-btn-sec" disabled={selecao.length < 2 || !!medProgresso} onClick={juntarSelecionadas}>Juntar em medley</button>
+              </div>
+            )}
+
+            {medProgresso && (
+              <div className={`est-card est-medprog ${medProgresso.erro ? 'erro' : ''}`}>
+                <div className="est-medprog-top">
+                  {medProgresso.erro ? '⚠️' : <span className="est-spin" />}
+                  <strong>{medProgresso.titulo}</strong>
+                </div>
+                <div className="est-medprog-lista">
+                  {medProgresso.etapas.map((e) => (
+                    <div key={e.nome}><span>{e.nome}</span><span>{e.status}</span></div>
+                  ))}
+                  <div><span>Juntar tudo numa faixa</span><span>{medProgresso.fase === 'juntando' ? (medProgresso.erro ? '—' : 'juntando…') : 'esperando'}</span></div>
+                </div>
+                {medProgresso.erro && (
+                  <div className="est-erro-txt">
+                    {medProgresso.erro}
+                    <button className="est-link" onClick={() => setMedProgresso(null)}>fechar</button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {gerando.map((g) => (
               <div key={g.chave} className={`est-card est-gerando ${g.erro ? 'erro' : ''}`}>
@@ -489,8 +710,9 @@ export default function EstudioMusica() {
               const ativa = tocando?.id === m.id;
               const ocupado = trabalho[m.id];
               return (
-                <div key={m.id} className={`est-card ${ativa ? 'ativa' : ''}`}>
-                  <button className="est-capa" onClick={() => tocar(m)} style={m.capaUrl ? { backgroundImage: `url(${m.capaUrl})` } : undefined}>
+                <div key={m.id} className={`est-card ${ativa ? 'ativa' : ''} ${selecionando ? 'sel' : ''} ${selecao.includes(m.id) ? 'marcada' : ''}`} onClick={selecionando ? () => alternarSelecao(m.id) : undefined}>
+                  {selecionando && <span className="est-selnum">{selecao.includes(m.id) ? selecao.indexOf(m.id) + 1 : ''}</span>}
+                  <button className="est-capa" onClick={(e) => { if (selecionando) return; e.stopPropagation(); tocar(m); }} style={m.capaUrl ? { backgroundImage: `url(${m.capaUrl})` } : undefined}>
                     <span className="est-play">{ativa && !pausado ? '❚❚' : '▶'}</span>
                   </button>
                   <div className="est-info">
@@ -500,25 +722,31 @@ export default function EstudioMusica() {
                     </div>
                     <div className="est-meta">
                       <span className={`est-badge ${m.motor}`}>{nomeMotor(m.motor)}</span>
-                      {m.instrumental ? ' Instrumental · ' : ' '}
+                      {m.tipo === 'medley' ? ` ${(m.faixas || []).length} músicas · ` : m.instrumental ? ' Instrumental · ' : ' '}
                       {fmtTempo(m.duracaoSeg)} · {new Date(m.criadoEm).toLocaleDateString('pt-BR')}
                     </div>
                     {ocupado && <div className="est-ocupado"><span className="est-spin" /> {ocupado}</div>}
                   </div>
-                  <div className="est-acoes">
+                  <div className="est-acoes" style={selecionando ? { display: 'none' } : undefined}>
                     <button title="Favoritar" className={m.favorito ? 'fav' : ''} onClick={() => favoritar(m)}>{m.favorito ? '★' : '☆'}</button>
                     <button title="Baixar MP3" onClick={() => baixar(m.audioUrl, arquivoNome(m.titulo))}>⬇</button>
                     <button title="Mais opções" onClick={() => setAberta(aberta === m.id ? null : m.id)}>⋯</button>
                   </div>
 
-                  {aberta === m.id && (
+                  {aberta === m.id && !selecionando && (
                     <div className="est-mais">
                       <div className="est-mais-btns">
-                        <button disabled={!!ocupado} onClick={() => variacao(m)}>🔁 Nova versão</button>
-                        <button onClick={() => reutilizar(m)}>✏️ Editar e recriar</button>
+                        {m.tipo === 'medley' ? (
+                          <button disabled={!!ocupado} onClick={() => mandarParaMedleyCanal(m)}>📺 Mandar p/ Medley do canal</button>
+                        ) : (
+                          <>
+                            <button disabled={!!ocupado} onClick={() => variacao(m)}>🔁 Nova versão</button>
+                            <button onClick={() => reutilizar(m)}>✏️ Editar e recriar</button>
+                          </>
+                        )}
                         <button disabled={!!ocupado} onClick={() => gerarCapa(m)}>🎨 {m.capaUrl ? 'Nova capa' : 'Gerar capa'}</button>
                         <button disabled={!!ocupado} onClick={() => separarStems(m)}>🎚 Separar voz/instrumental</button>
-                        <button disabled={!!ocupado} onClick={() => mandarParaFila(m)}>📺 Mandar p/ fila do canal</button>
+                        {m.tipo !== 'medley' && <button disabled={!!ocupado} onClick={() => mandarParaFila(m)}>📺 Mandar p/ fila do canal</button>}
                         <a className="est-mais-a" href="/cover">🎤 Fazer cover com voz IA</a>
                         <button onClick={() => renomear(m)}>✎ Renomear</button>
                         <button className="perigo" onClick={() => excluir(m)}>🗑 Excluir</button>
@@ -539,6 +767,19 @@ export default function EstudioMusica() {
 
                       {m.capaUrl && (
                         <button className="est-link" onClick={() => baixar(m.capaUrl, arquivoNome(m.titulo, 'jpg'))}>Baixar capa</button>
+                      )}
+
+                      {m.tipo === 'medley' && (m.faixas || []).length > 0 && (
+                        <div className="est-stems">
+                          <strong>Músicas do medley:</strong>
+                          {m.faixas.map((f, i) => (
+                            <div key={i} className="est-stem">
+                              <span>{i + 1}. {f.titulo}</span>
+                              <audio controls preload="none" src={f.audioUrl} />
+                              <button className="est-link" onClick={() => baixar(f.audioUrl, arquivoNome(f.titulo))}>baixar</button>
+                            </div>
+                          ))}
+                        </div>
                       )}
 
                       <div className="est-detalhe">
@@ -597,7 +838,7 @@ export default function EstudioMusica() {
 
         .est-criar { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 14px; padding: 18px; position: sticky; top: 16px; }
         @media (max-width: 900px) { .est-criar { position: static; } }
-        .est-abas { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg); border-radius: 10px; padding: 4px; margin-bottom: 8px; }
+        .est-abas { display: grid; grid-template-columns: 1fr 1fr 1fr; background: var(--bg); border-radius: 10px; padding: 4px; margin-bottom: 8px; }
         .est-abas button { background: none; border: 0; color: var(--text-muted); padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 15px; }
         .est-abas button.on { background: var(--gold); color: #1a1407; }
         .est-rot { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -656,6 +897,26 @@ export default function EstudioMusica() {
         .est-detalhe { margin-top: 10px; font-size: 14px; color: var(--text-muted); }
         .est-detalhe pre { white-space: pre-wrap; font-family: inherit; background: var(--bg); border-radius: 8px; padding: 12px; color: var(--text); max-height: 320px; overflow: auto; }
 
+        .est select { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 10px; font: inherit; }
+        .est-faixas { display: grid; gap: 8px; }
+        .est-faixa { display: grid; grid-template-columns: 26px 1fr 30px; gap: 8px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px; }
+        .est-faixa-n { width: 26px; height: 26px; border-radius: 50%; background: var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+        .est-faixa-campos { display: grid; gap: 6px; }
+        .est-faixa-campos select, .est-faixa-campos input { background: var(--bg-elevated) !important; padding: 8px 10px !important; font-size: 14px !important; }
+        .est-faixa-x { background: none; border: 0; color: var(--text-muted); cursor: pointer; font-size: 15px; }
+        .est-faixa-x:disabled { opacity: 0.3; }
+        .est-add { width: 100%; padding: 10px; margin-top: 8px; }
+        .est-juntar-toggle { margin-left: auto; border-style: dashed !important; }
+        .est-selbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--gold-soft); border: 1px solid var(--gold); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 14px; }
+        .est-selbar .est-btn-sec { padding: 9px 14px; }
+        .est-card.sel { cursor: pointer; grid-template-columns: 28px 64px 1fr; }
+        .est-card.marcada { border-color: var(--gold); background: var(--gold-soft); }
+        .est-selnum { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--gold); color: var(--gold); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+        .est-medprog { display: block; }
+        .est-medprog-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .est-medprog-lista { display: grid; gap: 4px; font-size: 14px; }
+        .est-medprog-lista div { display: flex; justify-content: space-between; gap: 12px; color: var(--text-muted); }
+        .est-badge.medley { background: var(--gold-soft); color: var(--gold); }
         .est-spin { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; display: inline-block; animation: gira 0.8s linear infinite; }
         .est-gerando .est-spin { width: 26px; height: 26px; }
         @keyframes gira { to { transform: rotate(360deg); } }
