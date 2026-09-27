@@ -894,10 +894,13 @@ function renderFila() {
     if (j.arquivoFinal) { const a = document.createElement('a'); a.textContent = 'Abrir pasta'; a.onclick = () => window.api.abrir.pasta(j.arquivoFinal); links.appendChild(a); }
     if (j.youtube?.url) { const a = document.createElement('a'); a.textContent = j.youtube.agendadoPara ? `Agendado ${new Date(j.youtube.agendadoPara).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}` : 'Ver no YouTube'; a.onclick = () => window.api.abrir.link(j.youtube.url); links.appendChild(a); }
     const acoes = d.querySelector('.acoes-job');
-    const botao = (txt, titulo, fn) => { const b = document.createElement('button'); b.textContent = txt; b.title = titulo; b.onclick = fn; acoes.appendChild(b); };
-    if (rodando || j.status === 'aguardando') botao('■', 'Cancelar', () => window.api.fila.cancelar(j.id));
+    const botao = (txt, titulo, fn, cls) => { const b = document.createElement('button'); b.textContent = txt; b.title = titulo; if (cls) b.className = cls; b.onclick = fn; acoes.appendChild(b); };
+    if (rodando) botao('■', 'Parar', () => window.api.fila.cancelar(j.id));
     if (['erro', 'cancelado', 'interrompido'].includes(j.status)) botao('↻', 'Tentar de novo', () => window.api.fila.retentar(j.id));
-    if (!rodando) botao('×', 'Tirar da fila', () => window.api.fila.remover(j.id));
+    botao('🗑', rodando ? 'Parar e tirar da fila' : 'Tirar da fila', () => {
+      if (rodando && !confirm(`Parar "${j.nome}" e tirar da fila?`)) return;
+      window.api.fila.remover(j.id);
+    }, 'excluir');
     box.appendChild(d);
   });
 }
@@ -1088,7 +1091,14 @@ async function iniciar() {
   $('#btnCorImagem').onclick = corDaImagem;
   $('#btnPasta').onclick = async () => { const p = await window.api.dialogo.pastaSaida(); if (p) { P.saida.pasta = p; $('#inPasta').value = p; salvarDepois(); } };
   $('#btnGerar').onclick = gerar;
-  $('#btnLimparFila').onclick = () => window.api.fila.limpar();
+  $('#btnLimparFila').onclick = () => {
+    if (!jobs.length) return;
+    const ativos = jobs.filter((j) => RODANDO.includes(j.status)).length;
+    const msg = ativos
+      ? `Limpar a fila inteira?\n\n${ativos} vídeo(s) estão sendo gerados/enviados agora e serão PARADOS.\nOs vídeos que já ficaram prontos continuam na pasta.`
+      : `Tirar ${jobs.length} item(ns) da fila?\n\nOs vídeos que já ficaram prontos continuam na pasta.`;
+    if (confirm(msg)) window.api.fila.limpar(true);
+  };
   $('#btnPainel').onclick = () => window.api.abrir.link('https://youvideors2.vercel.app');
   $$('.aba').forEach((a) => (a.onclick = () => trocarAba(a.dataset.aba)));
 

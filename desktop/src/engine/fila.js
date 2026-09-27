@@ -241,8 +241,10 @@ class Fila extends EventEmitter {
     this.emitir();
   }
 
-  limpar() {
-    this.jobs = this.jobs.filter((j) => EM_ANDAMENTO.includes(j.status) || j.status === 'aguardando');
+  // tudo = true também para o que está gerando/enviando agora
+  limpar(tudo = false) {
+    if (tudo) for (const j of this.jobs) if (EM_ANDAMENTO.includes(j.status)) this.cancelar(j.id);
+    this.jobs = tudo ? [] : this.jobs.filter((j) => EM_ANDAMENTO.includes(j.status));
     this.salvar();
     this.emitir();
   }

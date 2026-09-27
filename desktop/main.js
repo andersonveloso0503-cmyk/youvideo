@@ -346,7 +346,7 @@ app.whenReady().then(() => {
   ipcMain.handle('fila:cancelar', (_e, id) => fila.cancelar(id));
   ipcMain.handle('fila:remover', (_e, id) => fila.remover(id));
   ipcMain.handle('fila:retentar', (_e, id) => fila.retentar(id));
-  ipcMain.handle('fila:limpar', () => fila.limpar());
+  ipcMain.handle('fila:limpar', (_e, tudo) => fila.limpar(!!tudo));
 
   // ---------- Botão Inscrever (animação feita pela tela, vira um clipe com transparência) ----------
   const pastaBotao = (chave) => path.join(app.getPath('userData'), 'cache', 'botao', String(chave).replace(/[^\w-]/g, ''));
