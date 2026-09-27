@@ -384,6 +384,11 @@
         <div class="campo-config"><label>Senha da Central — <code>CENTRAL_TOKEN</code> (a mesma que você criou na Vercel)</label>
           <div class="linha-canal"><input id="cfgCentralToken" placeholder="cole a senha" /><button class="btn-mini" id="btnTestarCentral">Testar</button></div>
           <small id="resCentral"></small></div>
+        <div class="linha-botoes">
+          <button class="btn-mini" id="btnSyncEnviar" title="Guarda chaves e canais, criptografados com a senha da Central">☁ Salvar configurações na nuvem</button>
+          <button class="btn-mini destaque" id="btnSyncPuxar" title="Traz as chaves e canais salvos por outro PC">⬇ Puxar do outro PC</button>
+        </div>
+        <small class="nota" id="resSync">Em outro PC, é só colar a senha da Central e clicar em "Puxar do outro PC" — as chaves e os canais do YouTube vêm juntos.</small>
         <p class="nota">As chaves ficam guardadas só neste PC, criptografadas pelo Windows.</p>
       </div>
     </div>

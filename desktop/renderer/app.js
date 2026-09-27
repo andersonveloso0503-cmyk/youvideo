@@ -1019,7 +1019,7 @@ async function abrirConfig(msg) {
   $('#cfgEncoder').value = config.encoder || 'auto';
   $$('input[name=modo]').forEach((r) => (r.checked = r.value === (config.modo || 'normal')));
   $('#campoSimultaneos').style.display = config.modo === 'maximo' ? '' : 'none';
-  $('#modalConfig').showModal();
+  if (!$('#modalConfig').open) $('#modalConfig').showModal();
   if (msg) avisar(msg, true);
 }
 
@@ -1128,6 +1128,35 @@ async function iniciar() {
   };
   $('#btnConfig').onclick = () => abrirConfig();
   $('#btnSubir').onclick = () => Subir.abrir();
+  const puxarConfig = async () => {
+    const res = $('#resSync');
+    res.textContent = 'Buscando as configurações do outro PC...';
+    try {
+      const r = await window.api.sync.puxar();
+      if (!r.ok) return (res.textContent = 'Nenhuma configuração salva na nuvem ainda. No PC que já está configurado, clique em "Salvar configurações na nuvem".');
+      config = r.config;
+      canais = r.canais;
+      renderCanais();
+      abrirConfig();
+      res.textContent = `✅ Configurações puxadas (${r.canais} canal(is) do YouTube) — salvas em ${new Date(r.em).toLocaleString('pt-BR')}`;
+      avisar('Configurações do outro PC aplicadas');
+    } catch (e) {
+      res.textContent = '❌ ' + msgErro(e);
+    }
+  };
+  window.puxarConfig = puxarConfig;
+  $('#btnSyncPuxar').onclick = puxarConfig;
+  $('#btnSyncEnviar').onclick = async () => {
+    const res = $('#resSync');
+    res.textContent = 'Salvando...';
+    try {
+      const r = await window.api.sync.enviar();
+      res.textContent = r.ok ? `✅ Salvo na nuvem (criptografado) — ${new Date(r.em).toLocaleString('pt-BR')}` : 'Cadastre a senha da Central primeiro.';
+    } catch (e) {
+      res.textContent = '❌ ' + msgErro(e);
+    }
+  };
+  window.api.ao('sync:feito', () => {});
   $('#btnBiblioteca').onclick = () => Biblioteca.abrir({ recarregar: true });
   $('#btnTestarCentral').onclick = async () => {
     const r = $('#resCentral');
@@ -1140,6 +1169,8 @@ async function iniciar() {
       $('#cfgCentralToken').value = config.centralToken || '';
       const t = await window.api.central.testar();
       r.textContent = `✅ Conectado — ${t.total} vídeos na Biblioteca`;
+      // PC novo (sem chaves): já traz as configurações do outro PC
+      if (!config.temGroq && !config.temFal && !config.temGoogle) await puxarConfig();
     } catch (e) {
       r.textContent = '❌ ' + msgErro(e);
     }

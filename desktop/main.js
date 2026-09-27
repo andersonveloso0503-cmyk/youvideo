@@ -9,6 +9,14 @@ const { probe, rodar, detectarEncoder } = require('./src/engine/ffmpeg');
 const YT = require('./src/engine/youtube');
 const IA = require('./src/engine/ia');
 const Central = require('./src/engine/central');
+const Sync = require('./src/sync');
+
+// Depois de mudar chaves ou canais, guarda uma cópia criptografada na nuvem (se a Central estiver ligada)
+let tSync = null;
+function sincronizarDepois() {
+  clearTimeout(tSync);
+  tSync = setTimeout(() => Sync.enviar(store).then((r) => r.ok && enviar('sync:feito', r.em)).catch(() => {}), 1500);
+}
 const { gerarMiniatura, capaAoLado } = require('./src/engine/miniatura');
 const { ehImagem } = require('./src/engine/render');
 
@@ -271,6 +279,7 @@ app.whenReady().then(() => {
     for (const k of ['falKey', 'groqKey', 'centralToken']) if (mascarado(limpo[k]) || limpo[k] === undefined) delete limpo[k];
     if (limpo.google && mascarado(limpo.google.clientSecret)) delete limpo.google.clientSecret;
     store.salvar(limpo);
+    if (['falKey', 'groqKey', 'google', 'modo', 'simultaneos', 'encoder', 'envioPrefs'].some((k) => k in limpo)) sincronizarDepois();
     return store.paraTela();
   });
   ipcMain.handle('config:salvarProjeto', (_e, projeto) => {
@@ -393,6 +402,7 @@ app.whenReady().then(() => {
     const cfg = store.ler();
     const r = await YT.autorizarCanal(cfg.google, (url) => shell.openExternal(url));
     store.salvarCanal({ ...r, redirect: YT.REDIRECT });
+    sincronizarDepois();
     return store.canaisParaTela();
   });
   ipcMain.handle('canais:porToken', async (_e, { refreshToken }) => {
@@ -402,10 +412,12 @@ app.whenReady().then(() => {
     const redirect = cfg.google.redirectOriginal || YT.REDIRECT;
     const canal = await YT.canalPorToken(cfg.google, token, redirect);
     store.salvarCanal({ canal, refreshToken: token, redirect });
+    sincronizarDepois();
     return store.canaisParaTela();
   });
   ipcMain.handle('canais:remover', (_e, id) => {
     store.removerCanal(id);
+    sincronizarDepois();
     return store.canaisParaTela();
   });
 
@@ -432,6 +444,13 @@ app.whenReady().then(() => {
     await rodar(['-framerate', '24', '-i', path.join(pasta, 'q%04d.png'), '-c:v', 'png', '-pix_fmt', 'rgba', saida]).promise;
     for (const f of fs.readdirSync(pasta)) if (f.endsWith('.png')) fs.rmSync(path.join(pasta, f), { force: true });
     return saida;
+  });
+
+  // ---------- Levar configurações para outro PC ----------
+  ipcMain.handle('sync:enviar', () => Sync.enviar(store));
+  ipcMain.handle('sync:puxar', async () => {
+    const r = await Sync.puxar(store);
+    return { ...r, config: store.paraTela(), canais: store.canaisParaTela() };
   });
 
   // ---------- Aba Criar ----------

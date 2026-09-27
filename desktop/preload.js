@@ -5,6 +5,7 @@ const chamar = (canal) => (...args) => ipcRenderer.invoke(canal, ...args);
 contextBridge.exposeInMainWorld('api', {
   config: { ler: chamar('config:ler'), salvar: chamar('config:salvar'), salvarProjeto: chamar('config:salvarProjeto') },
   sistema: { info: chamar('sistema:info') },
+  sync: { enviar: chamar('sync:enviar'), puxar: chamar('sync:puxar') },
   dialogo: {
     musicas: chamar('dialogo:musicas'),
     pastaMusicas: chamar('dialogo:pastaMusicas'),
@@ -53,7 +54,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   caminhoDoArquivo: (file) => webUtils.getPathForFile(file),
   ao: (canal, fn) => {
-    const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download'];
+    const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download', 'sync:feito'];
     if (!permitidos.includes(canal)) return;
     ipcRenderer.on(canal, (_e, dados) => fn(dados));
   },
