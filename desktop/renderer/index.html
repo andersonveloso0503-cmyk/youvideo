@@ -209,7 +209,9 @@
               <button class="btn-mini" id="btnConectarCanal">+ Canal</button>
             </div>
             <div class="linha-rotulo"><label class="rotulo">Título</label><button class="btn-ia" id="btnIaTitulo" title="Cria título, descrição e tags a partir do nome do vídeo e das músicas">✨ Gerar com IA</button></div>
-            <input id="inTitulo" maxlength="100" placeholder="Ex.: Louvores para orar · 3 horas" />
+            <input id="inTitulo" maxlength="100" list="opcoesTitulo" placeholder="Ex.: Louvores para orar · 3 horas" />
+            <datalist id="opcoesTitulo"></datalist>
+            <span class="dica-opcoes" id="dicaOpcoesTitulo"></span>
             <label class="rotulo">Descrição</label>
             <textarea id="inDescricao" rows="4" placeholder="Texto que vai na descrição do vídeo"></textarea>
             <label class="interruptor"><input type="checkbox" id="cTracklist" /><span></span> Lista de músicas com minutagem na descrição</label>

@@ -120,7 +120,9 @@ const Subir = (() => {
         <div class="capa" title="Clique para trocar a capa">${v.previa ? `<img src="${urlArquivo(v.previa)}" />` : ''}<span>Trocar capa</span></div>
         <div class="campos">
           <div class="info"><span class="arq"></span><span>${tempo(v.duracao)}</span>${v.curto ? '<span>Shorts</span>' : ''}${v.musicas?.length ? `<span>${v.musicas.length} músicas</span>` : ''}<b>${quando}</b></div>
-          <div class="titulo-linha"><input class="t" maxlength="100" placeholder="Título do vídeo no YouTube" /><span class="conta"></span></div>
+          <div class="titulo-linha"><input class="t" maxlength="100" list="opcoes-envio-${i}" placeholder="Título do vídeo no YouTube" /><span class="conta"></span></div>
+          <datalist id="opcoes-envio-${i}">${(v.opcoes || []).map((o) => `<option value="${String(o).replace(/"/g, '&quot;')}"></option>`).join('')}</datalist>
+          ${v.opcoes?.length > 1 ? `<span class="dica-opcoes">💡 ${v.opcoes.length} opções de título — apague o texto do título para ver as outras${v.palavra ? ` · palavra-chave: <b>${String(v.palavra).replace(/</g, '')}</b>` : ''}</span>` : ''}
           <textarea class="d" rows="2" placeholder="Descrição"></textarea>
           <input class="g" placeholder="Tags separadas por vírgula" />
         </div>
@@ -236,7 +238,7 @@ const Subir = (() => {
             canal,
             contexto: S.contexto,
           });
-          Object.assign(v, { titulo: r.titulo, descricao: r.descricao, tags: r.tags.join(', '), fonte: 'ia' });
+          Object.assign(v, { titulo: r.titulo, opcoes: r.opcoes, palavra: r.palavraPrincipal, descricao: r.descricao, tags: r.tags.join(', '), fonte: 'ia' });
         } catch (e) {
           falhas++;
           avisar(msgErro(e), true);

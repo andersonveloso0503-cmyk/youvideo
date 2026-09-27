@@ -946,6 +946,10 @@ async function gerarTituloIa() {
       contexto: config.envioPrefs?.contexto || '',
     });
     P.publicar.titulo = r.titulo;
+    $('#opcoesTitulo').innerHTML = r.opcoes.map((o) => `<option value="${o.replace(/"/g, '&quot;')}"></option>`).join('');
+    $('#dicaOpcoesTitulo').innerHTML = r.opcoes.length > 1
+      ? `💡 ${r.opcoes.length} opções — apague o título para ver as outras${r.palavraPrincipal ? ` · palavra-chave: <b>${r.palavraPrincipal.replace(/</g, '')}</b>` : ''}`
+      : '';
     P.publicar.descricao = r.descricao;
     P.publicar.tags = r.tags.join(', ');
     $('#inTitulo').value = r.titulo;
