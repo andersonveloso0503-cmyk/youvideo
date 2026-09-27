@@ -268,6 +268,10 @@ export default function Home() {
       <PainelOrcamento />
 
       <div className="hub-grid">
+        <a href="/radar" className="hub-tile hub-tile--terracotta">
+          <div className="hub-tile-title">Youvideo Radar</div>
+          <div className="hub-tile-desc">Canais e vídeos em alta no YouTube pra modelar: busca por score, crescimento, tendências e spy de canal</div>
+        </a>
         <a href="/novo-canal" className="hub-tile hub-tile--gold">
           <div className="hub-tile-title">Novo canal</div>
           <div className="hub-tile-desc">Criar um canal novo do zero (wizard guiado)</div>
