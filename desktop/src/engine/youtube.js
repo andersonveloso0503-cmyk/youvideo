@@ -114,6 +114,20 @@ async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, 
   const yt = google.youtube({ version: 'v3', auth });
   const tamanho = fs.statSync(arquivo).size;
 
+  // Canal sem verificação por telefone só aceita vídeos de até 15 min: avisa antes de subir
+  const { probe } = require('./ffmpeg');
+  const duracao = (await probe(arquivo).catch(() => ({ duracao: 0 }))).duracao;
+  if (duracao > 15 * 60) {
+    const c = await yt.channels.list({ part: ['status', 'snippet'], mine: true }).catch(() => null);
+    const longos = c?.data?.items?.[0]?.status?.longUploadsStatus;
+    if (longos && longos !== 'allowed') {
+      const nome = c.data.items[0].snippet?.title || 'o canal';
+      throw new Error(
+        `O YouTube ainda não deixa "${nome}" subir vídeos com mais de 15 min. Verifique o canal por SMS em youtube.com/verify (logado nesse canal) e depois clique em ↻ Tentar de novo.`
+      );
+    }
+  }
+
   const status = { privacyStatus: privacidade || 'private', selfDeclaredMadeForKids: false };
   if (agendarPara) {
     status.privacyStatus = 'private';
