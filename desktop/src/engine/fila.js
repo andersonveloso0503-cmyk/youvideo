@@ -10,6 +10,7 @@ const R = require('./render');
 const { separar } = require('./separar');
 const { transcrever } = require('./legenda');
 const YT = require('./youtube');
+const { gerarMiniatura, capaAoLado } = require('./miniatura');
 
 const EM_ANDAMENTO = ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'];
 
@@ -42,8 +43,9 @@ function fundosDaParte(fundos, todas, grupo, i) {
 }
 
 class Fila extends EventEmitter {
-  constructor({ dirDados, fontsDir, obterConfig, obterCanal }) {
+  constructor({ dirDados, fontsDir, obterConfig, obterCanal, registrarEnvio }) {
     super();
+    this.registrarEnvio = registrarEnvio || (() => {});
     this.dirDados = dirDados;
     this.dirCache = path.join(dirDados, 'cache');
     this.arquivo = path.join(dirDados, 'fila.json');
@@ -134,6 +136,86 @@ class Fila extends EventEmitter {
     return criados;
   }
 
+  /** Vídeos prontos para subir no YouTube (tela "Subir p/ YouTube"). */
+  adicionarEnvios(lista) {
+    const lote = crypto.randomBytes(4).toString('hex');
+    const criados = lista.map((e, i) => {
+      const job = {
+        id: `${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`,
+        tipo: 'envio',
+        lote,
+        parte: i + 1,
+        partes: lista.length,
+        criadoEm: new Date().toISOString(),
+        nome: e.titulo || path.basename(e.arquivo),
+        status: 'aguardando',
+        etapa: 'Aguardando para enviar',
+        progresso: 0,
+        envio: e,
+      };
+      this.jobs.push(job);
+      return job;
+    });
+    this.salvar();
+    this.emitir();
+    this.proximo();
+    return criados;
+  }
+
+  async processarEnvio(job) {
+    const cfg = this.obterConfig();
+    const e = job.envio;
+    job.cancelado = false;
+    try {
+      if (!fs.existsSync(e.arquivo)) throw new Error(`Vídeo não encontrado: ${e.arquivo}`);
+      const canal = this.obterCanal(e.canalId);
+      if (!canal) throw new Error('Canal do YouTube não encontrado — conecte de novo em Contas YouTube.');
+      this.atualizar(job, { status: 'publicando', etapa: 'Preparando capa' });
+      let miniatura = e.capa && fs.existsSync(e.capa) ? e.capa : null;
+      if (miniatura) {
+        const pronta = path.join(os.tmpdir(), `youvideo-capa-${job.id}.jpg`);
+        try {
+          await gerarMiniatura(miniatura, pronta, { vertical: !!e.curto });
+          miniatura = pronta;
+        } catch {
+          miniatura = null;
+        }
+      }
+      if (job.cancelado) throw new Error('CANCELADO');
+      this.atualizar(job, { etapa: 'Enviando para o YouTube' });
+      const r = await YT.publicar({
+        credenciais: cfg.google,
+        redirectOriginal: canal.redirect,
+        refreshToken: canal.refreshToken,
+        arquivo: e.arquivo,
+        titulo: e.titulo,
+        descricao: e.descricao,
+        tags: e.tags,
+        privacidade: e.privacidade,
+        agendarPara: e.agendarPara || null,
+        miniatura: e.curto ? null : miniatura,
+        onProgresso: (x) => this.atualizar(job, { progresso: x * 0.97, etapa: `Enviando ${Math.round(x * 100)}%` }, false),
+      });
+      this.registrarEnvio();
+      this.atualizar(job, {
+        status: 'concluido',
+        etapa: e.agendarPara ? 'Agendado' : 'Enviado',
+        progresso: 1,
+        youtube: { ...r, canal: canal.titulo, agendadoPara: e.agendarPara || null },
+        arquivoFinal: e.arquivo,
+        aviso: r.miniaturaErro || null,
+        concluidoEm: new Date().toISOString(),
+      });
+    } catch (err) {
+      const cancelado = err.message === 'CANCELADO' || job.cancelado;
+      let msg = err.message;
+      if (/quota|uploadLimitExceeded/i.test(msg)) msg = 'O YouTube recusou: limite de envios do dia atingido. Tente de novo amanhã.';
+      if (/invalid_grant/i.test(msg)) msg = 'A autorização desse canal expirou. Em Contas YouTube, desconecte e conecte o canal de novo.';
+      this.atualizar(job, { status: cancelado ? 'cancelado' : 'erro', etapa: cancelado ? 'Cancelado' : 'Erro', erro: cancelado ? null : msg });
+      throw err;
+    }
+  }
+
   retentar(id) {
     const j = this.jobs.find((x) => x.id === id);
     if (!j || EM_ANDAMENTO.includes(j.status)) return;
@@ -168,21 +250,26 @@ class Fila extends EventEmitter {
   proximo() {
     const cfg = this.obterConfig();
     const limite = cfg.modo === 'maximo' ? Math.max(1, Math.min(3, Number(cfg.simultaneos) || 1)) : 1;
-    while (this.rodando.size < limite) {
-      const j = this.jobs.find((x) => x.status === 'aguardando' && !this.rodando.has(x.id));
-      if (!j) break;
-      this.rodando.add(j.id);
-      this.processar(j)
-        .catch(() => {})
-        .finally(() => {
-          this.rodando.delete(j.id);
-          this.cancelamentos.delete(j.id);
-          this.proximo();
-        });
+    // Geração (usa o processador) e envio (usa a internet) andam em paralelo, cada um na sua vez
+    const rodandoDe = (tipo) => [...this.rodando].filter((id) => (this.jobs.find((j) => j.id === id)?.tipo || 'video') === tipo).length;
+    for (const [tipo, max] of [['video', limite], ['envio', 1]]) {
+      while (rodandoDe(tipo) < max) {
+        const j = this.jobs.find((x) => x.status === 'aguardando' && !this.rodando.has(x.id) && (x.tipo || 'video') === tipo);
+        if (!j) break;
+        this.rodando.add(j.id);
+        this.processar(j)
+          .catch(() => {})
+          .finally(() => {
+            this.rodando.delete(j.id);
+            this.cancelamentos.delete(j.id);
+            this.proximo();
+          });
+      }
     }
   }
 
   async processar(job) {
+    if (job.tipo === 'envio') return this.processarEnvio(job);
     const cfg = this.obterConfig();
     const modo = cfg.modo || 'normal';
     const p = job.projeto;
@@ -296,7 +383,8 @@ class Fila extends EventEmitter {
       try {
         await R.renderizarFinal({
           fundo, audioArquivo: audio.arquivo, total: audio.total, W, H, efeito: p.efeito, textura: p.textura,
-          assArquivo, fontsDir: path.join(dir, 'fonts'), saida: temporario, encoder, modo, dir, registrarCancelar,
+          assArquivo, fontsDir: path.join(dir, 'fonts'), inscrever: p.inscrever?.ativo ? p.inscrever : null,
+          saida: temporario, encoder, modo, dir, registrarCancelar,
           onProgresso: (x, seg) => {
             progR(x);
             const decorrido = (Date.now() - inicioRender) / 1000;
@@ -310,25 +398,24 @@ class Fila extends EventEmitter {
           this.atualizar(job, { etapa: 'Placa de vídeo falhou, tentando com o processador' });
           await R.renderizarFinal({
             fundo, audioArquivo: audio.arquivo, total: audio.total, W, H, efeito: p.efeito, textura: p.textura,
-            assArquivo, fontsDir: path.join(dir, 'fonts'), saida: temporario, encoder: 'libx264', modo, dir, registrarCancelar, onProgresso: progR,
+            assArquivo, fontsDir: path.join(dir, 'fonts'), inscrever: p.inscrever?.ativo ? p.inscrever : null,
+            saida: temporario, encoder: 'libx264', modo, dir, registrarCancelar, onProgresso: progR,
           });
         } else throw e;
       }
       moverArquivo(temporario, saida);
 
-      // Miniatura: primeira imagem de fundo
+      // Capa do YouTube (1280x720, < 2 MB), salva ao lado do vídeo com o mesmo nome
       let miniatura = null;
       const primeiraImg = (p.fundos || []).find((f) => R.ehImagem(f) && fs.existsSync(f));
-      if (primeiraImg) {
-        miniatura = path.join(dir, 'miniatura.jpg');
-        try {
-          await rodar(['-i', primeiraImg, '-vf', 'scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720', '-q:v', '3', '-frames:v', '1', miniatura]).promise;
-        } catch {
-          miniatura = null;
-        }
+      try {
+        miniatura = saida.replace(/\.mp4$/i, '.jpg');
+        await gerarMiniatura(primeiraImg || saida, miniatura, { vertical: p.formato.tipo === 'curto' });
+      } catch {
+        miniatura = null;
       }
 
-      this.atualizar(job, { arquivoFinal: saida, timeline: audio.timeline.map((t) => ({ titulo: t.titulo, inicio: t.inicio })), duracao: audio.total });
+      this.atualizar(job, { arquivoFinal: saida, capa: miniatura, timeline: audio.timeline.map((t) => ({ titulo: t.titulo, inicio: t.inicio })), duracao: audio.total });
 
       // 7) Publicar
       if (publica) {
@@ -364,6 +451,7 @@ class Fila extends EventEmitter {
             this.atualizar(job, { etapa: `Enviando para o YouTube ${Math.round(x * 100)}%` }, false);
           },
         });
+        this.registrarEnvio();
         this.atualizar(job, { youtube: { ...r, canal: canal.titulo, agendadoPara: agendarPara ? agendarPara.toISOString() : null } });
       }
 

@@ -7,6 +7,9 @@ const { Store } = require('./src/store');
 const { Fila } = require('./src/engine/fila');
 const { probe, rodar, detectarEncoder } = require('./src/engine/ffmpeg');
 const YT = require('./src/engine/youtube');
+const IA = require('./src/engine/ia');
+const { gerarMiniatura, capaAoLado } = require('./src/engine/miniatura');
+const { ehImagem } = require('./src/engine/render');
 
 const { EXT_IMAGEM } = require('./src/engine/render');
 
@@ -127,6 +130,28 @@ async function infoMusicas(caminhos) {
   return res.sort((a, b) => ordem.get(a.arquivo) - ordem.get(b.arquivo));
 }
 
+// Contador de envios do dia. O limite do YouTube (100/dia) renova à meia-noite do horário do Pacífico.
+function diaPacifico() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date());
+}
+function enviosHoje() {
+  const e = store.ler().envios || {};
+  return e.dia === diaPacifico() ? e.n || 0 : 0;
+}
+function registrarEnvio() {
+  store.salvar({ envios: { dia: diaPacifico(), n: enviosHoje() + 1 } });
+}
+function horaRenovacao() {
+  // Próxima meia-noite do Pacífico, no horário do PC
+  const agora = new Date();
+  for (let h = 1; h <= 25; h++) {
+    const t = new Date(Math.ceil(agora.getTime() / 3600e3) * 3600e3 + (h - 1) * 3600e3);
+    const hora = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: '2-digit' }).format(t));
+    if (hora === 0 || hora === 24) return t.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+  return '';
+}
+
 function atualizarBloqueioSono(jobs) {
   const rodando = jobs.some((j) => ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'].includes(j.status));
   if (rodando && bloqueioSono === null) bloqueioSono = powerSaveBlocker.start('prevent-app-suspension');
@@ -161,6 +186,7 @@ app.whenReady().then(() => {
     fontsDir: fontsDir(),
     obterConfig: () => store.ler(),
     obterCanal: (id) => store.canal(id),
+    registrarEnvio: () => registrarEnvio(),
   });
   fila.proximo(); // retoma o que ficou aguardando na última vez
   fila.on('mudou', (jobs) => {
@@ -321,6 +347,110 @@ app.whenReady().then(() => {
   ipcMain.handle('fila:remover', (_e, id) => fila.remover(id));
   ipcMain.handle('fila:retentar', (_e, id) => fila.retentar(id));
   ipcMain.handle('fila:limpar', () => fila.limpar());
+
+  // ---------- Botão Inscrever (animação feita pela tela, vira um clipe com transparência) ----------
+  const pastaBotao = (chave) => path.join(app.getPath('userData'), 'cache', 'botao', String(chave).replace(/[^\w-]/g, ''));
+  ipcMain.handle('botao:existe', (_e, chave) => {
+    const f = path.join(pastaBotao(chave), 'botao.mov');
+    return fs.existsSync(f) ? f : null;
+  });
+  ipcMain.handle('botao:salvar', async (_e, { chave, quadros }) => {
+    const pasta = pastaBotao(chave);
+    fs.rmSync(pasta, { recursive: true, force: true });
+    fs.mkdirSync(pasta, { recursive: true });
+    quadros.forEach((q, i) => fs.writeFileSync(path.join(pasta, `q${String(i).padStart(4, '0')}.png`), Buffer.from(q)));
+    const saida = path.join(pasta, 'botao.mov');
+    await rodar(['-framerate', '24', '-i', path.join(pasta, 'q%04d.png'), '-c:v', 'png', '-pix_fmt', 'rgba', saida]).promise;
+    for (const f of fs.readdirSync(pasta)) if (f.endsWith('.png')) fs.rmSync(path.join(pasta, f), { force: true });
+    return saida;
+  });
+
+  // ---------- Subir vídeos prontos ----------
+  const EXT_VIDEO_ENVIO = ['mp4', 'mov', 'mkv', 'webm', 'avi', 'm4v', 'wmv', 'flv', 'mpg', 'mpeg', '3gp'];
+  const infoVideos = async (caminhos) => {
+    const saida = [];
+    for (const c of caminhos) {
+      try {
+        const i = await probe(c);
+        if (!i.temVideo) continue;
+        // Se o vídeo foi feito aqui, recupera as músicas (para a IA e a lista com minutagem)
+        const job = fila.lista().find((j) => j.arquivoFinal && path.resolve(j.arquivoFinal) === path.resolve(c) && j.tipo !== 'envio');
+        saida.push({
+          arquivo: c,
+          nome: path.basename(c, path.extname(c)),
+          duracao: i.duracao,
+          largura: i.largura,
+          altura: i.altura,
+          curto: i.altura > i.largura && i.duracao <= 180,
+          capa: capaAoLado(c),
+          musicas: job?.timeline || null,
+        });
+      } catch {}
+    }
+    return saida;
+  };
+  ipcMain.handle('envio:escolherVideos', async () => {
+    const r = await dialog.showOpenDialog(janela, {
+      title: 'Escolher vídeos para subir',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Vídeos', extensions: EXT_VIDEO_ENVIO }, { name: 'Todos os arquivos', extensions: ['*'] }],
+    });
+    return r.canceled ? [] : infoVideos(r.filePaths);
+  });
+  ipcMain.handle('envio:escolherPasta', async () => {
+    const r = await dialog.showOpenDialog(janela, { title: 'Escolher pasta com vídeos', properties: ['openDirectory'] });
+    return r.canceled ? [] : infoVideos(listarPasta(r.filePaths[0], EXT_VIDEO_ENVIO));
+  });
+  ipcMain.handle('envio:infoVideos', async (_e, caminhos) => {
+    const lista = [];
+    for (const c of caminhos || []) {
+      try {
+        if (fs.statSync(c).isDirectory()) lista.push(...listarPasta(c, EXT_VIDEO_ENVIO));
+        else if (EXT_VIDEO_ENVIO.includes(path.extname(c).slice(1).toLowerCase())) lista.push(c);
+      } catch {}
+    }
+    return infoVideos(lista);
+  });
+  ipcMain.handle('envio:escolherCapa', async () => {
+    const r = await dialog.showOpenDialog(janela, {
+      title: 'Escolher capa (miniatura)',
+      properties: ['openFile'],
+      filters: [{ name: 'Imagens', extensions: EXT_IMG }, { name: 'Todos os arquivos', extensions: ['*'] }],
+    });
+    return r.canceled ? null : r.filePaths[0];
+  });
+  // Capa para mostrar na lista: a imagem escolhida ou um quadro do vídeo
+  ipcMain.handle('envio:previaCapa', async (_e, { arquivo, capa }) => {
+    const pasta = path.join(app.getPath('userData'), 'cache', 'capas');
+    fs.mkdirSync(pasta, { recursive: true });
+    const origem = capa && fs.existsSync(capa) ? capa : arquivo;
+    const st = fs.statSync(origem);
+    const nome = require('crypto').createHash('sha1').update(`${origem}|${st.size}|${st.mtimeMs}`).digest('hex').slice(0, 16) + '.jpg';
+    const destino = path.join(pasta, nome);
+    if (!fs.existsSync(destino)) await gerarMiniatura(origem, destino);
+    return destino;
+  });
+  ipcMain.handle('envio:gerarTextos', async (_e, info) => {
+    const cfg = store.ler();
+    return IA.gerarTextosVideo(cfg.groqKey, info);
+  });
+  ipcMain.handle('envio:ultimoAgendado', async (_e, canalId) => {
+    const canal = store.canal(canalId);
+    if (!canal) return null;
+    const cfg = store.ler();
+    try {
+      return await YT.ultimoAgendado({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect });
+    } catch {
+      return null;
+    }
+  });
+  ipcMain.handle('envio:contador', () => ({ hoje: enviosHoje(), limite: 100, renova: horaRenovacao() }));
+  ipcMain.handle('envio:adicionar', (_e, lista) => {
+    if (!Array.isArray(lista) || !lista.length) throw new Error('Nenhum vídeo para subir.');
+    const livres = 100 - enviosHoje();
+    if (lista.length > livres) throw new Error(`Hoje só dá para subir mais ${Math.max(0, livres)} vídeo(s) (limite do YouTube: 100 por dia).`);
+    return fila.adicionarEnvios(lista).length;
+  });
 
   criarJanela();
 });

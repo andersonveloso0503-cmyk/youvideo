@@ -33,7 +33,8 @@ const PADRAO = {
   efeito: { estilo: 'onda', cor: '#d9a441', largura: 66, intensidade: 75, posX: 50, posY: 88, opacidade: 95 },
   textura: { granulado: 0, vinheta: true, escurecer: 15 },
   audio: { somenteInstrumental: false, crossfade: 2, normalizar: false },
-  legenda: { ativo: false, idioma: 'pt', posicao: 'baixo', tamanho: 100, cor: '#ffffff', mostrarNome: true },
+  legenda: { ativo: false, idioma: 'pt', posicao: 'baixo', tamanho: 100, cor: '#ffffff', mostrarNome: false },
+  inscrever: { ativo: false, idioma: 'pt', posicao: 'inf_dir', tamanho: 28, primeiroSeg: 10, intervaloMin: 10 },
   formato: { tipo: 'longo', resolucao: '1080', qtdVideos: '', duracaoMaxMin: '', limiteMusicaSeg: '' },
   saida: { pasta: '', nome: '' },
   publicar: {
@@ -635,6 +636,7 @@ function desenhar(tMs) {
   }
   desenharVisual(W, H, t);
   desenharTextos(W, H, t);
+  desenharBotaoPrevia(W, H, tMs);
 }
 
 // Miniaturas dos estilos
@@ -802,6 +804,12 @@ function ligarTudo() {
     ligarCampo('#selResolucao', fm, 'resolucao', 'change'),
     ligarCampo('#inDuracaoMax', fm, 'duracaoMaxMin'),
     ligarCampo('#inLimiteMusica', fm, 'limiteMusicaSeg'),
+    ligarCheck('#cInscrever', () => P.inscrever, 'ativo', () => $('#camposInscrever').classList.toggle('desligado', !P.inscrever.ativo)),
+    ligarSegmentado('#segIdiomaBotao', () => P.inscrever, 'idioma'),
+    ligarSegmentado('#gradePosicao', () => P.inscrever, 'posicao'),
+    ligarSlider('#sTamBotao', () => P.inscrever, 'tamanho', '#vTamBotao'),
+    ligarCampo('#inBotaoPrimeiro', () => P.inscrever, 'primeiroSeg'),
+    ligarCampo('#inBotaoIntervalo', () => P.inscrever, 'intervaloMin'),
   );
   $('#selCanal').onchange = (e) => { P.publicar.canalId = e.target.value; salvarDepois(); };
   $('#selQtdVideos').onchange = (e) => { P.formato.qtdVideos = e.target.value; salvarDepois(); };
@@ -824,6 +832,7 @@ function atualizarTudo() {
 // ---------- Canais ----------
 function renderCanais() {
   $('#qtdCanais').textContent = canais.length;
+  if (typeof Subir !== 'undefined') Subir.renderCanais();
   const sel = $('#selCanal');
   sel.innerHTML = canais.length ? '' : '<option value="">Nenhum canal conectado</option>';
   canais.forEach((c) => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.titulo; sel.appendChild(o); });
@@ -861,14 +870,16 @@ function renderFila() {
     const rodando = RODANDO.includes(j.status);
     const d = document.createElement('div');
     d.className = `job ${rodando ? 'rodando' : j.status}`;
-    const qtd = j.projeto.musicas.length;
+    const envio = j.tipo === 'envio';
+    const qtd = envio ? 0 : j.projeto.musicas.length;
     const detalhe = j.status === 'erro' ? j.erro
+      : envio ? (rodando ? j.etapa : j.status === 'concluido' ? `${j.youtube?.canal || ''}${j.aviso ? ' · ' + j.aviso : ''}` : `Enviar para ${canais.find((c) => c.id === j.envio.canalId)?.titulo || 'YouTube'}`)
       : rodando ? `${j.etapa}${j.restanteSeg ? ` · falta ~${tempoCurto(j.restanteSeg)}` : ''}`
       : j.status === 'concluido' ? `${qtd} música${qtd > 1 ? 's' : ''} · ${tempo(j.duracao)}`
       : j.status === 'interrompido' ? 'Processamento interrompido'
       : `${qtd} música${qtd > 1 ? 's' : ''} · ${j.projeto.fundos.length} fundo${j.projeto.fundos.length === 1 ? '' : 's'}`;
     d.innerHTML = `
-      <span class="estado">${ROTULO_STATUS[j.status] || j.status}${j.partes > 1 ? ` · ${j.parte}/${j.partes}` : ''}</span>
+      <span class="estado">${envio ? '⬆ ' : ''}${envio && j.status === 'publicando' ? 'Enviando' : ROTULO_STATUS[j.status] || j.status}${j.partes > 1 ? ` · ${j.parte}/${j.partes}` : ''}</span>
       <span class="nome-job"></span>
       <span class="detalhe"></span>
       <span class="barra"><i style="width:${Math.round((j.progresso || 0) * 100)}%"></i></span>
@@ -879,6 +890,7 @@ function renderFila() {
     d.querySelector('.detalhe').textContent = detalhe || '';
     d.querySelector('.detalhe').title = detalhe || '';
     const links = d.querySelector('.links');
+    if (j.status === 'concluido' && !envio && j.arquivoFinal && !j.youtube) { const a = document.createElement('a'); a.textContent = 'Subir p/ YouTube'; a.onclick = () => Subir.abrir([j.arquivoFinal]); links.appendChild(a); }
     if (j.arquivoFinal) { const a = document.createElement('a'); a.textContent = 'Abrir pasta'; a.onclick = () => window.api.abrir.pasta(j.arquivoFinal); links.appendChild(a); }
     if (j.youtube?.url) { const a = document.createElement('a'); a.textContent = j.youtube.agendadoPara ? `Agendado ${new Date(j.youtube.agendadoPara).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}` : 'Ver no YouTube'; a.onclick = () => window.api.abrir.link(j.youtube.url); links.appendChild(a); }
     const acoes = d.querySelector('.acoes-job');
@@ -888,6 +900,62 @@ function renderFila() {
     if (!rodando) botao('×', 'Tirar da fila', () => window.api.fila.remover(j.id));
     box.appendChild(d);
   });
+}
+
+// ---------- Botão Inscrever ----------
+// A animação é desenhada aqui e vira um clipe com fundo transparente (guardado no PC)
+async function prepararBotao(idioma) {
+  const chave = `v2-${idioma}`;
+  const existe = await window.api.botao.existe(chave);
+  if (existe) return existe;
+  avisar('Preparando o botão Inscreva-se...');
+  const quadros = await BotaoInscrever.gerarQuadros(idioma, 900);
+  return window.api.botao.salvar({ chave, quadros });
+}
+
+function desenharBotaoPrevia(W, H, tMs) {
+  const b = P.inscrever;
+  if (!b.ativo) return;
+  const largura = W * Math.max(15, Math.min(50, Number(b.tamanho) || 28)) / 100;
+  const altura = largura / 3;
+  const mx = W * 0.03, my = H * 0.04;
+  const x = b.posicao.endsWith('esq') ? mx : b.posicao.endsWith('dir') ? W - largura - mx : (W - largura) / 2;
+  const y = b.posicao.startsWith('sup') || b.posicao === 'topo' ? my : H - altura - my;
+  const ciclo = (tMs / 1000) % 6.5; // na prévia repete a cada 6,5 s
+  BotaoInscrever.desenhar(ctx, x, y, largura, altura, ciclo, b.idioma);
+}
+
+// ---------- IA para o título (aba Publicar) ----------
+async function gerarTituloIa() {
+  if (!config.temGroq) return abrirConfig('Cadastre a chave da Groq para usar a IA.');
+  const sel = selecionadas();
+  const b = $('#btnIaTitulo');
+  b.disabled = true;
+  b.textContent = '✨ Gerando...';
+  try {
+    const { duracoes } = dividir(sel);
+    const r = await window.api.envio.gerarTextos({
+      nome: P.saida.nome || sel[0]?.titulo || 'compilação',
+      musicas: sel.map((m) => m.titulo),
+      duracaoSeg: duracoes[0] || sel.reduce((a, m) => a + m.duracao, 0),
+      curto: P.formato.tipo === 'curto',
+      canal: canais.find((c) => c.id === P.publicar.canalId)?.titulo || '',
+      contexto: config.envioPrefs?.contexto || '',
+    });
+    P.publicar.titulo = r.titulo;
+    P.publicar.descricao = r.descricao;
+    P.publicar.tags = r.tags.join(', ');
+    $('#inTitulo').value = r.titulo;
+    $('#inDescricao').value = r.descricao;
+    $('#inTags').value = P.publicar.tags;
+    salvarDepois();
+    avisar('Título, descrição e tags gerados — pode editar à vontade');
+  } catch (e) {
+    avisar(msgErro(e), true);
+  } finally {
+    b.disabled = false;
+    b.textContent = '✨ Gerar com IA';
+  }
 }
 
 // ---------- Gerar ----------
@@ -908,6 +976,7 @@ async function gerar() {
     audio: { ...P.audio },
     legenda: { ...P.legenda },
     formato: { ...P.formato },
+    inscrever: { ...P.inscrever },
     saida: { pasta: P.saida.pasta, nome: nomeBase },
     publicar: {
       ...P.publicar,
@@ -916,6 +985,7 @@ async function gerar() {
     },
   };
   try {
+    if (P.inscrever.ativo) projeto.inscrever.arquivo = await prepararBotao(P.inscrever.idioma);
     const n = await window.api.fila.adicionar(projeto);
     avisar(n > 1 ? `${n} vídeos entraram na fila` : 'Vídeo entrou na fila');
   } catch (e) {
@@ -946,6 +1016,7 @@ async function abrirConfig(msg) {
 async function iniciar() {
   config = await window.api.config.ler();
   if (config.ultimoProjeto) P = mesclar(PADRAO, config.ultimoProjeto);
+  if (!P._v13) { P.legenda.mostrarNome = false; P._v13 = true; } // nome da música no topo agora vem desligado
   ligarTudo();
   atualizarTudo();
   canais = await window.api.canais.listar();
@@ -1040,6 +1111,8 @@ async function iniciar() {
     catch (e) { $('#erroCanais').textContent = msgErro(e); }
   };
   $('#btnConfig').onclick = () => abrirConfig();
+  $('#btnSubir').onclick = () => Subir.abrir();
+  $('#btnIaTitulo').onclick = gerarTituloIa;
   $$('input[name=modo]').forEach((r) => (r.onchange = () => ($('#campoSimultaneos').style.display = r.value === 'maximo' && r.checked ? '' : 'none')));
   $('#btnSalvarConfig').onclick = async () => {
     config = await window.api.config.salvar({

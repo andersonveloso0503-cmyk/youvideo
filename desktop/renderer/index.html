@@ -20,6 +20,10 @@
         <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M10 9.5v5l4.5-2.5z" class="cheio"/></svg>
         Contas YouTube <span class="contador" id="qtdCanais">0</span>
       </button>
+      <button class="btn-topo" id="btnSubir">
+        <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M12 15V9M9 11.5 12 9l3 2.5"/></svg>
+        Subir p/ YouTube
+      </button>
       <button class="btn-topo" id="btnConfig">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         Configurações
@@ -116,6 +120,32 @@
           <label class="interruptor"><input type="checkbox" id="cVinheta" /><span></span> Vinheta nas bordas</label>
           <p class="nota" id="notaGranulado">Granulado deixa a geração mais lenta.</p>
         </div>
+        <div class="cartao">
+          <label class="interruptor forte"><input type="checkbox" id="cInscrever" /><span></span> Botão Curtir + Inscreva-se</label>
+          <div class="campos-inscrever" id="camposInscrever">
+            <div class="segmentado" id="segIdiomaBotao">
+              <button data-v="pt">🇧🇷 Inscreva-se (PT)</button>
+              <button data-v="en">🇺🇸 Subscribe (EN)</button>
+            </div>
+            <label class="rotulo">Posição na tela</label>
+            <div class="grade-posicao" id="gradePosicao">
+              <button data-v="sup_esq">↖ Sup. Esq.</button>
+              <button data-v="topo">↑ Topo</button>
+              <button data-v="sup_dir">↗ Sup. Dir.</button>
+              <button data-v="inf_esq">↙ Inf. Esq.</button>
+              <button data-v="base">↓ Base</button>
+              <button data-v="inf_dir">↘ Inf. Dir.</button>
+            </div>
+            <div class="sliders">
+              <div class="slider inteiro"><label>Tamanho <b id="vTamBotao"></b></label><input type="range" min="15" max="50" id="sTamBotao" /></div>
+            </div>
+            <div class="linha-dois">
+              <label>Aparece aos<div class="linha-unidade"><input type="number" min="5" id="inBotaoPrimeiro" /><span>seg</span></div></label>
+              <label>Repete a cada<div class="linha-unidade"><input type="number" min="0" id="inBotaoIntervalo" /><span>min</span></div></label>
+            </div>
+            <p class="nota">Cada aparição dura 5 segundos. "Repete a cada 0" = aparece só uma vez.</p>
+          </div>
+        </div>
       </div>
 
       <div class="painel-aba" id="aba-textos">
@@ -174,7 +204,7 @@
               <select id="selCanal"></select>
               <button class="btn-mini" id="btnConectarCanal">+ Canal</button>
             </div>
-            <label class="rotulo">Título</label>
+            <div class="linha-rotulo"><label class="rotulo">Título</label><button class="btn-ia" id="btnIaTitulo" title="Cria título, descrição e tags a partir do nome do vídeo e das músicas">✨ Gerar com IA</button></div>
             <input id="inTitulo" maxlength="100" placeholder="Ex.: Louvores para orar · 3 horas" />
             <label class="rotulo">Descrição</label>
             <textarea id="inDescricao" rows="4" placeholder="Texto que vai na descrição do vídeo"></textarea>
@@ -322,8 +352,91 @@
     <div class="modal-acoes"><button class="btn-primario" id="btnSalvarConfig">Salvar</button></div>
   </dialog>
 
+  <!-- Modal: Subir vídeos prontos -->
+  <dialog class="modal largo modal-subir" id="modalSubir">
+    <div class="modal-topo">
+      <h2><span class="yt-icone">▶</span> Subir p/ YouTube</h2>
+      <button class="fechar" data-fechar>×</button>
+    </div>
+    <p class="modal-texto" id="subirResumo">Escolha os vídeos, o canal e como publicar.</p>
+
+    <div class="zona-envio" id="zonaEnvio">
+      <strong>⬇ Arraste aqui os vídeos (ou a pasta) que quer subir</strong>
+      <span>Serve para vídeos feitos aqui ou em qualquer outro programa. Ou
+        <a id="lnkEscolherVideos">escolha os vídeos</a> ·
+        <a id="lnkEscolherPasta">escolha uma pasta</a> ·
+        <a id="lnkProntos">use os que ficaram prontos na fila</a></span>
+    </div>
+
+    <div class="cartao">
+      <div class="linha-canal-envio">
+        <span>📺 Vai subir no canal: <b id="canalEscolhido">—</b></span>
+        <button class="btn-mini" id="btnSubirConectar">+ Conectar outro canal</button>
+      </div>
+      <div class="chips-canais" id="chipsCanais"></div>
+      <p class="nota">O limite de 100 envios por dia é o mesmo para todos os canais juntos.</p>
+    </div>
+
+    <details class="cartao ia-envio" open>
+      <summary><b>✨ Títulos, descrições e tags com IA</b> <span class="nota">(opcional — sem isso vale o modelo abaixo)</span></summary>
+      <label class="rotulo">Sobre o canal / o que a IA deve saber (opcional)</label>
+      <input id="inContextoIa" placeholder="Ex.: canal de rock instrumental para dirigir e trabalhar; público brasileiro" />
+      <div class="linha-botoes">
+        <button class="btn-primario" id="btnIaTodos">✨ Gerar para todos os vídeos</button>
+        <label class="interruptor"><input type="checkbox" id="cCapitulos" checked /><span></span> Lista de músicas com minutagem (capítulos) na descrição</label>
+      </div>
+      <p class="nota" id="notaIa">A IA usa o nome do arquivo e as músicas de cada vídeo. Dá pra revisar e editar tudo na lista antes de subir.</p>
+    </details>
+
+    <details class="cartao">
+      <summary>Modelo de reserva — usado nos vídeos sem texto da IA</summary>
+      <label class="rotulo">Título (use {nome} para o nome do arquivo)</label>
+      <input id="inModeloTitulo" value="{nome}" />
+      <label class="rotulo">Descrição</label>
+      <textarea id="inModeloDescricao" rows="3" placeholder="Ex.: As melhores músicas para ouvir trabalhando. Deixe seu like e se inscreva!"></textarea>
+      <label class="rotulo">Tags (separe com vírgula)</label>
+      <input id="inModeloTags" placeholder="música, playlist, instrumental" />
+    </details>
+
+    <ol class="lista-envio" id="listaEnvio"></ol>
+
+    <div class="cartao">
+      <div class="grade-agenda">
+        <label>Começar em<input type="date" id="inEnvioData" /></label>
+        <label>Horário (vale pra todos)<input type="time" id="inEnvioHora" value="12:00" /></label>
+        <label>Intervalo
+          <select id="selEnvioIntervalo">
+            <option value="24">1 por dia</option>
+            <option value="12">2 por dia (a cada 12 h)</option>
+            <option value="8">3 por dia (a cada 8 h)</option>
+            <option value="48">1 a cada 2 dias</option>
+            <option value="168">1 por semana</option>
+            <option value="0">Todos no mesmo horário</option>
+          </select>
+        </label>
+      </div>
+      <p class="nota alerta" id="avisoAgenda"></p>
+      <label class="rotulo">Privacidade</label>
+      <div class="grade-privacidade" id="segEnvioPrivacidade">
+        <button data-v="agendado">📅 Público agendado</button>
+        <button data-v="public">🌎 Público agora</button>
+        <button data-v="unlisted">🔗 Não listado</button>
+        <button data-v="private">🔒 Privado</button>
+      </div>
+      <p class="nota" id="notaPrivacidade"></p>
+    </div>
+
+    <div class="rodape-envio">
+      <span class="nota" id="contadorEnvios">Hoje: 0 de 100 envios</span>
+      <button class="btn-gerar" id="btnSubirVideos" disabled>⬆ Subir vídeos</button>
+    </div>
+    <p class="modal-erro" id="erroSubir"></p>
+  </dialog>
+
   <div class="aviso" id="aviso"></div>
   <audio id="audioPrevia" preload="auto"></audio>
+  <script src="botao-inscrever.js"></script>
+  <script src="subir.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -523,8 +523,31 @@ function gerarAss({ W, H, timeline, total, legendas, mostrarNome, legenda }) {
   return linhas.join('\n') + '\n';
 }
 
+const DUR_BOTAO = 5; // duração da animação do botão (segundos)
+
+/** Posição, tamanho e momentos em que o botão de inscrever aparece. */
+function filtroInscrever(cfg, W, H, total) {
+  const num = (v, pad) => (v === undefined || v === null || v === '' || isNaN(Number(v)) ? pad : Number(v));
+  const largura = par(W * Math.max(10, Math.min(60, num(cfg.tamanho, 28))) / 100);
+  const altura = par(largura / 3); // o clipe é 3:1
+  const mx = Math.round(W * 0.03);
+  const my = Math.round(H * 0.04);
+  const pos = cfg.posicao || 'inf_dir';
+  const x = pos.endsWith('esq') ? mx : pos.endsWith('dir') ? W - largura - mx : Math.round((W - largura) / 2);
+  const y = pos.startsWith('sup') || pos === 'topo' ? my : H - altura - my;
+  // Tempos arredondados para múltiplos de 5 s, assim cada aparição começa no início da animação
+  const r5 = (s) => Math.max(DUR_BOTAO, Math.round(s / DUR_BOTAO) * DUR_BOTAO);
+  const primeiro = r5(num(cfg.primeiroSeg, 10));
+  const intervalo = num(cfg.intervaloMin, 10) > 0 ? r5(num(cfg.intervaloMin, 10) * 60) : 0;
+  let quando = intervalo
+    ? `gte(t,${primeiro})*lt(mod(t-${primeiro},${intervalo}),${DUR_BOTAO})`
+    : `between(t,${primeiro},${primeiro + DUR_BOTAO})`;
+  if (primeiro >= total) quando = '0';
+  return { cadeia: `fps=${FPS},scale=${largura}:${altura},format=yuva420p`, x, y, quando };
+}
+
 /** Renderização final: fundo + onda + textura + textos + áudio. */
-async function renderizarFinal({ fundo, audioArquivo, total, W, H, efeito, textura, assArquivo, fontsDir, saida, encoder, modo, onProgresso, registrarCancelar, dir }) {
+async function renderizarFinal({ fundo, audioArquivo, total, W, H, efeito, textura, assArquivo, fontsDir, inscrever, saida, encoder, modo, onProgresso, registrarCancelar, dir }) {
   const args = [];
   if (fundo.tipo === 'imagens') {
     args.push('-f', 'concat', '-safe', '0', '-i', path.basename(fundo.lista));
@@ -550,6 +573,15 @@ async function renderizarFinal({ fundo, audioArquivo, total, W, H, efeito, textu
     partes.push(`[1:a]${vis.cadeia}[onda]`);
     partes.push(`[${atual}][onda]overlay=${vis.x}:${vis.y}:format=yuv420:shortest=1[comonda]`);
     atual = 'comonda';
+  }
+  // Botão "Inscreva-se / Deixe seu like" animado, aparecendo de tempos em tempos
+  if (inscrever?.arquivo && fs.existsSync(inscrever.arquivo)) {
+    const idx = 2 + (vis ? vis.entradasExtras.length / 2 : 0);
+    args.push('-stream_loop', '-1', '-i', inscrever.arquivo);
+    const b = filtroInscrever(inscrever, W, H, total);
+    partes.push(`[${idx}:v]${b.cadeia}[botao]`);
+    partes.push(`[${atual}][botao]overlay=${b.x}:${b.y}:format=yuv420:eof_action=pass:enable='${b.quando}'[combotao]`);
+    atual = 'combotao';
   }
   if (assArquivo) {
     const rel = path.relative(dir, fontsDir).split(path.sep).join('/');
@@ -586,4 +618,5 @@ module.exports = {
   argsEncoder,
   ehImagem,
   EXT_IMAGEM,
+  DUR_BOTAO,
 };

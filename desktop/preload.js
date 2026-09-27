@@ -14,6 +14,18 @@ contextBridge.exposeInMainWorld('api', {
   midia: { musicas: chamar('midia:musicas'), checarFundos: chamar('midia:checarFundos'), salvarImagem: chamar('midia:salvarImagem') },
   app: { verificarAtualizacao: chamar('app:verificarAtualizacao'), atualizar: chamar('app:atualizar') },
   abrir: { pasta: chamar('abrir:pasta'), link: chamar('abrir:link') },
+  botao: { existe: chamar('botao:existe'), salvar: chamar('botao:salvar') },
+  envio: {
+    escolherVideos: chamar('envio:escolherVideos'),
+    escolherPasta: chamar('envio:escolherPasta'),
+    infoVideos: chamar('envio:infoVideos'),
+    escolherCapa: chamar('envio:escolherCapa'),
+    previaCapa: chamar('envio:previaCapa'),
+    gerarTextos: chamar('envio:gerarTextos'),
+    ultimoAgendado: chamar('envio:ultimoAgendado'),
+    contador: chamar('envio:contador'),
+    adicionar: chamar('envio:adicionar'),
+  },
   canais: {
     listar: chamar('canais:listar'),
     autorizar: chamar('canais:autorizar'),

@@ -138,14 +138,39 @@ async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, 
   );
   const id = r.data.id;
 
+  let miniaturaErro = null;
   if (miniatura && fs.existsSync(miniatura)) {
     try {
-      await yt.thumbnails.set({ videoId: id, media: { body: fs.createReadStream(miniatura) } });
-    } catch {
-      // Canal sem verificação de telefone não aceita miniatura personalizada — segue sem ela
+      await yt.thumbnails.set({ videoId: id, media: { mimeType: 'image/jpeg', body: fs.createReadStream(miniatura) } });
+    } catch (e) {
+      // Canal sem verificação de telefone não aceita miniatura personalizada — o vídeo sobe mesmo assim
+      miniaturaErro = /verif|permission|forbidden/i.test(e.message)
+        ? 'Capa não enviada: o canal precisa estar verificado (youtube.com/verify)'
+        : `Capa não enviada: ${e.message}`;
     }
   }
-  return { id, url: `https://youtu.be/${id}` };
+  return { id, url: `https://youtu.be/${id}`, miniaturaErro };
 }
 
-module.exports = { autorizarCanal, canalPorToken, publicar, montarDescricao, REDIRECT };
+/** Data do último vídeo agendado (ainda não publicado) do canal, ou null. */
+async function ultimoAgendado({ credenciais, refreshToken, redirectOriginal }) {
+  const auth = cliente(credenciais, redirectOriginal || REDIRECT);
+  auth.setCredentials({ refresh_token: refreshToken });
+  const yt = google.youtube({ version: 'v3', auth });
+  const c = await yt.channels.list({ part: ['contentDetails'], mine: true });
+  const uploads = c.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploads) return null;
+  const itens = await yt.playlistItems.list({ part: ['contentDetails'], playlistId: uploads, maxResults: 50 });
+  const ids = (itens.data.items || []).map((i) => i.contentDetails.videoId).filter(Boolean);
+  if (!ids.length) return null;
+  const v = await yt.videos.list({ part: ['status'], id: ids });
+  const agora = Date.now();
+  const datas = (v.data.items || [])
+    .map((x) => x.status?.publishAt)
+    .filter(Boolean)
+    .map((d) => new Date(d).getTime())
+    .filter((t) => t > agora);
+  return datas.length ? new Date(Math.max(...datas)).toISOString() : null;
+}
+
+module.exports = { autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT };
