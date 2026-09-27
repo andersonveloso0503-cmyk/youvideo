@@ -267,6 +267,7 @@ export default function CortesComicos() {
 
   const salvarProjeto = () =>
     runStep('salvar', '/api/save-project', {
+      origem: 'cortes',
       tema,
       estilo,
       formato,

@@ -219,6 +219,7 @@ export default function Desenho() {
 
   const salvarProjeto = () =>
     runStep('salvar', '/api/save-project', {
+      origem: 'desenho',
       tema,
       estilo,
       formato,

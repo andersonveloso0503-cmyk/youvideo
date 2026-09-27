@@ -11,6 +11,7 @@ const { separar } = require('./separar');
 const { transcrever } = require('./legenda');
 const YT = require('./youtube');
 const { gerarMiniatura, capaAoLado } = require('./miniatura');
+const Central = require('./central');
 
 const EM_ANDAMENTO = ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'];
 
@@ -167,6 +168,20 @@ class Fila extends EventEmitter {
     const e = job.envio;
     job.cancelado = false;
     try {
+      // Vídeo da Biblioteca (na nuvem): baixa primeiro
+      if (e.baixarDe && (!e.arquivo || !fs.existsSync(e.arquivo))) {
+        this.atualizar(job, { status: 'publicando', etapa: 'Baixando o vídeo' });
+        const destino = path.join(this.dirCache, 'biblioteca', `${e.chaveArquivo || job.id}.mp4`);
+        e.arquivo = await Central.baixar(e.baixarDe, destino, (x) =>
+          this.atualizar(job, { progresso: x * 0.3, etapa: `Baixando o vídeo ${Math.round(x * 100)}%` }, false)
+        );
+        if (e.capaUrl && !e.capa) {
+          try {
+            e.capa = await Central.baixar(e.capaUrl, path.join(this.dirCache, 'biblioteca', `${e.chaveArquivo || job.id}-capa.jpg`));
+          } catch {}
+        }
+        this.salvar();
+      }
       if (!fs.existsSync(e.arquivo)) throw new Error(`Vídeo não encontrado: ${e.arquivo}`);
       const canal = this.obterCanal(e.canalId);
       if (!canal) throw new Error('Canal do YouTube não encontrado — conecte de novo em Contas YouTube.');
@@ -194,7 +209,10 @@ class Fila extends EventEmitter {
         privacidade: e.privacidade,
         agendarPara: e.agendarPara || null,
         miniatura: e.curto ? null : miniatura,
-        onProgresso: (x) => this.atualizar(job, { progresso: x * 0.97, etapa: `Enviando ${Math.round(x * 100)}%` }, false),
+        onProgresso: (x) => {
+          const ini = e.baixarDe ? 0.3 : 0;
+          this.atualizar(job, { progresso: ini + x * (0.97 - ini), etapa: `Enviando ${Math.round(x * 100)}%` }, false);
+        },
       });
       this.registrarEnvio();
       this.atualizar(job, {
@@ -212,6 +230,55 @@ class Fila extends EventEmitter {
       if (/quota|uploadLimitExceeded/i.test(msg)) msg = 'O YouTube recusou: limite de envios do dia atingido. Tente de novo amanhã.';
       if (/invalid_grant/i.test(msg)) msg = 'A autorização desse canal expirou. Em Contas YouTube, desconecte e conecte o canal de novo.';
       this.atualizar(job, { status: cancelado ? 'cancelado' : 'erro', etapa: cancelado ? 'Cancelado' : 'Erro', erro: cancelado ? null : msg });
+      throw err;
+    }
+  }
+
+  /** Posts para Facebook/Instagram/TikTok/Kwai de um vídeo do PC: sobe pra nuvem e agenda. */
+  adicionarNuvem(lista) {
+    const criados = lista.map((n) => {
+      const job = {
+        id: `${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`,
+        tipo: 'nuvem',
+        criadoEm: new Date().toISOString(),
+        nome: n.titulo || path.basename(n.arquivo),
+        status: 'aguardando',
+        etapa: 'Aguardando para subir',
+        progresso: 0,
+        nuvem: n, // { arquivo, titulo, legenda, curto, redes, quando }
+      };
+      this.jobs.push(job);
+      return job;
+    });
+    this.salvar();
+    this.emitir();
+    this.proximo();
+    return criados;
+  }
+
+  async processarNuvem(job) {
+    const cfg = this.obterConfig();
+    const n = job.nuvem;
+    job.cancelado = false;
+    try {
+      if (!fs.existsSync(n.arquivo)) throw new Error(`Vídeo não encontrado: ${n.arquivo}`);
+      this.atualizar(job, { status: 'publicando', etapa: 'Subindo para a nuvem' });
+      if (!n.videoUrl) {
+        n.videoUrl = await Central.subirParaNuvem(cfg, n.arquivo, (x) =>
+          this.atualizar(job, { progresso: x * 0.95, etapa: `Subindo para a nuvem ${Math.round(x * 100)}%` }, false)
+        );
+        this.salvar();
+      }
+      if (job.cancelado) throw new Error('CANCELADO');
+      this.atualizar(job, { etapa: 'Agendando nas redes' });
+      await Central.chamar(cfg, '/api/central/agenda', {
+        metodo: 'POST',
+        corpo: { itens: [{ titulo: n.titulo, legenda: n.legenda, videoUrl: n.videoUrl, curto: n.curto, redes: n.redes, quando: n.quando }] },
+      });
+      this.atualizar(job, { status: 'concluido', etapa: `Agendado: ${n.redes.join(', ')}`, progresso: 1, concluidoEm: new Date().toISOString() });
+    } catch (err) {
+      const cancelado = err.message === 'CANCELADO' || job.cancelado;
+      this.atualizar(job, { status: cancelado ? 'cancelado' : 'erro', etapa: cancelado ? 'Cancelado' : 'Erro', erro: cancelado ? null : err.message });
       throw err;
     }
   }
@@ -253,10 +320,11 @@ class Fila extends EventEmitter {
     const cfg = this.obterConfig();
     const limite = cfg.modo === 'maximo' ? Math.max(1, Math.min(3, Number(cfg.simultaneos) || 1)) : 1;
     // Geração (usa o processador) e envio (usa a internet) andam em paralelo, cada um na sua vez
-    const rodandoDe = (tipo) => [...this.rodando].filter((id) => (this.jobs.find((j) => j.id === id)?.tipo || 'video') === tipo).length;
-    for (const [tipo, max] of [['video', limite], ['envio', 1]]) {
+    const vaga = (j) => (!j?.tipo || j.tipo === 'video' ? 'video' : 'rede');
+    const rodandoDe = (tipo) => [...this.rodando].filter((id) => vaga(this.jobs.find((j) => j.id === id)) === tipo).length;
+    for (const [tipo, max] of [['video', limite], ['rede', 1]]) {
       while (rodandoDe(tipo) < max) {
-        const j = this.jobs.find((x) => x.status === 'aguardando' && !this.rodando.has(x.id) && (x.tipo || 'video') === tipo);
+        const j = this.jobs.find((x) => x.status === 'aguardando' && !this.rodando.has(x.id) && vaga(x) === tipo);
         if (!j) break;
         this.rodando.add(j.id);
         this.processar(j)
@@ -272,6 +340,7 @@ class Fila extends EventEmitter {
 
   async processar(job) {
     if (job.tipo === 'envio') return this.processarEnvio(job);
+    if (job.tipo === 'nuvem') return this.processarNuvem(job);
     const cfg = this.obterConfig();
     const modo = cfg.modo || 'normal';
     const p = job.projeto;

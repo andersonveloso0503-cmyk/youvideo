@@ -1005,6 +1005,9 @@ async function abrirConfig(msg) {
   config = await window.api.config.ler();
   $('#cfgFal').value = config.falKey || '';
   $('#cfgGroq').value = config.groqKey || '';
+  $('#cfgCentralUrl').value = config.centralUrl || '';
+  $('#cfgCentralToken').value = config.centralToken || '';
+  $('#resCentral').textContent = '';
   $('#cfgClientId').value = config.google.clientId || '';
   $('#cfgClientSecret').value = config.google.clientSecret || '';
   $('#cfgRedirect').value = config.google.redirectOriginal || '';
@@ -1036,7 +1039,7 @@ async function iniciar() {
     $('#redirectLocal').textContent = i.redirect;
   });
 
-  window.api.ao('fila:mudou', (j) => { jobs = j; renderFila(); });
+  window.api.ao('fila:mudou', (j) => { jobs = j; renderFila(); if (typeof Biblioteca !== 'undefined') Biblioteca.atualizarAgenda(); });
   // Atualização automática: confere se tem versão nova no GitHub
   const checarAtualizacao = async () => {
     const nova = await window.api.app.verificarAtualizacao();
@@ -1122,12 +1125,30 @@ async function iniciar() {
   };
   $('#btnConfig').onclick = () => abrirConfig();
   $('#btnSubir').onclick = () => Subir.abrir();
+  $('#btnBiblioteca').onclick = () => Biblioteca.abrir();
+  $('#btnTestarCentral').onclick = async () => {
+    const r = $('#resCentral');
+    r.textContent = 'Testando...';
+    try {
+      config = await window.api.config.salvar({
+        centralUrl: $('#cfgCentralUrl').value.trim() || 'https://youvideors2.vercel.app',
+        centralToken: $('#cfgCentralToken').value.trim(),
+      });
+      $('#cfgCentralToken').value = config.centralToken || '';
+      const t = await window.api.central.testar();
+      r.textContent = `✅ Conectado — ${t.total} vídeos na Biblioteca`;
+    } catch (e) {
+      r.textContent = '❌ ' + msgErro(e);
+    }
+  };
   $('#btnIaTitulo').onclick = gerarTituloIa;
   $$('input[name=modo]').forEach((r) => (r.onchange = () => ($('#campoSimultaneos').style.display = r.value === 'maximo' && r.checked ? '' : 'none')));
   $('#btnSalvarConfig').onclick = async () => {
     config = await window.api.config.salvar({
       falKey: $('#cfgFal').value.trim(),
       groqKey: $('#cfgGroq').value.trim(),
+      centralUrl: $('#cfgCentralUrl').value.trim() || 'https://youvideors2.vercel.app',
+      centralToken: $('#cfgCentralToken').value.trim(),
       google: { clientId: $('#cfgClientId').value.trim(), clientSecret: $('#cfgClientSecret').value.trim(), redirectOriginal: $('#cfgRedirect').value.trim() },
       modo: ($$('input[name=modo]').find((r) => r.checked) || {}).value || 'normal',
       simultaneos: Number($('#cfgSimultaneos').value) || 1,

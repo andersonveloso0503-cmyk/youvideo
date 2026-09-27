@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: blob: https:; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data: blob: https:; media-src 'self' file: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self' https:" />
   <title>Youvideo Compilador</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -19,6 +19,10 @@
       <button class="btn-topo" id="btnCanais">
         <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M10 9.5v5l4.5-2.5z" class="cheio"/></svg>
         Contas YouTube <span class="contador" id="qtdCanais">0</span>
+      </button>
+      <button class="btn-topo" id="btnBiblioteca">
+        <svg viewBox="0 0 24 24"><path d="M4 5h4v14H4zM10 5h4v14h-4zM16 6l3.5-1 3 13.5-3.5 1z"/></svg>
+        Biblioteca
       </button>
       <button class="btn-topo" id="btnSubir">
         <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M12 15V9M9 11.5 12 9l3 2.5"/></svg>
@@ -346,6 +350,11 @@
         <div class="campo-config"><label>Google — <code>GOOGLE_CLIENT_SECRET</code></label><input id="cfgClientSecret" placeholder="GOCSPX-..." /></div>
         <div class="campo-config"><label>Google — <code>GOOGLE_REDIRECT_URI</code> (só para tokens colados)</label><input id="cfgRedirect" placeholder="https://youvideors2.vercel.app/api/auth/callback" /></div>
         <p class="nota">Para o botão "Conectar canal pelo navegador" funcionar, adicione este endereço nos URIs de redirecionamento do cliente OAuth no Google Cloud: <code id="redirectLocal">http://127.0.0.1:53682/callback</code></p>
+        <h3 style="margin-top:16px">Central Youvideo (Biblioteca e agenda das redes)</h3>
+        <div class="campo-config"><label>Endereço do Youvideo</label><input id="cfgCentralUrl" placeholder="https://youvideors2.vercel.app" /></div>
+        <div class="campo-config"><label>Senha da Central — <code>CENTRAL_TOKEN</code> (a mesma que você criou na Vercel)</label>
+          <div class="linha-canal"><input id="cfgCentralToken" placeholder="cole a senha" /><button class="btn-mini" id="btnTestarCentral">Testar</button></div>
+          <small id="resCentral"></small></div>
         <p class="nota">As chaves ficam guardadas só neste PC, criptografadas pelo Windows.</p>
       </div>
     </div>
@@ -433,10 +442,74 @@
     <p class="modal-erro" id="erroSubir"></p>
   </dialog>
 
+  <!-- Modal: Biblioteca e Agenda (todos os vídeos do Youvideo) -->
+  <dialog class="modal modal-bib" id="modalBib">
+    <div class="bib-topo">
+      <h2>📚 Biblioteca</h2>
+      <div class="segmentado bib-abas" id="bibAbas">
+        <button data-v="biblioteca" class="ativo">Vídeos</button>
+        <button data-v="agenda">📅 Agenda</button>
+      </div>
+      <input id="bibBusca" type="search" placeholder="Buscar pelo título..." />
+      <button class="btn-mini" id="bibAtualizar" title="Buscar de novo no Youvideo">↻ Atualizar</button>
+      <button class="fechar" data-fechar>×</button>
+    </div>
+    <div class="bib-aviso" id="bibAviso" hidden></div>
+
+    <div class="bib-corpo" id="bibCorpoVideos">
+      <nav class="bib-categorias" id="bibCategorias"></nav>
+      <section class="bib-grade-wrap">
+        <div class="bib-filtros">
+          <div class="segmentado compacto" id="bibFormato">
+            <button data-v="todos" class="ativo">Todos</button>
+            <button data-v="longo">▭ Longos</button>
+            <button data-v="curto">▯ Shorts</button>
+          </div>
+          <label class="interruptor"><input type="checkbox" id="bibNaoPublicados" /><span></span> Só os que ainda não foram pro YouTube</label>
+          <span class="nota" id="bibContagem"></span>
+        </div>
+        <div class="bib-grade" id="bibGrade"></div>
+      </section>
+      <aside class="bib-agendar" id="bibPainel" hidden>
+        <h3>Agendar <span id="bibQtdSel">0</span> vídeo(s)</h3>
+        <label class="rotulo">Publicar em</label>
+        <div class="redes">
+          <label class="rede"><input type="checkbox" id="redeYoutube" /><span class="ic yt">▶</span> YouTube</label>
+          <select id="redeYoutubeCanal"></select>
+          <label class="rede"><input type="checkbox" id="redeFacebook" /><span class="ic fb">f</span> Facebook <small>Em Nome de Jesus</small></label>
+          <label class="rede"><input type="checkbox" id="redeInstagram" /><span class="ic ig">◎</span> Instagram <small>@emnomedejesus_rs</small></label>
+          <label class="rede"><input type="checkbox" id="redeTiktok" /><span class="ic tt">♪</span> TikTok <small>entra privado</small></label>
+          <label class="rede"><input type="checkbox" id="redeKwai" /><span class="ic kw">K</span> Kwai <small>você posta pelo celular</small></label>
+        </div>
+        <div class="grade-agenda dois">
+          <label>Começar em<input type="date" id="bibData" /></label>
+          <label>Horário<input type="time" id="bibHora" value="12:00" /></label>
+        </div>
+        <label class="rotulo">Intervalo</label>
+        <select id="bibIntervalo">
+          <option value="24">1 por dia</option>
+          <option value="12">2 por dia (a cada 12 h)</option>
+          <option value="48">1 a cada 2 dias</option>
+          <option value="168">1 por semana</option>
+        </select>
+        <label class="interruptor"><input type="checkbox" id="bibIa" checked /><span></span> Título e legenda com IA</label>
+        <p class="nota alerta" id="bibAvisoAgenda"></p>
+        <ol class="bib-previa" id="bibPrevia"></ol>
+        <button class="btn-gerar" id="bibAgendar">📅 Agendar</button>
+        <p class="modal-erro" id="bibErro"></p>
+      </aside>
+    </div>
+
+    <div class="bib-corpo agenda" id="bibCorpoAgenda" hidden>
+      <div class="agenda-lista" id="agendaLista"></div>
+    </div>
+  </dialog>
+
   <div class="aviso" id="aviso"></div>
   <audio id="audioPrevia" preload="auto"></audio>
   <script src="botao-inscrever.js"></script>
   <script src="subir.js"></script>
+  <script src="biblioteca.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

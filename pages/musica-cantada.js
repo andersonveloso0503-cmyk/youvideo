@@ -571,6 +571,7 @@ function SalvarProjetoBotao({ titulo, videoUrl }) {
           titulo: titulo || 'Cantor Virtual (sem título)',
           videoUrl,
           canal: 'musica',
+          origem: 'cantor',
         }),
       });
       const data = await res.json();

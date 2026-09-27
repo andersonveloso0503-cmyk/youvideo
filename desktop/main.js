@@ -8,6 +8,7 @@ const { Fila } = require('./src/engine/fila');
 const { probe, rodar, detectarEncoder } = require('./src/engine/ffmpeg');
 const YT = require('./src/engine/youtube');
 const IA = require('./src/engine/ia');
+const Central = require('./src/engine/central');
 const { gerarMiniatura, capaAoLado } = require('./src/engine/miniatura');
 const { ehImagem } = require('./src/engine/render');
 
@@ -199,7 +200,7 @@ app.whenReady().then(() => {
   ipcMain.handle('config:salvar', (_e, novo) => {
     const limpo = JSON.parse(JSON.stringify(novo || {}));
     const mascarado = (v) => typeof v === 'string' && v.startsWith('••••');
-    for (const k of ['falKey', 'groqKey']) if (mascarado(limpo[k]) || limpo[k] === undefined) delete limpo[k];
+    for (const k of ['falKey', 'groqKey', 'centralToken']) if (mascarado(limpo[k]) || limpo[k] === undefined) delete limpo[k];
     if (limpo.google && mascarado(limpo.google.clientSecret)) delete limpo.google.clientSecret;
     store.salvar(limpo);
     return store.paraTela();
@@ -363,6 +364,91 @@ app.whenReady().then(() => {
     await rodar(['-framerate', '24', '-i', path.join(pasta, 'q%04d.png'), '-c:v', 'png', '-pix_fmt', 'rgba', saida]).promise;
     for (const f of fs.readdirSync(pasta)) if (f.endsWith('.png')) fs.rmSync(path.join(pasta, f), { force: true });
     return saida;
+  });
+
+  // ---------- Central Youvideo (Biblioteca e Agenda das redes) ----------
+  ipcMain.handle('central:biblioteca', async () => {
+    const d = await Central.chamar(store.ler(), '/api/central/biblioteca');
+    // Vídeos feitos aqui no PC também entram na Biblioteca
+    const locais = fila
+      .lista()
+      .filter((j) => j.tipo !== 'envio' && j.tipo !== 'nuvem' && j.status === 'concluido' && j.arquivoFinal && fs.existsSync(j.arquivoFinal))
+      .map((j) => ({
+        chave: `pc:${j.id}`,
+        origem: 'pc',
+        id: j.id,
+        categoria: 'compilacoes',
+        titulo: j.nome,
+        arquivo: j.arquivoFinal,
+        capa: j.capa && fs.existsSync(j.capa) ? j.capa : null,
+        curto: j.projeto?.formato?.tipo === 'curto',
+        duracao: j.duracao,
+        musicas: j.timeline || null,
+        criadoEm: j.concluidoEm || j.criadoEm,
+        publicado: { youtube: !!j.youtube },
+      }));
+    return { ...d, categorias: { compilacoes: 'Feitos no PC', ...d.categorias }, itens: [...locais, ...d.itens] };
+  });
+  ipcMain.handle('central:categoria', (_e, dados) => Central.chamar(store.ler(), '/api/central/categoria', { metodo: 'POST', corpo: dados }));
+  ipcMain.handle('central:agenda', () => Central.chamar(store.ler(), '/api/central/agenda'));
+  ipcMain.handle('central:agendaAcao', (_e, { id, rede, acao }) =>
+    Central.chamar(store.ler(), '/api/central/agenda', { metodo: 'PATCH', corpo: { id, rede, acao } })
+  );
+  ipcMain.handle('central:agendaApagar', (_e, id) => Central.chamar(store.ler(), '/api/central/agenda', { metodo: 'DELETE', query: { id } }));
+  ipcMain.handle('central:testar', async () => {
+    const d = await Central.chamar(store.ler(), '/api/central/biblioteca');
+    return { ok: true, total: d.itens.length };
+  });
+  // Baixa um arquivo da Biblioteca para o PC (vídeo, ou o áudio do cover para usar como música)
+  ipcMain.handle('central:baixar', async (_e, { url, nome, pasta }) => {
+    const ext = path.extname(new URL(url).pathname) || '.mp4';
+    const limpo = String(nome || 'arquivo').replace(/[<>:"/\\|?*\x00-\x1f]/g, '').slice(0, 100) || 'arquivo';
+    const destino = pasta ? path.join(pasta, limpo + ext) : path.join(app.getPath('userData'), 'cache', 'biblioteca', limpo + ext);
+    return Central.baixar(url, destino, (x) => enviar('central:progresso', { url, x }));
+  });
+  /**
+   * Agenda vídeos da Biblioteca: cada item = { item, quando, titulo, descricao, tags, legenda }
+   * redes = { youtube: canalId|null, facebook, instagram, tiktok, kwai }
+   */
+  ipcMain.handle('central:agendar', async (_e, { itens, redes }) => {
+    const cfg = store.ler();
+    const redesNuvem = ['facebook', 'instagram', 'tiktok', 'kwai'].filter((r) => redes[r]);
+    if (redesNuvem.length && !cfg.centralToken) throw new Error('Cadastre a senha da Central em Configurações.');
+    if (redes.youtube) {
+      const livres = 100 - enviosHoje();
+      if (itens.length > livres) throw new Error(`Hoje só dá para subir mais ${Math.max(0, livres)} vídeo(s) no YouTube (limite de 100 por dia).`);
+    }
+    const remotos = [];
+    const locais = [];
+    const envios = [];
+    for (const it of itens) {
+      const v = it.item;
+      if (redes.youtube) {
+        envios.push({
+          arquivo: v.arquivo || null,
+          baixarDe: v.arquivo ? null : v.videoUrl,
+          chaveArquivo: String(v.chave).replace(/[^\w-]/g, '_'),
+          capa: v.capa || null,
+          capaUrl: v.thumbnailUrl || null,
+          titulo: it.titulo,
+          descricao: it.descricao,
+          tags: it.tags,
+          canalId: redes.youtube,
+          privacidade: 'private',
+          agendarPara: it.quando,
+          curto: !!v.curto,
+        });
+      }
+      if (redesNuvem.length) {
+        const post = { titulo: it.titulo, legenda: it.legenda, curto: !!v.curto, redes: redesNuvem, quando: it.quando, chaveBiblioteca: v.chave };
+        if (v.videoUrl) remotos.push({ ...post, videoUrl: v.videoUrl, thumbnailUrl: v.thumbnailUrl || null });
+        else locais.push({ ...post, arquivo: v.arquivo });
+      }
+    }
+    if (remotos.length) await Central.chamar(cfg, '/api/central/agenda', { metodo: 'POST', corpo: { itens: remotos } });
+    if (locais.length) fila.adicionarNuvem(locais);
+    if (envios.length) fila.adicionarEnvios(envios);
+    return { youtube: envios.length, nuvem: remotos.length + locais.length };
   });
 
   // ---------- Subir vídeos prontos ----------

@@ -11,10 +11,12 @@ const PADRAO = {
   simultaneos: 1,
   encoder: 'auto',
   pastaSaida: '',
+  centralUrl: 'https://youvideors2.vercel.app',
+  centralToken: '',
   ultimoProjeto: null,
 };
 
-const SECRETOS = ['falKey', 'groqKey'];
+const SECRETOS = ['falKey', 'groqKey', 'centralToken'];
 
 class Store {
   constructor(dir, safeStorage) {
@@ -70,6 +72,8 @@ class Store {
       ...c,
       falKey: mascarar(c.falKey),
       groqKey: mascarar(c.groqKey),
+      centralToken: mascarar(c.centralToken),
+      temCentral: !!c.centralToken,
       google: { ...c.google, clientSecret: mascarar(c.google.clientSecret) },
       temFal: !!c.falKey,
       temGroq: !!c.groqKey,
