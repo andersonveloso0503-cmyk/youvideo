@@ -63,6 +63,9 @@ async function gerarElevenLabs(prompt, { instrumental, duracaoSeg }) {
       const j = JSON.parse(txt);
       msg = j.detail?.message || j.detail?.status || (typeof j.detail === 'string' ? j.detail : '') || txt;
     } catch { /* texto puro */ }
+    if (/music_generation/i.test(msg)) {
+      throw new Error('ElevenLabs: sua chave de API não tem a permissão "Music Generation". No site da ElevenLabs vá em Developers → API Keys, edite a chave e ative Music Generation.');
+    }
     throw new Error(`ElevenLabs: ${String(msg).slice(0, 300)}`);
   }
   const buffer = Buffer.from(await r.arrayBuffer());
@@ -79,7 +82,13 @@ async function gerarLyria(prompt) {
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
   });
   const d = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(`Google Lyria: ${d?.error?.message || r.status}`);
+  if (!r.ok) {
+    const msg = d?.error?.message || String(r.status);
+    if (/free_tier|limit: 0/i.test(msg)) {
+      throw new Error('Google Lyria: o plano gratuito não inclui geração de música. Ative o faturamento (billing) no Google AI Studio para o projeto dessa chave.');
+    }
+    throw new Error(`Google Lyria: ${msg.slice(0, 300)}`);
+  }
 
   const parts = d?.candidates?.[0]?.content?.parts || [];
   let audio = null;
