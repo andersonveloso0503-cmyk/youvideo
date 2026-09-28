@@ -97,7 +97,14 @@ export default async function handler(req, res) {
       audioUrl: blob.url,
       capaUrl: '',
       favorito: false,
-      faixas: lista.map((f) => ({ id: f.id || '', titulo: f.titulo || '', audioUrl: f.audioUrl, letra: f.letra || '' })),
+      faixas: lista.map((f) => ({
+        id: f.id || '',
+        titulo: f.titulo || '',
+        audioUrl: f.audioUrl,
+        letra: f.letra || '',
+        estiloNome: f.estiloNome || '',
+        ideiasNomes: Array.isArray(f.ideiasNomes) ? f.ideiasNomes.slice(0, 30) : [],
+      })),
       criadoEm: new Date().toISOString(),
     };
     const ref = await getDb().collection('youvideo_estudio_musicas').add(musica);

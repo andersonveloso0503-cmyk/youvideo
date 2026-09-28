@@ -145,6 +145,17 @@ const RECEITAS = [
   { nome: '🕺 Anos 80', ids: ['synth80', 'slap', 'solo-sax', 'anos80', 'rapido'] },
 ];
 
+// Descobre, a partir do texto de estilo salvo, qual estilo e quais ideias foram escolhidos
+function descreverEstilo(texto) {
+  let resto = texto || '';
+  const est = ESTILOS.find((e) => resto.startsWith(e.base));
+  if (est) resto = resto.slice(est.base.length);
+  const ideias = TODAS_IDEIAS.filter((x) => resto.includes(x.en));
+  ideias.forEach((x) => { resto = resto.replace(x.en, ''); });
+  const extra = resto.split(',').map((t) => t.trim()).filter(Boolean).join(', ');
+  return { estilo: est ? est.nome : '', ideias: ideias.map((x) => x.nome), extra };
+}
+
 function ideiasEmTexto(ids) {
   return ids.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.en).filter(Boolean).join(', ');
 }
@@ -232,6 +243,57 @@ function PainelIdeias({ selecionadas, setSelecionadas }) {
         .ide-itens { display: flex; flex-wrap: wrap; gap: 5px; }
         .ide-itens button { background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 6px 11px; font-size: 13px; cursor: pointer; }
         .ide-itens button.on { border-color: var(--gold); background: var(--gold-soft); color: var(--gold); }
+      `}</style>
+    </div>
+  );
+}
+
+function EstilosDoMedley({ medley, biblioteca }) {
+  const faixas = (medley.faixas || []).map((f, i) => {
+    let estilo = f.estiloNome || '';
+    let ideias = f.ideiasNomes || null;
+    if (!estilo || !ideias) {
+      // medleys antigos: busca a música original na biblioteca
+      const orig = biblioteca.find((x) => x.id === f.id);
+      const d = descreverEstilo(orig?.estilo || '');
+      estilo = estilo || d.estilo || d.extra || '—';
+      ideias = ideias || d.ideias;
+    }
+    return { n: i + 1, titulo: f.titulo, estilo, ideias };
+  });
+  const ideiasTodas = [...new Set(faixas.flatMap((f) => f.ideias || []))];
+
+  return (
+    <div className="med-est">
+      <div className="med-est-rot">🎼 Estilos escolhidos</div>
+      <div className="med-est-lista">
+        {faixas.map((f) => (
+          <div key={f.n} className="med-est-item">
+            <span className="med-est-n">{f.n}</span>
+            <span className="med-est-nome">{f.estilo}</span>
+            {f.titulo && <span className="med-est-tit">{f.titulo}</span>}
+          </div>
+        ))}
+      </div>
+      {ideiasTodas.length > 0 && (
+        <>
+          <div className="med-est-rot">🎛 Instrumentos e arranjo</div>
+          <div className="med-est-ideias">
+            {ideiasTodas.map((x) => <span key={x}>{x}</span>)}
+          </div>
+        </>
+      )}
+      <style jsx>{`
+        .med-est { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+        .med-est-rot { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 8px; }
+        .med-est-ideias { margin-top: 0; }
+        .med-est-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin-bottom: 10px; }
+        .med-est-item { display: grid; grid-template-columns: 24px 1fr; column-gap: 8px; align-items: center; background: var(--bg-elevated); border-radius: 8px; padding: 8px 10px; }
+        .med-est-n { grid-row: span 2; width: 24px; height: 24px; border-radius: 50%; background: var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+        .med-est-nome { font-weight: 600; color: var(--gold); font-size: 14px; }
+        .med-est-tit { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .med-est-ideias { display: flex; flex-wrap: wrap; gap: 5px; }
+        .med-est-ideias span { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
       `}</style>
     </div>
   );
@@ -525,7 +587,7 @@ export default function EstudioMusica() {
         });
         setMusicas((ms) => [d.musica, ...ms]);
         marcar(k, 'pronta ✓');
-        return { ...d.musica, estiloNome: est.nome };
+        return { ...d.musica, estiloNome: est.nome, ideiasNomes: ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean) };
       });
 
       setMedProgresso((p) => ({ ...p, fase: 'juntando' }));
@@ -547,7 +609,10 @@ export default function EstudioMusica() {
   }
 
   async function juntarSelecionadas() {
-    const faixas = selecao.map((id) => musicas.find((m) => m.id === id)).filter(Boolean);
+    const faixas = selecao.map((id) => musicas.find((m) => m.id === id)).filter(Boolean).map((m) => {
+      const d = descreverEstilo(m.estilo);
+      return { ...m, estiloNome: d.estilo || d.extra, ideiasNomes: d.ideias };
+    });
     if (faixas.length < 2) { setAviso('Selecione pelo menos 2 músicas.'); return; }
     const t = window.prompt('Título do medley:', `Medley com ${faixas.length} músicas`);
     if (t === null) return;
@@ -965,6 +1030,9 @@ export default function EstudioMusica() {
 
                   {aberta === m.id && !selecionando && (
                     <div className="est-mais">
+                      {m.tipo === 'medley' && (
+                        <EstilosDoMedley medley={m} biblioteca={musicas} />
+                      )}
                       <div className="est-mais-btns">
                         {m.tipo === 'medley' ? (
                           <button disabled={!!ocupado} onClick={() => mandarParaMedleyCanal(m)}>📺 Mandar p/ Medley do canal</button>
