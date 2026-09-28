@@ -513,7 +513,7 @@ class Fila extends EventEmitter {
       const primeiraImg = (p.fundos || []).find((f) => R.ehImagem(f) && fs.existsSync(f));
       try {
         miniatura = saida.replace(/\.mp4$/i, '.jpg');
-        await gerarMiniatura(primeiraImg || saida, miniatura, { vertical: p.formato.tipo === 'curto' });
+        await gerarMiniatura(primeiraImg || saida, miniatura, { vertical: p.formato.tipo === 'curto', enquadramento: p.enquadramento || 'auto' });
       } catch {
         miniatura = null;
       }

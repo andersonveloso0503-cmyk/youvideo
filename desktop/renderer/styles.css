@@ -444,6 +444,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px;
 }
 .item-envio .num { color: var(--terracota-forte); font-weight: 800; font-size: 15px; text-align: center; padding-top: 4px; }
 .item-envio .capa { position: relative; width: 150px; aspect-ratio: 16/9; border-radius: 7px; overflow: hidden; background: var(--bg-4); cursor: pointer; }
+.item-envio .capa.em-pe { width: 72px; aspect-ratio: 9/16; justify-self: center; }
 .item-envio .capa img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .item-envio .capa span { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.7); font-size: 10px; text-align: center; padding: 2px; opacity: 0; transition: opacity .2s; }
 .item-envio .capa:hover span { opacity: 1; }

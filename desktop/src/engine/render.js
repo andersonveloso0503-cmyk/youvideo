@@ -234,6 +234,18 @@ function filtroEnquadrar(W, H, enquadramento, extras = '') {
   return `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1${pos}`;
 }
 
+/**
+ * "Automático": se o formato da imagem for bem diferente do vídeo (ex.: imagem deitada num Shorts em pé),
+ * mostra a imagem inteira com fundo desfocado; se for parecido, preenche a tela.
+ */
+async function resolverEnquadramento(item, W, H, enquadramento) {
+  if (enquadramento !== 'auto') return enquadramento || 'preencher';
+  const info = await probe(item).catch(() => null);
+  if (!info?.largura || !info?.altura) return 'preencher';
+  const razao = (info.largura / info.altura) / (W / H);
+  return razao > 1.3 || razao < 1 / 1.3 ? 'desfoque' : 'preencher';
+}
+
 function filtrosTexturaEstatica(textura) {
   const f = [];
   if (textura?.vinheta) f.push('vignette=PI/4.5');
@@ -263,7 +275,7 @@ async function prepararFundos({ fundos, W, H, enquadramento, textura, timeline, 
     const prontas = [];
     for (let i = 0; i < lista.length; i++) {
       const saida = path.join(dir, `fundo_${i}.jpg`);
-      const r = rodar(['-i', lista[i], '-filter_complex', filtroEnquadrar(W, H, enquadramento, estatico), '-frames:v', '1', '-q:v', '2', saida], { modo });
+      const r = rodar(['-i', lista[i], '-filter_complex', filtroEnquadrar(W, H, await resolverEnquadramento(lista[i], W, H, enquadramento), estatico), '-frames:v', '1', '-q:v', '2', saida], { modo });
       registrarCancelar && registrarCancelar(r.cancelar);
       await r.promise;
       prontas.push(saida);
@@ -282,14 +294,14 @@ async function prepararFundos({ fundos, W, H, enquadramento, textura, timeline, 
     let dur;
     if (ehImagem(item)) {
       dur = 15;
-      args = ['-loop', '1', '-t', String(dur), '-i', item, '-filter_complex', filtroEnquadrar(W, H, enquadramento, estatico), ...comum, saida];
+      args = ['-loop', '1', '-t', String(dur), '-i', item, '-filter_complex', filtroEnquadrar(W, H, await resolverEnquadramento(item, W, H, enquadramento), estatico), ...comum, saida];
     } else {
       // Vídeo ou GIF. GIF (animado ou parado) não informa duração: repete por 15 s
       const info = await probe(item).catch(() => ({ duracao: 0 }));
       const semDuracao = !(info.duracao > 0.5);
       dur = semDuracao ? 15 : Math.min(info.duracao, 300); // no máximo 5 min por vídeo de fundo
       const entrada = semDuracao ? ['-stream_loop', '-1', '-t', String(dur), '-i', item] : ['-t', String(dur), '-i', item];
-      args = [...entrada, '-filter_complex', filtroEnquadrar(W, H, enquadramento, [`fps=${FPS}`, estatico].filter(Boolean).join(',')), ...comum, saida];
+      args = [...entrada, '-filter_complex', filtroEnquadrar(W, H, await resolverEnquadramento(item, W, H, enquadramento), [`fps=${FPS}`, estatico].filter(Boolean).join(',')), ...comum, saida];
     }
     const r = rodar(args, { duracaoTotal: dur, modo, onProgresso: (p) => onProgresso && onProgresso((i + p) / lista.length) });
     registrarCancelar && registrarCancelar(r.cancelar);
@@ -618,5 +630,7 @@ module.exports = {
   argsEncoder,
   ehImagem,
   EXT_IMAGEM,
+  filtroEnquadrar,
+  resolverEnquadramento,
   DUR_BOTAO,
 };

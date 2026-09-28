@@ -630,14 +630,14 @@ app.whenReady().then(() => {
     return r.canceled ? null : r.filePaths[0];
   });
   // Capa para mostrar na lista: a imagem escolhida ou um quadro do vídeo
-  ipcMain.handle('envio:previaCapa', async (_e, { arquivo, capa }) => {
+  ipcMain.handle('envio:previaCapa', async (_e, { arquivo, capa, vertical }) => {
     const pasta = path.join(app.getPath('userData'), 'cache', 'capas');
     fs.mkdirSync(pasta, { recursive: true });
     const origem = capa && fs.existsSync(capa) ? capa : arquivo;
     const st = fs.statSync(origem);
-    const nome = require('crypto').createHash('sha1').update(`${origem}|${st.size}|${st.mtimeMs}`).digest('hex').slice(0, 16) + '.jpg';
+    const nome = require('crypto').createHash('sha1').update(`${origem}|${st.size}|${st.mtimeMs}|${vertical ? 'v' : 'h'}`).digest('hex').slice(0, 16) + '.jpg';
     const destino = path.join(pasta, nome);
-    if (!fs.existsSync(destino)) await gerarMiniatura(origem, destino);
+    if (!fs.existsSync(destino)) await gerarMiniatura(origem, destino, { vertical: !!vertical });
     return destino;
   });
   ipcMain.handle('envio:gerarTextos', async (_e, info) => {

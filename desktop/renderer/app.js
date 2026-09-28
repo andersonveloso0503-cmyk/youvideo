@@ -29,7 +29,7 @@ const PADRAO = {
   musicas: [], // {arquivo, titulo, duracao, selecionada}
   fundos: [],
   fundoAtivo: 0,
-  enquadramento: 'preencher',
+  enquadramento: 'auto',
   efeito: { estilo: 'onda', cor: '#d9a441', largura: 66, intensidade: 75, posX: 50, posY: 88, opacidade: 95 },
   textura: { granulado: 0, vinheta: true, escurecer: 15 },
   audio: { somenteInstrumental: false, crossfade: 2, normalizar: false },
@@ -466,6 +466,10 @@ function desenharCobrindo(el, W, H, modo) {
   const iw = el.videoWidth || el.naturalWidth, ih = el.videoHeight || el.naturalHeight;
   if (!iw || !ih) return false;
   const cobrir = Math.max(W / iw, H / ih), caber = Math.min(W / iw, H / ih);
+  if (modo === 'auto') {
+    const razao = (iw / ih) / (W / H);
+    modo = razao > 1.3 || razao < 1 / 1.3 ? 'desfoque' : 'preencher';
+  }
   if (modo === 'desfoque') {
     ctx.save();
     ctx.filter = `blur(${Math.round(W / 60)}px) brightness(0.85)`;
@@ -856,6 +860,11 @@ function ligarTudo() {
     ligarSegmentado('#segTipo', fm, 'tipo', () => {
       const max = Number(P.formato.duracaoMaxMin) || 0;
       if (P.formato.tipo === 'curto' && (!max || max > 3)) P.formato.duracaoMaxMin = 1;
+      // Trocou o formato: as imagens se adaptam sozinhas (deitada no Shorts = inteira com desfoque)
+      if (P.enquadramento === 'preencher') {
+        P.enquadramento = 'auto';
+        $('#segEnquadramento').querySelectorAll('button').forEach((b) => b.classList.toggle('ativo', b.dataset.v === 'auto'));
+      }
       if (P.formato.tipo === 'longo' && max && max <= 3) P.formato.duracaoMaxMin = '';
       $('#inDuracaoMax').value = P.formato.duracaoMaxMin;
       dimensionarPrevia(); atualizarResumo();

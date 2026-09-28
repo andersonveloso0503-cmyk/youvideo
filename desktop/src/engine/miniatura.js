@@ -2,14 +2,15 @@
 const fs = require('fs');
 const path = require('path');
 const { rodar, probe } = require('./ffmpeg');
-const { ehImagem } = require('./render');
+const { ehImagem, filtroEnquadrar, resolverEnquadramento } = require('./render');
 
 const LIMITE = 2 * 1024 * 1024 - 50 * 1024; // um pouco abaixo de 2 MB
 
 /** Cria a capa a partir de uma imagem, ou de um quadro do vídeo. */
-async function gerarMiniatura(origem, destino, { vertical = false } = {}) {
+async function gerarMiniatura(origem, destino, { vertical = false, enquadramento = 'auto' } = {}) {
   const [w, h] = vertical ? [720, 1280] : [1280, 720];
-  const filtro = `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1`;
+  // Imagem deitada numa capa em pé (ou o contrário): mostra inteira com fundo desfocado
+  const filtro = filtroEnquadrar(w, h, await resolverEnquadramento(origem, w, h, enquadramento));
   let entrada = ['-i', origem];
   if (!ehImagem(origem)) {
     // Vídeo: pega um quadro a 10% (no máximo aos 60 s) para não cair num começo preto
@@ -18,7 +19,7 @@ async function gerarMiniatura(origem, destino, { vertical = false } = {}) {
     entrada = ['-ss', seg.toFixed(2), '-i', origem];
   }
   for (const q of [2, 4, 6, 9, 13]) {
-    await rodar([...entrada, '-vf', filtro, '-frames:v', '1', '-q:v', String(q), destino]).promise;
+    await rodar([...entrada, '-filter_complex', filtro, '-frames:v', '1', '-q:v', String(q), destino]).promise;
     if (fs.statSync(destino).size <= LIMITE) return destino;
   }
   return destino;

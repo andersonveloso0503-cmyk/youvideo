@@ -119,7 +119,7 @@ const Subir = (() => {
         S.privacidade === 'agendado' ? `📅 ${dataHoraBR(hs[i])}` : S.privacidade === 'public' ? '🌎 publica na hora' : S.privacidade === 'unlisted' ? '🔗 não listado' : '🔒 privado';
       li.innerHTML = `
         <span class="num">${i + 1}</span>
-        <div class="capa" title="Clique para trocar a capa">${v.previa ? `<img src="${urlArquivo(v.previa)}" />` : ''}<span>Trocar capa</span></div>
+        <div class="capa${v.curto ? ' em-pe' : ''}" title="Clique para trocar a capa">${v.previa ? `<img src="${urlArquivo(v.previa)}" />` : ''}<span>Trocar capa</span></div>
         <div class="campos">
           <div class="info"><span class="arq"></span><span>${tempo(v.duracao)}</span>${v.curto ? '<span>Shorts</span>' : ''}${v.musicas?.length ? `<span>${v.musicas.length} músicas</span>` : ''}<b>${quando}</b></div>
           <div class="titulo-linha"><input class="t" maxlength="100" list="opcoes-envio-${i}" placeholder="Título do vídeo no YouTube" /><span class="conta"></span></div>
@@ -166,7 +166,7 @@ const Subir = (() => {
         const c = await window.api.envio.escolherCapa();
         if (!c) return;
         v.capa = c;
-        v.previa = await window.api.envio.previaCapa({ arquivo: v.arquivo, capa: c }).catch(() => null);
+        v.previa = await window.api.envio.previaCapa({ arquivo: v.arquivo, capa: c, vertical: !!v.curto }).catch(() => null);
         renderLista();
       };
       li.querySelector('.ia').onclick = () => gerarIa([v]);
@@ -212,7 +212,7 @@ const Subir = (() => {
     renderLista();
     // Prévia das capas (a imagem com o mesmo nome do vídeo, ou um quadro dele)
     for (const v of adicionados) {
-      v.previa = await window.api.envio.previaCapa({ arquivo: v.arquivo, capa: v.capa }).catch(() => null);
+      v.previa = await window.api.envio.previaCapa({ arquivo: v.arquivo, capa: v.capa, vertical: !!v.curto }).catch(() => null);
     }
     renderLista();
   }
