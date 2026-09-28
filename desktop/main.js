@@ -10,6 +10,7 @@ const YT = require('./src/engine/youtube');
 const IA = require('./src/engine/ia');
 const Central = require('./src/engine/central');
 const Sync = require('./src/sync');
+const { analisarMusica, resumoClima } = require('./src/engine/analise');
 
 // Depois de mudar chaves ou canais, guarda uma cópia criptografada na nuvem (se a Central estiver ligada)
 let tSync = null;
@@ -446,6 +447,15 @@ app.whenReady().then(() => {
     return saida;
   });
 
+  // ---------- Clima das músicas (calma / média / animada) ----------
+  ipcMain.handle('midia:analisar', async (_e, arquivo) => {
+    try {
+      return await analisarMusica(arquivo, path.join(app.getPath('userData'), 'cache'));
+    } catch {
+      return { bpm: null, nota: null, energia: null };
+    }
+  });
+
   // ---------- Levar configurações para outro PC ----------
   ipcMain.handle('sync:enviar', () => Sync.enviar(store));
   ipcMain.handle('sync:puxar', async () => {
@@ -491,6 +501,7 @@ app.whenReady().then(() => {
         curto: j.projeto?.formato?.tipo === 'curto',
         duracao: j.duracao,
         musicas: j.timeline || null,
+        clima: j.clima || resumoClima(j.projeto?.musicas),
         criadoEm: j.concluidoEm || j.criadoEm,
         publicado: { youtube: !!j.youtube },
       }));
@@ -577,6 +588,7 @@ app.whenReady().then(() => {
           curto: i.altura > i.largura && i.duracao <= 180,
           capa: capaAoLado(c),
           musicas: job?.timeline || null,
+          clima: job ? job.clima || resumoClima(job.projeto?.musicas) : '',
         });
       } catch {}
     }

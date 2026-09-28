@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('api', {
     fundos: chamar('dialogo:fundos'),
     pastaSaida: chamar('dialogo:pastaSaida'),
   },
-  midia: { musicas: chamar('midia:musicas'), checarFundos: chamar('midia:checarFundos'), salvarImagem: chamar('midia:salvarImagem') },
+  midia: { analisar: chamar('midia:analisar'), musicas: chamar('midia:musicas'), checarFundos: chamar('midia:checarFundos'), salvarImagem: chamar('midia:salvarImagem') },
   app: { verificarAtualizacao: chamar('app:verificarAtualizacao'), atualizar: chamar('app:atualizar') },
   abrir: { pasta: chamar('abrir:pasta'), link: chamar('abrir:link') },
   botao: { existe: chamar('botao:existe'), salvar: chamar('botao:salvar') },

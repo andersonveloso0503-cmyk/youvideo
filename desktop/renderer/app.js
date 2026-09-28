@@ -186,8 +186,47 @@ function adicionarMusicas(lista) {
   if (!P.nome && P.musicas.length) P.nome = '';
   renderMusicas();
   salvarDepois();
+  analisarPendentes();
   if (n) avisar(`${n} música${n > 1 ? 's' : ''} adicionada${n > 1 ? 's' : ''}`);
   else if (lista.length) avisar('Essas músicas já estavam na lista');
+}
+
+const ICONE_CLIMA = { calma: '🌙', media: '🎵', animada: '🔥' };
+const ROTULO_CLIMA = { calma: 'Calma / lenta', media: 'Ritmo médio', animada: 'Animada / agitada' };
+const ORDEM_CLIMA = { calma: 0, media: 1, animada: 2 };
+
+// "Ouve" as músicas que ainda não têm clima, uma de cada vez, sem travar a tela
+let analisando = false;
+async function analisarPendentes() {
+  if (analisando) return;
+  analisando = true;
+  try {
+    for (;;) {
+      const m = P.musicas.find((x) => !x.energia && !x.semAnalise);
+      if (!m) break;
+      const r = await window.api.midia.analisar(m.arquivo);
+      if (r?.energia) Object.assign(m, { energia: r.energia, bpm: r.bpm, nota: r.nota });
+      else m.semAnalise = true;
+      renderMusicas();
+      salvarDepois();
+    }
+  } finally {
+    analisando = false;
+  }
+}
+function climaDasSelecionadas() {
+  const sel = selecionadas().filter((m) => m.energia);
+  if (!sel.length) return '';
+  const cont = { calma: 0, media: 0, animada: 0 };
+  sel.forEach((m) => cont[m.energia]++);
+  const bpms = sel.map((m) => m.bpm).filter(Boolean).sort((a, b) => a - b);
+  const dom = Object.entries(cont).sort((a, b) => b[1] - a[1])[0][0];
+  const partes = [];
+  if (cont.animada) partes.push(`${cont.animada} animada(s)/agitada(s)`);
+  if (cont.media) partes.push(`${cont.media} de ritmo médio`);
+  if (cont.calma) partes.push(`${cont.calma} calma(s)/lenta(s)`);
+  const rotulo = cont[dom] / sel.length >= 0.6 ? { animada: 'ANIMADO/AGITADO', media: 'MODERADO', calma: 'CALMO/LENTO' }[dom] : 'MISTURADO';
+  return `${rotulo} — ${partes.join(', ')}${bpms.length ? ` (andamento típico ~${bpms[Math.floor(bpms.length / 2)]} BPM)` : ''}`;
 }
 
 function renderMusicas() {
@@ -203,6 +242,7 @@ function renderMusicas() {
       <button class="play" title="Ouvir com o efeito">${tocando === i && !$('#audioPrevia').paused ? '❚❚' : '▶'}</button>
       <span class="num">${i + 1}</span>
       <span class="nome" title="Duplo clique para renomear"></span>
+      <span class="clima ${m.energia || 'analisando'}" title="${m.energia ? `${ROTULO_CLIMA[m.energia]}${m.bpm ? ` · ~${m.bpm} BPM` : ' · sem batida marcada'} — medido ouvindo a música` : 'Ouvindo a música para saber se é calma ou animada...'}">${m.energia ? ICONE_CLIMA[m.energia] : '…'}</span>
       <span class="dur">${tempo(m.duracao)}</span>
       <span class="mover"><button data-d="-1" title="Subir">▲</button><button data-d="1" title="Descer">▼</button></span>
       <button class="lixo" title="Tirar da lista"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>`;
@@ -940,6 +980,7 @@ async function gerarTituloIa() {
     const r = await window.api.envio.gerarTextos({
       nome: P.saida.nome || sel[0]?.titulo || 'compilação',
       musicas: sel.map((m) => m.titulo),
+      clima: climaDasSelecionadas(),
       duracaoSeg: duracoes[0] || sel.reduce((a, m) => a + m.duracao, 0),
       curto: P.formato.tipo === 'curto',
       canal: canais.find((c) => c.id === P.publicar.canalId)?.titulo || '',
@@ -975,7 +1016,7 @@ async function gerar() {
   const nomeBase = (P.saida.nome || P.publicar.titulo || sel[0].titulo || 'compilacao').trim();
   const projeto = {
     nome: nomeBase,
-    musicas: sel.map(({ arquivo, titulo, duracao }) => ({ arquivo, titulo, duracao })),
+    musicas: sel.map(({ arquivo, titulo, duracao, energia, bpm }) => ({ arquivo, titulo, duracao, energia, bpm })),
     fundos: [...P.fundos],
     enquadramento: P.enquadramento,
     efeito: { ...P.efeito },
@@ -1034,6 +1075,7 @@ async function iniciar() {
   jobs = await window.api.fila.listar();
   renderFila();
   requestAnimationFrame(desenhar);
+  setTimeout(analisarPendentes, 2000);
 
   window.api.sistema.info().then((i) => {
     $('#versao').textContent = `v${i.versao}`;
@@ -1083,6 +1125,18 @@ async function iniciar() {
     pararMusica();
     P.musicas = P.musicas.filter((m) => !m.selecionada);
     renderMusicas(); salvarDepois();
+  };
+  let ordemCrescente = true;
+  $('#btnOrdenarEnergia').onclick = () => {
+    if (P.musicas.some((m) => !m.energia && !m.semAnalise)) return avisar('Ainda estou ouvindo algumas músicas, tente em alguns segundos');
+    const v = (m) => (m.energia ? ORDEM_CLIMA[m.energia] * 1000 + (m.bpm || 0) : 500);
+    P.musicas.sort((a, b) => (ordemCrescente ? v(a) - v(b) : v(b) - v(a)));
+    $('#btnOrdenarEnergia').textContent = ordemCrescente ? '🔥→🌙 Animada → Calma' : '🌙→🔥 Calma → Animada';
+    avisar(ordemCrescente ? 'Ordenado da mais calma para a mais animada' : 'Ordenado da mais animada para a mais calma');
+    ordemCrescente = !ordemCrescente;
+    pararMusica();
+    renderMusicas();
+    salvarDepois();
   };
   $('#btnEmbaralhar').onclick = () => {
     for (let i = P.musicas.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [P.musicas[i], P.musicas[j]] = [P.musicas[j], P.musicas[i]]; }

@@ -12,6 +12,7 @@ const { transcrever } = require('./legenda');
 const YT = require('./youtube');
 const { gerarMiniatura, capaAoLado } = require('./miniatura');
 const Central = require('./central');
+const { resumoClima } = require('./analise');
 
 const EM_ANDAMENTO = ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'];
 
@@ -486,7 +487,7 @@ class Fila extends EventEmitter {
         miniatura = null;
       }
 
-      this.atualizar(job, { arquivoFinal: saida, capa: miniatura, timeline: audio.timeline.map((t) => ({ titulo: t.titulo, inicio: t.inicio })), duracao: audio.total });
+      this.atualizar(job, { arquivoFinal: saida, capa: miniatura, clima: resumoClima(p.musicas), timeline: audio.timeline.map((t) => ({ titulo: t.titulo, inicio: t.inicio })), duracao: audio.total });
 
       // 7) Publicar
       if (publica) {

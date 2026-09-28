@@ -302,6 +302,7 @@ const Biblioteca = (() => {
               musicas: (i.musicas || []).map((m) => m.titulo),
               duracaoSeg: i.duracao || 0,
               curto: i.curto,
+              clima: i.clima || '',
               canal: redes.youtube ? canais.find((c) => c.id === redes.youtube)?.titulo || '' : '',
               contexto: [config.envioPrefs?.contexto, B.categorias[i.categoria]].filter(Boolean).join(' — '),
             });

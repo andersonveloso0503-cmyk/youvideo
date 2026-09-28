@@ -605,3 +605,9 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px;
   .marca-texto { display: none; }
   #versao { display: none; }
 }
+
+/* Clima da música na lista */
+.musica { grid-template-columns: 18px 28px 22px 1fr 20px auto 18px 22px; }
+.musica .clima { font-size: 13px; text-align: center; cursor: help; }
+.musica .clima.analisando { color: var(--mudo); animation: pulsar-op 1.2s ease-in-out infinite; }
+@keyframes pulsar-op { 50% { opacity: .3; } }

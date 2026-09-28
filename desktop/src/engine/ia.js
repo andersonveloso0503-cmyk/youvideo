@@ -111,6 +111,7 @@ function descreverVideo(info) {
     `Nome do arquivo do vídeo: ${limparNome(info.nome)}`,
     `Duração: ${duracao}${info.curto ? ' (Shorts vertical)' : ''}`,
     musicas.length ? `Músicas no vídeo (${musicas.length}):\n- ${musicas.join('\n- ')}` : '',
+    info.clima ? `Clima das músicas (medido ouvindo o áudio): ${info.clima}` : '',
     info.canal ? `Canal: ${info.canal}` : '',
     info.contexto ? `Sobre o canal / instruções extras: ${info.contexto}` : '',
   ]
@@ -146,6 +147,12 @@ REGRAS DO TÍTULO (as 3 opções seguem todas):
 6. Separe as partes com " | " ou " — ". No máximo 1 emoji, no fim ou entre as partes. Pode usar 1 a 3 palavras em CAIXA ALTA para destacar, nunca o título inteiro.
 7. Nada de clickbait falso, nada de aspas, nada de "Parte 1" (a não ser que o nome do arquivo seja uma série numerada), nenhum nome de artista que não esteja na informação.
 8. As 3 opções devem ter ângulos diferentes: (a) busca direta, (b) ocasião/benefício ("para dirigir", "para trabalhar e focar", "para orar"), (c) emoção/curiosidade.
+9. RESPEITE O CLIMA DAS MÚSICAS quando ele vier na informação (foi medido ouvindo o áudio):
+   - CALMO/LENTO → ocasiões e palavras calmas: relaxar, dormir, estudar, orar, meditar, "suave", "tranquilo", "acústico", "para ouvir à noite". NUNCA "treinar", "agitado", "pesado", "festa".
+   - MODERADO → trabalhar, dirigir na estrada, fim de semana, "boas vibrações", "para ouvir o dia todo".
+   - ANIMADO/AGITADO → treinar, academia, dirigir, festa, animar o dia, "pesado", "energia", "agitado". NUNCA "relaxar", "dormir", "calmo".
+   - MISTURADO (várias calmas e várias animadas) → evite prometer um clima só; use a ocasião mais neutra.
+   Escolha, da lista PESQUISADO NO YOUTUBE, as buscas que combinam com esse clima.
 
 EXEMPLOS DO PADRÃO CERTO
 - Rock instrumental longo: "Rock Instrumental para Dirigir | 3 Horas de Heavy Blues Guitar 🎸"

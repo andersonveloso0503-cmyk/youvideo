@@ -235,6 +235,7 @@ const Subir = (() => {
             musicas: (v.musicas || []).map((m) => m.titulo),
             duracaoSeg: v.duracao,
             curto: v.curto,
+            clima: v.clima || '',
             canal,
             contexto: S.contexto,
           });
