@@ -114,11 +114,15 @@ function mostrarVista(visivel) {
 
 function criarJanela() {
   nativeTheme.themeSource = 'dark';
+  // Abre do tamanho da tela (telas menores que 1400x860 abrem maximizadas)
+  const { screen } = require('electron');
+  const area = screen.getPrimaryDisplay().workAreaSize;
+  const cabe = area.width >= 1400 && area.height >= 860;
   janela = new BrowserWindow({
-    width: 1400,
-    height: 860,
-    minWidth: 1100,
-    minHeight: 700,
+    width: Math.min(1400, area.width),
+    height: Math.min(860, area.height),
+    minWidth: 1000,
+    minHeight: 640,
     backgroundColor: '#0d0d12',
     title: 'Youvideo Compilador',
     icon: path.join(__dirname, 'build', 'icon.png'),
@@ -130,6 +134,7 @@ function criarJanela() {
       sandbox: false,
     },
   });
+  if (!cabe) janela.maximize();
   janela.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   if (process.env.COMPILADOR_CAPTURA) {
     // Teste automático: tira um print da tela e fecha
