@@ -352,6 +352,20 @@
   <!-- Modal: Configurações -->
   <dialog class="modal largo" id="modalConfig">
     <div class="modal-topo"><h2>Configurações</h2><button class="fechar" data-fechar>×</button></div>
+    <div class="cartao-nuvem">
+      <div class="nuvem-titulo">☁ <b>Central Youvideo</b> — Biblioteca, agenda das redes e <b>levar as configurações para outro PC</b></div>
+      <div class="nuvem-campos">
+        <div class="campo-config"><label>Endereço do Youvideo</label><input id="cfgCentralUrl" placeholder="https://youvideors2.vercel.app" /></div>
+        <div class="campo-config"><label>Senha da Central — <code>CENTRAL_TOKEN</code></label>
+          <div class="linha-canal"><input id="cfgCentralToken" placeholder="cole a senha" /><button class="btn-mini" id="btnTestarCentral">Testar</button></div>
+          <small id="resCentral"></small></div>
+      </div>
+      <div class="linha-botoes">
+        <button class="btn-primario" id="btnSyncEnviar" title="Guarda chaves e canais, criptografados com a senha da Central">☁ Salvar configurações na nuvem</button>
+        <button class="btn-mini destaque" id="btnSyncPuxar" title="Traz as chaves e canais salvos por outro PC">⬇ Puxar do outro PC</button>
+      </div>
+      <small class="nota" id="resSync">No PC já configurado: clique em "Salvar configurações na nuvem". No outro PC: cole a senha, clique em Testar e depois em "Puxar do outro PC".</small>
+    </div>
     <div class="grade-config">
       <div>
         <h3>Desempenho</h3>
@@ -384,16 +398,6 @@
         <div class="campo-config"><label>Google — <code>GOOGLE_CLIENT_SECRET</code></label><input id="cfgClientSecret" placeholder="GOCSPX-..." /></div>
         <div class="campo-config"><label>Google — <code>GOOGLE_REDIRECT_URI</code> (só para tokens colados)</label><input id="cfgRedirect" placeholder="https://youvideors2.vercel.app/api/auth/callback" /></div>
         <p class="nota">Para o botão "Conectar canal pelo navegador" funcionar, adicione este endereço nos URIs de redirecionamento do cliente OAuth no Google Cloud: <code id="redirectLocal">http://127.0.0.1:53682/callback</code></p>
-        <h3 style="margin-top:16px">Central Youvideo (Biblioteca e agenda das redes)</h3>
-        <div class="campo-config"><label>Endereço do Youvideo</label><input id="cfgCentralUrl" placeholder="https://youvideors2.vercel.app" /></div>
-        <div class="campo-config"><label>Senha da Central — <code>CENTRAL_TOKEN</code> (a mesma que você criou na Vercel)</label>
-          <div class="linha-canal"><input id="cfgCentralToken" placeholder="cole a senha" /><button class="btn-mini" id="btnTestarCentral">Testar</button></div>
-          <small id="resCentral"></small></div>
-        <div class="linha-botoes">
-          <button class="btn-mini" id="btnSyncEnviar" title="Guarda chaves e canais, criptografados com a senha da Central">☁ Salvar configurações na nuvem</button>
-          <button class="btn-mini destaque" id="btnSyncPuxar" title="Traz as chaves e canais salvos por outro PC">⬇ Puxar do outro PC</button>
-        </div>
-        <small class="nota" id="resSync">Em outro PC, é só colar a senha da Central e clicar em "Puxar do outro PC" — as chaves e os canais do YouTube vêm juntos.</small>
         <p class="nota">As chaves ficam guardadas só neste PC, criptografadas pelo Windows.</p>
       </div>
     </div>

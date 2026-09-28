@@ -238,6 +238,7 @@ const Subir = (() => {
             duracaoSeg: v.duracao,
             curto: v.curto,
             clima: v.clima || '',
+            evitar: S.videos.filter((x) => x !== v && x.fonte === 'ia' && x.titulo).map((x) => x.titulo).slice(-12),
             canal,
             contexto: S.contexto,
           });

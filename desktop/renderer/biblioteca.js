@@ -323,6 +323,7 @@ const Biblioteca = (() => {
               duracaoSeg: i.duracao || 0,
               curto: i.curto,
               clima: i.clima || '',
+              evitar: lista.map((x) => x.titulo).slice(-12),
               canal: redes.youtube ? canais.find((c) => c.id === redes.youtube)?.titulo || '' : '',
               contexto: [config.envioPrefs?.contexto, B.categorias[i.categoria]].filter(Boolean).join(' — '),
             });

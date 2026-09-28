@@ -613,3 +613,12 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px;
 @keyframes pulsar-op { 50% { opacity: .3; } }
 
 #selVersoes { width: 120px; }
+
+/* Configurações: cartão da nuvem no topo e botão Salvar sempre visível */
+#modalConfig { max-height: 92vh; overflow-y: auto; }
+#modalConfig .modal-acoes { position: sticky; bottom: -18px; background: var(--bg-2); padding: 10px 0 4px; margin-bottom: -4px; border-top: 1px solid var(--borda); }
+.cartao-nuvem { margin-top: 12px; background: linear-gradient(135deg, rgba(217,164,65,.12), rgba(177,67,47,.1)); border: 1px solid rgba(217,164,65,.45); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.nuvem-titulo { font-size: 13px; color: var(--texto-2); }
+.nuvem-titulo b { color: var(--texto); }
+.nuvem-campos { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; }
+.nuvem-campos .campo-config { margin-bottom: 0; }

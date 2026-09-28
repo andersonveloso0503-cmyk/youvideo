@@ -145,7 +145,8 @@ REGRAS DO TÍTULO (as 3 opções seguem todas):
 4. Vídeo longo (mais de 30 min): coloque a duração arredondada ("1 Hora", "2 Horas", "3 Horas") — isso é muito buscado em playlist.
 5. Pode usar o ano ${ano} se fizer sentido (playlist, "as melhores", coletânea).
 6. Separe as partes com " | " ou " — ". No máximo 1 emoji, no fim ou entre as partes. Pode usar 1 a 3 palavras em CAIXA ALTA para destacar, nunca o título inteiro.
-7. Nada de clickbait falso, nada de aspas, nada de "Parte 1" (a não ser que o nome do arquivo seja uma série numerada), nenhum nome de artista que não esteja na informação.
+7. Nada de clickbait falso, nada de aspas, nada de "Parte 1" nem "Versão 2" (a não ser que o nome do arquivo seja uma série numerada de verdade), nenhum nome de artista que não esteja na informação.
+   A PRIMEIRA música da lista é a que abre o vídeo — pode usar o estilo dela como destaque.
 8. As 3 opções devem ter ângulos diferentes: (a) busca direta, (b) ocasião/benefício ("para dirigir", "para trabalhar e focar", "para orar"), (c) emoção/curiosidade.
 9. RESPEITE O CLIMA DAS MÚSICAS quando ele vier na informação (foi medido ouvindo o áudio):
    - CALMO/LENTO → ocasiões e palavras calmas: relaxar, dormir, estudar, orar, meditar, "suave", "tranquilo", "acústico", "para ouvir à noite". NUNCA "treinar", "agitado", "pesado", "festa".
@@ -175,7 +176,11 @@ TAGS
 
   const usuario = `${descreverVideo(info)}
 
-PESQUISADO NO YOUTUBE (buscas reais, das mais populares para as menos):
+${
+    info.evitar?.length
+      ? `TÍTULOS JÁ USADOS EM OUTROS VÍDEOS DESTA MESMA LEVA (mesmas músicas em outra ordem) — os seus 3 títulos precisam ser CLARAMENTE DIFERENTES destes: outra palavra_principal da lista, outra ocasião e outro gancho. Não repita a mesma estrutura:\n${info.evitar.map((t) => `- ${t}`).join('\n')}\n\n`
+      : ''
+  }PESQUISADO NO YOUTUBE (buscas reais, das mais populares para as menos):
 ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi possível consultar — use os termos mais buscados que você conhece para esse nicho)'}`;
 
   const j = await chamarGroq(groqKey, [
