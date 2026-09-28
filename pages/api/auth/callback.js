@@ -43,11 +43,22 @@ export default async function handler(req, res) {
     // Caso contrário, é um dos canais antigos (apostolos/musica) que ainda
     // usa variável de ambiente fixa — mantém o comportamento manual de sempre.
     const nomeVar = canal === 'musica' ? 'YOUTUBE_REFRESH_TOKEN_MUSICA' : 'YOUTUBE_REFRESH_TOKEN';
+    // Mostra EM QUAL CANAL essa autorização vai publicar, pra não salvar o canal errado
+    let nomeCanal = '(não consegui ler o nome do canal)';
+    try {
+      oauth2Client.setCredentials(tokens);
+      const r = await google.youtube({ version: 'v3', auth: oauth2Client }).channels.list({ part: ['snippet'], mine: true });
+      nomeCanal = r.data.items?.[0]?.snippet?.title || '(essa conta não tem canal do YouTube)';
+    } catch {}
+    const esperado = canal === 'musica' ? 'o canal de música' : 'o canal Em Nome de Jesus (vídeos bíblicos)';
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(`
-      <div style="font-family: sans-serif; padding: 40px; background:#0f1115; color:#eaeaea;">
-        <h2>Autorização concluída ✅ (canal: ${canal})</h2>
-        <p>Copie o valor abaixo e salve no Vercel como <b>${nomeVar}</b>:</p>
+      <div style="font-family: sans-serif; padding: 40px; background:#0f1115; color:#eaeaea; max-width:760px">
+        <h2>Autorização concluída ✅</h2>
+        <p>Esta autorização vai publicar no canal:</p>
+        <p style="font-size:28px;font-weight:800;color:#d9a441;margin:6px 0 18px">${nomeCanal}</p>
+        <p style="background:#2a1d10;border:1px solid #d9a441;border-radius:8px;padding:10px">Era para ser <b>${esperado}</b>. Se o nome acima estiver errado, <b>não salve</b>: troque de canal no YouTube e abra <a style="color:#d9a441" href="/api/auth/google?canal=${canal}">este link</a> de novo.</p>
+        <p>Se estiver certo, copie o valor abaixo e salve na Vercel como <b>${nomeVar}</b> (depois faça Redeploy):</p>
         <textarea style="width:100%; height:80px;">${tokens.refresh_token}</textarea>
       </div>
     `);

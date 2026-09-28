@@ -11,7 +11,8 @@ export default function handler(req, res) {
 
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    prompt: 'consent',
+    // select_account obriga o Google a mostrar a escolha de conta/canal (senão ele pega o último usado)
+    prompt: 'consent select_account',
     scope: [
       'https://www.googleapis.com/auth/youtube.upload',
       'https://www.googleapis.com/auth/youtube.force-ssl',
