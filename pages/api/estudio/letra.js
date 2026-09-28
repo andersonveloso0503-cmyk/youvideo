@@ -27,7 +27,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido.' });
   if (!process.env.GROQ_API_KEY) return res.status(500).json({ erro: 'GROQ_API_KEY não configurada.' });
 
-  const { acao, tema, estilo, voz, letraAtual, detalhes } = req.body || {};
+  const { acao, tema, estilo, voz, letraAtual, detalhes, evitar } = req.body || {};
   const temSolo = /solo|intro instrumental|drop|pausa/i.test(detalhes || '');
 
   try {
@@ -36,6 +36,36 @@ export default async function handler(req, res) {
 
 Ideia: ${tema || ''}`, 200);
       return res.status(200).json({ estilo: txt.replace(/^["']|["']$/g, '') });
+    }
+
+    // Medley: planeja N músicas DIFERENTES entre si a partir do tema geral
+    if (acao === 'planoMedley') {
+      const faixas = Array.isArray(req.body.faixas) ? req.body.faixas.slice(0, 15) : [];
+      if (!faixas.length) return res.status(400).json({ erro: 'Faltou a lista de músicas.' });
+      const lista = faixas.map((f, i) => `${i + 1}. estilo ${f.estilo || 'livre'}${f.ritmo ? `, ritmo ${f.ritmo}` : ''}${f.tema ? `, tema obrigatório: ${f.tema}` : ''}`).join('\n');
+      const pedidoPlano = `Vou gravar um medley com ${faixas.length} músicas ORIGINAIS e totalmente diferentes entre si.
+Tema geral que une o medley: ${tema || 'livre'}
+
+Músicas:
+${lista}
+
+Para CADA música invente um título diferente e um ângulo/assunto próprio dentro do tema geral (situação, personagem, sentimento ou história diferente), combinando com o estilo e o ritmo dela.
+Nenhuma pode repetir o assunto, as imagens ou as palavras-chave do título de outra. Se a música tiver "tema obrigatório", use-o.
+
+Responda SÓ com as linhas, uma por música, neste formato:
+1 | Título | ângulo em uma frase`;
+      for (let t = 1; t <= 3; t++) {
+        const txt = await groq(pedidoPlano);
+        const ideias = [];
+        txt.split('\n').forEach((l) => {
+          const m = l.replace(/[*_`]/g, '').match(/^\s*(\d+)\s*[|.)-]\s*([^|]+)\|\s*(.+)$/);
+          if (m) ideias[+m[1] - 1] = { titulo: m[2].replace(/[*"]/g, '').trim(), angulo: m[3].replace(/[*"]/g, '').trim() };
+        });
+        if (faixas.every((_, i) => ideias[i] && ideias[i].angulo)) {
+          return res.status(200).json({ ideias: faixas.map((_, i) => ideias[i]) });
+        }
+      }
+      return res.status(500).json({ erro: 'Não consegui planejar as músicas do medley. Tente de novo.' });
     }
 
     if (!String(tema || '').trim() && !String(letraAtual || '').trim()) {
@@ -53,6 +83,7 @@ Regras:
 ${estilo ? `- Estilo musical: ${estilo}.` : ''}
 ${voz ? `- Vai ser cantada por: ${voz}.` : ''}
 ${detalhes ? `- Arranjo pedido: ${detalhes}.` : ''}
+${Array.isArray(evitar) && evitar.length ? `- Esta música faz parte de um medley. Ela precisa ser COMPLETAMENTE diferente destas outras músicas do medley — não repita título, refrão, frases, rimas nem imagens delas:\n${evitar.slice(0, 14).map((x) => `  • ${x}`).join('\n')}` : ''}
 ${temSolo ? '- Inclua na estrutura as partes instrumentais pedidas, cada uma em linha própria SEM letra, por exemplo [Instrumental Intro], [Guitar Solo], [Trumpet Solo], [Sax Solo], [Piano Solo], [Violin Solo] ou [Instrumental Break] (geralmente o solo vem depois do segundo refrão).' : ''}
 - Estrutura com marcações em inglês entre colchetes, cada uma em linha própria: [Verse], [Pre-Chorus], [Chorus], [Verse], [Chorus], [Bridge], [Chorus], [Outro].
 - Versos com 4 linhas; refrão repetido igual nas vezes em que aparece.

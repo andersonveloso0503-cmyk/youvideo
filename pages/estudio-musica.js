@@ -643,7 +643,15 @@ export default function EstudioMusica() {
             method: 'POST',
             body: JSON.stringify({
               acao: 'letra',
-              tema: f.tema.trim() || plano.tema,
+              tema: plano.ideiasFaixas?.[k]
+                ? `${plano.ideiasFaixas[k].angulo} (título sugerido: "${plano.ideiasFaixas[k].titulo}"; tema geral do medley: ${plano.tema || f.tema})`
+                : (f.tema.trim() || plano.tema),
+              evitar: plano.faixas.map((_, i) => i).filter((i) => i !== k).map((i) => {
+                const pr = plano.prontas[i];
+                if (pr) return `"${pr.titulo}"`;
+                const id = plano.ideiasFaixas?.[i];
+                return id ? `"${id.titulo}" — ${id.angulo}` : `música ${i + 1}`;
+              }),
               estilo: [est.nome, f.ritmo ? `ritmo ${RITMOS.find((r) => r.id === f.ritmo)?.nome.toLowerCase()}` : ''].filter(Boolean).join(', '),
               voz: VOZES.find((v) => v.id === plano.voz)?.nome,
               detalhes: nomesIdeiasPlano.join(', '),
@@ -677,6 +685,33 @@ export default function EstudioMusica() {
     };
 
     setMedProgresso((p) => p && ({ ...p, fase: 'musicas', erro: '', falhas: [] }));
+
+    // 1º passo: planejar um título e um assunto diferente para cada música
+    if (!plano.ideiasFaixas) {
+      plano.faixas.forEach((_, k) => marcar(k, 'planejando…'));
+      try {
+        const pl = await api('/api/estudio/letra', {
+          method: 'POST',
+          body: JSON.stringify({
+            acao: 'planoMedley',
+            tema: plano.tema,
+            faixas: plano.faixas.map((f) => ({
+              estilo: ESTILOS.find((e) => e.id === f.estiloId)?.nome,
+              ritmo: f.ritmo ? RITMOS.find((r) => r.id === f.ritmo)?.nome.toLowerCase() : '',
+              tema: f.tema.trim(),
+            })),
+          }),
+        });
+        plano.ideiasFaixas = pl.ideias;
+        setMedProgresso((p) => p && ({
+          ...p,
+          etapas: p.etapas.map((e, i) => ({ ...e, nome: `${i + 1}. ${pl.ideias[i]?.titulo || ''} · ${ESTILOS.find((x) => x.id === plano.faixas[i].estiloId)?.nome}`, status: 'esperando' })),
+        }));
+      } catch (e) {
+        plano.ideiasFaixas = plano.faixas.map(() => null); // segue sem plano, mas avisando para variar
+      }
+    }
+
     await emLotes(indices, 2, umaFaixa);
 
     const falhas = plano.faixas.map((_, i) => i).filter((i) => !plano.prontas[i]);
