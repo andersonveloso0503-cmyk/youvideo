@@ -533,6 +533,11 @@ class Fila extends EventEmitter {
         const pedido = p.publicar.pedido || cfg.envioPrefs?.contexto || '';
         if (job.partes > 1 && p.publicar.iaPorVideo !== false && cfg.groqKey && (job.parte > 1 || !p.publicar.titulo)) {
           this.atualizar(job, { etapa: 'Criando título com IA' }, false);
+          // Um de cada vez, para cada vídeo enxergar os títulos que os outros já pegaram
+          const antes = this.travaIa || Promise.resolve();
+          let soltar;
+          this.travaIa = new Promise((ok) => (soltar = ok));
+          await antes;
           const usados = [p.publicar.titulo, ...this.jobs.filter((x) => x.lote === job.lote && x !== job && x.tituloIa).map((x) => x.tituloIa)].filter(Boolean);
           try {
             const r = await IA.gerarTextosVideo(cfg.groqKey, {
@@ -549,6 +554,8 @@ class Fila extends EventEmitter {
             if (r.descricao) descricaoBase = r.descricao;
             if (r.tags?.length) tags = r.tags;
           } catch {}
+          this.atualizar(job, { tituloIa: titulo });
+          soltar();
         } else if (job.parte === 1 || job.partes === 1) {
           titulo = p.publicar.titulo || titulo;
         }

@@ -61,6 +61,19 @@ function parecido(a, b) {
   return comum / Math.min(A.size, B.size);
 }
 
+const VAZIAS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'as', 'os', 'para', 'pra', 'com', 'em', 'no', 'na', 'the', 'of', 'for']);
+/** As 2 primeiras palavras que importam do título (é o que o YouTube e a pessoa veem primeiro). */
+function abertura(t) {
+  return semAcento(t).replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter((w) => w && !VAZIAS.has(w)).slice(0, 2).join(' ');
+}
+function singular(w) {
+  return w.replace(/(oes|aes)$/, 'ao').replace(/es$/, '').replace(/s$/, '');
+}
+function mesmaAbertura(a, b) {
+  const A = abertura(a).split(' ').map(singular), B = abertura(b).split(' ').map(singular);
+  return A.length && A[0] === B[0] && (A[1] || '') === (B[1] || '');
+}
+
 async function chamarGroq(groqKey, mensagens, { modelo = MODELO, temperatura = 0.7, tokens = 3000 } = {}) {
   const tentar = async (m) => {
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -185,6 +198,19 @@ async function gerarTextosVideo(groqKey, info) {
   const ano = new Date().getFullYear();
 
   const { pesquisados } = await palavrasPesquisadas(groqKey, info, idiomaCodigo);
+  const evitar = (info.evitar || []).filter(Boolean);
+  const aberturasUsadas = [...new Set(evitar.map(abertura).filter(Boolean))];
+  // Cada vídeo do lote ganha uma palavra-chave de abertura diferente
+  let chaveObrigatoria = '';
+  if (evitar.length) {
+    const livres = pesquisados.filter((p) => !evitar.some((e) => mesmaAbertura(p, e)));
+    const porAbertura = [];
+    for (const p of livres) if (!porAbertura.some((x) => mesmaAbertura(x, p))) porAbertura.push(p);
+    if (porAbertura.length) {
+      const ini = evitar.length % porAbertura.length;
+      chaveObrigatoria = [...porAbertura.slice(ini), ...porAbertura.slice(0, ini)].slice(0, 4).map((x) => `"${x}"`).join(', ');
+    }
+  }
 
   const sistema = `Você é um estrategista de SEO do YouTube especializado em canais de música e vídeos cristãos, e escreve em ${idioma}.
 Responda SOMENTE com JSON: {"palavra_principal": "...", "opcoes": ["título 1", "título 2", "título 3"], "melhor": 0, "descricao": "...", "tags": ["...", "..."]}
@@ -234,6 +260,15 @@ TAGS
   }`;
 
   const usuario = `${descreverVideo(info)}
+${
+    aberturasUsadas.length
+      ? `\nCOMEÇOS PROIBIDOS (outros vídeos desta leva já começam assim — o seu título NÃO pode começar com estas palavras, nem no singular/plural): ${aberturasUsadas.map((a) => `"${a}"`).join(', ')}\n${
+          chaveObrigatoria
+            ? `Escolha a palavra_principal entre estas buscas (que combine com o clima) e comece os títulos com ela: ${chaveObrigatoria}.`
+            : 'Comece com outra busca da lista ou com um gancho diferente (ex.: "1 Hora de...", "Para Orar...", "Hinos que...", "Música para...") e a palavra-chave logo depois.'
+        }\n`
+      : ''
+  }
 
 ${
     info.evitar?.length
@@ -243,14 +278,13 @@ ${
 ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi possível consultar — use os termos mais buscados que você conhece para esse nicho)'}`;
 
   const proibidos = generosProibidos(info.pedido);
-  const evitar = (info.evitar || []).filter(Boolean);
   const limparTitulo = (t) => String(t || '').replace(/^["'“]|["'”]$/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
-  const bom = (t) => !violaPedido(t, proibidos) && !evitar.some((e) => parecido(t, e) >= 0.7);
+  const bom = (t) => !violaPedido(t, proibidos) && !evitar.some((e) => parecido(t, e) >= 0.7 || mesmaAbertura(t, e));
 
-  let j, opcoes = [], melhor = 0;
-  for (let tentativa = 0; tentativa < 3; tentativa++) {
+  let j, opcoes = [], melhor = 0, sobras = [];
+  for (let tentativa = 0; tentativa < 4; tentativa++) {
     const extra = tentativa
-      ? `\n\nATENÇÃO: a resposta anterior ${proibidos.length ? 'usou um gênero que o dono NÃO pediu ou ' : ''}ficou parecida demais com títulos já usados. Siga o PEDIDO DO DONO e escreva 3 títulos bem diferentes.`
+      ? `\n\nATENÇÃO: a resposta anterior ${proibidos.length ? 'usou um gênero que o dono NÃO pediu ou ' : ''}ficou parecida demais com títulos já usados ou começou com as mesmas palavras. Siga o PEDIDO DO DONO e escreva 3 títulos que comecem com palavras DIFERENTES dos COMEÇOS PROIBIDOS.`
       : '';
     j = await chamarGroq(groqKey, [
       { role: 'system', content: sistema },
@@ -258,11 +292,17 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
     ], { temperatura: evitar.length || tentativa ? 0.9 : 0.7 });
     const todas = (Array.isArray(j.opcoes) ? j.opcoes : [j.titulo]).map(limparTitulo).filter(Boolean);
     const escolhida = todas[Math.max(0, Math.min(todas.length - 1, Number(j.melhor) || 0))];
+    sobras.push(...todas.filter((t) => !violaPedido(t, proibidos)));
     opcoes = todas.filter(bom);
     if (opcoes.length) {
       melhor = Math.max(0, opcoes.indexOf(escolhida));
       break;
     }
+  }
+  if (!opcoes.length && sobras.length) {
+    // Nenhuma saiu perfeita: fica com a que menos se parece com as já usadas
+    const nota = (t) => evitar.reduce((a, e) => a + parecido(t, e) + (mesmaAbertura(t, e) ? 1 : 0), 0);
+    opcoes = [...new Set(sobras)].sort((a, b) => nota(a) - nota(b)).slice(0, 3);
   }
   if (!opcoes.length) opcoes = [limparNome(info.pedido || info.nome)];
   let tags = (Array.isArray(j.tags) ? j.tags : String(j.tags || '').split(','))
