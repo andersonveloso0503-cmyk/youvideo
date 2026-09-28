@@ -74,26 +74,75 @@ function mesmaAbertura(a, b) {
   return A.length && A[0] === B[0] && (A[1] || '') === (B[1] || '');
 }
 
-async function chamarGroq(groqKey, mensagens, { modelo = MODELO, temperatura = 0.7, tokens = 3000 } = {}) {
+const dormir = (ms) => new Promise((ok) => setTimeout(ok, ms));
+
+/** Quanto a Groq mandou esperar (cabeçalho retry-after ou "try again in 1m2.5s"). */
+function tempoDeEspera(r, msg) {
+  const h = Number(r.headers.get('retry-after'));
+  if (h > 0) return h * 1000;
+  const m = String(msg || '').match(/try again in\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:([\d.]+)s)?/i);
+  if (!m) return 0;
+  return ((Number(m[1]) || 0) * 3600 + (Number(m[2]) || 0) * 60 + (Number(m[3]) || 0)) * 1000;
+}
+
+async function chamarGroq(groqKey, mensagens, { modelo = MODELO, temperatura = 0.7, tokens = 2500 } = {}) {
   const tentar = async (m) => {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${groqKey}` },
-      body: JSON.stringify({ model: m, messages: mensagens, temperature: temperatura, max_completion_tokens: tokens, response_format: { type: 'json_object' } }),
-    });
-    const d = await r.json().catch(() => null);
-    if (!r.ok) {
-      const e = new Error(d?.error?.message || `Groq respondeu ${r.status}`);
+    for (let volta = 0; ; volta++) {
+      let r;
+      try {
+        r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${groqKey}` },
+          body: JSON.stringify({
+            model: m,
+            messages: mensagens,
+            temperature: temperatura,
+            max_completion_tokens: tokens,
+            response_format: { type: 'json_object' },
+            ...(m.startsWith('openai/gpt-oss') ? { reasoning_effort: 'low' } : {}),
+          }),
+          signal: AbortSignal.timeout(60000), // nunca fica travado esperando
+        });
+      } catch (e) {
+        if (volta < 1) continue; // uma nova tentativa se a conexão caiu / demorou
+        const err = new Error(e.name === 'TimeoutError' ? 'A IA demorou demais para responder.' : 'Sem conexão com a IA (Groq).');
+        err.status = 0;
+        throw err;
+      }
+      const d = await r.json().catch(() => null);
+      if (r.ok) return lerJson(d?.choices?.[0]?.message?.content || '');
+      const msg = d?.error?.message || `Groq respondeu ${r.status}`;
+      // Limite por minuto da conta grátis: espera o tempo pedido e tenta de novo
+      if (r.status === 429) {
+        const espera = tempoDeEspera(r, msg);
+        if (espera && espera <= 90000 && volta < 4) {
+          await dormir(espera + 500);
+          continue;
+        }
+        const e = new Error(espera > 90000
+          ? `A IA (Groq) atingiu o limite de uso agora. Tente de novo em ${Math.ceil(espera / 60000)} min.`
+          : 'A IA (Groq) está no limite de uso. Tente de novo em 1 minuto.');
+        e.status = 429;
+        throw e;
+      }
+      if (r.status >= 500 && volta < 2) {
+        await dormir(3000);
+        continue;
+      }
+      const e = new Error(msg);
       e.status = r.status;
       throw e;
     }
-    return lerJson(d?.choices?.[0]?.message?.content || '');
   };
   try {
     return await tentar(modelo);
   } catch (e) {
     if (e.status === 401) throw new Error('A chave da Groq foi recusada. Confira em Configurações.');
-    return tentar(MODELO_RESERVA);
+    try {
+      return await tentar(MODELO_RESERVA);
+    } catch (e2) {
+      throw e.status === 429 ? e : e2;
+    }
   }
 }
 
@@ -282,7 +331,7 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   const bom = (t) => !violaPedido(t, proibidos) && !evitar.some((e) => parecido(t, e) >= 0.7 || mesmaAbertura(t, e));
 
   let j, opcoes = [], melhor = 0, sobras = [];
-  for (let tentativa = 0; tentativa < 4; tentativa++) {
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
     const extra = tentativa
       ? `\n\nATENÇÃO: a resposta anterior ${proibidos.length ? 'usou um gênero que o dono NÃO pediu ou ' : ''}ficou parecida demais com títulos já usados ou começou com as mesmas palavras. Siga o PEDIDO DO DONO e escreva 3 títulos que comecem com palavras DIFERENTES dos COMEÇOS PROIBIDOS.`
       : '';
