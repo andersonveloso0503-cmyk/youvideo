@@ -613,48 +613,110 @@ export default function EstudioMusica() {
     const etapas = medFaixas.map((f, i) => ({ nome: `${i + 1}. ${ESTILOS.find((e) => e.id === f.estiloId)?.nome}`, status: 'esperando' }));
     setMedProgresso({ titulo: tituloMed, etapas, fase: 'musicas', erro: '' });
     const marcar = (k, status) => setMedProgresso((p) => p && ({ ...p, etapas: p.etapas.map((e, i) => (i === k ? { ...e, status } : e)) }));
+    const plano = {
+      titulo: tituloMed,
+      motor: motorMed,
+      grupoId,
+      faixas: medFaixas.map((f) => ({ ...f })),
+      ideias: [...ideias],
+      estiloExtra: estiloExtra.trim(),
+      voz,
+      duracao,
+      crossfade,
+      tema: medTema,
+      prontas: [],
+    };
+    await rodarMedley(plano, medFaixas.map((_, i) => i), marcar);
+  }
 
+  // Gera as músicas que faltam (com novas tentativas) e junta as que ficaram prontas
+  async function rodarMedley(plano, indices, marcar) {
+    const umaFaixa = async (k) => {
+      const f = plano.faixas[k];
+      const est = ESTILOS.find((e) => e.id === f.estiloId) || ESTILOS[0];
+      const nomesIdeiasPlano = plano.ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean);
+      let ultimoErro = '';
+      for (let tentativa = 1; tentativa <= 2; tentativa++) {
+        try {
+          marcar(k, tentativa > 1 ? 'tentando de novo: letra…' : 'escrevendo a letra…');
+          const l = await api('/api/estudio/letra', {
+            method: 'POST',
+            body: JSON.stringify({
+              acao: 'letra',
+              tema: f.tema.trim() || plano.tema,
+              estilo: [est.nome, f.ritmo ? `ritmo ${RITMOS.find((r) => r.id === f.ritmo)?.nome.toLowerCase()}` : ''].filter(Boolean).join(', '),
+              voz: VOZES.find((v) => v.id === plano.voz)?.nome,
+              detalhes: nomesIdeiasPlano.join(', '),
+            }),
+          });
+          marcar(k, tentativa > 1 ? 'tentando de novo: música…' : 'criando a música…');
+          const d = await api('/api/estudio/gerar', {
+            method: 'POST',
+            body: JSON.stringify({
+              motor: plano.motor,
+              modo: 'personalizado',
+              titulo: l.titulo || `${plano.titulo} ${k + 1}`,
+              letra: l.letra,
+              estilo: [est.base, ritmoEn(f.ritmo), ideiasEmTexto(plano.ideias), plano.estiloExtra].filter(Boolean).join(', '),
+              voz: plano.voz,
+              instrumental: false,
+              duracaoSeg: plano.duracao,
+              grupoId: plano.grupoId,
+              versao: k + 1,
+            }),
+          });
+          setMusicas((ms) => [d.musica, ...ms]);
+          marcar(k, 'pronta ✓');
+          plano.prontas[k] = { ...d.musica, estiloNome: est.nome, ritmoNome: nomeRitmo(f.ritmo), ideiasNomes: nomesIdeiasPlano };
+          return;
+        } catch (e) {
+          ultimoErro = e.message;
+        }
+      }
+      marcar(k, `falhou ✕ (${ultimoErro.slice(0, 80)})`);
+    };
+
+    setMedProgresso((p) => p && ({ ...p, fase: 'musicas', erro: '', falhas: [] }));
+    await emLotes(indices, 2, umaFaixa);
+
+    const falhas = plano.faixas.map((_, i) => i).filter((i) => !plano.prontas[i]);
+    const prontas = plano.prontas.filter(Boolean);
+
+    if (falhas.length) {
+      setMedProgresso((p) => p && ({
+        ...p,
+        plano,
+        falhas,
+        erro: `${falhas.length} música(s) não saíram. Você pode tentar de novo só essas, ou juntar as ${prontas.length} que ficaram prontas.`,
+      }));
+      return;
+    }
+    await juntarPlano(plano);
+  }
+
+  async function juntarPlano(plano) {
+    const prontas = plano.prontas.filter(Boolean);
+    if (prontas.length < 2) { setAviso('Precisa de pelo menos 2 músicas prontas para juntar.'); return; }
+    setMedProgresso((p) => p && ({ ...p, fase: 'juntando', erro: '', falhas: [] }));
     try {
-      const prontas = await emLotes(medFaixas, 2, async (f, k) => {
-        const est = ESTILOS.find((e) => e.id === f.estiloId) || ESTILOS[0];
-        marcar(k, 'escrevendo a letra…');
-        const l = await api('/api/estudio/letra', {
-          method: 'POST',
-          body: JSON.stringify({ acao: 'letra', tema: f.tema.trim() || medTema, estilo: [est.nome, f.ritmo ? `ritmo ${RITMOS.find((r) => r.id === f.ritmo)?.nome.toLowerCase()}` : ''].filter(Boolean).join(', '), voz: VOZES.find((v) => v.id === voz)?.nome, detalhes: nomesIdeias }),
-        });
-        marcar(k, 'criando a música…');
-        const d = await api('/api/estudio/gerar', {
-          method: 'POST',
-          body: JSON.stringify({
-            motor: motorMed,
-            modo: 'personalizado',
-            titulo: l.titulo || `${tituloMed} ${k + 1}`,
-            letra: l.letra,
-            estilo: [est.base, ritmoEn(f.ritmo), ideiasEmTexto(ideias), estiloExtra.trim()].filter(Boolean).join(', '),
-            voz,
-            instrumental: false,
-            duracaoSeg: duracao,
-            grupoId,
-            versao: k + 1,
-          }),
-        });
-        setMusicas((ms) => [d.musica, ...ms]);
-        marcar(k, 'pronta ✓');
-        return { ...d.musica, estiloNome: est.nome, ritmoNome: nomeRitmo(f.ritmo), ideiasNomes: ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean) };
-      });
-
-      setMedProgresso((p) => ({ ...p, fase: 'juntando' }));
       const d = await api('/api/estudio/juntar', {
         method: 'POST',
-        body: JSON.stringify({ titulo: tituloMed, faixas: prontas, crossfade }),
+        body: JSON.stringify({ titulo: plano.titulo, faixas: prontas, crossfade: plano.crossfade }),
       });
       setMusicas((ms) => [d.musica, ...ms]);
       setMedProgresso(null);
       setAberta(d.musica.id);
-      setAviso(`Medley "${tituloMed}" pronto! As músicas separadas também ficaram na biblioteca.`);
+      setAviso(`Medley "${plano.titulo}" pronto! As músicas separadas também ficaram na biblioteca.`);
     } catch (e) {
-      setMedProgresso((p) => p && ({ ...p, erro: e.message }));
+      setMedProgresso((p) => p && ({ ...p, plano, erro: `Erro ao juntar: ${e.message}`, falhas: [] }));
     }
+  }
+
+  function tentarFalhasDeNovo() {
+    const p = medProgresso;
+    if (!p?.plano) return;
+    const marcar = (k, status) => setMedProgresso((x) => x && ({ ...x, etapas: x.etapas.map((e, i) => (i === k ? { ...e, status } : e)) }));
+    rodarMedley(p.plano, p.falhas, marcar);
   }
 
   function alternarSelecao(id) {
@@ -1034,6 +1096,18 @@ export default function EstudioMusica() {
                 {medProgresso.erro && (
                   <div className="est-erro-txt">
                     {medProgresso.erro}
+                    {medProgresso.plano && (
+                      <div className="est-medprog-btns">
+                        {medProgresso.falhas?.length > 0 && (
+                          <button className="est-btn-sec" onClick={tentarFalhasDeNovo}>🔁 Tentar de novo as que falharam</button>
+                        )}
+                        {medProgresso.plano.prontas.filter(Boolean).length >= 2 && (
+                          <button className="est-btn-sec" onClick={() => juntarPlano(medProgresso.plano)}>
+                            🔗 Juntar as {medProgresso.plano.prontas.filter(Boolean).length} prontas
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <button className="est-link" onClick={() => setMedProgresso(null)}>fechar</button>
                   </div>
                 )}
@@ -1285,6 +1359,8 @@ export default function EstudioMusica() {
         .est-selnum { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--gold); color: var(--gold); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
         .est-medprog { display: block; }
         .est-medprog-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .est-medprog-btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+        .est-medprog-btns .est-btn-sec { padding: 9px 14px; }
         .est-medprog-lista { display: grid; gap: 4px; font-size: 14px; }
         .est-medprog-lista div { display: flex; justify-content: space-between; gap: 12px; color: var(--text-muted); }
         .est-badge.medley { background: var(--gold-soft); color: var(--gold); }

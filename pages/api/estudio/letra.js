@@ -4,7 +4,9 @@
 
 export const config = { maxDuration: 60 };
 
-async function groq(prompt, maxTokens = 1200) {
+// O modelo gpt-oss "pensa" antes de responder e esse pensamento gasta o limite
+// de tokens — por isso o limite é alto e o esforço de raciocínio é baixo.
+async function groq(prompt, maxTokens = 4000) {
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
@@ -13,6 +15,7 @@ async function groq(prompt, maxTokens = 1200) {
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.9,
       max_completion_tokens: maxTokens,
+      reasoning_effort: 'low',
     }),
   });
   const d = await r.json();
@@ -43,7 +46,7 @@ Ideia: ${tema || ''}`, 200);
       ? `Melhore a letra abaixo mantendo a ideia, deixando mais cantável, com rimas naturais e refrão forte e fácil de lembrar.\n\nLetra atual:\n${letraAtual}`
       : `Escreva uma letra de música ORIGINAL sobre: ${tema}`;
 
-    const txt = await groq(`${base}
+    const pedido = `${base}
 
 Regras:
 - Português do Brasil, linguagem natural e emocionante.
@@ -59,14 +62,22 @@ ${temSolo ? '- Inclua na estrutura as partes instrumentais pedidas, cada uma em 
 Responda EXATAMENTE neste formato:
 TÍTULO: <título curto>
 LETRA:
-<letra com as marcações>`, 1500);
+<letra com as marcações>`;
 
-    const mTitulo = txt.match(/T[ÍI]TULO:\s*(.+)/i);
-    const mLetra = txt.split(/LETRA:\s*/i)[1];
-    return res.status(200).json({
-      titulo: (mTitulo ? mTitulo[1] : '').replace(/[*"]/g, '').trim(),
-      letra: (mLetra || txt).trim(),
-    });
+    // Às vezes a IA devolve vazio ou cortado — tenta até 3 vezes
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+      const txt = await groq(pedido);
+      const mTitulo = txt.match(/T[ÍI]TULO:\s*(.+)/i);
+      const letra = (txt.split(/LETRA:\s*/i)[1] || txt).replace(/^```\w*|```$/g, '').trim();
+      const linhasCantadas = letra.split('\n').filter((l) => l.trim() && !/^\s*\[.*\]\s*$/.test(l));
+      if (linhasCantadas.length >= 8) {
+        return res.status(200).json({
+          titulo: (mTitulo ? mTitulo[1] : '').replace(/[*"#]/g, '').trim(),
+          letra,
+        });
+      }
+    }
+    return res.status(500).json({ erro: 'A IA não conseguiu escrever a letra agora. Tente de novo em instantes.' });
   } catch (e) {
     return res.status(500).json({ erro: e.message });
   }
