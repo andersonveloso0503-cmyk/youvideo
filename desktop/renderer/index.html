@@ -212,10 +212,13 @@
               <select id="selCanal"></select>
               <button class="btn-mini" id="btnConectarCanal">+ Canal</button>
             </div>
+            <label class="rotulo">O que a IA deve escrever <span class="nota">(o estilo manda no título)</span></label>
+            <input id="inPedidoIa" maxlength="200" placeholder="Ex.: louvores gospel de adoração para orar" />
             <div class="linha-rotulo"><label class="rotulo">Título</label><button class="btn-ia" id="btnIaTitulo" title="Cria título, descrição e tags a partir do nome do vídeo e das músicas">✨ Gerar com IA</button></div>
             <input id="inTitulo" maxlength="100" list="opcoesTitulo" placeholder="Ex.: Louvores para orar · 3 horas" />
             <datalist id="opcoesTitulo"></datalist>
             <span class="dica-opcoes" id="dicaOpcoesTitulo"></span>
+            <label class="interruptor"><input type="checkbox" id="cIaPorVideo" /><span></span> Quando gerar vários vídeos, a IA cria um título diferente para cada um</label>
             <label class="rotulo">Descrição</label>
             <textarea id="inDescricao" rows="4" placeholder="Texto que vai na descrição do vídeo"></textarea>
             <label class="interruptor"><input type="checkbox" id="cTracklist" /><span></span> Lista de músicas com minutagem na descrição</label>
@@ -431,8 +434,8 @@
 
     <details class="cartao ia-envio" open>
       <summary><b>✨ Títulos, descrições e tags com IA</b> <span class="nota">(opcional — sem isso vale o modelo abaixo)</span></summary>
-      <label class="rotulo">Sobre o canal / o que a IA deve saber (opcional)</label>
-      <input id="inContextoIa" placeholder="Ex.: canal de rock instrumental para dirigir e trabalhar; público brasileiro" />
+      <label class="rotulo">O que a IA deve escrever (o estilo manda no título)</label>
+      <input id="inContextoIa" placeholder="Ex.: louvores gospel de adoração para orar" />
       <div class="linha-botoes">
         <button class="btn-primario" id="btnIaTodos">✨ Gerar para todos os vídeos</button>
         <label class="interruptor"><input type="checkbox" id="cCapitulos" checked /><span></span> Lista de músicas com minutagem (capítulos) na descrição</label>

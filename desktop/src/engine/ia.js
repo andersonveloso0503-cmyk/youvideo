@@ -13,6 +13,54 @@ function limparNome(nome) {
     .trim();
 }
 
+// Gêneros: se o dono pediu um estilo, nada de outro gênero aparecer no título
+const GENEROS = [
+  ['gospel', 'louvor', 'louvores', 'adoração', 'adoracao', 'hino', 'hinos', 'worship', 'cristã', 'crista', 'cristão', 'cristao', 'evangélica', 'evangelica', 'evangélico', 'evangelico', 'católica', 'catolica', 'fé', 'deus', 'jesus'],
+  ['rock', 'metal', 'heavy', 'hard rock', 'punk', 'grunge'],
+  ['sertanejo', 'sertaneja', 'modão', 'modao', 'moda de viola', 'arrocha'],
+  ['funk', 'baile'],
+  ['pagode', 'samba'],
+  ['forró', 'forro', 'piseiro', 'xote', 'baião', 'baiao'],
+  ['rap', 'trap', 'hip hop', 'hip-hop'],
+  ['eletrônica', 'eletronica', 'electronic', 'edm', 'house', 'techno', 'trance'],
+  ['blues'],
+  ['jazz'],
+  ['reggae'],
+  ['mpb'],
+  ['pop'],
+  ['country'],
+  ['lofi', 'lo-fi'],
+  ['clássica', 'classica', 'orquestra', 'piano clássico'],
+  ['kpop', 'k-pop'],
+];
+const semAcento = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+function temPalavra(texto, termo) {
+  const t = ` ${semAcento(texto).replace(/[^a-z0-9]+/g, ' ')} `;
+  return t.includes(` ${semAcento(termo).replace(/[^a-z0-9]+/g, ' ').trim()} `);
+}
+function gruposDe(texto) {
+  return GENEROS.map((g, i) => (g.some((w) => temPalavra(texto, w)) ? i : -1)).filter((i) => i >= 0);
+}
+/** Palavras de gênero que NÃO combinam com o pedido do dono. */
+function generosProibidos(pedido) {
+  const permitidos = gruposDe(pedido);
+  if (!permitidos.length) return [];
+  return GENEROS.filter((_, i) => !permitidos.includes(i)).flat();
+}
+function violaPedido(texto, proibidos) {
+  return proibidos.some((w) => temPalavra(texto, w));
+}
+function palavras(t) {
+  return new Set(semAcento(t).replace(/[^a-z0-9]+/g, ' ').split(' ').filter((w) => w.length > 2));
+}
+function parecido(a, b) {
+  const A = palavras(a), B = palavras(b);
+  if (!A.size || !B.size) return 0;
+  let comum = 0;
+  for (const w of A) if (B.has(w)) comum++;
+  return comum / Math.min(A.size, B.size);
+}
+
 async function chamarGroq(groqKey, mensagens, { modelo = MODELO, temperatura = 0.7, tokens = 3000 } = {}) {
   const tentar = async (m) => {
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -76,7 +124,8 @@ async function palavrasPesquisadas(groqKey, info, idiomaCodigo) {
             'Você é especialista em pesquisa de palavras-chave do YouTube. Responda só JSON: {"sementes": ["...", "...", "...", "...", "..."]}. ' +
             'Dê 5 termos CURTOS (2 a 4 palavras, minúsculas, sem emoji) que uma pessoa digitaria na busca do YouTube para achar este vídeo: ' +
             'gênero/estilo, ocasião de uso (ex.: para dirigir, para trabalhar, para dormir, para orar), formato (ex.: playlist, coletânea, desenho animado) e o tema principal. ' +
-            'Não use nomes de artistas que não estejam na informação.',
+            'Não use nomes de artistas que não estejam na informação. ' +
+            'Se houver PEDIDO DO DONO DO CANAL, TODOS os termos precisam ser do estilo/tema do pedido (ex.: pedido "louvores gospel" → "louvores gospel", "louvor para orar", "hinos de adoração"...). Nunca invente outro gênero musical.',
         },
         { role: 'user', content: descreverVideo(info) },
       ],
@@ -84,6 +133,11 @@ async function palavrasPesquisadas(groqKey, info, idiomaCodigo) {
     );
     sementes = (r.sementes || []).map((s) => String(s).toLowerCase().trim()).filter(Boolean).slice(0, 6);
   } catch {}
+  const proibidos = generosProibidos(info.pedido);
+  sementes = sementes.filter((x) => !violaPedido(x, proibidos));
+  // O próprio pedido também vira busca (é o que o dono quer aparecer)
+  const doPedido = String(info.pedido || '').toLowerCase().replace(/[^\p{L}\p{N} ]+/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 4).join(' ');
+  if (doPedido && !sementes.includes(doPedido)) sementes.unshift(doPedido);
   if (!sementes.length) sementes = [limparNome(info.nome).toLowerCase().split(' ').slice(0, 3).join(' ')];
 
   const vistos = new Set();
@@ -93,7 +147,7 @@ async function palavrasPesquisadas(groqKey, info, idiomaCodigo) {
   for (let i = 0; i < 10; i++) {
     for (const r of resultados) {
       const s = r[i];
-      if (s && !vistos.has(s.toLowerCase())) {
+      if (s && !vistos.has(s.toLowerCase()) && !violaPedido(s, proibidos)) {
         vistos.add(s.toLowerCase());
         lista.push(s);
       }
@@ -108,6 +162,7 @@ function descreverVideo(info) {
   const duracao = info.duracaoSeg ? (horas ? `${horas}h${minutos ? String(minutos).padStart(2, '0') : ''}` : `${minutos} min`) : 'desconhecida';
   const musicas = (info.musicas || []).filter(Boolean).slice(0, 40);
   return [
+    info.pedido ? `PEDIDO DO DONO DO CANAL (obrigatório — manda no estilo, no gênero e no tema): ${info.pedido}` : '',
     `Nome do arquivo do vídeo: ${limparNome(info.nome)}`,
     `Duração: ${duracao}${info.curto ? ' (Shorts vertical)' : ''}`,
     musicas.length ? `Músicas no vídeo (${musicas.length}):\n- ${musicas.join('\n- ')}` : '',
@@ -121,7 +176,7 @@ function descreverVideo(info) {
 
 /**
  * Gera { titulo, opcoes: [3 títulos], descricao, tags, pesquisados }.
- * info = { nome, musicas: [titulos], duracaoSeg, curto, canal, contexto, idioma }
+ * info = { nome, musicas: [titulos], duracaoSeg, curto, canal, contexto, pedido, idioma, clima, evitar }
  */
 async function gerarTextosVideo(groqKey, info) {
   if (!groqKey) throw new Error('Para gerar com IA, cadastre a chave da Groq em Configurações.');
@@ -137,6 +192,10 @@ Responda SOMENTE com JSON: {"palavra_principal": "...", "opcoes": ["título 1", 
 COMO ESCOLHER AS PALAVRAS
 - Você recebe a lista "PESQUISADO NO YOUTUBE": são buscas REAIS que as pessoas fazem (autocompletar do YouTube). Use essas expressões EXATAS, sem trocar a ordem das palavras.
 - palavra_principal = a busca da lista que melhor descreve ESTE vídeo (a mais específica que ainda é popular).
+
+REGRA NÚMERO 1 — O PEDIDO DO DONO
+- Se vier "PEDIDO DO DONO DO CANAL", ele manda: gênero, estilo e tema do título, da descrição e das tags são os do pedido.
+- NUNCA coloque outro gênero musical (ex.: pedido de louvores gospel → nada de rock, sertanejo, pop, funk, eletrônica...). Nome de arquivo, nome das músicas e a lista de buscas NÃO mudam o gênero pedido.
 
 REGRAS DO TÍTULO (as 3 opções seguem todas):
 1. A palavra_principal fica nas PRIMEIRAS palavras do título (o YouTube dá mais peso ao começo).
@@ -155,10 +214,10 @@ REGRAS DO TÍTULO (as 3 opções seguem todas):
    - MISTURADO (várias calmas e várias animadas) → evite prometer um clima só; use a ocasião mais neutra.
    Escolha, da lista PESQUISADO NO YOUTUBE, as buscas que combinam com esse clima.
 
-EXEMPLOS DO PADRÃO CERTO
-- Rock instrumental longo: "Rock Instrumental para Dirigir | 3 Horas de Heavy Blues Guitar 🎸"
-- Playlist: "PLAYLIST ROCK NACIONAL ANOS 80 — As Melhores Para Ouvir no Carro"
+EXEMPLOS DO PADRÃO CERTO (só a forma — o gênero é sempre o do vídeo/pedido)
 - Gospel: "Louvores de Adoração ${ano} | 1 Hora de Músicas Gospel Para Orar 🙏"
+- Gospel: "Hinos Para Acalmar o Coração — Louvores Para Ouvir Antes de Dormir"
+- Playlist: "PLAYLIST SERTANEJA ${ano} — As Melhores Para Ouvir no Carro"
 - Desenho bíblico: "A Arca de Noé em Desenho Animado | História Bíblica para Crianças"
 - Corte cômico (Short): "Jonas e a Baleia Mas Ninguém Esperava Isso 😂 #Shorts"
 
@@ -178,23 +237,38 @@ TAGS
 
 ${
     info.evitar?.length
-      ? `TÍTULOS JÁ USADOS EM OUTROS VÍDEOS DESTA MESMA LEVA (mesmas músicas em outra ordem) — os seus 3 títulos precisam ser CLARAMENTE DIFERENTES destes: outra palavra_principal da lista, outra ocasião e outro gancho. Não repita a mesma estrutura:\n${info.evitar.map((t) => `- ${t}`).join('\n')}\n\n`
+      ? `TÍTULOS JÁ USADOS EM OUTROS VÍDEOS DESTA MESMA LEVA (mesmas músicas em outra ordem) — os seus 3 títulos precisam ser CLARAMENTE DIFERENTES destes: comece com OUTRAS palavras, use outra palavra_principal da lista, outra ocasião e outro gancho (o YouTube trata títulos repetidos como spam). Não repita a mesma estrutura:\n${info.evitar.map((t) => `- ${t}`).join('\n')}\n\n`
       : ''
   }PESQUISADO NO YOUTUBE (buscas reais, das mais populares para as menos):
 ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi possível consultar — use os termos mais buscados que você conhece para esse nicho)'}`;
 
-  const j = await chamarGroq(groqKey, [
-    { role: 'system', content: sistema },
-    { role: 'user', content: usuario },
-  ]);
-
+  const proibidos = generosProibidos(info.pedido);
+  const evitar = (info.evitar || []).filter(Boolean);
   const limparTitulo = (t) => String(t || '').replace(/^["'“]|["'”]$/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
-  let opcoes = (Array.isArray(j.opcoes) ? j.opcoes : [j.titulo]).map(limparTitulo).filter(Boolean);
-  if (!opcoes.length) opcoes = [limparNome(info.nome)];
-  const melhor = Math.max(0, Math.min(opcoes.length - 1, Number(j.melhor) || 0));
+  const bom = (t) => !violaPedido(t, proibidos) && !evitar.some((e) => parecido(t, e) >= 0.7);
+
+  let j, opcoes = [], melhor = 0;
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    const extra = tentativa
+      ? `\n\nATENÇÃO: a resposta anterior ${proibidos.length ? 'usou um gênero que o dono NÃO pediu ou ' : ''}ficou parecida demais com títulos já usados. Siga o PEDIDO DO DONO e escreva 3 títulos bem diferentes.`
+      : '';
+    j = await chamarGroq(groqKey, [
+      { role: 'system', content: sistema },
+      { role: 'user', content: usuario + extra },
+    ], { temperatura: evitar.length || tentativa ? 0.9 : 0.7 });
+    const todas = (Array.isArray(j.opcoes) ? j.opcoes : [j.titulo]).map(limparTitulo).filter(Boolean);
+    const escolhida = todas[Math.max(0, Math.min(todas.length - 1, Number(j.melhor) || 0))];
+    opcoes = todas.filter(bom);
+    if (opcoes.length) {
+      melhor = Math.max(0, opcoes.indexOf(escolhida));
+      break;
+    }
+  }
+  if (!opcoes.length) opcoes = [limparNome(info.pedido || info.nome)];
   let tags = (Array.isArray(j.tags) ? j.tags : String(j.tags || '').split(','))
     .map((t) => String(t).replace(/^#/, '').trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((t) => !violaPedido(t, proibidos));
   // O YouTube aceita até 500 caracteres de tags no total
   const cabem = [];
   let total = 0;
@@ -208,7 +282,7 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   return {
     titulo: opcoes[melhor],
     opcoes,
-    descricao: String(j.descricao || '').trim(),
+    descricao: String(j?.descricao || '').trim(),
     tags,
     palavraPrincipal: j.palavra_principal || '',
     pesquisados,

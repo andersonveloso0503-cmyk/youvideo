@@ -240,7 +240,7 @@ const Subir = (() => {
             clima: v.clima || '',
             evitar: S.videos.filter((x) => x !== v && x.fonte === 'ia' && x.titulo).map((x) => x.titulo).slice(-12),
             canal,
-            contexto: S.contexto,
+            pedido: S.contexto,
           });
           Object.assign(v, { titulo: r.titulo, opcoes: r.opcoes, palavra: r.palavraPrincipal, descricao: r.descricao, tags: r.tags.join(', '), fonte: 'ia' });
         } catch (e) {

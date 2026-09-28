@@ -38,7 +38,7 @@ const PADRAO = {
   formato: { tipo: 'longo', resolucao: '1080', versoes: '', qtdVideos: '', duracaoMaxMin: '', limiteMusicaSeg: '' },
   saida: { pasta: '', nome: '' },
   publicar: {
-    ativo: false, canalId: '', titulo: '', descricao: '', tags: '', privacidade: 'private', incluirTracklist: true,
+    ativo: false, canalId: '', titulo: '', descricao: '', tags: '', privacidade: 'private', incluirTracklist: true, pedido: '', iaPorVideo: true,
     agendar: { ativo: false, inicio: '', intervaloHoras: 24 },
   },
 };
@@ -842,6 +842,8 @@ function ligarTudo() {
     ligarSlider('#sCrossfade', au, 'crossfade', '#vCrossfade', (v) => (v ? `${v} s` : 'sem')),
     ligarCheck('#cNormalizar', au, 'normalizar'),
     ligarCheck('#cPublicar', pb, 'ativo', () => { $('#camposPublicar').classList.toggle('desligado', !P.publicar.ativo); atualizarResumo(); }),
+    ligarCampo('#inPedidoIa', pb, 'pedido'),
+    ligarCheck('#cIaPorVideo', pb, 'iaPorVideo'),
     ligarCampo('#inTitulo', pb, 'titulo'),
     ligarCampo('#inDescricao', pb, 'descricao'),
     ligarCheck('#cTracklist', pb, 'incluirTracklist'),
@@ -1001,7 +1003,8 @@ async function gerarTituloIa() {
       duracaoSeg: duracoes[0] || sel.reduce((a, m) => a + m.duracao, 0),
       curto: P.formato.tipo === 'curto',
       canal: canais.find((c) => c.id === P.publicar.canalId)?.titulo || '',
-      contexto: config.envioPrefs?.contexto || '',
+      contexto: P.publicar.pedido?.trim() ? '' : config.envioPrefs?.contexto || '',
+      pedido: P.publicar.pedido || '',
     });
     P.publicar.titulo = r.titulo;
     $('#opcoesTitulo').innerHTML = r.opcoes.map((o) => `<option value="${o.replace(/"/g, '&quot;')}"></option>`).join('');
