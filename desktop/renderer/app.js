@@ -35,7 +35,7 @@ const PADRAO = {
   audio: { somenteInstrumental: false, crossfade: 2, normalizar: false },
   legenda: { ativo: false, idioma: 'pt', posicao: 'baixo', tamanho: 100, cor: '#ffffff', mostrarNome: false },
   inscrever: { ativo: false, idioma: 'pt', posicao: 'inf_dir', tamanho: 28, primeiroSeg: 10, intervaloMin: 10 },
-  formato: { tipo: 'longo', resolucao: '1080', qtdVideos: '', duracaoMaxMin: '', limiteMusicaSeg: '' },
+  formato: { tipo: 'longo', resolucao: '1080', versoes: '', qtdVideos: '', duracaoMaxMin: '', limiteMusicaSeg: '' },
   saida: { pasta: '', nome: '' },
   publicar: {
     ativo: false, canalId: '', titulo: '', descricao: '', tags: '', privacidade: 'private', incluirTracklist: true,
@@ -129,6 +129,13 @@ function dividir(musicas) {
   const max = maxMin ? maxMin * 60 : Infinity;
   const lim = Number(P.formato.limiteMusicaSeg) || 0;
   const cf = Number(P.audio.crossfade) || 0;
+  const versoes = curto ? 0 : Number(P.formato.versoes) || 0;
+  if (versoes > 1 && musicas.length) {
+    // Prévia: cada versão tem todas as músicas, começando por uma diferente
+    const grupos = Array.from({ length: versoes }, (_, k) => [musicas[k % musicas.length], ...musicas.filter((_, i) => i !== k % musicas.length)]);
+    const dur = musicas.reduce((a, m, i) => a + (lim ? Math.min(m.duracao, lim) : m.duracao) - (i ? cf : 0), 0);
+    return { grupos, duracoes: grupos.map(() => dur) };
+  }
   const qtd = curto ? 0 : Number(P.formato.qtdVideos) || 0;
   if (qtd && musicas.length) {
     const grupos = dividirEmQuantidade(musicas, qtd, { limiteMusicaSeg: lim, crossfade: cf });
@@ -169,7 +176,17 @@ function atualizarQtdVideos(nMusicas) {
   }
   if (Number(atual) > max) P.formato.qtdVideos = '';
   sel.value = curto ? '' : String(P.formato.qtdVideos || '');
-  const usaQtd = !curto && Number(P.formato.qtdVideos) > 0;
+  // Versões
+  const sv = $('#selVersoes');
+  if (!sv.options.length) {
+    sv.innerHTML = '<option value="">1 (normal)</option>' + [2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20].map((n) => `<option value="${n}">${n} versões</option>`).join('');
+    sv.onchange = (e) => { P.formato.versoes = e.target.value; salvarDepois(); };
+  }
+  sv.disabled = curto;
+  sv.value = curto ? '' : String(P.formato.versoes || '');
+  const usaVersoes = !curto && Number(P.formato.versoes) > 1;
+  sel.disabled = curto || usaVersoes;
+  const usaQtd = usaVersoes || (!curto && Number(P.formato.qtdVideos) > 0);
   $('#inDuracaoMax').disabled = usaQtd;
   $('#inDuracaoMax').placeholder = usaQtd ? '—' : '∞';
 }
@@ -298,7 +315,7 @@ function atualizarResumo() {
   btn.disabled = !sel.length;
   let dica = '';
   if (!sel.length) dica = 'Selecione músicas para começar';
-  else if (grupos.length > 1) dica = P.formato.tipo === 'curto' ? `Um Short por música (até ${Number(P.formato.duracaoMaxMin) || 1} min cada)` : Number(P.formato.qtdVideos) ? `Dividido em ${grupos.length} vídeos com tempos parecidos` : `Dividido pela duração máxima de ${P.formato.duracaoMaxMin} min`;
+  else if (grupos.length > 1) dica = P.formato.tipo === 'curto' ? `Um Short por música (até ${Number(P.formato.duracaoMaxMin) || 1} min cada)` : Number(P.formato.versoes) > 1 ? `${grupos.length} versões: cada uma começa com uma música diferente e o resto embaralhado` : Number(P.formato.qtdVideos) ? `Dividido em ${grupos.length} vídeos com tempos parecidos` : `Dividido pela duração máxima de ${P.formato.duracaoMaxMin} min`;
   else if (P.publicar.ativo) dica = 'Vai publicar no YouTube quando terminar';
   else dica = 'O vídeo é gerado aqui no seu PC';
   if (P.audio.somenteInstrumental && !config.temFal) dica = '⚠ Falta a chave da fal.ai (Configurações)';

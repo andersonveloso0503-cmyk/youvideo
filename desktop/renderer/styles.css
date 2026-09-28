@@ -611,3 +611,5 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px;
 .musica .clima { font-size: 13px; text-align: center; cursor: help; }
 .musica .clima.analisando { color: var(--mudo); animation: pulsar-op 1.2s ease-in-out infinite; }
 @keyframes pulsar-op { 50% { opacity: .3; } }
+
+#selVersoes { width: 120px; }

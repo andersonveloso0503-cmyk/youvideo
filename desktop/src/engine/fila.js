@@ -27,6 +27,33 @@ function caminhoLivre(pasta, nome) {
   return alvo;
 }
 
+// Várias versões com as MESMAS músicas: a versão 1 começa com a música 1, a 2 com a música 2...
+// e o resto vem embaralhado, diferente em cada versão.
+function gerarVersoes(musicas, n) {
+  const embaralhar = (l) => {
+    const a = [...l];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const vistas = new Set();
+  return Array.from({ length: n }, (_, k) => {
+    const primeira = musicas[k % musicas.length];
+    let ordem;
+    for (let t = 0; t < 20; t++) {
+      ordem = [primeira, ...embaralhar(musicas.filter((m) => m !== primeira))];
+      const assinatura = ordem.map((m) => m.arquivo).join('|');
+      if (!vistas.has(assinatura) || musicas.length < 3) {
+        vistas.add(assinatura);
+        break;
+      }
+    }
+    return ordem;
+  });
+}
+
 function girar(lista, n) {
   if (!lista.length) return lista;
   const k = n % lista.length;
@@ -102,19 +129,22 @@ class Fila extends EventEmitter {
     const musicas = projeto.musicas.filter((m) => m.duracao > 0);
     if (!musicas.length) throw new Error('Selecione pelo menos uma música.');
     const curto = projeto.formato.tipo === 'curto';
-    const qtd = curto ? 0 : Number(projeto.formato.qtdVideos) || 0;
+    const versoes = curto ? 0 : Math.min(30, Number(projeto.formato.versoes) || 0);
+    const qtd = curto || versoes > 1 ? 0 : Number(projeto.formato.qtdVideos) || 0;
     const opcoes = { limiteMusicaSeg: Number(projeto.formato.limiteMusicaSeg) || 0, crossfade: Number(projeto.audio?.crossfade) || 0 };
-    const grupos = qtd
+    const grupos = versoes > 1
+      ? gerarVersoes(musicas, versoes)
+      : qtd
       ? R.dividirEmQuantidade(musicas, qtd, opcoes)
       : R.dividirEmVideos(musicas, {
           duracaoMaxMin: curto ? Number(projeto.formato.duracaoMaxMin) || 1 : Number(projeto.formato.duracaoMaxMin) || 0,
           ...opcoes,
         });
     // Com quantidade escolhida, a duração máxima não corta nada
-    if (qtd) projeto = { ...projeto, formato: { ...projeto.formato, duracaoMaxMin: '' } };
+    if (qtd || versoes > 1) projeto = { ...projeto, formato: { ...projeto.formato, duracaoMaxMin: '' } };
     const lote = crypto.randomBytes(4).toString('hex');
     const criados = grupos.map((grupo, i) => {
-      const sufixo = grupos.length > 1 ? (curto ? ` - ${grupo[0].titulo}` : ` - Parte ${i + 1}`) : '';
+      const sufixo = grupos.length > 1 ? (curto ? ` - ${grupo[0].titulo}` : versoes > 1 ? ` - Versão ${i + 1}` : ` - Parte ${i + 1}`) : '';
       const job = {
         id: `${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`,
         lote,
