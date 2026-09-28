@@ -467,6 +467,29 @@ export default function EstudioMusica() {
   const [pos, setPos] = useState(0);
   const [dur, setDur] = useState(0);
   const [agora, setAgora] = useState(Date.now());
+  const [volume, setVolume] = useState(0.8);
+  const [mudo, setMudo] = useState(false);
+
+  // Lembra o volume escolhido neste navegador
+  useEffect(() => {
+    try {
+      const v = parseFloat(localStorage.getItem('estudio-volume'));
+      if (!Number.isNaN(v)) setVolume(Math.max(0, Math.min(1, v)));
+    } catch { /* sem armazenamento */ }
+  }, []);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+      audioRef.current.muted = mudo;
+    }
+    try { localStorage.setItem('estudio-volume', String(volume)); } catch { /* sem armazenamento */ }
+  }, [volume, mudo, tocando]);
+
+  function mudarVolume(v) {
+    setVolume(v);
+    if (v > 0 && mudo) setMudo(false);
+  }
 
   const estiloTexto = useMemo(() => {
     const base = ESTILOS.find((e) => e.id === estiloId)?.base || '';
@@ -1302,6 +1325,23 @@ export default function EstudioMusica() {
               <span>{fmtTempo(dur)}</span>
             </div>
           </div>
+          <div className="est-vol">
+            <button className="est-vol-btn" title="Diminuir volume" onClick={() => mudarVolume(Math.max(0, Math.round((volume - 0.1) * 10) / 10))}>−</button>
+            <button className="est-vol-btn" title={mudo ? 'Tirar do mudo' : 'Mudo'} onClick={() => setMudo(!mudo)}>
+              {mudo || volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={mudo ? 0 : volume}
+              onChange={(e) => mudarVolume(+e.target.value)}
+              aria-label="Volume"
+            />
+            <button className="est-vol-btn" title="Aumentar volume" onClick={() => mudarVolume(Math.min(1, Math.round((volume + 0.1) * 10) / 10))}>+</button>
+            <span className="est-vol-num">{mudo ? 0 : Math.round(volume * 100)}%</span>
+          </div>
           <button className="est-player-x" onClick={() => { audioRef.current?.pause(); setTocando(null); }}>✕</button>
         </div>
       )}
@@ -1409,6 +1449,15 @@ export default function EstudioMusica() {
         .est-player-meio { flex: 1; min-width: 0; }
         .est-player-titulo { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .est-player-barra { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); }
+        .est-vol { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .est-vol input[type='range'] { width: 110px; }
+        .est-vol-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text); font-size: 16px; cursor: pointer; }
+        .est-vol-num { font-size: 12px; color: var(--text-muted); width: 36px; text-align: right; }
+        @media (max-width: 640px) {
+          .est-player { flex-wrap: wrap; }
+          .est-vol { width: 100%; justify-content: center; order: 5; }
+          .est-vol input[type='range'] { flex: 1; width: auto; }
+        }
         .est-player-x { background: none; border: 0; color: var(--text-muted); font-size: 18px; cursor: pointer; }
       `}</style>
     </>
