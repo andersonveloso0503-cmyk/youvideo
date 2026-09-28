@@ -238,7 +238,27 @@ const Biblioteca = (() => {
       o.textContent = c.titulo;
       sel.appendChild(o);
     });
-    sel.value = atual && canais.find((c) => c.id === atual) ? atual : config.envioPrefs?.canalId || canais[0]?.id || '';
+    // Cada tipo de vídeo lembra o seu canal (bíblicos num canal, músicas em outro...)
+    const cats = [...new Set(itens.map((i) => i.categoria))];
+    const lembrado = cats.length === 1 ? config.envioPrefs?.canalPorCategoria?.[cats[0]] : null;
+    const chave = cats.join(',');
+    if (B.ultimaSelecaoCats !== chave) {
+      B.ultimaSelecaoCats = chave;
+      sel.value = lembrado && canais.find((c) => c.id === lembrado) ? lembrado : '';
+    } else {
+      sel.value = atual && canais.find((c) => c.id === atual) ? atual : '';
+    }
+    if (!sel.value) {
+      if (!sel.querySelector('option[value=""]')) sel.insertAdjacentHTML('afterbegin', '<option value="">— escolha o canal —</option>');
+      sel.value = '';
+    }
+    const avisoCanal = q('#bibAvisoCanal');
+    avisoCanal.textContent =
+      cats.length > 1
+        ? '⚠ Você marcou vídeos de tipos diferentes — confira se o canal está certo para todos.'
+        : lembrado
+          ? `Canal usado da última vez para ${B.categorias[cats[0]] || 'este tipo'}.`
+          : `Primeira vez agendando ${B.categorias[cats[0]] || 'este tipo'}: escolha o canal (o app lembra depois).`;
     sel.disabled = !q('#redeYoutube').checked;
     const hs = horarios(itens.length);
     q('#bibPrevia').innerHTML = itens
@@ -324,6 +344,12 @@ const Biblioteca = (() => {
       }
       btn.textContent = 'Agendando...';
       const r = await window.api.central.agendar({ itens: lista, redes });
+      if (redes.youtube) {
+        const mapa = { ...(config.envioPrefs?.canalPorCategoria || {}) };
+        itens.forEach((i) => (mapa[i.categoria] = redes.youtube));
+        config.envioPrefs = { ...(config.envioPrefs || {}), canalPorCategoria: mapa };
+        window.api.config.salvar({ envioPrefs: config.envioPrefs }).catch(() => {});
+      }
       const partes = [];
       if (r.youtube) partes.push(`${r.youtube} no YouTube (acompanhe na Fila)`);
       if (r.nuvem) partes.push(`${r.nuvem} nas redes`);

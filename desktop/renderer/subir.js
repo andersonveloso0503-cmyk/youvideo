@@ -24,7 +24,9 @@ const Subir = (() => {
 
   function salvarPrefs() {
     const { canalId, privacidade, hora, intervalo, contexto, capitulos, modelo } = S;
-    window.api.config.salvar({ envioPrefs: { canalId, privacidade, hora, intervalo, contexto, capitulos, modelo } }).catch(() => {});
+    const envioPrefs = { ...(config.envioPrefs || {}), canalId, privacidade, hora, intervalo, contexto, capitulos, modelo };
+    config.envioPrefs = envioPrefs;
+    window.api.config.salvar({ envioPrefs }).catch(() => {});
   }
 
   function fmtMin(seg) {
