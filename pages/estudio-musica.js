@@ -19,6 +19,224 @@ const ESTILOS = [
   { id: 'infantil', nome: 'Infantil', base: "children's song, playful, cheerful, simple melody" },
 ];
 
+// ───────────────────────── Ideias de instrumentos, solos e arranjo ─────────────────────────
+// nome = o que aparece na tela; en = o que vai pro motor de IA (entende melhor em inglês)
+
+const IDEIAS = [
+  {
+    cat: 'Guitarra', emoji: '🎸',
+    itens: [
+      { id: 'solo-pent', nome: 'Solo na pentatônica', en: 'melodic electric guitar solo using the pentatonic scale' },
+      { id: 'solo-blues', nome: 'Solo blues com bends', en: 'expressive blues guitar solo with string bends and vibrato' },
+      { id: 'solo-rock', nome: 'Solo de rock rápido', en: 'fast shredding rock guitar solo' },
+      { id: 'solo-melod', nome: 'Solo melódico worship', en: 'soaring melodic worship guitar solo with delay and reverb' },
+      { id: 'slide', nome: 'Slide guitar', en: 'slide guitar licks' },
+      { id: 'wah', nome: 'Wah-wah', en: 'wah-wah guitar' },
+      { id: 'riff', nome: 'Riff marcante', en: 'catchy distorted guitar riff' },
+      { id: 'dedilhado', nome: 'Violão dedilhado', en: 'fingerpicked acoustic guitar' },
+      { id: 'violao-nylon', nome: 'Violão de nylon', en: 'nylon string guitar' },
+      { id: 'viola', nome: 'Viola caipira', en: 'Brazilian viola caipira' },
+      { id: 'cavaco', nome: 'Cavaquinho', en: 'cavaquinho' },
+      { id: 'guit-limpa', nome: 'Guitarra limpa (clean)', en: 'clean electric guitar arpeggios' },
+    ],
+  },
+  {
+    cat: 'Metais e sopros', emoji: '🎺',
+    itens: [
+      { id: 'trompete', nome: 'Trompetes', en: 'bright trumpets' },
+      { id: 'solo-trompete', nome: 'Solo de trompete', en: 'trumpet solo' },
+      { id: 'naipe', nome: 'Naipe de metais', en: 'punchy brass section (trumpet, trombone, sax)' },
+      { id: 'sax', nome: 'Saxofone', en: 'smooth saxophone' },
+      { id: 'solo-sax', nome: 'Solo de sax', en: 'soulful saxophone solo' },
+      { id: 'trombone', nome: 'Trombone', en: 'trombone' },
+      { id: 'flauta', nome: 'Flauta', en: 'flute melody' },
+      { id: 'gaita', nome: 'Gaita (harmônica)', en: 'harmonica' },
+      { id: 'acordeon', nome: 'Acordeon / Sanfona', en: 'accordion' },
+    ],
+  },
+  {
+    cat: 'Teclados', emoji: '🎹',
+    itens: [
+      { id: 'piano', nome: 'Piano', en: 'expressive grand piano' },
+      { id: 'solo-piano', nome: 'Solo de piano', en: 'piano solo' },
+      { id: 'hammond', nome: 'Órgão Hammond', en: 'Hammond organ' },
+      { id: 'rhodes', nome: 'Rhodes / piano elétrico', en: 'Rhodes electric piano' },
+      { id: 'pads', nome: 'Pads atmosféricos', en: 'lush atmospheric synth pads' },
+      { id: 'synth80', nome: 'Sintetizador anos 80', en: '80s analog synthesizers' },
+    ],
+  },
+  {
+    cat: 'Cordas e orquestra', emoji: '🎻',
+    itens: [
+      { id: 'violino', nome: 'Violino', en: 'violin' },
+      { id: 'solo-violino', nome: 'Solo de violino', en: 'emotional violin solo' },
+      { id: 'cello', nome: 'Violoncelo', en: 'cello' },
+      { id: 'orquestra', nome: 'Orquestra épica', en: 'epic cinematic orchestra' },
+      { id: 'harpa', nome: 'Harpa', en: 'harp' },
+    ],
+  },
+  {
+    cat: 'Ritmo e percussão', emoji: '🥁',
+    itens: [
+      { id: 'bat-forte', nome: 'Bateria forte', en: 'powerful live drums' },
+      { id: 'bat-suave', nome: 'Bateria suave (vassourinha)', en: 'soft brushed drums' },
+      { id: 'baixo-groove', nome: 'Baixo com groove', en: 'groovy bass line' },
+      { id: 'slap', nome: 'Baixo slap', en: 'slap bass' },
+      { id: 'palmas', nome: 'Palmas', en: 'hand claps' },
+      { id: 'percussao', nome: 'Percussão brasileira', en: 'Brazilian percussion (pandeiro, surdo, tamborim)' },
+      { id: 'zabumba', nome: 'Zabumba e triângulo', en: 'zabumba and triangle' },
+      { id: 'beat', nome: 'Beat eletrônico', en: 'electronic beat' },
+      { id: 'lento', nome: 'Lento (~70 bpm)', en: 'slow tempo around 70 bpm' },
+      { id: 'medio', nome: 'Médio (~95 bpm)', en: 'mid tempo around 95 bpm' },
+      { id: 'rapido', nome: 'Animado (~125 bpm)', en: 'upbeat tempo around 125 bpm' },
+    ],
+  },
+  {
+    cat: 'Vozes e coro', emoji: '🎤',
+    itens: [
+      { id: 'coro', nome: 'Coral gospel', en: 'big gospel choir' },
+      { id: 'backing', nome: 'Backing vocals', en: 'backing vocal harmonies' },
+      { id: 'falsete', nome: 'Falsete', en: 'falsetto moments' },
+      { id: 'adlibs', nome: 'Improvisos (ad-libs)', en: 'vocal ad-libs and runs' },
+      { id: 'rouca', nome: 'Voz rouca / rasgada', en: 'raspy vocal' },
+      { id: 'potente', nome: 'Voz potente', en: 'powerful belting vocal' },
+      { id: 'intima', nome: 'Voz íntima e suave', en: 'soft intimate vocal' },
+    ],
+  },
+  {
+    cat: 'Arranjo e estrutura', emoji: '🧩',
+    itens: [
+      { id: 'intro-inst', nome: 'Intro instrumental', en: 'instrumental intro' },
+      { id: 'build', nome: 'Crescendo até o refrão', en: 'gradual build-up into the chorus' },
+      { id: 'modulacao', nome: 'Sobe o tom no último refrão', en: 'key change up for the final chorus' },
+      { id: 'breakdown', nome: 'Parte só voz e piano', en: 'stripped-down breakdown with just voice and piano' },
+      { id: 'drop', nome: 'Pausa e explosão (drop)', en: 'dramatic pause then full band drop' },
+      { id: 'final-epico', nome: 'Final épico', en: 'big epic ending' },
+      { id: 'fade', nome: 'Final em fade out', en: 'fade out ending' },
+    ],
+  },
+  {
+    cat: 'Clima e produção', emoji: '✨',
+    itens: [
+      { id: 'emocionante', nome: 'Emocionante', en: 'emotional and moving' },
+      { id: 'alegre', nome: 'Alegre / festivo', en: 'joyful and festive' },
+      { id: 'melancolico', nome: 'Melancólico', en: 'melancholic' },
+      { id: 'epico', nome: 'Épico / cinematográfico', en: 'epic cinematic' },
+      { id: 'aovivo', nome: 'Gravação ao vivo', en: 'live concert recording feel with crowd ambience' },
+      { id: 'acustico', nome: 'Acústico / unplugged', en: 'acoustic unplugged' },
+      { id: 'anos80', nome: 'Anos 80', en: '80s production' },
+      { id: 'anos90', nome: 'Anos 90', en: '90s production' },
+      { id: 'lofi', nome: 'Lo-fi', en: 'lo-fi warm tape texture' },
+    ],
+  },
+];
+
+const TODAS_IDEIAS = IDEIAS.flatMap((c) => c.itens);
+
+// Combinações prontas (um clique marca várias ideias)
+const RECEITAS = [
+  { nome: '🔥 Louvor de arena', ids: ['intro-inst', 'build', 'solo-melod', 'coro', 'modulacao', 'final-epico', 'bat-forte'] },
+  { nome: '🎷 Blues gospel', ids: ['solo-blues', 'hammond', 'backing', 'rouca', 'medio'] },
+  { nome: '🎺 Gospel com metais', ids: ['naipe', 'solo-trompete', 'palmas', 'coro', 'alegre', 'rapido'] },
+  { nome: '🤘 Rock com solo', ids: ['riff', 'solo-rock', 'bat-forte', 'potente', 'final-epico'] },
+  { nome: '🪗 Sertanejo raiz', ids: ['viola', 'acordeon', 'dedilhado', 'emocionante', 'medio'] },
+  { nome: '🌙 Balada ao piano', ids: ['piano', 'cello', 'intima', 'breakdown', 'lento'] },
+  { nome: '🎻 Épico orquestral', ids: ['orquestra', 'solo-violino', 'coro', 'epico', 'final-epico'] },
+  { nome: '🕺 Anos 80', ids: ['synth80', 'slap', 'solo-sax', 'anos80', 'rapido'] },
+];
+
+function ideiasEmTexto(ids) {
+  return ids.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.en).filter(Boolean).join(', ');
+}
+
+function PainelIdeias({ selecionadas, setSelecionadas }) {
+  const [aba, setAba] = useState(IDEIAS[0].cat);
+  const [aberto, setAberto] = useState(false);
+  const alternar = (id) => setSelecionadas((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const surpresa = () => {
+    const pega = (cat, n) => {
+      const itens = [...(IDEIAS.find((c) => c.cat === cat)?.itens || [])].sort(() => Math.random() - 0.5);
+      return itens.slice(0, n).map((x) => x.id);
+    };
+    setSelecionadas([
+      ...pega('Guitarra', 1), ...pega('Metais e sopros', 1), ...pega('Teclados', 1),
+      ...pega('Arranjo e estrutura', 2), ...pega('Clima e produção', 1),
+    ]);
+    setAberto(true);
+  };
+  const categoria = IDEIAS.find((c) => c.cat === aba);
+
+  return (
+    <div className="ide">
+      <div className="ide-top">
+        <button className="ide-abrir" onClick={() => setAberto(!aberto)}>
+          🎛 Instrumentos, solos e arranjo {selecionadas.length ? <b>{selecionadas.length}</b> : null} <span>{aberto ? '▲' : '▼'}</span>
+        </button>
+        <button className="ide-dado" title="Sortear uma combinação" onClick={surpresa}>🎲</button>
+      </div>
+
+      {selecionadas.length > 0 && (
+        <div className="ide-sel">
+          {selecionadas.map((id) => {
+            const it = TODAS_IDEIAS.find((x) => x.id === id);
+            return it ? <button key={id} onClick={() => alternar(id)}>{it.nome} ✕</button> : null;
+          })}
+          <button className="ide-limpar" onClick={() => setSelecionadas([])}>limpar</button>
+        </div>
+      )}
+
+      {aberto && (
+        <div className="ide-corpo">
+          <div className="ide-rot">Receitas prontas</div>
+          <div className="ide-receitas">
+            {RECEITAS.map((r) => (
+              <button key={r.nome} onClick={() => setSelecionadas(r.ids)}>{r.nome}</button>
+            ))}
+          </div>
+
+          <div className="ide-abas">
+            {IDEIAS.map((c) => {
+              const n = c.itens.filter((x) => selecionadas.includes(x.id)).length;
+              return (
+                <button key={c.cat} className={aba === c.cat ? 'on' : ''} onClick={() => setAba(c.cat)}>
+                  {c.emoji} {c.cat}{n ? ` (${n})` : ''}
+                </button>
+              );
+            })}
+          </div>
+          <div className="ide-itens">
+            {categoria.itens.map((x) => (
+              <button key={x.id} className={selecionadas.includes(x.id) ? 'on' : ''} onClick={() => alternar(x.id)}>{x.nome}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .ide { margin-top: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px; }
+        .ide-top { display: flex; gap: 6px; }
+        .ide-abrir { flex: 1; display: flex; align-items: center; gap: 8px; background: none; border: 0; color: var(--text); font: inherit; font-weight: 600; font-size: 14px; padding: 6px; cursor: pointer; text-align: left; }
+        .ide-abrir b { background: var(--gold); color: #1a1407; border-radius: 999px; padding: 1px 8px; font-size: 12px; }
+        .ide-abrir span { margin-left: auto; color: var(--text-muted); font-size: 11px; }
+        .ide-dado { background: var(--gold-soft); border: 1px solid var(--gold); border-radius: 8px; width: 38px; cursor: pointer; font-size: 17px; }
+        .ide-sel { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 4px 2px; }
+        .ide-sel button { background: var(--gold-soft); border: 1px solid var(--gold); color: var(--gold); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+        .ide-sel .ide-limpar { background: none; border-color: transparent; color: var(--text-muted); text-decoration: underline; }
+        .ide-corpo { padding: 6px 4px 4px; }
+        .ide-rot { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin: 6px 0; }
+        .ide-receitas { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
+        .ide-receitas button { background: var(--bg-elevated); border: 1px dashed var(--gold); color: var(--text); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+        .ide-abas { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+        .ide-abas button { white-space: nowrap; background: none; border: 0; color: var(--text-muted); padding: 6px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+        .ide-abas button.on { background: var(--bg-elevated); color: var(--gold); font-weight: 600; }
+        .ide-itens { display: flex; flex-wrap: wrap; gap: 5px; }
+        .ide-itens button { background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 6px 11px; font-size: 13px; cursor: pointer; }
+        .ide-itens button.on { border-color: var(--gold); background: var(--gold-soft); color: var(--gold); }
+      `}</style>
+    </div>
+  );
+}
+
 const VOZES = [
   { id: 'masculina', nome: 'Masculina' },
   { id: 'feminina', nome: 'Feminina' },
@@ -103,6 +321,7 @@ export default function EstudioMusica() {
   const [temaLetra, setTemaLetra] = useState('');
   const [estiloId, setEstiloId] = useState('gospel');
   const [estiloExtra, setEstiloExtra] = useState('');
+  const [ideias, setIdeias] = useState([]);
   const [voz, setVoz] = useState('masculina');
   const [instrumental, setInstrumental] = useState(false);
   const [duracao, setDuracao] = useState(150);
@@ -139,8 +358,10 @@ export default function EstudioMusica() {
 
   const estiloTexto = useMemo(() => {
     const base = ESTILOS.find((e) => e.id === estiloId)?.base || '';
-    return [base, estiloExtra.trim()].filter(Boolean).join(', ');
-  }, [estiloId, estiloExtra]);
+    return [base, ideiasEmTexto(ideias), estiloExtra.trim()].filter(Boolean).join(', ');
+  }, [estiloId, estiloExtra, ideias]);
+
+  const nomesIdeias = ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean).join(', ');
 
   useEffect(() => { carregar(); }, []);
 
@@ -179,6 +400,7 @@ export default function EstudioMusica() {
           tema: temaLetra || titulo,
           estilo: ESTILOS.find((e) => e.id === estiloId)?.nome,
           voz: VOZES.find((v) => v.id === voz)?.nome,
+          detalhes: nomesIdeias,
           letraAtual: melhorar ? letra : '',
         }),
       });
@@ -249,13 +471,16 @@ export default function EstudioMusica() {
     setInstrumental(!!m.instrumental);
     if (m.voz) setVoz(m.voz);
     if (m.duracaoSeg) setDuracao(m.duracaoSeg);
-    const achado = ESTILOS.find((e) => m.estilo && m.estilo.startsWith(e.base));
+    let resto = m.estilo || '';
+    const achado = ESTILOS.find((e) => resto.startsWith(e.base));
     if (achado) {
       setEstiloId(achado.id);
-      setEstiloExtra(m.estilo.slice(achado.base.length).replace(/^,\s*/, ''));
-    } else {
-      setEstiloExtra(m.estilo || '');
+      resto = resto.slice(achado.base.length);
     }
+    const achadas = TODAS_IDEIAS.filter((x) => resto.includes(x.en));
+    achadas.forEach((x) => { resto = resto.replace(x.en, ''); });
+    setIdeias(achadas.map((x) => x.id));
+    setEstiloExtra(resto.split(',').map((t) => t.trim()).filter(Boolean).join(', '));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -280,7 +505,7 @@ export default function EstudioMusica() {
         marcar(k, 'escrevendo a letra…');
         const l = await api('/api/estudio/letra', {
           method: 'POST',
-          body: JSON.stringify({ acao: 'letra', tema: f.tema.trim() || medTema, estilo: est.nome, voz: VOZES.find((v) => v.id === voz)?.nome }),
+          body: JSON.stringify({ acao: 'letra', tema: f.tema.trim() || medTema, estilo: est.nome, voz: VOZES.find((v) => v.id === voz)?.nome, detalhes: nomesIdeias }),
         });
         marcar(k, 'criando a música…');
         const d = await api('/api/estudio/gerar', {
@@ -290,7 +515,7 @@ export default function EstudioMusica() {
             modo: 'personalizado',
             titulo: l.titulo || `${tituloMed} ${k + 1}`,
             letra: l.letra,
-            estilo: est.base,
+            estilo: [est.base, ideiasEmTexto(ideias), estiloExtra.trim()].filter(Boolean).join(', '),
             voz,
             instrumental: false,
             duracaoSeg: duracao,
@@ -520,6 +745,9 @@ export default function EstudioMusica() {
                   <button className="est-btn-sec est-add" onClick={() => setMedFaixas((fs) => [...fs, { estiloId: ESTILOS[fs.length % ESTILOS.length].id, tema: '' }])}>+ Adicionar música</button>
                 )}
 
+                <label className="est-rot">Instrumentos e arranjo (vale para todas)</label>
+                <PainelIdeias selecionadas={ideias} setSelecionadas={setIdeias} />
+
                 <label className="est-rot">Voz</label>
                 <div className="est-chips">
                   {VOZES.map((v) => (
@@ -599,10 +827,12 @@ export default function EstudioMusica() {
                 <button key={e.id} className={estiloId === e.id ? 'on' : ''} onClick={() => setEstiloId(e.id)}>{e.nome}</button>
               ))}
             </div>
+            <PainelIdeias selecionadas={ideias} setSelecionadas={setIdeias} />
             <input
+              style={{ marginTop: 8 }}
               value={estiloExtra}
               onChange={(e) => setEstiloExtra(e.target.value)}
-              placeholder="Detalhes extras (opcional): violino, 90 bpm, estilo anos 80…"
+              placeholder="Outros detalhes com suas palavras (opcional)…"
             />
 
             <label className="est-toggle">

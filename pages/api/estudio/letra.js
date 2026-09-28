@@ -24,7 +24,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido.' });
   if (!process.env.GROQ_API_KEY) return res.status(500).json({ erro: 'GROQ_API_KEY não configurada.' });
 
-  const { acao, tema, estilo, voz, letraAtual } = req.body || {};
+  const { acao, tema, estilo, voz, letraAtual, detalhes } = req.body || {};
+  const temSolo = /solo|intro instrumental|drop|pausa/i.test(detalhes || '');
 
   try {
     if (acao === 'estilo') {
@@ -48,6 +49,8 @@ Regras:
 - Português do Brasil, linguagem natural e emocionante.
 ${estilo ? `- Estilo musical: ${estilo}.` : ''}
 ${voz ? `- Vai ser cantada por: ${voz}.` : ''}
+${detalhes ? `- Arranjo pedido: ${detalhes}.` : ''}
+${temSolo ? '- Inclua na estrutura as partes instrumentais pedidas, cada uma em linha própria SEM letra, por exemplo [Instrumental Intro], [Guitar Solo], [Trumpet Solo], [Sax Solo], [Piano Solo], [Violin Solo] ou [Instrumental Break] (geralmente o solo vem depois do segundo refrão).' : ''}
 - Estrutura com marcações em inglês entre colchetes, cada uma em linha própria: [Verse], [Pre-Chorus], [Chorus], [Verse], [Chorus], [Bridge], [Chorus], [Outro].
 - Versos com 4 linhas; refrão repetido igual nas vezes em que aparece.
 - Duração pensada para uns 3 minutos.
