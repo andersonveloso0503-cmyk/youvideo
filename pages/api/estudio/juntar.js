@@ -103,6 +103,7 @@ export default async function handler(req, res) {
         audioUrl: f.audioUrl,
         letra: f.letra || '',
         estiloNome: f.estiloNome || '',
+        ritmoNome: f.ritmoNome || '',
         ideiasNomes: Array.isArray(f.ideiasNomes) ? f.ideiasNomes.slice(0, 30) : [],
       })),
       criadoEm: new Date().toISOString(),

@@ -86,9 +86,6 @@ const IDEIAS = [
       { id: 'percussao', nome: 'Percussão brasileira', en: 'Brazilian percussion (pandeiro, surdo, tamborim)' },
       { id: 'zabumba', nome: 'Zabumba e triângulo', en: 'zabumba and triangle' },
       { id: 'beat', nome: 'Beat eletrônico', en: 'electronic beat' },
-      { id: 'lento', nome: 'Lento (~70 bpm)', en: 'slow tempo around 70 bpm' },
-      { id: 'medio', nome: 'Médio (~95 bpm)', en: 'mid tempo around 95 bpm' },
-      { id: 'rapido', nome: 'Animado (~125 bpm)', en: 'upbeat tempo around 125 bpm' },
     ],
   },
   {
@@ -136,24 +133,73 @@ const TODAS_IDEIAS = IDEIAS.flatMap((c) => c.itens);
 // Combinações prontas (um clique marca várias ideias)
 const RECEITAS = [
   { nome: '🔥 Louvor de arena', ids: ['intro-inst', 'build', 'solo-melod', 'coro', 'modulacao', 'final-epico', 'bat-forte'] },
-  { nome: '🎷 Blues gospel', ids: ['solo-blues', 'hammond', 'backing', 'rouca', 'medio'] },
-  { nome: '🎺 Gospel com metais', ids: ['naipe', 'solo-trompete', 'palmas', 'coro', 'alegre', 'rapido'] },
+  { nome: '🎷 Blues gospel', ids: ['solo-blues', 'hammond', 'backing', 'rouca'] },
+  { nome: '🎺 Gospel com metais', ids: ['naipe', 'solo-trompete', 'palmas', 'coro', 'alegre'] },
   { nome: '🤘 Rock com solo', ids: ['riff', 'solo-rock', 'bat-forte', 'potente', 'final-epico'] },
-  { nome: '🪗 Sertanejo raiz', ids: ['viola', 'acordeon', 'dedilhado', 'emocionante', 'medio'] },
-  { nome: '🌙 Balada ao piano', ids: ['piano', 'cello', 'intima', 'breakdown', 'lento'] },
+  { nome: '🪗 Sertanejo raiz', ids: ['viola', 'acordeon', 'dedilhado', 'emocionante'] },
+  { nome: '🌙 Balada ao piano', ids: ['piano', 'cello', 'intima', 'breakdown'] },
   { nome: '🎻 Épico orquestral', ids: ['orquestra', 'solo-violino', 'coro', 'epico', 'final-epico'] },
-  { nome: '🕺 Anos 80', ids: ['synth80', 'slap', 'solo-sax', 'anos80', 'rapido'] },
+  { nome: '🕺 Anos 80', ids: ['synth80', 'slap', 'solo-sax', 'anos80'] },
 ];
+
+// Ritmo / energia da música
+const RITMOS = [
+  { id: '', nome: 'Automático', emoji: '🎲', en: '' },
+  { id: 'lenta', nome: 'Lenta', emoji: '🐢', en: 'slow tempo around 70 bpm, calm and gentle', alt: ['slow tempo around 70 bpm'] },
+  { id: 'media', nome: 'Média', emoji: '🚶', en: 'mid tempo around 95 bpm, steady groove', alt: ['mid tempo around 95 bpm'] },
+  { id: 'animada', nome: 'Animada', emoji: '🏃', en: 'upbeat tempo around 120 bpm, energetic', alt: ['upbeat tempo around 125 bpm'] },
+  { id: 'muito', nome: 'Muito animada', emoji: '🔥', en: 'very fast high-energy tempo around 140 bpm, danceable' },
+];
+
+function ritmoEn(id) {
+  return RITMOS.find((r) => r.id === id)?.en || '';
+}
+
+function nomeRitmo(id) {
+  const r = RITMOS.find((x) => x.id === id);
+  return r && r.id ? `${r.emoji} ${r.nome}` : '';
+}
+
+function acharRitmo(texto) {
+  for (const r of RITMOS) {
+    if (!r.id) continue;
+    for (const t of [r.en, ...(r.alt || [])]) {
+      if (texto.includes(t)) return { id: r.id, texto: t };
+    }
+  }
+  return null;
+}
+
+function EscolherRitmo({ valor, onChange, compacto }) {
+  return (
+    <div className={`rit ${compacto ? 'rit-c' : ''}`}>
+      {RITMOS.map((r) => (
+        <button key={r.id || 'auto'} type="button" className={valor === r.id ? 'on' : ''} onClick={() => onChange(r.id)} title={r.nome}>
+          {r.emoji}{compacto ? '' : ` ${r.nome}`}
+        </button>
+      ))}
+      <style jsx>{`
+        .rit { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .rit button { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+        .rit button.on { border-color: var(--gold); background: var(--gold-soft); color: var(--gold); }
+        .rit-c { gap: 4px; margin: 0; }
+        .rit-c button { padding: 4px 9px; font-size: 15px; background: var(--bg-elevated); }
+      `}</style>
+    </div>
+  );
+}
 
 // Descobre, a partir do texto de estilo salvo, qual estilo e quais ideias foram escolhidos
 function descreverEstilo(texto) {
   let resto = texto || '';
   const est = ESTILOS.find((e) => resto.startsWith(e.base));
   if (est) resto = resto.slice(est.base.length);
+  const rit = acharRitmo(resto);
+  if (rit) resto = resto.replace(rit.texto, '');
   const ideias = TODAS_IDEIAS.filter((x) => resto.includes(x.en));
   ideias.forEach((x) => { resto = resto.replace(x.en, ''); });
   const extra = resto.split(',').map((t) => t.trim()).filter(Boolean).join(', ');
-  return { estilo: est ? est.nome : '', ideias: ideias.map((x) => x.nome), extra };
+  return { estilo: est ? est.nome : '', ritmo: rit ? nomeRitmo(rit.id) : '', ritmoId: rit ? rit.id : '', ideias: ideias.map((x) => x.nome), extra };
 }
 
 function ideiasEmTexto(ids) {
@@ -252,14 +298,16 @@ function EstilosDoMedley({ medley, biblioteca }) {
   const faixas = (medley.faixas || []).map((f, i) => {
     let estilo = f.estiloNome || '';
     let ideias = f.ideiasNomes || null;
-    if (!estilo || !ideias) {
+    let ritmo = f.ritmoNome;
+    if (!estilo || !ideias || ritmo === undefined) {
       // medleys antigos: busca a música original na biblioteca
       const orig = biblioteca.find((x) => x.id === f.id);
       const d = descreverEstilo(orig?.estilo || '');
       estilo = estilo || d.estilo || d.extra || '—';
       ideias = ideias || d.ideias;
+      ritmo = ritmo === undefined ? d.ritmo : ritmo;
     }
-    return { n: i + 1, titulo: f.titulo, estilo, ideias };
+    return { n: i + 1, titulo: f.titulo, estilo, ritmo, ideias };
   });
   const ideiasTodas = [...new Set(faixas.flatMap((f) => f.ideias || []))];
 
@@ -270,7 +318,7 @@ function EstilosDoMedley({ medley, biblioteca }) {
         {faixas.map((f) => (
           <div key={f.n} className="med-est-item">
             <span className="med-est-n">{f.n}</span>
-            <span className="med-est-nome">{f.estilo}</span>
+            <span className="med-est-nome">{f.estilo}{f.ritmo ? <span className="med-est-rit">{f.ritmo}</span> : null}</span>
             {f.titulo && <span className="med-est-tit">{f.titulo}</span>}
           </div>
         ))}
@@ -290,7 +338,8 @@ function EstilosDoMedley({ medley, biblioteca }) {
         .med-est-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin-bottom: 10px; }
         .med-est-item { display: grid; grid-template-columns: 24px 1fr; column-gap: 8px; align-items: center; background: var(--bg-elevated); border-radius: 8px; padding: 8px 10px; }
         .med-est-n { grid-row: span 2; width: 24px; height: 24px; border-radius: 50%; background: var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
-        .med-est-nome { font-weight: 600; color: var(--gold); font-size: 14px; }
+        .med-est-nome { font-weight: 600; color: var(--gold); font-size: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+        .med-est-rit { font-size: 11px; font-weight: 600; color: var(--text); background: var(--teal-soft); border-radius: 999px; padding: 2px 8px; }
         .med-est-tit { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .med-est-ideias { display: flex; flex-wrap: wrap; gap: 5px; }
         .med-est-ideias span { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
@@ -337,10 +386,10 @@ function nomeMotor(m) {
 }
 
 const MEDLEY_PADRAO = [
-  { estiloId: 'gospel', tema: '' },
-  { estiloId: 'sertanejo', tema: '' },
-  { estiloId: 'forro', tema: '' },
-  { estiloId: 'pagode', tema: '' },
+  { estiloId: 'gospel', tema: '', ritmo: 'media' },
+  { estiloId: 'sertanejo', tema: '', ritmo: 'media' },
+  { estiloId: 'forro', tema: '', ritmo: 'animada' },
+  { estiloId: 'pagode', tema: '', ritmo: 'animada' },
 ];
 
 // Roda tarefas com no máximo N ao mesmo tempo
@@ -384,6 +433,7 @@ export default function EstudioMusica() {
   const [estiloId, setEstiloId] = useState('gospel');
   const [estiloExtra, setEstiloExtra] = useState('');
   const [ideias, setIdeias] = useState([]);
+  const [ritmo, setRitmo] = useState('');
   const [voz, setVoz] = useState('masculina');
   const [instrumental, setInstrumental] = useState(false);
   const [duracao, setDuracao] = useState(150);
@@ -420,8 +470,8 @@ export default function EstudioMusica() {
 
   const estiloTexto = useMemo(() => {
     const base = ESTILOS.find((e) => e.id === estiloId)?.base || '';
-    return [base, ideiasEmTexto(ideias), estiloExtra.trim()].filter(Boolean).join(', ');
-  }, [estiloId, estiloExtra, ideias]);
+    return [base, ritmoEn(ritmo), ideiasEmTexto(ideias), estiloExtra.trim()].filter(Boolean).join(', ');
+  }, [estiloId, estiloExtra, ideias, ritmo]);
 
   const nomesIdeias = ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean).join(', ');
 
@@ -539,6 +589,9 @@ export default function EstudioMusica() {
       setEstiloId(achado.id);
       resto = resto.slice(achado.base.length);
     }
+    const rit = acharRitmo(resto);
+    setRitmo(rit ? rit.id : '');
+    if (rit) resto = resto.replace(rit.texto, '');
     const achadas = TODAS_IDEIAS.filter((x) => resto.includes(x.en));
     achadas.forEach((x) => { resto = resto.replace(x.en, ''); });
     setIdeias(achadas.map((x) => x.id));
@@ -567,7 +620,7 @@ export default function EstudioMusica() {
         marcar(k, 'escrevendo a letra…');
         const l = await api('/api/estudio/letra', {
           method: 'POST',
-          body: JSON.stringify({ acao: 'letra', tema: f.tema.trim() || medTema, estilo: est.nome, voz: VOZES.find((v) => v.id === voz)?.nome, detalhes: nomesIdeias }),
+          body: JSON.stringify({ acao: 'letra', tema: f.tema.trim() || medTema, estilo: [est.nome, f.ritmo ? `ritmo ${RITMOS.find((r) => r.id === f.ritmo)?.nome.toLowerCase()}` : ''].filter(Boolean).join(', '), voz: VOZES.find((v) => v.id === voz)?.nome, detalhes: nomesIdeias }),
         });
         marcar(k, 'criando a música…');
         const d = await api('/api/estudio/gerar', {
@@ -577,7 +630,7 @@ export default function EstudioMusica() {
             modo: 'personalizado',
             titulo: l.titulo || `${tituloMed} ${k + 1}`,
             letra: l.letra,
-            estilo: [est.base, ideiasEmTexto(ideias), estiloExtra.trim()].filter(Boolean).join(', '),
+            estilo: [est.base, ritmoEn(f.ritmo), ideiasEmTexto(ideias), estiloExtra.trim()].filter(Boolean).join(', '),
             voz,
             instrumental: false,
             duracaoSeg: duracao,
@@ -587,7 +640,7 @@ export default function EstudioMusica() {
         });
         setMusicas((ms) => [d.musica, ...ms]);
         marcar(k, 'pronta ✓');
-        return { ...d.musica, estiloNome: est.nome, ideiasNomes: ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean) };
+        return { ...d.musica, estiloNome: est.nome, ritmoNome: nomeRitmo(f.ritmo), ideiasNomes: ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean) };
       });
 
       setMedProgresso((p) => ({ ...p, fase: 'juntando' }));
@@ -611,7 +664,7 @@ export default function EstudioMusica() {
   async function juntarSelecionadas() {
     const faixas = selecao.map((id) => musicas.find((m) => m.id === id)).filter(Boolean).map((m) => {
       const d = descreverEstilo(m.estilo);
-      return { ...m, estiloNome: d.estilo || d.extra, ideiasNomes: d.ideias };
+      return { ...m, estiloNome: d.estilo || d.extra, ritmoNome: d.ritmo, ideiasNomes: d.ideias };
     });
     if (faixas.length < 2) { setAviso('Selecione pelo menos 2 músicas.'); return; }
     const t = window.prompt('Título do medley:', `Medley com ${faixas.length} músicas`);
@@ -800,6 +853,10 @@ export default function EstudioMusica() {
                         <select value={f.estiloId} onChange={(e) => setMedFaixas((fs) => fs.map((x, k) => (k === i ? { ...x, estiloId: e.target.value } : x)))}>
                           {ESTILOS.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
                         </select>
+                        <div className="est-faixa-rit">
+                          <span>{RITMOS.find((r) => r.id === (f.ritmo || ''))?.nome}</span>
+                          <EscolherRitmo compacto valor={f.ritmo || ''} onChange={(v) => setMedFaixas((fs) => fs.map((x, k) => (k === i ? { ...x, ritmo: v } : x)))} />
+                        </div>
                         <input value={f.tema} onChange={(e) => setMedFaixas((fs) => fs.map((x, k) => (k === i ? { ...x, tema: e.target.value } : x)))} placeholder="Tema próprio (opcional)" />
                       </div>
                       <button className="est-faixa-x" disabled={medFaixas.length <= 2} onClick={() => setMedFaixas((fs) => fs.filter((_, k) => k !== i))}>✕</button>
@@ -807,7 +864,7 @@ export default function EstudioMusica() {
                   ))}
                 </div>
                 {medFaixas.length < 10 && (
-                  <button className="est-btn-sec est-add" onClick={() => setMedFaixas((fs) => [...fs, { estiloId: ESTILOS[fs.length % ESTILOS.length].id, tema: '' }])}>+ Adicionar música</button>
+                  <button className="est-btn-sec est-add" onClick={() => setMedFaixas((fs) => [...fs, { estiloId: ESTILOS[fs.length % ESTILOS.length].id, tema: '', ritmo: '' }])}>+ Adicionar música</button>
                 )}
 
                 <label className="est-rot">Instrumentos e arranjo (vale para todas)</label>
@@ -892,6 +949,10 @@ export default function EstudioMusica() {
                 <button key={e.id} className={estiloId === e.id ? 'on' : ''} onClick={() => setEstiloId(e.id)}>{e.nome}</button>
               ))}
             </div>
+
+            <label className="est-rot">Ritmo</label>
+            <EscolherRitmo valor={ritmo} onChange={setRitmo} />
+
             <PainelIdeias selecionadas={ideias} setSelecionadas={setIdeias} />
             <input
               style={{ marginTop: 8 }}
@@ -1081,7 +1142,17 @@ export default function EstudioMusica() {
                       )}
 
                       <div className="est-detalhe">
-                        {m.estilo && <p><strong>Estilo:</strong> {m.estilo}</p>}
+                        {m.estilo && m.tipo !== 'medley' && (() => {
+                          const d = descreverEstilo(m.estilo);
+                          return (
+                            <>
+                              {d.estilo && <p><strong>Estilo:</strong> {d.estilo}</p>}
+                              {d.ritmo && <p><strong>Ritmo:</strong> {d.ritmo}</p>}
+                              {d.ideias.length > 0 && <p><strong>Instrumentos e arranjo:</strong> {d.ideias.join(', ')}</p>}
+                              {d.extra && <p><strong>Outros detalhes:</strong> {d.extra}</p>}
+                            </>
+                          );
+                        })()}
                         {m.descricao && <p><strong>Descrição:</strong> {m.descricao}</p>}
                         {m.letra && <pre>{m.letra}</pre>}
                       </div>
@@ -1201,6 +1272,8 @@ export default function EstudioMusica() {
         .est-faixa-n { width: 26px; height: 26px; border-radius: 50%; background: var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
         .est-faixa-campos { display: grid; gap: 6px; }
         .est-faixa-campos select, .est-faixa-campos input { background: var(--bg-elevated) !important; padding: 8px 10px !important; font-size: 14px !important; }
+        .est-faixa-rit { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .est-faixa-rit > span { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
         .est-faixa-x { background: none; border: 0; color: var(--text-muted); cursor: pointer; font-size: 15px; }
         .est-faixa-x:disabled { opacity: 0.3; }
         .est-add { width: 100%; padding: 10px; margin-top: 8px; }
