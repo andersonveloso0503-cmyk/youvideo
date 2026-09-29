@@ -116,6 +116,16 @@ function criarVista() {
   return vistaCriar;
 }
 
+// Cada PC tem um código próprio (não vai junto na sincronização de configurações)
+function identidadePc() {
+  let { pcId } = store.ler();
+  if (!pcId) {
+    pcId = `${os.hostname().replace(/[^\w-]/g, '').slice(0, 20) || 'pc'}-${require('crypto').randomBytes(3).toString('hex')}`;
+    store.salvar({ pcId });
+  }
+  return { pc: pcId, pcNome: os.hostname() };
+}
+
 function mostrarVista(visivel) {
   if (!vistaCriar || !janela) return;
   if (visivel && !vistaNoAr) {
@@ -285,6 +295,7 @@ app.whenReady().then(() => {
     obterConfig: () => store.ler(),
     obterCanal: (id) => store.canal(id),
     registrarEnvio: () => registrarEnvio(),
+    identidade: () => identidadePc(),
   });
   fila.proximo(); // retoma o que ficou aguardando na última vez
   fila.on('mudou', (jobs) => {
@@ -322,6 +333,34 @@ app.whenReady().then(() => {
   }
   setTimeout(buscarPedidosDoSite, 8000);
   setInterval(buscarPedidosDoSite, 45000);
+
+  // ---------- Fila deste PC na nuvem (para acompanhar de outro computador) ----------
+  let tFilaNuvem = null;
+  let ultimaFilaNuvem = 0;
+  async function mandarFilaParaNuvem() {
+    tFilaNuvem = null;
+    const cfg = store.ler();
+    if (!cfg.centralToken) return;
+    ultimaFilaNuvem = Date.now();
+    const jobs = fila.lista().slice(-40).reverse().map((j) => ({
+      id: j.id, tipo: j.tipo || 'video', nome: j.nome, status: j.status, etapa: j.etapa, progresso: j.progresso,
+      restanteSeg: j.restanteSeg, duracao: j.duracao, erro: j.erro, criadoEm: j.criadoEm, concluidoEm: j.concluidoEm,
+      nuvem: j.espelho?.status || null,
+    }));
+    const { pc, pcNome } = identidadePc();
+    await Central.chamar(cfg, '/api/central/pc-filas', { metodo: 'PUT', corpo: { pc, pcNome, jobs } }).catch(() => {});
+  }
+  fila.on('mudou', () => {
+    if (tFilaNuvem) return;
+    tFilaNuvem = setTimeout(mandarFilaParaNuvem, Math.max(3000, 15000 - (Date.now() - ultimaFilaNuvem)));
+  });
+  setTimeout(mandarFilaParaNuvem, 5000);
+  setInterval(() => !tFilaNuvem && mandarFilaParaNuvem(), 60000);
+  ipcMain.handle('fila:outrosPcs', async () => {
+    const { pcs = [] } = await Central.chamar(store.ler(), '/api/central/pc-filas');
+    const eu = identidadePc().pc;
+    return pcs.filter((p) => p.pc !== eu).sort((a, b) => b.atualizadoEm - a.atualizadoEm);
+  });
 
   // ---------- Configurações ----------
   ipcMain.handle('config:ler', () => store.paraTela());
@@ -567,8 +606,35 @@ app.whenReady().then(() => {
         clima: j.clima || resumoClima(j.projeto?.musicas),
         criadoEm: j.concluidoEm || j.criadoEm,
         publicado: { youtube: !!j.youtube },
+        videoUrl: j.videoUrlNuvem || j.videoUrlSite || undefined, // já na nuvem: agendar nas redes não sobe de novo
+        ...(j.receita?.categoria ? { categoria: j.receita.categoria } : {}),
       }));
-    return { ...d, categorias: { compilacoes: 'Feitos no PC', ...d.categorias }, itens: [...locais, ...d.itens] };
+    // Vídeos feitos em outros PCs (subiram para a nuvem sozinhos)
+    const eu = identidadePc().pc;
+    const idsLocais = new Set(locais.map((l) => l.id));
+    let deOutros = [];
+    try {
+      const { videos = [] } = await Central.chamar(store.ler(), '/api/central/pc-videos');
+      deOutros = videos
+        .filter((v) => !(v.pc === eu && idsLocais.has(v.jobId)))
+        .map((v) => ({
+          chave: `nuvem-pc:${v.id}`,
+          origem: 'nuvem-pc',
+          id: v.id,
+          categoria: v.categoria || 'compilacoes',
+          titulo: v.titulo,
+          videoUrl: v.videoUrl,
+          thumbnailUrl: v.capaUrl || null,
+          curto: !!v.curto,
+          duracao: v.duracao,
+          musicas: v.musicas?.length ? v.musicas : null,
+          clima: v.clima || '',
+          criadoEm: v.criadoEm,
+          pcNome: v.pcNome,
+          publicado: {},
+        }));
+    } catch {}
+    return { ...d, categorias: { compilacoes: 'Feitos no PC', ...d.categorias }, itens: [...locais, ...deOutros, ...d.itens] };
   });
   ipcMain.handle('central:categoria', (_e, dados) => Central.chamar(store.ler(), '/api/central/categoria', { metodo: 'POST', corpo: dados }));
   ipcMain.handle('central:agenda', () => Central.chamar(store.ler(), '/api/central/agenda'));

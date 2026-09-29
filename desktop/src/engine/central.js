@@ -61,7 +61,7 @@ async function subirParaNuvem(cfg, arquivo, onProgresso) {
     access: 'public',
     token,
     multipart: true,
-    contentType: 'video/mp4',
+    contentType: /\.jpe?g$/i.test(arquivo) ? 'image/jpeg' : /\.png$/i.test(arquivo) ? 'image/png' : 'video/mp4',
     addRandomSuffix: true,
     onUploadProgress: (e) => onProgresso && onProgresso((e.loaded || 0) / (e.total || tamanho)),
   });

@@ -16,7 +16,7 @@ export default async function handler(req, res) {
       token: BLOB_TOKEN,
       pathname,
       maximumSizeInBytes: 4 * 1024 * 1024 * 1024,
-      allowedContentTypes: ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v'],
+      allowedContentTypes: ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v', 'image/jpeg', 'image/png'],
       validUntil: Date.now() + 6 * 3600e3,
       addRandomSuffix: true,
     });

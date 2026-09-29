@@ -961,6 +961,14 @@ function renderFila() {
     d.querySelector('.detalhe').title = detalhe || '';
     const links = d.querySelector('.links');
     if (j.status === 'concluido' && !envio && j.arquivoFinal && !j.youtube) { const a = document.createElement('a'); a.textContent = 'Subir p/ YouTube'; a.onclick = () => Subir.abrir([j.arquivoFinal]); links.appendChild(a); }
+    if (j.espelho) {
+      const e = j.espelho;
+      const sp = document.createElement('span');
+      sp.className = `selo-nuvem ${e.status}`;
+      sp.textContent = e.status === 'ok' ? '☁ Na nuvem' : e.status === 'enviando' ? `☁ Subindo ${Math.round((e.x || 0) * 100)}%` : e.status === 'erro' ? '☁ Não subiu' : '☁ Na vez de subir';
+      if (e.erro) sp.title = e.erro;
+      links.appendChild(sp);
+    }
     if (j.arquivoFinal) { const a = document.createElement('a'); a.textContent = 'Abrir pasta'; a.onclick = () => window.api.abrir.pasta(j.arquivoFinal); links.appendChild(a); }
     if (j.youtube?.url) { const a = document.createElement('a'); a.textContent = j.youtube.agendadoPara ? `Agendado ${new Date(j.youtube.agendadoPara).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}` : 'Ver no YouTube'; a.onclick = () => window.api.abrir.link(j.youtube.url); links.appendChild(a); }
     const acoes = d.querySelector('.acoes-job');
@@ -1083,6 +1091,7 @@ async function abrirConfig(msg) {
   $('#cfgGroq').value = config.groqKey || '';
   $('#cfgCentralUrl').value = config.centralUrl || '';
   $('#cfgCentralToken').value = config.centralToken || '';
+  $('#cfgNuvemAuto').checked = config.nuvemAuto !== false;
   $('#resCentral').textContent = '';
   $('#cfgClientId').value = config.google.clientId || '';
   $('#cfgClientSecret').value = config.google.clientSecret || '';
@@ -1183,6 +1192,46 @@ async function iniciar() {
   $('#btnCorImagem').onclick = corDaImagem;
   $('#btnPasta').onclick = async () => { const p = await window.api.dialogo.pastaSaida(); if (p) { P.saida.pasta = p; $('#inPasta').value = p; salvarDepois(); } };
   $('#btnGerar').onclick = gerar;
+  const ROTULO_PC = { aguardando: 'Na fila', concluido: 'Pronto', erro: 'Erro', cancelado: 'Cancelado', interrompido: 'Interrompido' };
+  async function carregarPcs() {
+    const box = $('#listaPcs');
+    box.innerHTML = '<p class="nota">Carregando...</p>';
+    try {
+      const pcs = await window.api.fila.outrosPcs();
+      if (!pcs.length) { box.innerHTML = '<p class="nota">Nenhum outro PC com o app aberto recentemente. (O outro PC precisa estar na versão nova e com a senha da Central.)</p>'; return; }
+      box.innerHTML = '';
+      for (const pc of pcs) {
+        const min = Math.round((Date.now() - pc.atualizadoEm) / 60000);
+        const aberto = min <= 3;
+        const d = document.createElement('div');
+        d.className = 'pc-bloco';
+        d.innerHTML = `<h3></h3><div class="pc-jobs"></div>`;
+        d.querySelector('h3').textContent = `${aberto ? '🟢' : '⚪'} ${pc.pcNome || pc.pc} · ${aberto ? 'app aberto agora' : `visto há ${min < 60 ? min + ' min' : Math.round(min / 60) + ' h'}`}`;
+        const lista = d.querySelector('.pc-jobs');
+        const jobsPc = (pc.jobs || []).filter((j) => j.tipo !== 'nuvem');
+        if (!jobsPc.length) lista.innerHTML = '<p class="nota">Fila vazia.</p>';
+        for (const j of jobsPc.slice(0, 15)) {
+          const l = document.createElement('div');
+          l.className = 'pc-job';
+          const rod = RODANDO.includes(j.status);
+          const txt = rod ? `${j.etapa || 'Gerando'}${j.restanteSeg ? ` · falta ~${tempoCurto(j.restanteSeg)}` : ''}` : (ROTULO_PC[j.status] || j.status) + (j.erro ? ` · ${j.erro}` : '') + (j.nuvem === 'ok' ? ' · ☁ na nuvem' : '');
+          l.innerHTML = `<span class="n"></span><span class="s"></span><span class="barra"><i style="width:${Math.round((j.progresso || 0) * 100)}%"></i></span>`;
+          l.querySelector('.n').textContent = j.nome;
+          l.querySelector('.s').textContent = txt;
+          lista.appendChild(l);
+        }
+        box.appendChild(d);
+      }
+    } catch (e) {
+      box.innerHTML = '';
+      const p = document.createElement('p');
+      p.className = 'nota';
+      p.textContent = msgErro(e);
+      box.appendChild(p);
+    }
+  }
+  $('#btnOutrosPcs').onclick = () => { if (!$('#modalPcs').open) $('#modalPcs').showModal(); carregarPcs(); };
+  $('#btnAtualizarPcs').onclick = carregarPcs;
   $('#btnAbrirReceita').onclick = async () => {
     try {
       const n = await window.api.fila.abrirReceita();
@@ -1280,6 +1329,7 @@ async function iniciar() {
       modo: ($$('input[name=modo]').find((r) => r.checked) || {}).value || 'normal',
       simultaneos: Number($('#cfgSimultaneos').value) || 1,
       encoder: $('#cfgEncoder').value,
+      nuvemAuto: $('#cfgNuvemAuto').checked,
     });
     $('#modalConfig').close();
     avisar('Configurações salvas');

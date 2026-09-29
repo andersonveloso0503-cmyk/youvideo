@@ -248,6 +248,7 @@
   <section class="fila">
     <div class="fila-rotulo"><span>FILA</span><b id="qtdFila">0</b></div>
     <div class="fila-cartoes" id="filaCartoes"><p class="fila-vazia">Os vídeos que você mandar gerar aparecem aqui.</p></div>
+    <button class="btn-limpar" id="btnOutrosPcs" title="Ver a fila dos outros computadores com o Youvideo Compilador">🖥 Outros PCs</button>
     <button class="btn-limpar" id="btnAbrirReceita" title="Monta aqui no PC um vídeo criado no site (arquivo .youvideo.json baixado em &quot;Montar no PC&quot;)">📥 Abrir receita</button>
     <button class="btn-limpar" id="btnLimparFila" title="Tira todos os cartões da fila (os vídeos já gerados continuam na pasta)">🗑 Limpar fila</button>
   </section>
@@ -354,6 +355,14 @@
     <p class="modal-erro" id="erroCanais"></p>
   </dialog>
 
+  <!-- Modal: fila dos outros PCs -->
+  <dialog class="modal" id="modalPcs">
+    <div class="modal-topo"><h2>🖥 Fila dos outros PCs</h2><button class="fechar" data-fechar>×</button></div>
+    <p class="nota">Só para acompanhar. Cada PC gera os vídeos dele; os prontos sobem para a nuvem e aparecem na Biblioteca de todos.</p>
+    <div id="listaPcs"><p class="nota">Carregando...</p></div>
+    <div class="linha-botoes"><button class="btn-mini" id="btnAtualizarPcs">↻ Atualizar</button></div>
+  </dialog>
+
   <!-- Modal: Configurações -->
   <dialog class="modal largo" id="modalConfig">
     <div class="modal-topo"><h2>Configurações</h2><button class="fechar" data-fechar>×</button></div>
@@ -369,6 +378,7 @@
         <button class="btn-primario" id="btnSyncEnviar" title="Guarda chaves e canais, criptografados com a senha da Central">☁ Salvar configurações na nuvem</button>
         <button class="btn-mini destaque" id="btnSyncPuxar" title="Traz as chaves e canais salvos por outro PC">⬇ Puxar do outro PC</button>
       </div>
+      <label class="interruptor"><input type="checkbox" id="cfgNuvemAuto" /><span></span> Subir sozinho para a nuvem os vídeos que ficam prontos (aparecem na Biblioteca de todos os PCs)</label>
       <small class="nota" id="resSync">No PC já configurado: clique em "Salvar configurações na nuvem". No outro PC: cole a senha, clique em Testar e depois em "Puxar do outro PC".</small>
     </div>
     <div class="grade-config">

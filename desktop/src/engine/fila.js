@@ -74,8 +74,10 @@ function fundosDaParte(fundos, todas, grupo, i) {
 }
 
 class Fila extends EventEmitter {
-  constructor({ dirDados, fontsDir, obterConfig, obterCanal, registrarEnvio }) {
+  constructor({ dirDados, fontsDir, obterConfig, obterCanal, registrarEnvio, identidade }) {
     super();
+    this.identidade = identidade || (() => ({ pc: 'pc', pcNome: 'PC' }));
+    this.cadeiaNuvem = Promise.resolve();
     this.registrarEnvio = registrarEnvio || (() => {});
     this.dirDados = dirDados;
     this.dirCache = path.join(dirDados, 'cache');
@@ -87,6 +89,50 @@ class Fila extends EventEmitter {
     this.cancelamentos = new Map();
     this.rodando = new Set();
     this.carregar();
+  }
+
+  /**
+   * Vídeo pronto aqui: sobe para a nuvem (em segundo plano, um de cada vez) e registra,
+   * para aparecer na Biblioteca de todos os PCs.
+   */
+  espelhar(job) {
+    const cfg = this.obterConfig();
+    if (cfg.nuvemAuto === false || !cfg.centralToken) return;
+    if (!job || job.status !== 'concluido' || !job.arquivoFinal || !['video', 'montagem', undefined].includes(job.tipo)) return;
+    if (job.espelho?.status === 'ok') return;
+    this.atualizar(job, { espelho: { status: 'esperando' } });
+    this.cadeiaNuvem = this.cadeiaNuvem.then(() => this.subirEspelho(job)).catch(() => {});
+  }
+
+  async subirEspelho(job) {
+    const cfg = this.obterConfig();
+    if (!this.jobs.includes(job)) return; // tirado da fila enquanto esperava
+    try {
+      if (!fs.existsSync(job.arquivoFinal)) throw new Error('Arquivo do vídeo não está mais na pasta.');
+      this.atualizar(job, { espelho: { status: 'enviando', x: 0 } });
+      let ultimo = 0;
+      const videoUrl = job.videoUrlNuvem || job.videoUrlSite || (await Central.subirParaNuvem(cfg, job.arquivoFinal, (x) => {
+        if (Date.now() - ultimo < 1000) return;
+        ultimo = Date.now();
+        this.atualizar(job, { espelho: { status: 'enviando', x } }, false);
+      }));
+      this.atualizar(job, { videoUrlNuvem: videoUrl });
+      let capaUrl = job.capaUrlNuvem || null;
+      if (!capaUrl && job.capa && fs.existsSync(job.capa)) capaUrl = await Central.subirParaNuvem(cfg, job.capa).catch(() => null);
+      const { pc, pcNome } = this.identidade();
+      await Central.chamar(cfg, '/api/central/pc-videos', {
+        metodo: 'POST',
+        corpo: {
+          pc, pcNome, jobId: job.id, titulo: job.nome, videoUrl, capaUrl,
+          duracao: job.duracao, curto: job.projeto ? job.projeto.formato?.tipo === 'curto' : !!job.curto,
+          clima: job.clima || '', musicas: job.timeline || [], categoria: job.receita?.categoria || 'compilacoes',
+          criadoEm: job.concluidoEm || job.criadoEm,
+        },
+      });
+      this.atualizar(job, { capaUrlNuvem: capaUrl, espelho: { status: 'ok' } });
+    } catch (e) {
+      this.atualizar(job, { espelho: { status: 'erro', erro: e.message } });
+    }
   }
 
   carregar() {
@@ -110,6 +156,10 @@ class Fila extends EventEmitter {
         }
       }
     }
+    // Envio para a nuvem que ficou pela metade: tenta de novo daqui a pouco
+    setTimeout(() => {
+      for (const j of this.jobs) if (j.espelho && ['esperando', 'enviando', 'erro'].includes(j.espelho.status)) this.espelhar(j);
+    }, 20000);
     this.salvar();
   }
 
@@ -474,6 +524,7 @@ class Fila extends EventEmitter {
         }
         await this.devolverAoSite(job, cfg, saidaJ);
         this.atualizar(job, { arquivoFinal: saidaJ, capa: capaJ, duracao, curto, status: 'concluido', etapa: job.pedidoId ? 'Pronto e enviado ao site' : 'Pronto', progresso: 1, restanteSeg: null, concluidoEm: new Date().toISOString() });
+        this.espelhar(job);
         fs.rmSync(dir, { recursive: true, force: true });
         return;
       }
@@ -528,6 +579,7 @@ class Fila extends EventEmitter {
         arquivoFinal: saida, capa, duracao: rc.duracao, curto,
         status: 'concluido', etapa: job.pedidoId ? 'Pronto e enviado ao site' : 'Pronto', progresso: 1, restanteSeg: null, concluidoEm: new Date().toISOString(),
       });
+      this.espelhar(job);
       fs.rmSync(dir, { recursive: true, force: true });
     } catch (e) {
       if (job.pedidoId) {
@@ -764,6 +816,7 @@ class Fila extends EventEmitter {
       }
 
       this.atualizar(job, { status: 'concluido', etapa: publica ? 'Publicado' : 'Pronto', progresso: 1, restanteSeg: null, concluidoEm: new Date().toISOString() });
+      this.espelhar(job);
       fs.rmSync(dir, { recursive: true, force: true });
     } catch (e) {
       const cancelado = e.message === 'CANCELADO' || job.cancelado;
