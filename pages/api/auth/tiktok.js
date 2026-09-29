@@ -1,6 +1,7 @@
 export default function handler(req, res) {
   const state = Math.random().toString(36).slice(2);
-  const redirectUri = `${process.env.TIKTOK_REDIRECT_URI}`;
+  // Sem a variável na Vercel, usa o endereço do próprio site
+  const redirectUri = process.env.TIKTOK_REDIRECT_URI || `https://${req.headers.host}/api/auth/tiktok-callback`;
 
   const params = new URLSearchParams({
     client_key: process.env.TIKTOK_CLIENT_KEY,
