@@ -452,16 +452,19 @@ app.whenReady().then(() => {
       const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30`, { headers: { 'User-Agent': 'youvideo-compilador' } });
       if (!r.ok) return null;
       const lista = await r.json();
-      const rel = lista.find((x) => String(x.tag_name).startsWith('compilador-v') && !x.draft);
-      const exe = rel && rel.assets.find((a) => a.name.endsWith('.exe'));
-      if (!rel || !exe) return null;
-      const nova = rel.tag_name.replace('compilador-v', '');
       const comparar = (a, b) => {
         const pa = a.split('.').map(Number);
         const pb = b.split('.').map(Number);
         for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
         return 0;
       };
+      // O GitHub não lista em ordem de versão (1.9.9 aparece antes de 1.9.12): pega a MAIOR versão
+      const rel = lista
+        .filter((x) => String(x.tag_name).startsWith('compilador-v') && !x.draft && x.assets?.some((a) => a.name.endsWith('.exe')))
+        .sort((a, b) => comparar(b.tag_name.replace('compilador-v', ''), a.tag_name.replace('compilador-v', '')))[0];
+      const exe = rel && rel.assets.find((a) => a.name.endsWith('.exe'));
+      if (!rel || !exe) return null;
+      const nova = rel.tag_name.replace('compilador-v', '');
       if (comparar(nova, app.getVersion()) <= 0) return null;
       return { versao: nova, url: exe.browser_download_url, tamanho: exe.size, notas: rel.body || '' };
     } catch {
