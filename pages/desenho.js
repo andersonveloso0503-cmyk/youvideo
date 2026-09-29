@@ -257,6 +257,7 @@ export default function Desenho() {
       // Guardados pra permitir reformatar esse vídeo (ex: pra vertical)
       // sem precisar gerar roteiro/voz/imagens de novo depois.
       audioUrl: results.voice?.audioUrl,
+      audioSegments: results.voice?.audioSegments,
       cenas: results.visual?.arquivos,
       palavras: results.voice?.palavras,
     });

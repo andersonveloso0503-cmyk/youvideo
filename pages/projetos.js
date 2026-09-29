@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { montarNoPc } from '../lib/montarNoPc';
 import { upload } from '@vercel/blob/client';
 
 async function compartilhar(arquivo, titulo, setStatus) {
@@ -14,6 +15,7 @@ async function compartilhar(arquivo, titulo, setStatus) {
 }
 
 export default function Projetos() {
+  const [montandoPc, setMontandoPc] = useState({});
   const [projetos, setProjetos] = useState(null);
   const [erro, setErro] = useState(null);
   const [arquivosProntos, setArquivosProntos] = useState({});
@@ -210,6 +212,37 @@ export default function Projetos() {
           <p style={{ fontSize: 12, color: '#666' }}>
             {p.estilo} · {p.formato} · {new Date(p.criadoEm).toLocaleString('pt-BR')}
           </p>
+          {!p.videoUrl && p.cenas?.length > 0 && (p.audioUrl || p.audioSegments?.length) && (
+            <div style={{ marginTop: 10 }}>
+              <button
+                style={{ marginTop: 0 }}
+                disabled={montandoPc[p.id] === '...'}
+                onClick={async () => {
+                  setMontandoPc((m) => ({ ...m, [p.id]: '...' }));
+                  try {
+                    const aviso = await montarNoPc(
+                      {
+                        ...(p.audioSegments?.length > 1 ? { audioSegments: p.audioSegments } : { audioUrl: p.audioUrl }),
+                        cenas: p.cenas,
+                        formato: p.formato,
+                        palavras: p.palavras,
+                        marca: 'Em Nome de Jesus',
+                      },
+                      p.titulo || p.tema
+                    );
+                    setMontandoPc((m) => ({ ...m, [p.id]: aviso }));
+                  } catch (e) {
+                    setMontandoPc((m) => ({ ...m, [p.id]: `Erro: ${e.message}` }));
+                  }
+                }}
+              >
+                💻 Montar no PC (Youvideo Compilador)
+              </button>
+              {montandoPc[p.id] && montandoPc[p.id] !== '...' && (
+                <div style={{ fontSize: 12, color: '#aaa', marginTop: 6 }}>{montandoPc[p.id]}</div>
+              )}
+            </div>
+          )}
           {p.videoUrl && (
             <>
               <video src={p.videoUrl} controls playsInline style={{ width: '100%', maxWidth: 300, borderRadius: 6, marginTop: 10 }} />

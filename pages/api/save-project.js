@@ -3,7 +3,7 @@ import { getDb } from '../../lib/firebase-admin';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { tema, estilo, formato, titulo, descricao, videoUrl, thumbnailUrl, canal, audioUrl, cenas, palavras, origem } = req.body;
+  const { tema, estilo, formato, titulo, descricao, videoUrl, thumbnailUrl, canal, audioUrl, audioSegments, cenas, palavras, origem } = req.body;
   if (!titulo) return res.status(400).json({ error: 'Nada pra salvar ainda (gere o roteiro primeiro)' });
 
   try {
@@ -23,6 +23,7 @@ export default async function handler(req, res) {
       // vertical) sem precisar gerar tudo de novo. Ficam null em telas que
       // ainda não mandam esses dados (compatível com o que já existia).
       audioUrl: audioUrl || null,
+      audioSegments: audioSegments || null,
       cenas: cenas || null,
       palavras: palavras || null,
       criadoEm: new Date().toISOString(),
