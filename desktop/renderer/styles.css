@@ -661,3 +661,4 @@ body { grid-template-columns: minmax(0, 1fr); }
   .btn-gerar { order: 4; padding: 10px 16px; }
   .rodape { padding-top: 8px; padding-bottom: 8px; }
 }
+#btnAbrirReceita:hover { background: var(--ouro-suave); border-color: var(--ouro); color: var(--ouro); }

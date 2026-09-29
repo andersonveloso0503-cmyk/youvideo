@@ -14,6 +14,7 @@ const { gerarMiniatura, capaAoLado } = require('./miniatura');
 const Central = require('./central');
 const { resumoClima } = require('./analise');
 const IA = require('./ia');
+const M = require('./montagem');
 
 const EM_ANDAMENTO = ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'];
 
@@ -352,7 +353,7 @@ class Fila extends EventEmitter {
     const cfg = this.obterConfig();
     const limite = cfg.modo === 'maximo' ? Math.max(1, Math.min(3, Number(cfg.simultaneos) || 1)) : 1;
     // Geração (usa o processador) e envio (usa a internet) andam em paralelo, cada um na sua vez
-    const vaga = (j) => (!j?.tipo || j.tipo === 'video' ? 'video' : 'rede');
+    const vaga = (j) => (!j?.tipo || j.tipo === 'video' || j.tipo === 'montagem' ? 'video' : 'rede');
     const rodandoDe = (tipo) => [...this.rodando].filter((id) => vaga(this.jobs.find((j) => j.id === id)) === tipo).length;
     for (const [tipo, max] of [['video', limite], ['rede', 1]]) {
       while (rodandoDe(tipo) < max) {
@@ -370,9 +371,109 @@ class Fila extends EventEmitter {
     }
   }
 
+  /** Vídeo criado no site (história animada/narrada) para montar aqui no PC. */
+  adicionarMontagem(receita, pastaSaida) {
+    const job = {
+      id: `${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`,
+      tipo: 'montagem',
+      criadoEm: new Date().toISOString(),
+      nome: receita.titulo || 'História do Youvideo',
+      status: 'aguardando',
+      etapa: 'Aguardando para montar',
+      progresso: 0,
+      receita,
+      pastaSaida,
+    };
+    this.jobs.push(job);
+    this.salvar();
+    this.emitir();
+    this.proximo();
+    return job;
+  }
+
+  async processarMontagem(job) {
+    const cfg = this.obterConfig();
+    const modo = cfg.modo || 'normal';
+    const rc = job.receita;
+    const curto = rc.formato === 'short' || rc.formato === 'curto';
+    const [W, H] = curto ? [1080, 1920] : [1920, 1080];
+    const dir = path.join(os.tmpdir(), 'youvideo-compilador', job.id);
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    job.cancelado = false;
+    const registrarCancelar = (fn) => this.cancelamentos.set(job.id, fn);
+    const checar = () => { if (job.cancelado) throw new Error('CANCELADO'); };
+    // Peso de cada etapa na barra: baixar 15%, áudio 5%, cenas 45%, final 35%
+    const faixa = (ini, tam, status, etapa) => {
+      this.atualizar(job, { status, etapa });
+      return (x) => this.atualizar(job, { progresso: ini + tam * Math.min(1, x) }, false);
+    };
+    try {
+      const pasta = pastaDeSaida(job.pastaSaida || cfg.ultimoProjeto?.saida?.pasta);
+      const locais = await M.baixarTudo(rc, this.dirCache, faixa(0, 0.15, 'audio', 'Baixando cenas e narração'), checar);
+      checar();
+      faixa(0.15, 0.05, 'audio', 'Preparando narração')(0);
+      const audio = await M.prepararAudio(rc, locais, dir, { modo, registrarCancelar });
+      checar();
+      const { fundo, capaOrigem } = await M.prepararFundo(rc, locais, dir, W, H, {
+        modo, registrarCancelar, checar, onProgresso: faixa(0.2, 0.45, 'fundos', 'Preparando as cenas'),
+      });
+      let assArquivo = null;
+      if (rc.legenda !== false && (rc.palavras || []).length || rc.marca) {
+        assArquivo = path.join(dir, 'legenda.ass');
+        fs.writeFileSync(assArquivo, M.gerarAssNarracao({ W, H, palavras: rc.legenda === false ? [] : rc.palavras, duracao: rc.duracao, marca: rc.marca, curto }));
+        const fontsTmp = path.join(dir, 'fonts');
+        fs.mkdirSync(fontsTmp, { recursive: true });
+        for (const f of fs.readdirSync(this.fontsDir)) fs.copyFileSync(path.join(this.fontsDir, f), path.join(fontsTmp, f));
+      }
+      checar();
+      const progR = faixa(0.65, 0.35, 'renderizando', 'Gerando vídeo');
+      const saida = caminhoLivre(pasta, nomeSeguro(job.nome));
+      const temporario = path.join(dir, 'final.mp4');
+      const encoder = cfg.encoder && cfg.encoder !== 'auto' ? cfg.encoder : await detectarEncoder();
+      const inicio = Date.now();
+      const renderizar = (enc) => R.renderizarFinal({
+        fundo: { tipo: 'loop', arquivo: fundo }, audioArquivo: audio, total: rc.duracao, W, H,
+        efeito: { estilo: 'nenhum' }, textura: {}, assArquivo, fontsDir: path.join(dir, 'fonts'), inscrever: null,
+        saida: temporario, encoder: enc, modo, dir, registrarCancelar,
+        onProgresso: (x) => {
+          progR(x);
+          const dec = (Date.now() - inicio) / 1000;
+          this.atualizar(job, { etapa: `Gerando vídeo ${Math.round(x * 100)}%`, restanteSeg: x > 0.01 ? dec / x - dec : null }, false);
+        },
+      });
+      try {
+        await renderizar(encoder);
+      } catch (e) {
+        if (encoder === 'libx264' || e.message === 'CANCELADO') throw e;
+        this.atualizar(job, { etapa: 'Placa de vídeo falhou, tentando com o processador' });
+        await renderizar('libx264');
+      }
+      moverArquivo(temporario, saida);
+      let capa = null;
+      try {
+        capa = saida.replace(/\.mp4$/i, '.jpg');
+        await gerarMiniatura(capaOrigem || saida, capa, { vertical: curto });
+      } catch {
+        capa = null;
+      }
+      this.atualizar(job, {
+        arquivoFinal: saida, capa, duracao: rc.duracao, curto,
+        status: 'concluido', etapa: 'Pronto', progresso: 1, restanteSeg: null, concluidoEm: new Date().toISOString(),
+      });
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch (e) {
+      const cancelado = e.message === 'CANCELADO' || job.cancelado;
+      this.atualizar(job, { status: cancelado ? 'cancelado' : 'erro', etapa: cancelado ? 'Cancelado' : 'Erro', erro: cancelado ? null : e.message, restanteSeg: null });
+      if (cancelado) fs.rmSync(dir, { recursive: true, force: true });
+      throw e;
+    }
+  }
+
   async processar(job) {
     if (job.tipo === 'envio') return this.processarEnvio(job);
     if (job.tipo === 'nuvem') return this.processarNuvem(job);
+    if (job.tipo === 'montagem') return this.processarMontagem(job);
     const cfg = this.obterConfig();
     const modo = cfg.modo || 'normal';
     const p = job.projeto;

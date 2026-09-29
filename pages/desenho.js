@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { montarNoPc } from '../lib/montarNoPc';
 
 const HISTORIAS = [
   {
@@ -54,7 +55,7 @@ export default function Desenho() {
   const [duracaoDesejada, setDuracaoDesejada] = useState('420');
   const [vozId, setVozId] = useState('');
   const [modeloVoz, setModeloVoz] = useState('eleven');
-  const [motorRender, setMotorRender] = useState('shotstack');
+  const [motorRender, setMotorRender] = useState('pc');
   const [vozes, setVozes] = useState(null);
   const [serieId, setSerieId] = useState('');
   const [series, setSeries] = useState([]);
@@ -168,6 +169,29 @@ export default function Desenho() {
   };
 
   const assembleVideo = async () => {
+    if (motorRender === 'pc') {
+      setLoading('assemble');
+      try {
+        const temPedacos = (results.voice?.audioSegments || []).length > 1;
+        const aviso = await montarNoPc(
+          {
+            ...(temPedacos ? { audioSegments: results.voice.audioSegments } : { audioUrl: results.voice?.audioUrl }),
+            cenas: results.visual?.arquivos,
+            formato,
+            palavras: results.voice?.palavras,
+            marca: 'Em Nome de Jesus',
+          },
+          results.script?.titulo || tema
+        );
+        setResults((r) => ({ ...r, assemble: { status: aviso } }));
+        setStatus((s) => ({ ...s, assemble: 'ok' }));
+      } catch (e) {
+        setResults((r) => ({ ...r, assemble: { error: e.message } }));
+        setStatus((s) => ({ ...s, assemble: 'error' }));
+      }
+      setLoading(null);
+      return;
+    }
     // Narração longa vem em vários pedaços — manda todos, senão o áudio para no meio
     const temVariosPedacos = (results.voice?.audioSegments || []).length > 1;
     const primeira = await runStep('assemble', '/api/assemble-video', {
@@ -345,7 +369,8 @@ export default function Desenho() {
 
         <label>Motor de montagem do vídeo</label>
         <select value={motorRender} onChange={(e) => setMotorRender(e.target.value)}>
-          <option value="shotstack">Shotstack (de sempre)</option>
+          <option value="pc">💻 No meu PC — Youvideo Compilador (grátis, sem limite de tempo)</option>
+          <option value="shotstack">Shotstack (plano atual: só até 60 s)</option>
           <option value="json2video">JSON2Video (teste — mais barato)</option>
         </select>
         {motorRender === 'json2video' && (

@@ -182,6 +182,34 @@ export default async function handler(req, res) {
     return clipes;
   });
 
+  // ── Montar no PC (Youvideo Compilador) ─────────────────────────────────
+  // Devolve só a "receita" (cenas com tempo, áudio, palavras); quem monta é o
+  // app no computador, com ffmpeg — sem custo e sem limite de duração.
+  if (motor === 'pc') {
+    const receita = {
+      tipo: 'youvideo-montagem',
+      versao: 1,
+      titulo: String(req.body.titulo || '').slice(0, 120),
+      formato: isVertical ? 'short' : 'longo',
+      duracao: duracaoTotalAudio,
+      marca: marca || '',
+      audio: temAudioSegments
+        ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length }))
+        : [{ url: audioUrl, start: 0, length: duracaoTotalAudio }],
+      clipes: clipsVideo.map((c) => ({
+        tipo: c.asset.type === 'video' ? 'video' : 'imagem',
+        url: c.asset.src,
+        start: c.start,
+        length: c.length,
+        efeito: c.effect || null,
+      })),
+      palavras: (palavras || [])
+        .filter((p) => p && p.start != null && p.end != null)
+        .map((p) => ({ texto: p.texto, start: p.start, end: p.end })),
+    };
+    return res.status(200).json({ receita });
+  }
+
   // ── Motor alternativo: JSON2Video ──────────────────────────────────────
   // Reaproveita todo o cálculo de tempo por cena feito acima (clipsVideo),
   // só muda como isso vira o JSON final e pra onde é enviado.

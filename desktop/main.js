@@ -9,6 +9,7 @@ const { probe, rodar, detectarEncoder } = require('./src/engine/ffmpeg');
 const YT = require('./src/engine/youtube');
 const IA = require('./src/engine/ia');
 const Central = require('./src/engine/central');
+const Montagem = require('./src/engine/montagem');
 const Sync = require('./src/sync');
 const { analisarMusica, resumoClima } = require('./src/engine/analise');
 
@@ -67,7 +68,21 @@ function criarVista() {
       const t = item.getTotalBytes();
       if (t) enviar('criar:download', { estado: 'baixando', nome: item.getFilename(), x: item.getReceivedBytes() / t });
     });
-    item.once('done', (_ev, estado) => enviar('criar:download', { estado, nome: item.getFilename(), arquivo: destino }));
+    item.once('done', (_ev, estado) => {
+      // Receita de vídeo do site ("Montar no PC"): vira um vídeo na fila, montado aqui
+      if (estado === 'completed' && /\.youvideo\.json$/i.test(destino)) {
+        try {
+          const receita = Montagem.lerReceita(destino);
+          fs.rmSync(destino, { force: true });
+          fila.adicionarMontagem(receita, pasta);
+          enviar('criar:download', { estado: 'montagem', nome: receita.titulo || 'vídeo' });
+        } catch (e) {
+          enviar('criar:download', { estado: 'erro', nome: item.getFilename(), erro: e.message });
+        }
+        return;
+      }
+      enviar('criar:download', { estado, nome: item.getFilename(), arquivo: destino });
+    });
   });
   vistaCriar = new WebContentsView({ webPreferences: { session: sessao, contextIsolation: true, sandbox: true } });
   vistaCriar.setBackgroundColor('#15130f');
@@ -434,6 +449,18 @@ app.whenReady().then(() => {
   ipcMain.handle('fila:remover', (_e, id) => fila.remover(id));
   ipcMain.handle('fila:retentar', (_e, id) => fila.retentar(id));
   ipcMain.handle('fila:limpar', (_e, tudo) => fila.limpar(!!tudo));
+  // Receita baixada do site fora do app: escolhe o arquivo e manda montar
+  ipcMain.handle('fila:abrirReceita', async () => {
+    const r = await dialog.showOpenDialog(janela, {
+      title: 'Abrir receita de vídeo do Youvideo',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Receita do Youvideo', extensions: ['json'] }],
+    });
+    if (r.canceled) return 0;
+    const pasta = store.ler().ultimoProjeto?.saida?.pasta || app.getPath('videos');
+    for (const f of r.filePaths) fila.adicionarMontagem(Montagem.lerReceita(f), pasta);
+    return r.filePaths.length;
+  });
 
   // ---------- Botão Inscrever (animação feita pela tela, vira um clipe com transparência) ----------
   const pastaBotao = (chave) => path.join(app.getPath('userData'), 'cache', 'botao', String(chave).replace(/[^\w-]/g, ''));
@@ -503,7 +530,7 @@ app.whenReady().then(() => {
         titulo: j.nome,
         arquivo: j.arquivoFinal,
         capa: j.capa && fs.existsSync(j.capa) ? j.capa : null,
-        curto: j.projeto?.formato?.tipo === 'curto',
+        curto: j.projeto?.formato?.tipo === 'curto' || !!j.curto,
         duracao: j.duracao,
         musicas: j.timeline || null,
         clima: j.clima || resumoClima(j.projeto?.musicas),

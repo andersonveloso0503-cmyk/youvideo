@@ -939,15 +939,17 @@ function renderFila() {
     const d = document.createElement('div');
     d.className = `job ${rodando ? 'rodando' : j.status}`;
     const envio = j.tipo === 'envio';
-    const qtd = envio ? 0 : j.projeto.musicas.length;
+    const montagem = j.tipo === 'montagem';
+    const qtd = j.projeto?.musicas?.length || 0;
     const detalhe = j.status === 'erro' ? j.erro
       : envio ? (rodando ? j.etapa : j.status === 'concluido' ? `${j.youtube?.canal || ''}${j.aviso ? ' · ' + j.aviso : ''}` : `Enviar para ${canais.find((c) => c.id === j.envio.canalId)?.titulo || 'YouTube'}`)
       : rodando ? `${j.etapa}${j.restanteSeg ? ` · falta ~${tempoCurto(j.restanteSeg)}` : ''}`
+      : montagem ? (j.status === 'concluido' ? `Montado no PC · ${tempo(j.duracao)}` : j.status === 'interrompido' ? 'Processamento interrompido' : `Vídeo do site · ${tempo(j.receita?.duracao || 0)}`)
       : j.status === 'concluido' ? `${qtd} música${qtd > 1 ? 's' : ''} · ${tempo(j.duracao)}`
       : j.status === 'interrompido' ? 'Processamento interrompido'
-      : `${qtd} música${qtd > 1 ? 's' : ''} · ${j.projeto.fundos.length} fundo${j.projeto.fundos.length === 1 ? '' : 's'}`;
+      : j.projeto ? `${qtd} música${qtd > 1 ? 's' : ''} · ${j.projeto.fundos.length} fundo${j.projeto.fundos.length === 1 ? '' : 's'}` : j.etapa || '';
     d.innerHTML = `
-      <span class="estado">${envio ? '⬆ ' : ''}${envio && j.status === 'publicando' ? 'Enviando' : ROTULO_STATUS[j.status] || j.status}${j.partes > 1 ? ` · ${j.parte}/${j.partes}` : ''}</span>
+      <span class="estado">${envio ? '⬆ ' : montagem ? '🎞 ' : ''}${envio && j.status === 'publicando' ? 'Enviando' : ROTULO_STATUS[j.status] || j.status}${j.partes > 1 ? ` · ${j.parte}/${j.partes}` : ''}</span>
       <span class="nome-job"></span>
       <span class="detalhe"></span>
       <span class="barra"><i style="width:${Math.round((j.progresso || 0) * 100)}%"></i></span>
@@ -1181,6 +1183,14 @@ async function iniciar() {
   $('#btnCorImagem').onclick = corDaImagem;
   $('#btnPasta').onclick = async () => { const p = await window.api.dialogo.pastaSaida(); if (p) { P.saida.pasta = p; $('#inPasta').value = p; salvarDepois(); } };
   $('#btnGerar').onclick = gerar;
+  $('#btnAbrirReceita').onclick = async () => {
+    try {
+      const n = await window.api.fila.abrirReceita();
+      if (n) avisar(n > 1 ? `${n} vídeos do site entraram na fila` : 'O vídeo do site entrou na fila para montar aqui no PC');
+    } catch (e) {
+      avisar(msgErro(e), true);
+    }
+  };
   $('#btnLimparFila').onclick = () => {
     if (!jobs.length) return;
     const ativos = jobs.filter((j) => RODANDO.includes(j.status)).length;

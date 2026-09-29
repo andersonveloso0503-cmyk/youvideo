@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('api', {
     remover: chamar('fila:remover'),
     retentar: chamar('fila:retentar'),
     limpar: chamar('fila:limpar'),
+    abrirReceita: chamar('fila:abrirReceita'),
   },
   caminhoDoArquivo: (file) => webUtils.getPathForFile(file),
   ao: (canal, fn) => {
