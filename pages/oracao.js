@@ -107,6 +107,7 @@ export default function Oracao() {
       ...(temVariosPedacos
         ? { audioSegments: results.voice.audioSegments }
         : { audioUrl: results.voice?.audioUrl }),
+      titulo: results.script?.titulo,
       cenas: results.visual?.arquivos,
       formato: 'longo',
       palavras: results.voice?.palavras,
@@ -116,7 +117,7 @@ export default function Oracao() {
 
     setLoading('assemble');
     let tentativas = 0;
-    while (tentativas < 60) {
+    while (tentativas < (String(primeira.renderId).startsWith('pc:') ? 1440 : 60)) {
       await new Promise((r) => setTimeout(r, 5000));
       const check = await fetch(`/api/assemble-video?id=${primeira.renderId}`).then((r) => r.json());
       if (check.status === 'done') {

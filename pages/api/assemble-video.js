@@ -1,3 +1,5 @@
+import { criarPedido, statusPedido } from '../../lib/montarPc';
+
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } };
 
 // Sandbox e Produção da Shotstack usam CHAVES DE API DIFERENTES, não é só
@@ -17,6 +19,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   let { audioUrl, audioSegments, cenas, formato, palavras, ambiente, marca, motor } = req.body;
+  // Padrão: montar no PC (Youvideo Compilador). Shotstack/JSON2Video só se pedido de propósito.
+  if (!motor) motor = process.env.MONTAGEM_PADRAO || 'pc';
 
   // Quando os dados são grandes demais pra caber numa requisição (medleys
   // com várias músicas), quem chama sobe um JSON no Blob e manda só o link
@@ -37,7 +41,7 @@ export default async function handler(req, res) {
   // (o JSON2Video, escolhido como motor, não precisa dela — mesmo que o
   // código ainda use a Shotstack só pra sondar duração de vídeo animado,
   // isso já falha de forma silenciosa e cai num valor padrão).
-  if (!apiKey && motor !== 'json2video') {
+  if (!apiKey && motor === 'shotstack') {
     return res.status(500).json({
       error: modo === 'sandbox'
         ? 'SHOTSTACK_API_KEY_SANDBOX não configurada ainda (pegue a chave de Sandbox no dashboard da Shotstack).'
@@ -185,7 +189,7 @@ export default async function handler(req, res) {
   // ── Montar no PC (Youvideo Compilador) ─────────────────────────────────
   // Devolve só a "receita" (cenas com tempo, áudio, palavras); quem monta é o
   // app no computador, com ffmpeg — sem custo e sem limite de duração.
-  if (motor === 'pc') {
+  if (motor === 'pc' || motor === 'pc-receita') {
     const receita = {
       tipo: 'youvideo-montagem',
       versao: 1,
@@ -207,7 +211,19 @@ export default async function handler(req, res) {
         .filter((p) => p && p.start != null && p.end != null)
         .map((p) => ({ texto: p.texto, start: p.start, end: p.end })),
     };
-    return res.status(200).json({ receita });
+    // 'pc-receita' = só devolve a receita (arquivo para abrir no app)
+    if (motor === 'pc-receita') return res.status(200).json({ receita });
+    try {
+      const renderId = await criarPedido(receita, req.body.origem || '');
+      return res.status(200).json({
+        status: 'processing',
+        renderId,
+        receita,
+        aviso: 'Enviado para o Youvideo Compilador montar no seu PC — deixe o app aberto.',
+      });
+    } catch (err) {
+      return res.status(500).json({ error: `Não consegui mandar para o PC: ${err.message}` });
+    }
   }
 
   // ── Motor alternativo: JSON2Video ──────────────────────────────────────
@@ -510,6 +526,14 @@ async function renderizarComJson2Video({
 async function checkStatus(req, res) {
   const { id, ambiente } = req.query;
   if (!id) return res.status(400).json({ error: 'Parâmetro id é obrigatório' });
+
+  if (id.startsWith('pc:')) {
+    try {
+      return res.status(200).json(await statusPedido(id));
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
   if (id.startsWith('j2v:')) {
     const project = id.slice(4);

@@ -85,7 +85,7 @@ export default function OracaoMatinal() {
 
       setStatus('Juntando os pedaços na sequência certa...');
       let tentativas = 0;
-      while (tentativas < 60) {
+      while (tentativas < (String(videoData.renderId).startsWith('pc:') ? 1440 : 60)) {
         await new Promise((r) => setTimeout(r, 5000));
         const check = await fetch(`/api/gerar-video-falado?id=${videoData.renderId}`).then((r) => r.json());
         if (check.status === 'done') {
@@ -166,9 +166,9 @@ export default function OracaoMatinal() {
       const montaData = await montaRes.json();
       if (!montaRes.ok) throw new Error(montaData.error);
 
-      setStatus('Renderizando na Shotstack (pode levar 1-2 minutos)...');
+      setStatus('Montando no seu PC pelo Youvideo Compilador (deixe o app aberto)...');
       let tentativas = 0;
-      while (tentativas < 60) {
+      while (tentativas < (String(montaData.renderId).startsWith('pc:') ? 1440 : 60)) {
         await new Promise((r) => setTimeout(r, 5000));
         const check = await fetch(`/api/assemble-video?id=${montaData.renderId}`).then((r) => r.json());
         if (check.status === 'done') {

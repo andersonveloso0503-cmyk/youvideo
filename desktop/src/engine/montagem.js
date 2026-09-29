@@ -171,4 +171,49 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto }) {
   return linhas.join('\n');
 }
 
-module.exports = { lerReceita, baixarTudo, prepararAudio, prepararFundo, gerarAssNarracao, organizarCenas };
+
+/**
+ * Modo "juntar": clipes que já têm o próprio áudio (ex.: oração falada da D-ID),
+ * um atrás do outro. Devolve o vídeo final pronto.
+ */
+async function juntarClipes(receita, locais, dir, W, H, { modo, onProgresso, registrarCancelar, checar }) {
+  const clipes = receita.clipes.filter((c) => c.url && locais[c.url]);
+  const feitos = [];
+  let total = 0;
+  const infos = [];
+  for (const c of clipes) {
+    const i = await probe(locais[c.url]);
+    infos.push(i);
+    total += i.duracao || 0;
+  }
+  let pronto = 0;
+  for (let i = 0; i < clipes.length; i++) {
+    checar && checar();
+    const arq = locais[clipes[i].url];
+    const dur = infos[i].duracao || 1;
+    const saida = path.join(dir, `parte_${String(i).padStart(4, '0')}.mp4`);
+    const enq = await R.resolverEnquadramento(arq, W, H, 'auto');
+    const args = ['-i', arq];
+    const temAudio = infos[i].temAudio;
+    if (!temAudio) args.push('-f', 'lavfi', '-t', dur.toFixed(3), '-i', 'anullsrc=r=48000:cl=stereo');
+    args.push(
+      '-filter_complex', `[0:v]${R.filtroEnquadrar(W, H, enq, `fps=${FPS}`)},format=yuv420p[v]`,
+      '-map', '[v]', '-map', temAudio ? '0:a' : '1:a',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-r', String(FPS),
+      '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-shortest', saida
+    );
+    const r = rodar(args, { modo, duracaoTotal: dur, onProgresso: (x) => onProgresso && onProgresso((pronto + x * dur) / (total || 1)) });
+    registrarCancelar && registrarCancelar(r.cancelar);
+    await r.promise;
+    pronto += dur;
+    feitos.push(saida);
+  }
+  fs.writeFileSync(path.join(dir, 'partes.txt'), feitos.map((f) => `file '${path.basename(f)}'`).join('\n'));
+  const final = path.join(dir, 'final.mp4');
+  const r = rodar(['-f', 'concat', '-safe', '0', '-i', 'partes.txt', '-c', 'copy', '-movflags', '+faststart', final], { modo, cwd: dir });
+  registrarCancelar && registrarCancelar(r.cancelar);
+  await r.promise;
+  return { final, duracao: total };
+}
+
+module.exports = { juntarClipes, lerReceita, baixarTudo, prepararAudio, prepararFundo, gerarAssNarracao, organizarCenas };

@@ -1,4 +1,5 @@
 import { put } from '@vercel/blob';
+import { criarPedido, statusPedido } from '../../lib/montarPc';
 
 export const config = { api: { bodyParser: { sizeLimit: '15mb' } } };
 export const maxDuration = 300;
@@ -37,37 +38,23 @@ export default async function handler(req, res) {
       return res.status(200).json({ videoUrl: clipesUrls[0] });
     }
 
-    // 2) Vários pedaços: junta em sequência na Shotstack. Cada clipe já
-    // vem com vídeo E áudio juntos (a D-ID entrega isso combinado), então
-    // só precisamos posicionar um atrás do outro, sem faixa de áudio
-    // separada.
-    const env = process.env.SHOTSTACK_ENV === 'production' ? 'v1' : 'stage';
-    const base = `https://api.shotstack.io/edit/${env}`;
-
-    const duracoes = [];
-    for (const url of clipesUrls) {
-      duracoes.push(await probarDuracao(url, base));
-    }
-
-    let cursor = 0;
-    const clips = clipesUrls.map((url, i) => {
-      const clip = { asset: { type: 'video', src: url }, start: cursor, length: duracoes[i], fit: 'cover' };
-      cursor += duracoes[i];
-      return clip;
-    });
-
-    const renderRes = await fetch(`${base}/render`, {
-      method: 'POST',
-      headers: { 'x-api-key': process.env.SHOTSTACK_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        timeline: { tracks: [{ clips }] },
-        output: { format: 'mp4', resolution: 'hd' },
-      }),
-    });
-    const renderData = await renderRes.json();
-    if (!renderRes.ok) throw new Error(renderData.message || 'Erro ao juntar os pedaços do vídeo falado na Shotstack');
-
-    return res.status(200).json({ renderId: renderData.response.id, montandoPedacos: clipesUrls.length });
+    // 2) Vários pedaços: o Youvideo Compilador junta em sequência no PC.
+    // Cada clipe já vem com vídeo E áudio (a D-ID entrega combinado).
+    const renderId = await criarPedido(
+      {
+        tipo: 'youvideo-montagem',
+        versao: 1,
+        modo: 'juntar',
+        titulo: String(req.body.titulo || 'Oração falada').slice(0, 120),
+        formato: 'longo',
+        duracao: 0,
+        audio: [],
+        clipes: clipesUrls.map((url) => ({ tipo: 'video', url, comAudio: true })),
+        palavras: [],
+      },
+      'oracao-falada'
+    );
+    return res.status(200).json({ renderId, montandoPedacos: clipesUrls.length });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -138,6 +125,13 @@ async function checarMontagem(req, res) {
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'Parâmetro id é obrigatório' });
 
+  if (String(id).startsWith('pc:')) {
+    try {
+      return res.status(200).json(await statusPedido(id));
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
   const env = process.env.SHOTSTACK_ENV === 'production' ? 'v1' : 'stage';
   try {
     const statusRes = await fetch(`https://api.shotstack.io/edit/${env}/render/${id}`, {

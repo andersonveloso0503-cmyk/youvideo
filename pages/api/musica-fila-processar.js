@@ -1,4 +1,5 @@
 import { getDb } from '../../lib/firebase-admin';
+import { escolherProximo } from '../../lib/montarPc';
 
 // Encurta um título longo (com gancho/emoji) pra caber como texto pequeno
 // na thumbnail — remove emoji (a fonte usada não desenha eles direito) e
@@ -19,18 +20,21 @@ export default async function handler(req, res) {
   const db = getDb();
   const baseUrl = `https://${req.headers.host}`;
 
+  let docEscolhido = null;
   try {
     const snapshot = await db
       .collection('youvideo_musica_fila')
       .where('status', 'not-in', ['renderizado', 'concluido', 'erro'])
       .orderBy('status')
       .orderBy('criadoEm')
-      .limit(1)
+      .limit(15)
       .get();
 
     if (snapshot.empty) return res.status(200).json({ mensagem: 'Fila de música vazia, nada a processar.' });
 
-    const doc = snapshot.docs[0];
+    const doc = await escolherProximo(snapshot.docs);
+    if (!doc) return res.status(200).json({ mensagem: 'Só tem vídeo esperando o Youvideo Compilador montar no PC.' });
+    docEscolhido = doc;
     const item = doc.data();
     const ref = doc.ref;
 
@@ -71,6 +75,8 @@ export default async function handler(req, res) {
           formato: item.formato,
           palavras: item.palavras,
           ambiente: item.ambiente || 'production',
+          titulo: item.titulo,
+          origem: 'musica-fila',
         });
         await ref.update({ renderId, status: 'montando' });
         break;

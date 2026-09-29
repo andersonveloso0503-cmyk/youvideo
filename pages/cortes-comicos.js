@@ -218,6 +218,7 @@ export default function CortesComicos() {
   const assembleVideo = async () => {
     const primeira = await runStep('assemble', '/api/assemble-video', {
       audioSegments: results.voice?.audioSegments,
+      titulo: results.script?.titulo,
       cenas: results.visual?.arquivos,
       formato,
       palavras: results.voice?.palavras,
@@ -227,7 +228,7 @@ export default function CortesComicos() {
 
     setLoading('assemble');
     let tentativas = 0;
-    while (tentativas < 40) {
+    while (tentativas < (String(primeira.renderId).startsWith('pc:') ? 1440 : 40)) {
       await new Promise((r) => setTimeout(r, 5000));
       const check = await fetch(`/api/assemble-video?id=${primeira.renderId}`).then((r) => r.json());
       if (check.status === 'done') {

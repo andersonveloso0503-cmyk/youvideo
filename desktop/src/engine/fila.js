@@ -101,6 +101,12 @@ class Fila extends EventEmitter {
         if (EM_ANDAMENTO.includes(j.status)) {
           j.status = 'interrompido';
           j.etapa = 'Processamento interrompido';
+          // Pedido do site: recomeça sozinho (o site está esperando)
+          if (j.tipo === 'montagem' && j.pedidoId) {
+            j.status = 'aguardando';
+            j.etapa = 'Aguardando para montar';
+            j.progresso = 0;
+          }
         }
       }
     }
@@ -332,9 +338,16 @@ class Fila extends EventEmitter {
     if (c) c();
   }
 
+  // Pedido do site tirado da fila antes de rodar: avisa o site para não ficar esperando
+  avisarRemovido(j) {
+    if (!j?.pedidoId || EM_ANDAMENTO.includes(j.status) || ['concluido', 'erro', 'cancelado'].includes(j.status)) return;
+    Central.chamar(this.obterConfig(), '/api/central/montar-pc', { metodo: 'POST', corpo: { id: j.pedidoId, acao: 'erro', erro: 'Tirado da fila no PC' } }).catch(() => {});
+  }
+
   remover(id) {
     const j = this.jobs.find((x) => x.id === id);
     if (!j) return;
+    this.avisarRemovido(j);
     if (EM_ANDAMENTO.includes(j.status)) this.cancelar(id);
     this.jobs = this.jobs.filter((x) => x.id !== id);
     this.salvar();
@@ -343,6 +356,7 @@ class Fila extends EventEmitter {
 
   // tudo = true também para o que está gerando/enviando agora
   limpar(tudo = false) {
+    for (const j of this.jobs) this.avisarRemovido(j);
     if (tudo) for (const j of this.jobs) if (EM_ANDAMENTO.includes(j.status)) this.cancelar(j.id);
     this.jobs = tudo ? [] : this.jobs.filter((j) => EM_ANDAMENTO.includes(j.status));
     this.salvar();
@@ -372,7 +386,11 @@ class Fila extends EventEmitter {
   }
 
   /** Vídeo criado no site (história animada/narrada) para montar aqui no PC. */
-  adicionarMontagem(receita, pastaSaida) {
+  pedidoNaFila(pedidoId) {
+    return this.jobs.some((j) => j.pedidoId === pedidoId && !['erro', 'cancelado'].includes(j.status));
+  }
+
+  adicionarMontagem(receita, pastaSaida, extra = {}) {
     const job = {
       id: `${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`,
       tipo: 'montagem',
@@ -383,12 +401,32 @@ class Fila extends EventEmitter {
       progresso: 0,
       receita,
       pastaSaida,
+      pedidoId: extra.pedidoId || null, // veio do site: devolve o vídeo pronto para lá
     };
     this.jobs.push(job);
     this.salvar();
     this.emitir();
     this.proximo();
     return job;
+  }
+
+  /** Vídeo pedido pelo site: sobe para a nuvem e avisa o site, que continua o fluxo (YouTube, redes...). */
+  async devolverAoSite(job, cfg, arquivo) {
+    if (!job.pedidoId) return;
+    this.atualizar(job, { status: 'publicando', etapa: 'Enviando o vídeo pronto para o site' });
+    let videoUrl = null;
+    for (let tentativa = 1; tentativa <= 3 && !videoUrl; tentativa++) {
+      try {
+        videoUrl = await Central.subirParaNuvem(cfg, arquivo, (x) =>
+          this.atualizar(job, { etapa: `Enviando o vídeo pronto para o site ${Math.round(x * 100)}%` }, false)
+        );
+      } catch (e) {
+        if (tentativa === 3) throw new Error(`O vídeo ficou pronto no PC, mas não consegui mandar para o site: ${e.message}`);
+        await new Promise((ok) => setTimeout(ok, 5000 * tentativa));
+      }
+    }
+    await Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: job.pedidoId, acao: 'feito', videoUrl } });
+    this.atualizar(job, { videoUrlSite: videoUrl });
   }
 
   async processarMontagem(job) {
@@ -404,13 +442,41 @@ class Fila extends EventEmitter {
     const registrarCancelar = (fn) => this.cancelamentos.set(job.id, fn);
     const checar = () => { if (job.cancelado) throw new Error('CANCELADO'); };
     // Peso de cada etapa na barra: baixar 15%, áudio 5%, cenas 45%, final 35%
-    const faixa = (ini, tam, status, etapa) => {
+    let faixa = (ini, tam, status, etapa) => {
       this.atualizar(job, { status, etapa });
       return (x) => this.atualizar(job, { progresso: ini + tam * Math.min(1, x) }, false);
     };
     try {
       const pasta = pastaDeSaida(job.pastaSaida || cfg.ultimoProjeto?.saida?.pasta);
+      // Mostra o andamento no site também (no máximo a cada 20 s)
+      let ultimoAviso = 0;
+      const avisarSite = (x) => {
+        if (!job.pedidoId || Date.now() - ultimoAviso < 20000) return;
+        ultimoAviso = Date.now();
+        Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: job.pedidoId, acao: 'progresso', progresso: x } }).catch(() => {});
+      };
+      const faixaBase = faixa;
+      faixa = (ini, tam, status, etapa) => {
+        const f = faixaBase(ini, tam, status, etapa);
+        return (x) => { f(x); avisarSite(ini + tam * Math.min(1, x)); };
+      };
       const locais = await M.baixarTudo(rc, this.dirCache, faixa(0, 0.15, 'audio', 'Baixando cenas e narração'), checar);
+      if (rc.modo === 'juntar') {
+        const { final, duracao } = await M.juntarClipes(rc, locais, dir, W, H, { modo, registrarCancelar, checar, onProgresso: faixa(0.15, 0.8, 'renderizando', 'Juntando os vídeos') });
+        const saidaJ = caminhoLivre(pasta, nomeSeguro(job.nome));
+        moverArquivo(final, saidaJ);
+        let capaJ = null;
+        try {
+          capaJ = saidaJ.replace(/\.mp4$/i, '.jpg');
+          await gerarMiniatura(saidaJ, capaJ, { vertical: curto });
+        } catch {
+          capaJ = null;
+        }
+        await this.devolverAoSite(job, cfg, saidaJ);
+        this.atualizar(job, { arquivoFinal: saidaJ, capa: capaJ, duracao, curto, status: 'concluido', etapa: job.pedidoId ? 'Pronto e enviado ao site' : 'Pronto', progresso: 1, restanteSeg: null, concluidoEm: new Date().toISOString() });
+        fs.rmSync(dir, { recursive: true, force: true });
+        return;
+      }
       checar();
       faixa(0.15, 0.05, 'audio', 'Preparando narração')(0);
       const audio = await M.prepararAudio(rc, locais, dir, { modo, registrarCancelar });
@@ -457,12 +523,17 @@ class Fila extends EventEmitter {
       } catch {
         capa = null;
       }
+      await this.devolverAoSite(job, cfg, saida);
       this.atualizar(job, {
         arquivoFinal: saida, capa, duracao: rc.duracao, curto,
-        status: 'concluido', etapa: 'Pronto', progresso: 1, restanteSeg: null, concluidoEm: new Date().toISOString(),
+        status: 'concluido', etapa: job.pedidoId ? 'Pronto e enviado ao site' : 'Pronto', progresso: 1, restanteSeg: null, concluidoEm: new Date().toISOString(),
       });
       fs.rmSync(dir, { recursive: true, force: true });
     } catch (e) {
+      if (job.pedidoId) {
+        const motivo = job.cancelado || e.message === 'CANCELADO' ? 'Cancelado no PC' : e.message;
+        Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: job.pedidoId, acao: 'erro', erro: motivo } }).catch(() => {});
+      }
       const cancelado = e.message === 'CANCELADO' || job.cancelado;
       this.atualizar(job, { status: cancelado ? 'cancelado' : 'erro', etapa: cancelado ? 'Cancelado' : 'Erro', erro: cancelado ? null : e.message, restanteSeg: null });
       if (cancelado) fs.rmSync(dir, { recursive: true, force: true });

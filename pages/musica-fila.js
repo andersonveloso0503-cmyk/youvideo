@@ -278,7 +278,7 @@ function FormatoSwitcher({ item }) {
       if (!res.ok) throw new Error(data.error);
 
       let tentativas = 0;
-      while (tentativas < 40) {
+      while (tentativas < (String(data.renderId).startsWith('pc:') ? 1440 : 40)) {
         await new Promise((r) => setTimeout(r, 5000));
         const check = await fetch(`/api/assemble-video?id=${data.renderId}&ambiente=production`).then((r) => r.json());
         if (check.status === 'done') {

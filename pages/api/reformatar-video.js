@@ -32,7 +32,10 @@ export default async function handler(req, res) {
         });
       }
 
-      bodyMontagem = { audioUrl: projeto.audioUrl, cenas: projeto.cenas, formato: novoFormato, palavras: projeto.palavras, ambiente: ambiente || 'production' };
+      bodyMontagem = {
+        ...(projeto.audioSegments?.length > 1 ? { audioSegments: projeto.audioSegments } : { audioUrl: projeto.audioUrl }),
+        cenas: projeto.cenas, formato: novoFormato, palavras: projeto.palavras, ambiente: ambiente || 'production',
+      };
       titulo = projeto.titulo;
       thumbnailUrl = projeto.thumbnailUrl || null;
       canal = projeto.canal || 'apostolos';
@@ -100,7 +103,7 @@ export default async function handler(req, res) {
     const montagemRes = await fetch(`${baseUrl}/api/assemble-video`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bodyMontagem),
+      body: JSON.stringify({ ...bodyMontagem, titulo: `${titulo || 'Vídeo'}${novoFormato === 'short' ? ' (vertical)' : ''}` }),
     });
     const montagemData = await montagemRes.json();
     if (!montagemRes.ok) throw new Error(montagemData.error || 'Erro ao iniciar a remontagem');

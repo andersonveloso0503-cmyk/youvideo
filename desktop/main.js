@@ -292,6 +292,37 @@ app.whenReady().then(() => {
     atualizarBloqueioSono(jobs);
   });
 
+  // ---------- Montar no PC: pega os vídeos que o site mandou montar aqui ----------
+  let buscandoPedidos = false;
+  async function buscarPedidosDoSite() {
+    const cfg = store.ler();
+    if (buscandoPedidos || !cfg.centralToken) return;
+    buscandoPedidos = true;
+    try {
+      const { pedidos = [] } = await Central.chamar(cfg, '/api/central/montar-pc');
+      const pasta = cfg.ultimoProjeto?.saida?.pasta || app.getPath('videos');
+      for (const p of pedidos) {
+        if (fila.pedidoNaFila(p.id)) continue;
+        const { ok } = await Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: p.id, acao: 'pegar', pc: os.hostname() } });
+        if (!ok) continue; // outro PC já pegou
+        try {
+          const receita = p.receita;
+          if (receita?.tipo !== 'youvideo-montagem' || !receita.clipes?.length) throw new Error('Receita inválida.');
+          if (!receita.titulo) receita.titulo = p.titulo || 'Vídeo do Youvideo';
+          fila.adicionarMontagem(receita, pasta, { pedidoId: p.id });
+        } catch (e) {
+          Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: p.id, acao: 'erro', erro: e.message } }).catch(() => {});
+        }
+      }
+    } catch {
+      // sem internet / Central fora do ar: tenta de novo na próxima volta
+    } finally {
+      buscandoPedidos = false;
+    }
+  }
+  setTimeout(buscarPedidosDoSite, 8000);
+  setInterval(buscarPedidosDoSite, 45000);
+
   // ---------- Configurações ----------
   ipcMain.handle('config:ler', () => store.paraTela());
   ipcMain.handle('config:salvar', (_e, novo) => {

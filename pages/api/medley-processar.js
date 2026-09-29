@@ -90,6 +90,8 @@ export default async function handler(req, res) {
         const { renderId } = await chamar('/api/assemble-video', {
           dataUrl: dadosBlob.url,
           formato: medley.formato,
+          titulo: medley.titulo,
+          origem: 'medley',
           ambiente: medley.ambiente || 'production',
         });
 

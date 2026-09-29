@@ -1,3 +1,4 @@
+import { escolherProximo } from '../../../lib/montarPc';
 import { getDb } from '../../../lib/firebase-admin';
 import {
   gerarRoteiro,
@@ -41,12 +42,13 @@ export default async function handler(req, res) {
       .where('status', 'not-in', ['concluido', 'erro'])
       .orderBy('status')
       .orderBy('criadoEm')
-      .limit(1)
+      .limit(15)
       .get();
 
     if (snapshot.empty) return res.status(200).json({ mensagem: 'Fila vazia, nada a processar.' });
 
-    const doc = snapshot.docs[0];
+    const doc = await escolherProximo(snapshot.docs);
+    if (!doc) return res.status(200).json({ mensagem: 'Só tem vídeo esperando o Youvideo Compilador montar no PC.' });
     const item = doc.data();
     const ref = doc.ref;
 
@@ -90,6 +92,8 @@ export default async function handler(req, res) {
         if (item.animar === false) {
           const renderId = await iniciarMontagem({
             audioUrl: item.narracao.audioUrl,
+            audioSegments: item.narracao.audioSegments,
+            titulo: item.roteiro?.titulo || item.tema,
             cenas: item.arquivos,
             formato: item.formato,
             palavras: item.narracao.palavras,
@@ -149,6 +153,8 @@ export default async function handler(req, res) {
         if (todasProntas) {
           const renderId = await iniciarMontagem({
             audioUrl: item.narracao.audioUrl,
+            audioSegments: item.narracao.audioSegments,
+            titulo: item.roteiro?.titulo || item.tema,
             cenas: arquivosAtualizados,
             formato: item.formato,
             palavras: item.narracao.palavras,

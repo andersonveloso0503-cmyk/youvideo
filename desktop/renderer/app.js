@@ -944,7 +944,7 @@ function renderFila() {
     const detalhe = j.status === 'erro' ? j.erro
       : envio ? (rodando ? j.etapa : j.status === 'concluido' ? `${j.youtube?.canal || ''}${j.aviso ? ' · ' + j.aviso : ''}` : `Enviar para ${canais.find((c) => c.id === j.envio.canalId)?.titulo || 'YouTube'}`)
       : rodando ? `${j.etapa}${j.restanteSeg ? ` · falta ~${tempoCurto(j.restanteSeg)}` : ''}`
-      : montagem ? (j.status === 'concluido' ? `Montado no PC · ${tempo(j.duracao)}` : j.status === 'interrompido' ? 'Processamento interrompido' : `Vídeo do site · ${tempo(j.receita?.duracao || 0)}`)
+      : montagem ? (j.status === 'concluido' ? `Montado no PC${j.pedidoId ? ' e devolvido ao site' : ''} · ${tempo(j.duracao)}` : j.status === 'interrompido' ? 'Processamento interrompido' : `Pedido do site${j.receita?.duracao ? ' · ' + tempo(j.receita.duracao) : ''}`)
       : j.status === 'concluido' ? `${qtd} música${qtd > 1 ? 's' : ''} · ${tempo(j.duracao)}`
       : j.status === 'interrompido' ? 'Processamento interrompido'
       : j.projeto ? `${qtd} música${qtd > 1 ? 's' : ''} · ${j.projeto.fundos.length} fundo${j.projeto.fundos.length === 1 ? '' : 's'}` : j.etapa || '';

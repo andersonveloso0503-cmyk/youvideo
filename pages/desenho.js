@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { montarNoPc } from '../lib/montarNoPc';
 
 const HISTORIAS = [
   {
@@ -169,33 +168,11 @@ export default function Desenho() {
   };
 
   const assembleVideo = async () => {
-    if (motorRender === 'pc') {
-      setLoading('assemble');
-      try {
-        const temPedacos = (results.voice?.audioSegments || []).length > 1;
-        const aviso = await montarNoPc(
-          {
-            ...(temPedacos ? { audioSegments: results.voice.audioSegments } : { audioUrl: results.voice?.audioUrl }),
-            cenas: results.visual?.arquivos,
-            formato,
-            palavras: results.voice?.palavras,
-            marca: 'Em Nome de Jesus',
-          },
-          results.script?.titulo || tema
-        );
-        setResults((r) => ({ ...r, assemble: { status: aviso } }));
-        setStatus((s) => ({ ...s, assemble: 'ok' }));
-      } catch (e) {
-        setResults((r) => ({ ...r, assemble: { error: e.message } }));
-        setStatus((s) => ({ ...s, assemble: 'error' }));
-      }
-      setLoading(null);
-      return;
-    }
     // Narração longa vem em vários pedaços — manda todos, senão o áudio para no meio
     const temVariosPedacos = (results.voice?.audioSegments || []).length > 1;
     const primeira = await runStep('assemble', '/api/assemble-video', {
       ...(temVariosPedacos ? { audioSegments: results.voice.audioSegments } : { audioUrl: results.voice?.audioUrl }),
+      titulo: results.script?.titulo || tema,
       cenas: results.visual?.arquivos,
       formato,
       palavras: results.voice?.palavras,
@@ -206,7 +183,7 @@ export default function Desenho() {
 
     setLoading('assemble');
     let tentativas = 0;
-    while (tentativas < 40) {
+    while (tentativas < (String(primeira.renderId).startsWith('pc:') ? 1440 : 40)) {
       await new Promise((r) => setTimeout(r, 5000));
       const check = await fetch(`/api/assemble-video?id=${primeira.renderId}`).then((r) => r.json());
       if (check.status === 'done') {

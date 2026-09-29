@@ -28,7 +28,7 @@ export default function Musica() {
   const [estilo, setEstilo] = useState('cinematografico');
   const [formato, setFormato] = useState('longo');
   const [ambiente, setAmbiente] = useState('sandbox');
-  const [motorRender, setMotorRender] = useState('shotstack');
+  const [motorRender, setMotorRender] = useState('pc');
   const [letra, setLetra] = useState('');
   const [textoThumbnail, setTextoThumbnail] = useState('');
   const [arquivoAudio, setArquivoAudio] = useState(null);
@@ -125,6 +125,7 @@ export default function Musica() {
     const primeira = await runStep('assemble', () =>
       postJson('/api/assemble-video', {
         audioUrl: results.audio.audioUrl,
+        titulo: titulo || results.script?.titulo,
         cenas: results.visual.arquivos,
         formato,
         palavras: results.align.palavras,
@@ -136,7 +137,7 @@ export default function Musica() {
 
     setLoading('assemble');
     let tentativas = 0;
-    while (tentativas < 40) {
+    while (tentativas < (String(primeira.renderId).startsWith('pc:') ? 1440 : 40)) {
       await new Promise((r) => setTimeout(r, 5000));
       const check = await fetch(`/api/assemble-video?id=${primeira.renderId}&ambiente=${ambiente}`).then((r) => r.json());
       if (check.status === 'done') {
@@ -240,6 +241,7 @@ export default function Musica() {
 
         <label>Motor de montagem do vídeo</label>
         <select value={motorRender} onChange={(e) => setMotorRender(e.target.value)}>
+          <option value="pc">💻 No meu PC — Youvideo Compilador (grátis, sem limite de tempo)</option>
           <option value="shotstack">Shotstack (de sempre)</option>
           <option value="json2video">JSON2Video (teste — mais barato)</option>
         </select>
