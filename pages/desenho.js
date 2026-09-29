@@ -132,6 +132,7 @@ export default function Desenho() {
       arquivos: results.visual?.arquivos || [],
       formato,
       duracaoAlvo,
+      loop: true, // cada cena fica em movimento o tempo todo (sem imagem parada)
     });
     if (!primeiro) return;
 
@@ -167,8 +168,10 @@ export default function Desenho() {
   };
 
   const assembleVideo = async () => {
+    // Narração longa vem em vários pedaços — manda todos, senão o áudio para no meio
+    const temVariosPedacos = (results.voice?.audioSegments || []).length > 1;
     const primeira = await runStep('assemble', '/api/assemble-video', {
-      audioUrl: results.voice?.audioUrl,
+      ...(temVariosPedacos ? { audioSegments: results.voice.audioSegments } : { audioUrl: results.voice?.audioUrl }),
       cenas: results.visual?.arquivos,
       formato,
       palavras: results.voice?.palavras,

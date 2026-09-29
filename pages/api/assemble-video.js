@@ -156,6 +156,17 @@ export default async function handler(req, res) {
     // Cena animada: toca o vídeo até seu fim real e, se sobrar tempo da
     // fatia, completa com a mesma imagem de referência + zoom em vez de
     // deixar o vídeo congelado parado.
+    // Clipe em loop (começa e termina no mesmo quadro): repete o clipe
+    // emendado até cobrir a cena inteira — sempre em movimento, nunca para.
+    if (c.videoLoop) {
+      const dur = Math.max(1, duracoesReais[idx] || DURACAO_PADRAO_VIDEO_ANIMADO);
+      const partes = [];
+      for (let t = 0; t < lengthFatia - 0.05; t += dur) {
+        partes.push({ asset: { type: 'video', src: c.videoUrl }, start: start + t, length: Math.min(dur, lengthFatia - t), fit: 'cover' });
+      }
+      return partes;
+    }
+
     const duracaoReal = Math.min(duracoesReais[idx] || DURACAO_PADRAO_VIDEO_ANIMADO, lengthFatia);
     const clipes = [{ asset: { type: 'video', src: c.videoUrl }, start, length: duracaoReal, fit: 'cover' }];
     const sobra = lengthFatia - duracaoReal;
