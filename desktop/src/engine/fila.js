@@ -127,6 +127,8 @@ class Fila extends EventEmitter {
           duracao: job.duracao, curto: job.projeto ? job.projeto.formato?.tipo === 'curto' : !!job.curto,
           clima: job.clima || '', musicas: job.timeline || [], categoria: job.receita?.categoria || 'compilacoes',
           criadoEm: job.concluidoEm || job.criadoEm,
+          tamanho: fs.statSync(job.arquivoFinal).size,
+          subiuPeloPc: !job.videoUrlSite, // link do site: a limpeza não apaga o arquivo
         },
       });
       this.atualizar(job, { capaUrlNuvem: capaUrl, espelho: { status: 'ok' } });

@@ -588,6 +588,12 @@ app.whenReady().then(() => {
   // ---------- Central Youvideo (Biblioteca e Agenda das redes) ----------
   ipcMain.handle('central:biblioteca', async () => {
     const d = await Central.chamar(store.ler(), '/api/central/biblioteca');
+    const eu = identidadePc().pc;
+    let videosNuvem = [];
+    try {
+      ({ videos: videosNuvem = [] } = await Central.chamar(store.ler(), '/api/central/pc-videos'));
+    } catch {}
+    const naNuvem = new Set(videosNuvem.filter((v) => v.pc === eu).map((v) => v.jobId));
     // Vídeos feitos aqui no PC também entram na Biblioteca
     const locais = fila
       .lista()
@@ -606,16 +612,15 @@ app.whenReady().then(() => {
         clima: j.clima || resumoClima(j.projeto?.musicas),
         criadoEm: j.concluidoEm || j.criadoEm,
         publicado: { youtube: !!j.youtube },
-        videoUrl: j.videoUrlNuvem || j.videoUrlSite || undefined, // já na nuvem: agendar nas redes não sobe de novo
+        // Ainda na nuvem (a limpeza automática pode ter apagado): agendar nas redes não sobe de novo
+        videoUrl: j.videoUrlSite || (j.videoUrlNuvem && naNuvem.has(j.id) ? j.videoUrlNuvem : undefined),
         ...(j.receita?.categoria ? { categoria: j.receita.categoria } : {}),
       }));
     // Vídeos feitos em outros PCs (subiram para a nuvem sozinhos)
-    const eu = identidadePc().pc;
     const idsLocais = new Set(locais.map((l) => l.id));
     let deOutros = [];
     try {
-      const { videos = [] } = await Central.chamar(store.ler(), '/api/central/pc-videos');
-      deOutros = videos
+      deOutros = videosNuvem
         .filter((v) => !(v.pc === eu && idsLocais.has(v.jobId)))
         .map((v) => ({
           chave: `nuvem-pc:${v.id}`,
