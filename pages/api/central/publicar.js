@@ -3,7 +3,7 @@
 // Também aceita chamada manual: GET /api/central/publicar?token=CENTRAL_TOKEN
 import { getDb } from '../../../lib/firebase-admin';
 import { autorizado } from '../../../lib/central';
-import { publicarVideoFacebook, publicarNoInstagram } from '../../../lib/publicarSocial';
+import { publicarVideoFacebook, criarContainerInstagram, statusContainerInstagram, publicarContainerInstagram } from '../../../lib/publicarSocial';
 import { publicarNoTiktok } from '../../../lib/publicarTiktok';
 
 export const config = { maxDuration: 300 };
@@ -14,14 +14,13 @@ const ORCAMENTO_MS = 240e3; // para antes do limite de 300 s da Vercel
 async function publicarEm(rede, item) {
   const legenda = item.legenda || item.titulo;
   if (rede === 'facebook') return publicarVideoFacebook({ videoUrl: item.videoUrl, legenda });
-  if (rede === 'instagram') return publicarNoInstagram({ tipo: 'video', midiaUrl: item.videoUrl, legenda });
   if (rede === 'tiktok') return publicarNoTiktok({ videoUrl: item.videoUrl, legenda });
   throw new Error('Rede desconhecida');
 }
 
 async function atualizarPendente(ref) {
   const d = (await ref.get()).data();
-  const pendente = Object.entries(d?.redes || {}).some(([r, v]) => r !== 'kwai' && ['pendente', 'publicando'].includes(v.status));
+  const pendente = Object.entries(d?.redes || {}).some(([r, v]) => r !== 'kwai' && ['pendente', 'publicando', 'processando'].includes(v.status));
   if (d && d.pendente !== pendente) await ref.update({ pendente });
 }
 
@@ -44,6 +43,41 @@ export default async function handler(req, res) {
       for (const rede of ['facebook', 'instagram', 'tiktok']) {
         const st = item.redes?.[rede];
         if (!st) continue;
+        // Instagram: vídeo leva alguns minutos para processar. Cria o container numa rodada
+        // e publica numa das próximas (a cada 10 min), em vez de esperar tudo de uma vez.
+        if (rede === 'instagram' && (st.status === 'pendente' || st.status === 'processando')) {
+          if (Date.now() - inicio > ORCAMENTO_MS) return res.status(200).json({ feitos, maisDepois: true });
+          try {
+            let creationId = st.creationId;
+            if (st.status === 'pendente' || !creationId) {
+              creationId = await criarContainerInstagram({ tipo: 'video', midiaUrl: item.videoUrl, legenda: item.legenda || item.titulo });
+              await doc.ref.update({ 'redes.instagram': { status: 'processando', creationId, desde: new Date().toISOString(), em: new Date().toISOString(), tentativas: (st.tentativas || 0) + 1 } });
+            }
+            // Espera até ~1 min nesta rodada; se ainda não ficou pronto, volta na próxima
+            let codigo = 'IN_PROGRESS';
+            let detalhe = '';
+            for (let i = 0; i < 12; i++) {
+              ({ codigo, detalhe } = await statusContainerInstagram(creationId));
+              if (codigo !== 'IN_PROGRESS') break;
+              await new Promise((r) => setTimeout(r, 5000));
+            }
+            if (codigo === 'FINISHED') {
+              const r = await publicarContainerInstagram(creationId);
+              await doc.ref.update({ 'redes.instagram': { status: 'ok', em: new Date().toISOString(), id: r.id, url: null } });
+              feitos.push({ id: doc.id, rede, ok: true });
+            } else if (codigo === 'IN_PROGRESS') {
+              const desde = new Date(st.desde || Date.now()).getTime();
+              if (Date.now() - desde > 90 * 60e3) throw new Error('O Instagram ficou mais de 1h30 processando o vídeo. Clique para tentar de novo.');
+              feitos.push({ id: doc.id, rede, ok: null, obs: 'processando' });
+            } else {
+              throw new Error(`O Instagram não aceitou o vídeo (${codigo}${detalhe ? ': ' + detalhe : ''}). Reels precisam ter entre 3 s e 15 min, em pé (9:16) de preferência.`);
+            }
+          } catch (e) {
+            await doc.ref.update({ 'redes.instagram': { status: 'erro', em: new Date().toISOString(), erro: String(e.message).slice(0, 500), tentativas: (st.tentativas || 0) + 1 } });
+            feitos.push({ id: doc.id, rede, ok: false, erro: e.message });
+          }
+          continue;
+        }
         // Se ficou "publicando" por mais de 20 min, algo travou: tenta de novo
         const travado = st.status === 'publicando' && Date.now() - new Date(st.em || 0).getTime() > 20 * 60e3;
         if (st.status !== 'pendente' && !travado) continue;

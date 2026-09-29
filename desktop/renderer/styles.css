@@ -677,3 +677,4 @@ body { grid-template-columns: minmax(0, 1fr); }
 .pc-job .s { color: var(--mudo); font-size: 11.5px; text-align: right; }
 .pc-job .barra { grid-column: 1 / -1; height: 3px; background: var(--bg-4); border-radius: 2px; overflow: hidden; }
 .pc-job .barra i { display: block; height: 100%; background: var(--ouro); }
+.link-kwai { cursor: pointer; color: var(--ouro); text-decoration: underline; }

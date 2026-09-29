@@ -397,8 +397,8 @@ const Biblioteca = (() => {
 
   function chip(rede, st, item) {
     const [, nome, cls, ic] = REDES.find(([r]) => r === rede);
-    const rotulo = { pendente: 'agendado', publicando: 'publicando…', subindo: 'subindo do PC…', ok: 'publicado', erro: 'erro', manual: 'postar pelo celular' }[st.status] || st.status;
-    const icone = { pendente: '⏳', publicando: '⬆', subindo: '⬆', ok: '✅', erro: '❌', manual: '📱' }[st.status] || '';
+    const rotulo = { pendente: 'agendado', processando: 'Instagram processando…', publicando: 'publicando…', subindo: 'subindo do PC…', ok: 'publicado', erro: 'erro', manual: 'postar pelo celular' }[st.status] || st.status;
+    const icone = { pendente: '⏳', processando: '⏳', publicando: '⬆', subindo: '⬆', ok: '✅', erro: '❌', manual: '📱' }[st.status] || '';
     const el = document.createElement('span');
     el.className = `chip-rede ${cls} st-${st.status}`;
     el.innerHTML = `<i>${ic}</i> ${nome} <em>${icone} ${rotulo}</em>`;
@@ -434,7 +434,11 @@ const Biblioteca = (() => {
     if (kwai.length) {
       const sec = document.createElement('div');
       sec.className = 'agenda-kwai';
-      sec.innerHTML = `<h3>📱 Para postar no Kwai agora (${kwai.length})</h3>`;
+      sec.innerHTML = `<h3>📱 Para postar no Kwai agora (${kwai.length})</h3><p class="nota">Pelo celular: abra <b class="link-kwai">${esc(String(config.centralUrl || 'https://youvideors2.vercel.app').replace(/\/+$/, ''))}/kwai</b> no navegador do celular (pede a senha da Central uma vez).</p>`;
+      sec.querySelector('.link-kwai').onclick = async () => {
+        await navigator.clipboard.writeText(sec.querySelector('.link-kwai').textContent);
+        avisar('Endereço copiado. Mande para o seu celular (WhatsApp, e-mail...)');
+      };
       for (const a of kwai) {
         const l = document.createElement('div');
         l.className = 'kwai-item';
