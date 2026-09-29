@@ -1,10 +1,9 @@
-// Publica os posts agendados que já chegaram na hora (Facebook, Instagram, TikTok).
+// Publica os posts agendados que já chegaram na hora (Facebook e Instagram; TikTok e Kwai vão pelo celular).
 // Chamado de 10 em 10 minutos pelo cron da Vercel (vercel.json) — o PC pode ficar desligado.
 // Também aceita chamada manual: GET /api/central/publicar?token=CENTRAL_TOKEN
 import { getDb } from '../../../lib/firebase-admin';
 import { autorizado } from '../../../lib/central';
 import { publicarVideoFacebook, criarContainerInstagram, statusContainerInstagram, publicarContainerInstagram } from '../../../lib/publicarSocial';
-import { publicarNoTiktok } from '../../../lib/publicarTiktok';
 
 export const config = { maxDuration: 300 };
 
@@ -14,7 +13,6 @@ const ORCAMENTO_MS = 240e3; // para antes do limite de 300 s da Vercel
 async function publicarEm(rede, item) {
   const legenda = item.legenda || item.titulo;
   if (rede === 'facebook') return publicarVideoFacebook({ videoUrl: item.videoUrl, legenda });
-  if (rede === 'tiktok') return publicarNoTiktok({ videoUrl: item.videoUrl, legenda });
   throw new Error('Rede desconhecida');
 }
 
@@ -40,7 +38,8 @@ export default async function handler(req, res) {
     const vencidos = snap.docs.filter((d) => (d.data().quando || '') <= agora).sort((a, b) => a.data().quando.localeCompare(b.data().quando));
     for (const doc of vencidos) {
       const item = doc.data();
-      for (const rede of ['facebook', 'instagram', 'tiktok']) {
+      // TikTok e Kwai são postados pelo celular (/postar)
+      for (const rede of ['facebook', 'instagram']) {
         const st = item.redes?.[rede];
         if (!st) continue;
         // Instagram: vídeo leva alguns minutos para processar. Cria o container numa rodada

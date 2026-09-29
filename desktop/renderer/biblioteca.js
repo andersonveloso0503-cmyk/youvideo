@@ -428,23 +428,26 @@ const Biblioteca = (() => {
       p.textContent = `⚠ Agenda das redes indisponível: ${erroNuvem}`;
       box.appendChild(p);
     }
-    // Kwai: o que está na hora de postar
+    // Kwai e TikTok: postados pelo celular — o que está na hora
     const agora = new Date().toISOString();
-    const kwai = B.agenda.filter((a) => !a.local && a.redes?.kwai?.status === 'manual' && a.quando <= agora);
-    if (kwai.length) {
+    const MANUAIS = [['tiktok', 'TikTok'], ['kwai', 'Kwai']];
+    const faltam = (a) => MANUAIS.filter(([r]) => a.redes?.[r]?.status === 'manual');
+    const naHora = B.agenda.filter((a) => !a.local && a.quando <= agora && faltam(a).length);
+    if (naHora.length) {
       const sec = document.createElement('div');
       sec.className = 'agenda-kwai';
-      sec.innerHTML = `<h3>📱 Para postar no Kwai agora (${kwai.length})</h3><p class="nota">Pelo celular: abra <b class="link-kwai">${esc(String(config.centralUrl || 'https://youvideors2.vercel.app').replace(/\/+$/, ''))}/kwai</b> no navegador do celular (pede a senha da Central uma vez).</p>`;
+      const endereco = `${String(config.centralUrl || 'https://youvideors2.vercel.app').replace(/\/+$/, '')}/postar`;
+      sec.innerHTML = `<h3>📱 Para postar no TikTok / Kwai agora (${naHora.length})</h3><p class="nota">Pelo celular: abra <b class="link-kwai">${esc(endereco)}</b> no navegador do celular (pede a senha da Central uma vez).</p>`;
       sec.querySelector('.link-kwai').onclick = async () => {
-        await navigator.clipboard.writeText(sec.querySelector('.link-kwai').textContent);
+        await navigator.clipboard.writeText(endereco);
         avisar('Endereço copiado. Mande para o seu celular (WhatsApp, e-mail...)');
       };
-      for (const a of kwai) {
+      for (const a of naHora) {
         const l = document.createElement('div');
         l.className = 'kwai-item';
-        l.innerHTML = `<span></span><button class="btn-mini">⬇ Baixar vídeo</button><button class="btn-mini">📋 Copiar legenda</button><button class="btn-mini destaque">✓ Já postei</button>`;
-        l.querySelector('span').textContent = a.titulo;
-        const [bBaixar, bCopiar, bFeito] = l.querySelectorAll('button');
+        l.innerHTML = `<span></span><button class="btn-mini">⬇ Baixar vídeo</button><button class="btn-mini">📋 Copiar legenda</button>`;
+        l.querySelector('span').textContent = `${a.titulo} · ${faltam(a).map(([, n]) => n).join(' e ')}`;
+        const [bBaixar, bCopiar] = l.querySelectorAll('button');
         bBaixar.onclick = async () => {
           bBaixar.textContent = 'Baixando...';
           try {
@@ -460,10 +463,16 @@ const Biblioteca = (() => {
           await navigator.clipboard.writeText(a.legenda || a.titulo);
           avisar('Legenda copiada');
         };
-        bFeito.onclick = async () => {
-          await window.api.central.agendaAcao({ id: a.id, rede: 'kwai', acao: 'feito' });
-          carregarAgenda();
-        };
+        for (const [r, nome] of faltam(a)) {
+          const b = document.createElement('button');
+          b.className = 'btn-mini destaque';
+          b.textContent = `✓ Postei no ${nome}`;
+          b.onclick = async () => {
+            await window.api.central.agendaAcao({ id: a.id, rede: r, acao: 'feito' });
+            carregarAgenda();
+          };
+          l.appendChild(b);
+        }
         sec.appendChild(l);
       }
       box.appendChild(sec);

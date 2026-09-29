@@ -7,6 +7,7 @@ import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 
 const REDES = ['facebook', 'instagram', 'tiktok', 'kwai'];
+const MANUAIS = ['kwai', 'tiktok']; // sem publicação automática: vão para a página do celular
 const COL = 'youvideo_agenda';
 
 export default async function handler(req, res) {
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
         const quando = new Date(it.quando);
         if (isNaN(quando)) return res.status(400).json({ erro: `Data inválida: ${it.titulo}` });
         const redes = {};
-        for (const r of REDES) if (it.redes?.includes(r)) redes[r] = { status: r === 'kwai' ? 'manual' : 'pendente' };
+        for (const r of REDES) if (it.redes?.includes(r)) redes[r] = { status: MANUAIS.includes(r) ? 'manual' : 'pendente' };
         if (!Object.keys(redes).length) continue;
         const ref = db.collection(COL).doc();
         lote.set(ref, {
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
           chaveBiblioteca: it.chaveBiblioteca || null,
           quando: quando.toISOString(),
           redes,
-          pendente: Object.keys(redes).some((r) => r !== 'kwai'),
+          pendente: Object.keys(redes).some((r) => !MANUAIS.includes(r)),
           criadoEm: new Date().toISOString(),
         });
         ids.push(ref.id);
@@ -53,7 +54,8 @@ export default async function handler(req, res) {
     if (req.method === 'PATCH') {
       const { id, rede, acao } = req.body || {};
       if (!id || !REDES.includes(rede)) return res.status(400).json({ erro: 'Pedido inválido.' });
-      const status = acao === 'feito' ? 'ok' : 'pendente';
+      // Kwai e TikTok são postados pelo celular (página /postar)
+      const status = acao === 'feito' ? 'ok' : MANUAIS.includes(rede) ? 'manual' : 'pendente';
       const upd = { [`redes.${rede}`]: { status, em: new Date().toISOString() } };
       if (status === 'pendente') upd.pendente = true;
       await db.collection(COL).doc(String(id)).update(upd);
