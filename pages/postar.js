@@ -18,6 +18,7 @@ export default function Postar() {
   const [itens, setItens] = useState(null);
   const [erro, setErro] = useState('');
   const [msg, setMsg] = useState({});
+  const [prontos, setProntos] = useState({}); // vídeo já baixado no celular, pronto para compartilhar
 
   useEffect(() => {
     try {
@@ -54,28 +55,40 @@ export default function Postar() {
 
   const aviso = (id, texto) => setMsg((m) => ({ ...m, [id]: texto }));
 
-  async function compartilhar(a) {
-    const legenda = a.legenda || a.titulo;
+  // 1º toque: baixa o vídeo para o celular. 2º toque: abre a lista de apps (TikTok, Kwai...).
+  // (O celular só deixa abrir o compartilhar logo depois de um toque, por isso são dois passos.)
+  async function preparar(a) {
     try {
-      aviso(a.id, 'Preparando o vídeo...');
+      aviso(a.id, 'Baixando o vídeo para o celular...');
       const r = await fetch(`/api/download-video?url=${encodeURIComponent(a.videoUrl)}`);
       if (!r.ok) throw new Error('não consegui baixar o vídeo');
       const blob = await r.blob();
       const arquivo = new File([blob], `${(a.titulo || 'video').replace(/[^\w\- ]/g, '').slice(0, 40) || 'video'}.mp4`, { type: 'video/mp4' });
+      setProntos((p) => ({ ...p, [a.id]: arquivo }));
+      aviso(a.id, 'Pronto! Agora toque em "Enviar".');
+    } catch (e) {
+      aviso(a.id, `Não deu: ${e.message}`);
+    }
+  }
+
+  async function compartilhar(a) {
+    const arquivo = prontos[a.id];
+    const legenda = a.legenda || a.titulo;
+    try {
       try { await navigator.clipboard.writeText(legenda); } catch {}
       if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
         await navigator.share({ files: [arquivo], text: legenda, title: a.titulo });
-        aviso(a.id, 'Escolha o app (TikTok ou Kwai) na lista. A legenda já está copiada: é só colar. Depois toque em "Já postei".');
+        aviso(a.id, 'Escolha o TikTok ou o Kwai. A legenda já está copiada: é só colar. Depois toque em "Já postei".');
       } else {
-        const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(arquivo);
         const link = document.createElement('a');
         link.href = url;
         link.download = arquivo.name;
         link.click();
-        aviso(a.id, 'Este navegador não compartilha vídeo direto: o vídeo foi baixado. Abra o TikTok ou o Kwai e escolha da galeria. A legenda já está copiada.');
+        aviso(a.id, 'Este navegador não compartilha vídeo direto: o vídeo foi salvo. Abra o TikTok ou o Kwai e escolha da galeria. A legenda já está copiada.');
       }
     } catch (e) {
-      if (e.name === 'AbortError') return aviso(a.id, '');
+      if (e.name === 'AbortError') return;
       aviso(a.id, `Não deu: ${e.message}`);
     }
   }
@@ -115,7 +128,11 @@ export default function Postar() {
         <small>{cedo ? `Agendado para ${quando(a.quando)}` : `Era para ${quando(a.quando)}`}</small>
         <div className="redes">{faltando(a).map(([r, nome, cor]) => <span key={r} style={{ borderColor: cor, color: cor }}>{nome}</span>)}</div>
         <p className="legenda">{a.legenda || a.titulo}</p>
-        <button className="principal" onClick={() => compartilhar(a)}>📤 Enviar para {faltando(a).map(([, n]) => n).join(' / ')}</button>
+        {prontos[a.id] ? (
+          <button className="principal" onClick={() => compartilhar(a)}>📤 Enviar para {faltando(a).map(([, n]) => n).join(' / ')}</button>
+        ) : (
+          <button className="principal" onClick={() => preparar(a)}>⬇ Preparar vídeo para postar</button>
+        )}
         <div className="linha">
           <button onClick={() => copiar(a)}>📋 Copiar legenda</button>
           <a href={`/api/download-video?url=${encodeURIComponent(a.videoUrl)}`}><button>⬇ Baixar</button></a>
@@ -135,6 +152,7 @@ export default function Postar() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <h1>📱 Postar no TikTok e no Kwai</h1>
+      <p className="topo-links"><a href="/">← Youvideo</a> · <a href="/projetos">Meus projetos</a></p>
       {!token ? (
         <div className="entrar">
           <p>Digite a senha da Central (a mesma do Youvideo Compilador). Fica guardada neste celular.</p>
@@ -177,6 +195,8 @@ export default function Postar() {
         .entrar input { font: inherit; padding: 12px; border-radius: 10px; border: 1px solid #3a3228; background: #211d17; color: #f3ead9; }
         .erro { color: #ff8a7a; }
         .msg { color: #d9a441; font-size: 13px; margin: 0; }
+        .topo-links { margin: -8px 0 12px; font-size: 13px; }
+        .topo-links a { color: #d9a441; }
       `}</style>
     </div>
   );

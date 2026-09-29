@@ -324,6 +324,10 @@ export default function Home() {
           <div className="hub-tile-title">Meus projetos</div>
           <div className="hub-tile-desc">Tudo que já foi criado, dos dois canais</div>
         </a>
+        <a href="/postar" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">📱 Postar no TikTok e Kwai</div>
+          <div className="hub-tile-desc">Abra no celular: os vídeos agendados, prontos para enviar ao app</div>
+        </a>
         <a href="/transcrever" className="hub-tile hub-tile--teal">
           <div className="hub-tile-title">Transcrever áudio</div>
           <div className="hub-tile-desc">Recuperar a letra real cantada de uma música</div>

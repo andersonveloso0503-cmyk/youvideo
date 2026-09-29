@@ -164,6 +164,9 @@ export default function Projetos() {
   return (
     <div className="container">
       <h1>Meus Projetos</h1>
+      <a href="/postar" style={{ display: 'block', background: '#2a1a22', border: '1px solid #ff3b5c', borderRadius: 10, padding: '10px 14px', color: '#ffb3c0', textDecoration: 'none', marginBottom: 14 }}>
+        📱 <b>Vídeos agendados para o TikTok e o Kwai</b> — abrir a página de postar pelo celular →
+      </a>
       <p className="subtitle">
         <a href="/" style={{ color: '#4f7cff' }}>← voltar pro painel</a>
       </p>
@@ -254,7 +257,7 @@ export default function Projetos() {
                   }
                   style={{ marginTop: 0 }}
                 >
-                  {arquivosProntos[p.id] ? 'Enviar (TikTok / Kwai / etc)' : 'Preparando...'}
+                  {arquivosProntos[p.id] ? '📱 Postar no TikTok / Kwai' : 'Preparando...'}
                 </button>
                 {statusEnvio[p.id] === 'sem-suporte' && (
                   <div style={{ fontSize: 11, color: '#ff9d9d', marginTop: 4 }}>
