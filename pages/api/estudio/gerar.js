@@ -92,6 +92,12 @@ function montarPrompt({ modo, descricao, letra, estilo, voz, instrumental, durac
       partes.push('The singing style must match the genre: do NOT sing like sertanejo, no country twang.');
     }
   }
+  // Reforço no texto (o Google Lyria só entende o texto): gênero no começo e o que evitar
+  const g = genero && GENEROS[genero.id];
+  if (g && g.pos.length > 1) {
+    partes.unshift(`Genre: ${g.pos.slice(0, 6).join(', ')}.`);
+    if (g.neg.length) partes.push(`Avoid: ${g.neg.join(', ')}.`);
+  }
   if (duracaoSeg) partes.push(`Length about ${Math.round(duracaoSeg)} seconds.`);
   if (!instrumental && modo === 'personalizado' && letra) {
     partes.push(`Use exactly these lyrics, in this order:\n${letra.trim()}`);

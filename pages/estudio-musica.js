@@ -460,6 +460,7 @@ export default function EstudioMusica() {
   const [selecao, setSelecao] = useState([]); // ids em ordem
   const [marcadas, setMarcadas] = useState([]); // músicas marcadas para "Nova versão" em lote
   const [versoesLote, setVersoesLote] = useState(1);
+  const [motorLote, setMotorLote] = useState('elevenlabs'); // '' = mesmo motor da música original
   const [loteRodando, setLoteRodando] = useState('');
 
   // Biblioteca
@@ -595,10 +596,10 @@ export default function EstudioMusica() {
     }));
   }
 
-  function variacao(m, qtdVersoes = 2) {
+  function variacao(m, qtdVersoes = 2, motorNovo = '') {
     return criar({
       qtdVersoes,
-      motor: m.motor,
+      motor: motorNovo || (m.motor === 'medley' ? 'elevenlabs' : m.motor),
       modo: m.modo,
       descricao: m.descricao || '',
       titulo: m.titulo,
@@ -623,7 +624,7 @@ export default function EstudioMusica() {
     const trabalhador = async () => {
       while (fila.length) {
         const m = fila.shift();
-        await variacao(m, versoesLote);
+        await variacao(m, versoesLote, motorLote);
         feitas += 1;
         setLoteRodando(feitas < lista.length ? `Criando ${feitas} de ${lista.length}…` : '');
       }
@@ -1180,6 +1181,11 @@ export default function EstudioMusica() {
                     <select value={versoesLote} onChange={(e) => setVersoesLote(Number(e.target.value))}>
                       <option value={1}>1 versão de cada</option>
                       <option value={2}>2 versões de cada</option>
+                    </select>
+                    <select value={motorLote} onChange={(e) => setMotorLote(e.target.value)} title="Motor da nova versão">
+                      <option value="elevenlabs">com ElevenLabs</option>
+                      <option value="lyria">com Google Lyria</option>
+                      <option value="">com o mesmo motor</option>
                     </select>
                     <button className="est-btn-sec" onClick={novaVersaoMarcadas}>🔁 Nova versão</button>
                     <button className="est-btn-link" onClick={() => setMarcadas([])}>Desmarcar</button>
