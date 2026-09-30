@@ -58,6 +58,7 @@ export default async function handler(req, res) {
           estilo: item.estilo,
           formato: item.formato,
           duracaoDesejada: item.duracaoDesejada,
+          serie: item.serie || null,
         });
         await ref.update({ roteiro, status: 'roteiro_ok' });
         break;

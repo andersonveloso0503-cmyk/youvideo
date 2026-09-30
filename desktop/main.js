@@ -392,7 +392,7 @@ app.whenReady().then(() => {
               duracaoSeg: 60,
               curto: true,
               canal: it.canalYoutube?.titulo || '',
-              pedido: `história bíblica: ${it.tema}`,
+              pedido: `história bíblica: ${it.serie?.nome || it.tema}`,
               contexto: `Canal cristão de histórias da Bíblia em Shorts (${it.estilo === 'desenho' ? 'desenho animado' : 'narração com imagens realistas'}). Resumo: ${String(it.descricao || '').slice(0, 400)}`,
               evitar: usados,
             });
@@ -402,6 +402,17 @@ app.whenReady().then(() => {
           } catch {
             // Groq fora do ar: usa o título e as tags do roteiro
           }
+        }
+        // Série: o título no YouTube sempre mostra a parte, e a descrição lembra de seguir o canal
+        const serie = it.serie && it.serie.total > 1 ? it.serie : null;
+        if (serie) {
+          const sufixo = ` (Parte ${serie.parte}/${serie.total})`;
+          const base = titulo.replace(/\s*[-–—|(]*\s*parte\s*\d+\s*(\/\s*\d+|de\s*\d+)?\s*\)?\s*/gi, ' ').replace(/\s*#shorts\b/gi, '').trim();
+          titulo = `${base.slice(0, 100 - sufixo.length)}${sufixo}`;
+          const aviso = serie.parte < serie.total
+            ? `👉 Esta é a PARTE ${serie.parte} de ${serie.total} da série "${serie.nome}". Inscreva-se para não perder a parte ${serie.parte + 1}!`
+            : `✅ Parte final da série "${serie.nome}". Veja as outras partes no canal e inscreva-se para a próxima série!`;
+          descricao = `${aviso}\n\n${descricao}`.trim();
         }
         fila.adicionarEnvios([{
           arquivo: null,

@@ -28,7 +28,7 @@ const Fabrica = (() => {
   function salvarPrefs() {
     const p = {
       dias: q('#fabDias').value, porDia: q('#fabPorDia').value, hora1: q('#fabHora1').value, hora2: q('#fabHora2').value,
-      animacao: q('#fabAnimacao').value, canal: q('#fabCanal').value,
+      animacao: q('#fabAnimacao').value, canal: q('#fabCanal').value, formato: q('#fabFormato').value,
       redes: { youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked, tiktok: q('#fabTiktok').checked, kwai: q('#fabKwai').checked },
     };
     config.fabricaPrefs = p;
@@ -62,10 +62,11 @@ const Fabrica = (() => {
     if (p.hora1) q('#fabHora1').value = p.hora1;
     if (p.hora2) q('#fabHora2').value = p.hora2;
     if (p.animacao) q('#fabAnimacao').value = p.animacao;
+    if (p.formato != null) q('#fabFormato').value = p.formato;
     for (const [r, id] of [['youtube', '#fabYoutube'], ['facebook', '#fabFacebook'], ['instagram', '#fabInstagram'], ['tiktok', '#fabTiktok'], ['kwai', '#fabKwai']]) {
       if (p.redes && r in p.redes) q(id).checked = !!p.redes[r];
     }
-    ['#fabDias', '#fabPorDia', '#fabHora1', '#fabHora2', '#fabAnimacao', '#fabCanal', '#fabYoutube', '#fabFacebook', '#fabInstagram', '#fabTiktok', '#fabKwai'].forEach((id) =>
+    ['#fabDias', '#fabPorDia', '#fabHora1', '#fabHora2', '#fabAnimacao', '#fabFormato', '#fabCanal', '#fabYoutube', '#fabFacebook', '#fabInstagram', '#fabTiktok', '#fabKwai'].forEach((id) =>
       q(id).addEventListener('change', () => {
         salvarPrefs();
         custo();
@@ -99,6 +100,8 @@ const Fabrica = (() => {
         porDia: Number(q('#fabPorDia').value),
         horarios: [q('#fabHora1').value, q('#fabHora2').value],
         animacao: q('#fabAnimacao').value,
+        series: q('#fabFormato').value !== '0',
+        partes: Number(q('#fabFormato').value) || 3,
         redes,
         canalYoutube: redes.youtube && canal ? { id: canal.id, titulo: canal.titulo } : null,
       });
@@ -115,7 +118,7 @@ const Fabrica = (() => {
   function seloYoutube(i) {
     if (!i.redes?.youtube) return '';
     const y = i.youtube;
-    if (!y) return '<span class="fab-yt">▶ YouTube: depois de pronto</span>';
+    if (!y) return `<span class="fab-yt">▶ YouTube${i.quandoYoutube ? ` ${esc(quandoTxt(i.quandoYoutube))}` : ''}: depois de pronto</span>`;
     if (y.status === 'ok') return `<a class="fab-yt ok" data-link="${esc(y.url || '')}">▶ YouTube agendado ✅</a>`;
     if (y.status === 'erro') return `<a class="fab-yt erro" data-repetir-yt="${esc(i.id)}" title="${esc(y.erro || '')}">▶ YouTube: erro (clique p/ tentar de novo)</a>`;
     if (y.status === 'enviando') return '<span class="fab-yt">▶ YouTube: subindo pelo PC...</span>';
@@ -148,7 +151,7 @@ const Fabrica = (() => {
           <span class="tipo" title="${i.animar ? 'Animado' : 'Imagens com zoom'}">${i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar ? '✨' : ''}</span>
           <span class="txt"><b></b><small></small></span>
           <span class="acoes"></span>`;
-        l.querySelector('b').textContent = i.titulo || i.tema;
+        l.querySelector('b').textContent = i.titulo || (i.serie ? `${i.serie.nome} (Parte ${i.serie.parte}/${i.serie.total})` : i.tema);
         l.querySelector('small').innerHTML = `${esc(i.status === 'erro' ? `Erro: ${i.erro || ''}` : ETAPA[i.status] || i.status)} · ${esc(redes)} ${seloYoutube(i)}`;
         const acoes = l.querySelector('.acoes');
         const botao = (txt, titulo, fn) => {
