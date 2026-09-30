@@ -834,13 +834,19 @@ export default function EstudioMusica() {
   function tocar(m) {
     const a = audioRef.current;
     if (!a) return;
+    // Celular (principalmente iPhone): o play tem que sair direto do toque, e se falhar a gente avisa
+    const falhou = (e) => {
+      if (e && e.name === 'AbortError') return; // trocou de música no meio: normal
+      setAviso(`O celular não conseguiu tocar "${m.titulo}" aqui (${e?.message || 'erro'}). Toque em "Abrir áudio" no player para ouvir direto.`);
+    };
     if (tocando && tocando.id === m.id) {
-      if (a.paused) a.play(); else a.pause();
+      if (a.paused) a.play().catch(falhou); else a.pause();
       return;
     }
     setTocando(m);
     a.src = m.audioUrl;
-    a.play().catch(() => {});
+    a.load();
+    a.play().catch(falhou);
   }
 
   // ── Ações da biblioteca ──
@@ -1307,6 +1313,9 @@ export default function EstudioMusica() {
       {/* ───────── Player fixo ───────── */}
       <audio
         ref={audioRef}
+        playsInline
+        preload="none"
+        onError={() => tocando && setAviso(`Não deu para carregar "${tocando.titulo}" no player. Toque em "Abrir áudio" para ouvir direto.`)}
         onPlay={() => setPausado(false)}
         onPause={() => setPausado(true)}
         onTimeUpdate={(e) => setPos(e.currentTarget.currentTime)}
@@ -1349,6 +1358,7 @@ export default function EstudioMusica() {
             <button className="est-vol-btn" title="Aumentar volume" onClick={() => mudarVolume(Math.min(1, Math.round((volume + 0.1) * 10) / 10))}>+</button>
             <span className="est-vol-num">{mudo ? 0 : Math.round(volume * 100)}%</span>
           </div>
+          <a className="est-player-abrir" href={tocando.audioUrl} target="_blank" rel="noreferrer">Abrir áudio</a>
           <button className="est-player-x" onClick={() => { audioRef.current?.pause(); setTocando(null); }}>✕</button>
         </div>
       )}
@@ -1360,6 +1370,7 @@ export default function EstudioMusica() {
         .est-aviso { background: var(--gold-soft); border: 1px solid var(--gold); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
         .est-grid { display: grid; grid-template-columns: 400px 1fr; gap: 24px; align-items: start; }
         @media (max-width: 900px) { .est-grid { grid-template-columns: 1fr; } }
+        .est-grid { padding-bottom: 170px; } /* o player fixo não cobre a última música */
 
         .est-criar { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 14px; padding: 18px; position: sticky; top: 16px; }
         @media (max-width: 900px) { .est-criar { position: static; } }
@@ -1465,6 +1476,8 @@ export default function EstudioMusica() {
           .est-vol { width: 100%; justify-content: center; order: 5; }
           .est-vol input[type='range'] { flex: 1; width: auto; }
         }
+        .est-player-abrir { font-size: 12px; color: var(--gold); white-space: nowrap; text-decoration: underline; }
+        @media (max-width: 640px) { .est-player-abrir { order: 4; } }
         .est-player-x { background: none; border: 0; color: var(--text-muted); font-size: 18px; cursor: pointer; }
       `}</style>
     </>
