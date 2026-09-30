@@ -565,7 +565,8 @@ const Biblioteca = (() => {
     amanha.setDate(amanha.getDate() + 1);
     if (!q('#bibData').value || q('#bibData').value < hojeISO()) q('#bibData').value = hojeISO(amanha);
     q('#bibData').min = hojeISO();
-    q('#modalBib').showModal();
+    if (!q('#modalBib').open) q('#modalBib').showModal();
+    if (opcoes.aba) B.aba = opcoes.aba;
     trocarAba(B.aba);
     if (!B.carregado || opcoes.recarregar) await carregar();
     else renderGrade();

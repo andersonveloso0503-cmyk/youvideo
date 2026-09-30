@@ -1182,6 +1182,7 @@ async function iniciar() {
     chip.onclick = () => alert(`Créditos das IAs:\n\n${chip.title}\n\nfal.ai: fal.ai/dashboard/billing\nFlux: dashboard.bfl.ai\nElevenLabs: elevenlabs.io/app/subscription`);
   };
   window.api.ao('creditos:status', mostrarCreditos);
+  window.api.ao('abrir:agenda', () => Biblioteca.abrir({ recarregar: true, aba: 'agenda' }));
   setTimeout(() => window.api.creditos.ler().then(mostrarCreditos).catch(() => {}), 25000);
   window.api.ao('sistema:cpu', (v) => {
     $('#cpuTexto').textContent = `CPU ${v}%`;

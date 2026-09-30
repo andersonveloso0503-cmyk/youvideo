@@ -452,6 +452,34 @@ app.whenReady().then(() => {
       // sem internet: tenta depois
     }
   }
+  // ---------- Lembrete: hora de postar no TikTok / Kwai (pelo celular) ----------
+  const lembrados = new Set();
+  async function lembrarPostsCelular() {
+    const cfg = store.ler();
+    if (!cfg.centralToken) return;
+    try {
+      const { itens = [] } = await Central.chamar(cfg, '/api/central/agenda');
+      const agora = Date.now();
+      const faltam = (a) => ['tiktok', 'kwai'].filter((r) => a.redes?.[r]?.status === 'manual');
+      // Chegou a hora (até 6 h de atraso) e ainda não foi postado
+      const naHora = itens.filter((a) => faltam(a).length && new Date(a.quando).getTime() <= agora && agora - new Date(a.quando).getTime() < 6 * 3600e3 && !lembrados.has(a.id));
+      if (!naHora.length || !Notification.isSupported()) return;
+      naHora.forEach((a) => lembrados.add(a.id));
+      const base = String(cfg.centralUrl || Central.URL_PADRAO).replace(/\/+$/, '');
+      const n = new Notification({
+        title: naHora.length === 1 ? `📱 Hora de postar no ${faltam(naHora[0]).map((r) => (r === 'tiktok' ? 'TikTok' : 'Kwai')).join(' e ')}` : `📱 ${naHora.length} vídeos para postar no TikTok/Kwai`,
+        body: `${naHora.map((a) => a.titulo).join(' • ').slice(0, 180)}\nNo celular: ${base}/postar (a legenda já vai copiada)`,
+      });
+      n.on('click', () => {
+        if (janela) { janela.show(); janela.focus(); }
+        enviar('abrir:agenda', true);
+      });
+      n.show();
+    } catch {}
+  }
+  setTimeout(lembrarPostsCelular, 30000);
+  setInterval(lembrarPostsCelular, 5 * 60e3);
+
   setTimeout(checarCreditos, 20000);
   setInterval(checarCreditos, 30 * 60e3);
   ipcMain.handle('creditos:ler', async () => {

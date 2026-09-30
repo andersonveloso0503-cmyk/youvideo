@@ -116,8 +116,12 @@ export default function Postar() {
   }
 
   const agora = new Date().toISOString();
-  const naHora = (itens || []).filter((a) => a.quando <= agora);
-  const depois = (itens || []).filter((a) => a.quando > agora);
+  const diaBr = (iso) => new Date(new Date(iso).getTime() - 3 * 3600e3).toISOString().slice(0, 10);
+  const hoje = diaBr(new Date().toISOString());
+  const atrasados = (itens || []).filter((a) => a.quando <= agora && diaBr(a.quando) < hoje);
+  const deHoje = (itens || []).filter((a) => diaBr(a.quando) === hoje);
+  const depois = (itens || []).filter((a) => diaBr(a.quando) > hoje);
+  const horaTxt = (iso) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const quando = (iso) => new Date(iso).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
   const Cartao = ({ a, cedo }) => (
@@ -166,9 +170,19 @@ export default function Postar() {
           {erro && <p className="erro">{erro}</p>}
           {itens === null && !erro && <p>Carregando...</p>}
           {itens && !itens.length && <p>Nada para postar agora. 🎉</p>}
-          {naHora.length > 0 && <h2>Para postar agora ({naHora.length})</h2>}
-          {naHora.map((a) => <Cartao key={a.id} a={a} />)}
-          {depois.length > 0 && <h2>Próximos</h2>}
+          {deHoje.length > 0 && (
+            <div className="hoje">
+              <b>📅 Hoje você posta {deHoje.length === 1 ? 'este' : `estes ${deHoje.length}`}:</b>
+              {deHoje.map((a) => (
+                <div key={a.id}>{a.quando <= agora ? '🔔' : '🕒'} {horaTxt(a.quando)} — {a.titulo}</div>
+              ))}
+            </div>
+          )}
+          {atrasados.length > 0 && <h2>Ficaram para trás ({atrasados.length})</h2>}
+          {atrasados.map((a) => <Cartao key={a.id} a={a} />)}
+          {deHoje.length > 0 && <h2>Hoje ({deHoje.length})</h2>}
+          {deHoje.map((a) => <Cartao key={a.id} a={a} cedo={a.quando > agora} />)}
+          {depois.length > 0 && <h2>Próximos dias</h2>}
           {depois.map((a) => <Cartao key={a.id} a={a} cedo />)}
         </>
       )}
@@ -195,6 +209,7 @@ export default function Postar() {
         .entrar input { font: inherit; padding: 12px; border-radius: 10px; border: 1px solid #3a3228; background: #211d17; color: #f3ead9; }
         .erro { color: #ff8a7a; }
         .msg { color: #d9a441; font-size: 13px; margin: 0; }
+        .hoje { background: #2a1a22; border: 1px solid #ff3b5c; border-radius: 12px; padding: 12px; margin: 6px 0 4px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
         .topo-links { margin: -8px 0 12px; font-size: 13px; }
         .topo-links a { color: #d9a441; }
       `}</style>
