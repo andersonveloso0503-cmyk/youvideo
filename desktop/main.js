@@ -297,6 +297,12 @@ app.whenReady().then(() => {
     registrarEnvio: () => registrarEnvio(),
     identidade: () => identidadePc(),
   });
+  // Voltou de uma atualização: recomeça sozinho o que foi interrompido
+  const flagRetomar = path.join(dirDados, 'retomar-apos-atualizar');
+  if (fs.existsSync(flagRetomar)) {
+    fs.rmSync(flagRetomar, { force: true });
+    for (const j of fila.lista()) if (j.status === 'interrompido') fila.retentar(j.id);
+  }
   fila.proximo(); // retoma o que ficou aguardando na última vez
   fila.on('mudou', (jobs) => {
     enviar('fila:mudou', jobs);
@@ -586,8 +592,10 @@ app.whenReady().then(() => {
       enviar('app:progressoAtualizacao', tamanho ? baixado / tamanho : 0);
     }
     await new Promise((res) => arquivo.end(res));
-    // Abre o instalador e fecha o app para ele poder substituir os arquivos
-    require('child_process').spawn(destino, [], { detached: true, stdio: 'ignore' }).unref();
+    // Marca para retomar sozinho o que estava gerando/enviando quando o app voltar
+    try { fs.writeFileSync(path.join(dirDados, 'retomar-apos-atualizar'), new Date().toISOString()); } catch {}
+    // Instala em silêncio (sem clicar em nada) e abre o app de novo no final
+    require('child_process').spawn(destino, ['/S', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
     setTimeout(() => app.exit(0), 800);
     return true;
   });

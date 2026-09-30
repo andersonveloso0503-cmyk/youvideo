@@ -928,8 +928,14 @@ const ROTULO_STATUS = {
   aguardando: 'Aguardando', separando: 'Separando voz', legenda: 'Legenda', audio: 'Áudio', fundos: 'Fundos',
   renderizando: 'Gerando', publicando: 'Publicando', concluido: 'Pronto', erro: 'Erro', cancelado: 'Cancelado', interrompido: 'Interrompido',
 };
+let esperarFilaParaAtualizar = null; // 'Atualizar quando a fila terminar'
 const RODANDO = ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'];
 function renderFila() {
+  if (esperarFilaParaAtualizar && !jobs.some((j) => RODANDO.includes(j.status) || j.status === 'aguardando')) {
+    const instalar = esperarFilaParaAtualizar;
+    esperarFilaParaAtualizar = null;
+    setTimeout(instalar, 3000);
+  }
   const box = $('#filaCartoes');
   $('#qtdFila').textContent = jobs.length;
   if (!jobs.length) { box.innerHTML = '<p class="fila-vazia">Os vídeos que você mandar gerar aparecem aqui.</p>'; return; }
@@ -1137,13 +1143,26 @@ async function iniciar() {
     b.hidden = false;
     b.textContent = `⬆ Atualizar para v${nova.versao}`;
     b.title = nova.notas || '';
-    b.onclick = async () => {
-      const rodando = jobs.some((j) => RODANDO.includes(j.status));
-      if (rodando && !confirm('Tem vídeo sendo gerado. Atualizar agora vai interromper. Continuar?')) return;
-      if (!rodando && !confirm(`Baixar e instalar a versão ${nova.versao}? O app fecha e o instalador abre — é só clicar em avançar. Suas configurações e canais continuam.`)) return;
+    const instalar = async () => {
       b.disabled = true;
       try { await window.api.app.atualizar({ url: nova.url, tamanho: nova.tamanho }); }
       catch (e) { b.disabled = false; b.textContent = `⬆ Atualizar para v${nova.versao}`; avisar(msgErro(e), true); }
+    };
+    b.onclick = () => {
+      const rodando = jobs.some((j) => RODANDO.includes(j.status));
+      const d = $('#modalAtualizar');
+      $('#atuTexto').textContent = rodando
+        ? `Tem vídeo sendo gerado ou enviado agora. Você pode atualizar para a v${nova.versao} agora (o app fecha uns segundos, instala sozinho, abre de novo e continua de onde parou) ou deixar para quando a fila terminar.`
+        : `Instalar a v${nova.versao}? O app fecha uns segundos, instala sozinho e abre de novo. Configurações, canais e fila continuam.`;
+      $('#atuDepois').hidden = !rodando;
+      $('#atuAgora').onclick = () => { d.close(); instalar(); };
+      $('#atuDepois').onclick = () => {
+        d.close();
+        esperarFilaParaAtualizar = instalar;
+        b.textContent = '⏳ Atualiza quando a fila terminar';
+        avisar('O app vai se atualizar sozinho quando os vídeos terminarem');
+      };
+      if (!d.open) d.showModal();
     };
   };
   window.api.ao('app:progressoAtualizacao', (p) => { $('#btnAtualizar').textContent = `Baixando ${Math.round(p * 100)}%`; });
