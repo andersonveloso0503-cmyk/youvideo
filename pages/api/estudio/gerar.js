@@ -7,7 +7,7 @@
 //   descricao,            // modo simples: "uma música gospel sobre esperança..."
 //   titulo, letra,        // modo personalizado
 //   estilo,               // texto de estilo (ex: "Brazilian gospel worship, piano")
-//   voz,                  // 'masculina' | 'feminina' | 'dueto' | 'coral' | ''
+//   voz,                  // chave de VOZES abaixo (ex.: 'masculina', 'masc-potente', 'dupla') | ''
 //   instrumental,         // true = sem voz
 //   duracaoSeg,           // 30..300
 //   grupoId, versao       // para juntar as versões da mesma criação
@@ -21,7 +21,13 @@ export const config = { maxDuration: 300, api: { bodyParser: { sizeLimit: '1mb' 
 
 const VOZES = {
   masculina: 'male lead vocal',
+  'masc-potente': 'male lead vocal, clean and clear tone, no rasp, powerful emotional belting with strong high notes in the chorus, warm mid-range in the verses',
+  'masc-suave': 'male lead vocal, soft, warm and intimate tone, gentle delivery, smooth and calm',
+  'masc-rouca': 'male lead vocal, raspy and gritty tone, emotional and heartfelt delivery',
   feminina: 'female lead vocal',
+  'fem-potente': 'female lead vocal, clean and powerful, strong belting with high notes in the chorus, emotional delivery',
+  'fem-suave': 'female lead vocal, soft, sweet and intimate tone, gentle and airy delivery',
+  dupla: 'two male lead vocalists singing in close harmony, Brazilian sertanejo duo style (dupla sertaneja)',
   dueto: 'male and female duet vocals',
   coral: 'lead vocal with gospel choir backing',
 };

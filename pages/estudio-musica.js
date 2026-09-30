@@ -7,7 +7,7 @@ const ESTILOS = [
   { id: 'gospel', nome: 'Gospel / Louvor', base: 'Brazilian gospel worship, modern, emotional, piano and pads, uplifting build' },
   { id: 'gospel-animado', nome: 'Gospel Animado', base: 'upbeat Brazilian gospel, festive, drums, bass, joyful, danceable' },
   { id: 'sertanejo', nome: 'Sertanejo', base: 'Brazilian sertanejo, romantic, acoustic guitar, accordion touch' },
-  { id: 'sertanejo-potente', nome: 'Sertanejo Masculino Potente', base: 'Brazilian sertanejo, male lead vocalist, clean and clear voice, no rasp, powerful emotional belting in the chorus, strong high notes, warm mid-range verses, modern arena sertanejo production, acoustic guitar and viola caipira, full band, big anthemic chorus, sung in Brazilian Portuguese' },
+  { id: 'sertanejo-potente', nome: 'Sertanejo Arena', base: 'Brazilian sertanejo, modern arena sertanejo production, acoustic guitar and viola caipira, full band, big anthemic chorus' },
   { id: 'gaucha', nome: 'Gaúcha / Nativista', base: 'Southern Brazilian gaucho music, milonga, nylon guitar, accordion' },
   { id: 'pagode', nome: 'Pagode / Samba', base: 'Brazilian pagode, samba, cavaquinho, pandeiro, swing' },
   { id: 'forro', nome: 'Forró / Piseiro', base: 'Brazilian forro piseiro, accordion, zabumba, danceable' },
@@ -351,8 +351,14 @@ function EstilosDoMedley({ medley, biblioteca }) {
 
 const VOZES = [
   { id: 'masculina', nome: 'Masculina' },
+  { id: 'masc-potente', nome: 'Masculina potente' },
+  { id: 'masc-suave', nome: 'Masculina suave' },
+  { id: 'masc-rouca', nome: 'Masculina rouca' },
   { id: 'feminina', nome: 'Feminina' },
-  { id: 'dueto', nome: 'Dueto' },
+  { id: 'fem-potente', nome: 'Feminina potente' },
+  { id: 'fem-suave', nome: 'Feminina suave' },
+  { id: 'dupla', nome: 'Dupla sertaneja' },
+  { id: 'dueto', nome: 'Dueto (homem e mulher)' },
   { id: 'coral', nome: 'Com coral' },
 ];
 
