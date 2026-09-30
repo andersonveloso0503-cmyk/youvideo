@@ -32,14 +32,46 @@ const VOZES = {
   coral: 'lead vocal with gospel choir backing',
 };
 
+// Cada estilo tem o SEU tipo de cantor. Sem isso a IA canta tudo em português com a mesma voz
+// (que puxa para o sertanejo). A voz escolhida na tela define homem/mulher e o timbre;
+// aqui entra o jeito de cantar do gênero.
+const CANTORES = [
+  { id: 'forro', teste: /forr[oó]|piseiro|xote|bai[aã]o|zabumba/i, cantor: 'Northeastern Brazilian forró / piseiro singer with a nordestino accent, bright and slightly nasal tone, rhythmic syncopated phrasing typical of forró and piseiro, festive and danceable delivery' },
+  { id: 'rock', teste: /\brock\b|metal|grunge|punk|hard rock/i, cantor: 'rock band frontman, gritty powerful rock vocals with raspy belting and attitude, sustained high notes and energy in the chorus, sung like Brazilian rock (rock nacional), not pop, not sertanejo' },
+  { id: 'blues', teste: /blues|soul/i, cantor: 'soulful blues singer, gritty warm tone, bluesy bends and runs, expressive and emotional phrasing' },
+  { id: 'funk', teste: /\bfunk\b|baile/i, cantor: 'Brazilian funk MC, rhythmic half-spoken half-sung delivery, confident street style, catchy chant-like hook' },
+  { id: 'pagode', teste: /pagode|samba|cavaquinho/i, cantor: 'Brazilian pagode / samba singer, smooth swinging carioca phrasing, relaxed and romantic, group backing vocals answering in the chorus' },
+  { id: 'gaucha', teste: /ga[uú]ch|nativis|milonga|chamam[eé]|vanera/i, cantor: 'Southern Brazilian gaucho nativist singer, deep warm baritone, proud storytelling delivery, milonga phrasing' },
+  { id: 'sertanejo', teste: /sertanej|viola caipira|country/i, cantor: 'Brazilian sertanejo singer, typical sertanejo vocal style with emotional twang' },
+  { id: 'mpb', teste: /\bmpb\b|bossa/i, cantor: 'Brazilian MPB singer, intimate and natural, soft bossa nova phrasing, close to the microphone' },
+  { id: 'lofi', teste: /lo-?fi|chill/i, cantor: 'soft breathy laid-back vocals, relaxed and intimate' },
+  { id: 'infantil', teste: /children|infantil|kids/i, cantor: 'cheerful friendly singer for a children\'s song, very clear, simple and playful' },
+  { id: 'gospel-animado', teste: /upbeat.*gospel|gospel.*(festive|danceable|upbeat)/i, cantor: 'energetic Brazilian gospel singer, joyful celebratory vocals, call-and-response with backing singers' },
+  { id: 'gospel', teste: /gospel|worship|louvor/i, cantor: 'Brazilian contemporary worship (louvor) singer, heartfelt clean tone, soaring gospel runs in the chorus' },
+  { id: 'pop', teste: /\bpop\b/i, cantor: 'modern pop singer, polished catchy delivery, breathy verses and bright chorus' },
+];
+
+function cantorDoEstilo(estilo) {
+  return CANTORES.find((c) => c.teste.test(estilo || '')) || null;
+}
+
 function montarPrompt({ modo, descricao, letra, estilo, voz, instrumental, duracaoSeg }) {
   const partes = [];
+  const genero = cantorDoEstilo(`${estilo} ${modo === 'simples' ? descricao : ''}`);
   if (estilo) partes.push(`Style: ${estilo}.`);
   if (modo === 'simples' && descricao) partes.push(`Song idea: ${descricao}.`);
   if (instrumental) {
     partes.push('Instrumental only, no vocals.');
   } else {
-    partes.push(`${VOZES[voz] || 'lead vocal'}, sung in Brazilian Portuguese, clear pronunciation.`);
+    // "Dupla sertaneja" só faz sentido no sertanejo; nos outros estilos vira dupla de vozes do próprio estilo
+    let v = VOZES[voz] || 'lead vocal';
+    if (voz === 'dupla' && genero && !['sertanejo', 'gaucha'].includes(genero.id)) v = 'two male lead vocalists singing in harmony';
+    partes.push(`Vocals: ${v}.`);
+    if (genero) partes.push(`Singer: ${genero.cantor}.`);
+    partes.push('Sung in Brazilian Portuguese, clear pronunciation.');
+    if (genero && !['sertanejo', 'gaucha'].includes(genero.id)) {
+      partes.push('The singing style must match the genre: do NOT sing like sertanejo, no country twang.');
+    }
   }
   if (duracaoSeg) partes.push(`Length about ${Math.round(duracaoSeg)} seconds.`);
   if (!instrumental && modo === 'personalizado' && letra) {

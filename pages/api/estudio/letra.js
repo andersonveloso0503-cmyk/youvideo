@@ -80,7 +80,7 @@ Responda SÓ com as linhas, uma por música, neste formato:
 
 Regras:
 - Português do Brasil, linguagem natural e emocionante.
-${estilo ? `- Estilo musical: ${estilo}.` : ''}
+${estilo ? `- Estilo musical: ${estilo}. Escreva com o vocabulário, as gírias, o jeito de falar e o clima TÍPICOS desse estilo (forró com jeito nordestino e festeiro, rock com atitude e energia, pagode com swing, gospel com adoração...). Não escreva tudo com cara de sertanejo.` : ''}
 ${voz ? `- Vai ser cantada por: ${voz}.` : ''}
 ${detalhes ? `- Arranjo pedido: ${detalhes}.` : ''}
 ${Array.isArray(evitar) && evitar.length ? `- Esta música faz parte de um medley. Ela precisa ser COMPLETAMENTE diferente destas outras músicas do medley — não repita título, refrão, frases, rimas nem imagens delas:\n${evitar.slice(0, 14).map((x) => `  • ${x}`).join('\n')}` : ''}
