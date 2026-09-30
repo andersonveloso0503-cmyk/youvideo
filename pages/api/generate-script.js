@@ -1,3 +1,4 @@
+import { variacaoRoteiro } from '../../lib/ganchos';
 
 // Aumenta o limite de execução da função (padrão é bem curto e cortava
 // respostas de IA mais demoradas no meio). Precisa do plano Pro do
@@ -24,6 +25,7 @@ export default async function handler(req, res) {
       ? `Formato Short: a narração precisa ter aproximadamente ${palavrasAlvo} palavras (pra durar bem perto de ${duracaoMin > 0 ? `${duracaoMin}min ` : ''}${duracaoSeg}s ao ser falada), gancho forte nos primeiros 3 segundos, ritmo direto.`
       : `Formato vídeo longo: a narração precisa ter aproximadamente ${palavrasAlvo} palavras (pra durar bem perto de ${duracaoMin}min ao ser falada), com introdução, desenvolvimento e conclusão bem desenvolvidos — não encurte o conteúdo, expanda com contexto histórico e detalhes da história pra atingir esse tamanho.`;
 
+  const varia = variacaoRoteiro(); // abertura e título diferentes a cada vídeo
   const prompt = `Você é roteirista de um canal de histórias bíblicas no YouTube.
 Tema: "${tema}"
 Estilo visual: ${estilo}
@@ -34,13 +36,13 @@ IMPORTANTE:
 - Não copie trechos literais de nenhuma tradução da Bíblia; narre a história com suas próprias palavras, de forma envolvente e fiel ao relato.
 - Divida a narração em cenas curtas, pensando em cada cena como um clipe de vídeo separado.
 - GATILHOS DE RETENÇÃO (aplique de verdade, não apenas mencione):
-  1. Nos primeiros 3-5 segundos da narração, comece com uma pergunta intrigante, uma afirmação surpreendente ou um "flash-forward" do momento mais tenso da história (ex: "O que você faria se descobrisse que seu melhor amigo te traiu por 30 moedas?") — nunca comece com "Olá" ou apresentação genérica.
+  1. ABERTURA (primeiros 3-5 segundos): ${varia.abertura}. É PROIBIDO começar com ${varia.proibidas} ou qualquer apresentação genérica.
   2. No meio da narração, insira pelo menos um "gancho de continuidade" (ex: "mas o que aconteceu a seguir mudaria tudo...") pra segurar quem está pensando em sair.
   3. Termine com uma pergunta reflexiva pro espectador ou um convite claro pra comentar/seguir a série (ex: "Você já passou por uma situação parecida? Conta nos comentários.").
   4. Use frases curtas e diretas na narração, evite parágrafos longos e formais — o tom deve soar como alguém contando uma história empolgante, não uma aula.
 - Retorne APENAS um JSON válido, sem texto antes ou depois, no formato:
 {
-  "titulo": "PRIORIZE o formato de pergunta provocativa 'Por Que [pergunta intrigante sobre a história]?' (ex: 'Por Que Jesus Desceu ao Inferno nos 3 Dias Antes da Ressurreição?', 'Por Que Deus Deu a Jesus Apenas 33 Anos?') — é o padrão com maior volume de visualizações comprovado no nicho de histórias bíblicas no YouTube. Alternativa válida: '[Personagem] e [evento marcante] | [subtítulo emocional/intrigante]', ex: 'Jonas e a Baleia | A Fuga que Quase Custou Sua Vida'. Chamativo mas não enganoso, em português",
+  "titulo": "título no estilo ${varia.titulo}. Chamativo mas não enganoso, em português",
   "thumbnailTitulo": "o NOME do personagem principal, ou no máximo 2 palavras, pra aparecer BEM GRANDE na thumbnail como título de pôster de filme (ex: 'LUCAS', 'A TRAIÇÃO', 'O MILAGRE'), em maiúsculas, em português",
   "thumbnailSubtitulo": "frase curta de 4 a 7 palavras que gera curiosidade/mistério e reforça o CTA de clicar, pra aparecer menor logo abaixo do título (ex: 'A HISTÓRIA QUE NINGUÉM CONTOU', 'O QUE A BÍBLIA REVELA SOBRE ELE'), em maiúsculas, em português",
   "descricao": "descrição CURTA e direta para o YouTube, em português: 1 a 2 frases (no máximo 30 palavras) resumindo o vídeo de forma atrativa, sem contar a história inteira nem dar spoiler — só o suficiente pra gerar curiosidade. Depois disso, pule uma linha e coloque de 5 a 8 hashtags relevantes (ex: #biblia #fe #jesus).",
