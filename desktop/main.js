@@ -379,15 +379,38 @@ app.whenReady().then(() => {
         if (!ok) continue;
         let quando = it.quandoYoutube ? new Date(it.quandoYoutube) : null;
         if (quando && quando.getTime() < Date.now() + 20 * 60e3) quando = new Date(Date.now() + 20 * 60e3); // ficou pronto atrasado
-        const tags = Array.isArray(it.tags) ? it.tags : String(it.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
+        let tags = Array.isArray(it.tags) ? it.tags : String(it.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
+        let titulo = String(it.titulo || it.tema || 'Short');
+        let descricao = it.descricao || '';
+        // SEO de verdade: título, descrição e tags com base no que as pessoas buscam no YouTube
+        if (cfg.groqKey) {
+          try {
+            const usados = fila.lista().filter((j) => j.envio?.fabricaId).map((j) => j.nome).slice(-12);
+            const r = await IA.gerarTextosVideo(cfg.groqKey, {
+              nome: it.titulo || it.tema,
+              musicas: [],
+              duracaoSeg: 60,
+              curto: true,
+              canal: it.canalYoutube?.titulo || '',
+              pedido: `história bíblica: ${it.tema}`,
+              contexto: `Canal cristão de histórias da Bíblia em Shorts (${it.estilo === 'desenho' ? 'desenho animado' : 'narração com imagens realistas'}). Resumo: ${String(it.descricao || '').slice(0, 400)}`,
+              evitar: usados,
+            });
+            if (r.titulo) titulo = r.titulo;
+            if (r.descricao) descricao = r.descricao;
+            if (r.tags?.length) tags = r.tags;
+          } catch {
+            // Groq fora do ar: usa o título e as tags do roteiro
+          }
+        }
         fila.adicionarEnvios([{
           arquivo: null,
           baixarDe: it.videoUrl,
           chaveArquivo: `fabrica-${it.id}`,
           capa: null,
           capaUrl: it.thumbnailUrl || null, // cena do vídeo: base da capa chamativa
-          titulo: String(it.titulo || it.tema || 'Short').slice(0, 95),
-          descricao: `${it.descricao || ''}\n\n#Shorts`.trim(),
+          titulo: titulo.slice(0, 100),
+          descricao: /#shorts/i.test(descricao) ? descricao : `${descricao}\n\n#Shorts`.trim(),
           tags,
           canalId,
           privacidade: 'private',
