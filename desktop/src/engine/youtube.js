@@ -108,6 +108,30 @@ function montarDescricao({ descricao, timeline, incluirTracklist, curto, tags })
 }
 
 /** Envia o vídeo para o canal. Devolve { id, url }. */
+/**
+ * Tags no limite do YouTube: 500 caracteres no total, contando a vírgula entre elas e as
+ * aspas que ele põe em tag com espaço. Passou disso ele recusa com "invalid video keywords".
+ */
+function limparTags(tags) {
+  const lista = Array.isArray(tags) ? tags : String(tags || '').split(',');
+  const vistas = new Set();
+  const saida = [];
+  let total = 0;
+  for (const bruta of lista) {
+    const t = String(bruta || '').replace(/[<>"#]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (t.length < 2 || vistas.has(t.toLowerCase())) continue;
+    const custo = t.length + (t.includes(' ') ? 2 : 0) + (saida.length ? 1 : 0);
+    if (total + custo > 450) continue; // folga abaixo dos 500
+    vistas.add(t.toLowerCase());
+    saida.push(t);
+    total += custo;
+  }
+  return saida;
+}
+
+// O YouTube recusa < e > no título e na descrição
+const semSinais = (t) => String(t || '').replace(/[<>]/g, '');
+
 async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, titulo, descricao, tags, privacidade, miniatura, categoria, agendarPara, onProgresso }) {
   const auth = cliente(credenciais, redirectOriginal || REDIRECT);
   auth.setCredentials({ refresh_token: refreshToken });
@@ -139,9 +163,9 @@ async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, 
       part: ['snippet', 'status'],
       requestBody: {
         snippet: {
-          title: String(titulo || 'Compilação').slice(0, 100),
-          description: descricao || '',
-          tags: (tags || []).slice(0, 30),
+          title: semSinais(titulo).replace(/\s+/g, ' ').trim().slice(0, 100) || 'Compilação',
+          description: semSinais(descricao).slice(0, 4900),
+          tags: limparTags(tags),
           categoryId: categoria || '10', // Música
         },
         status,
@@ -187,4 +211,5 @@ async function ultimoAgendado({ credenciais, refreshToken, redirectOriginal }) {
   return datas.length ? new Date(Math.max(...datas)).toISOString() : null;
 }
 
-module.exports = { autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT };
+module.exports = {
+  limparTags, autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT };
