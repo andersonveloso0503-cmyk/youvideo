@@ -7,6 +7,7 @@ const ESTILOS = [
   { id: 'gospel', nome: 'Gospel / Louvor', base: 'Brazilian gospel worship, modern, emotional, piano and pads, uplifting build' },
   { id: 'gospel-animado', nome: 'Gospel Animado', base: 'upbeat Brazilian gospel, festive, drums, bass, joyful, danceable' },
   { id: 'sertanejo', nome: 'Sertanejo', base: 'Brazilian sertanejo, romantic, acoustic guitar, accordion touch' },
+  { id: 'sertanejo-potente', nome: 'Sertanejo Masculino Potente', base: 'Brazilian sertanejo, male lead vocalist, clean and clear voice, no rasp, powerful emotional belting in the chorus, strong high notes, warm mid-range verses, modern arena sertanejo production, acoustic guitar and viola caipira, full band, big anthemic chorus, sung in Brazilian Portuguese' },
   { id: 'gaucha', nome: 'Gaúcha / Nativista', base: 'Southern Brazilian gaucho music, milonga, nylon guitar, accordion' },
   { id: 'pagode', nome: 'Pagode / Samba', base: 'Brazilian pagode, samba, cavaquinho, pandeiro, swing' },
   { id: 'forro', nome: 'Forró / Piseiro', base: 'Brazilian forro piseiro, accordion, zabumba, danceable' },
