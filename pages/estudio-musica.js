@@ -636,6 +636,38 @@ export default function EstudioMusica() {
     setLoteRodando('');
   }
 
+  // Baixa as músicas marcadas num arquivo .zip só (uma só: baixa o mp3 direto)
+  async function baixarMarcadas() {
+    const lista = musicas.filter((m) => marcadas.includes(m.id) && m.audioUrl);
+    if (!lista.length) return;
+    if (lista.length === 1) { baixar(lista[0].audioUrl, arquivoNome(lista[0].titulo, lista[0].audioUrl.includes('.wav') ? 'wav' : 'mp3')); return; }
+    try {
+      const { zipSync } = await import('fflate');
+      const arquivos = {};
+      for (let i = 0; i < lista.length; i++) {
+        const m = lista[i];
+        setLoteRodando(`Baixando ${i + 1} de ${lista.length}…`);
+        const buf = new Uint8Array(await fetch(m.audioUrl).then((r) => { if (!r.ok) throw new Error(`não baixou "${m.titulo}"`); return r.arrayBuffer(); }));
+        let nome = arquivoNome(m.titulo, m.audioUrl.includes('.wav') ? 'wav' : 'mp3');
+        for (let n = 2; arquivos[nome]; n++) nome = nome.replace(/(-\d+)?\.(\w+)$/, `-${n}.$2`);
+        arquivos[nome] = [buf, { level: 0 }]; // mp3 já é comprimido: só junta
+      }
+      setLoteRodando('Montando o arquivo .zip…');
+      const zip = zipSync(arquivos);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([zip], { type: 'application/zip' }));
+      a.download = `musicas-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    } catch (e) {
+      setAviso(`Não consegui juntar as músicas: ${e.message}`);
+    } finally {
+      setLoteRodando('');
+    }
+  }
+
   function reutilizar(m) {
     setModo(m.modo === 'personalizado' ? 'personalizado' : 'simples');
     setDescricao(m.descricao || '');
@@ -1180,7 +1212,7 @@ export default function EstudioMusica() {
               <div className={`est-selbar est-lote ${marcadas.length ? "cheia" : ""}`}>
                 {marcadas.length ? (
                   <>
-                    <span>{marcadas.length} marcada{marcadas.length > 1 ? 's' : ''}</span>
+                    <span>{loteRodando || `${marcadas.length} marcada${marcadas.length > 1 ? 's' : ''}`}</span>
                     <select value={versoesLote} onChange={(e) => setVersoesLote(Number(e.target.value))}>
                       <option value={1}>1 versão de cada</option>
                       <option value={2}>2 versões de cada</option>
@@ -1191,12 +1223,13 @@ export default function EstudioMusica() {
                       <option value="">com o mesmo motor</option>
                     </select>
                     <button className="est-btn-sec" onClick={novaVersaoMarcadas}>🔁 Nova versão</button>
+                    <button className="est-btn-sec" disabled={!!loteRodando} onClick={baixarMarcadas}>⬇ Baixar {marcadas.length > 1 ? `(${marcadas.length})` : ''}</button>
                     <button className="est-btn-link" onClick={() => setMarcadas([])}>Desmarcar</button>
                   </>
                 ) : (
                   <>
-                    <span>{loteRodando || 'Marque ☐ as músicas para fazer nova versão de várias de uma vez'}</span>
-                    <button className="est-btn-link" onClick={() => setMarcadas(lista.filter((m) => m.tipo !== 'medley').map((m) => m.id))}>Marcar todas</button>
+                    <span>{loteRodando || 'Marque ☐ as músicas para baixar ou fazer nova versão de várias de uma vez'}</span>
+                    <button className="est-btn-link" onClick={() => setMarcadas(lista.map((m) => m.id))}>Marcar todas</button>
                   </>
                 )}
               </div>
@@ -1275,7 +1308,7 @@ export default function EstudioMusica() {
                   </button>
                   <div className="est-info">
                     <div className="est-titulo" onClick={() => setAberta(aberta === m.id ? null : m.id)}>
-                      {!selecionando && m.tipo !== 'medley' && (
+                      {!selecionando && (
                         <input
                           type="checkbox"
                           className="est-marca"
