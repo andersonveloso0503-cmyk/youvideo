@@ -631,6 +631,7 @@ module.exports = {
   ehImagem,
   EXT_IMAGEM,
   filtroEnquadrar,
+  filtroInscrever,
   resolverEnquadramento,
   DUR_BOTAO,
 };

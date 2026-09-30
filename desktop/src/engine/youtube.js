@@ -132,7 +132,7 @@ function limparTags(tags) {
 // O YouTube recusa < e > no título e na descrição
 const semSinais = (t) => String(t || '').replace(/[<>]/g, '');
 
-async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, titulo, descricao, tags, privacidade, miniatura, categoria, agendarPara, onProgresso }) {
+async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, titulo, descricao, tags, privacidade, miniatura, categoria, agendarPara, onProgresso, conteudoIa = false }) {
   const auth = cliente(credenciais, redirectOriginal || REDIRECT);
   auth.setCredentials({ refresh_token: refreshToken });
   const yt = google.youtube({ version: 'v3', auth });
@@ -152,7 +152,8 @@ async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, 
     }
   }
 
-  const status = { privacyStatus: privacidade || 'private', selfDeclaredMadeForKids: false };
+  // conteudoIa: marca "conteúdo alterado ou sintético" (feito com IA), como pede a regra do YouTube
+  const status = { privacyStatus: privacidade || 'private', selfDeclaredMadeForKids: false, ...(conteudoIa ? { containsSyntheticMedia: true } : {}) };
   if (agendarPara) {
     status.privacyStatus = 'private';
     status.publishAt = new Date(agendarPara).toISOString();

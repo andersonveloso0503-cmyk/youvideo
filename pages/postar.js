@@ -73,7 +73,7 @@ export default function Postar() {
 
   async function compartilhar(a) {
     const arquivo = prontos[a.id];
-    const legenda = a.legenda || a.titulo;
+    const legenda = a.legendaCelular || a.legenda || a.titulo;
     try {
       try { await navigator.clipboard.writeText(legenda); } catch {}
       if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
@@ -95,7 +95,7 @@ export default function Postar() {
 
   async function copiar(a) {
     try {
-      await navigator.clipboard.writeText(a.legenda || a.titulo);
+      await navigator.clipboard.writeText(a.legendaCelular || a.legenda || a.titulo);
       aviso(a.id, 'Legenda copiada');
     } catch {
       aviso(a.id, 'Não consegui copiar. Segure no texto da legenda para copiar.');
@@ -127,7 +127,7 @@ export default function Postar() {
         <b>{a.titulo}</b>
         <small>{cedo ? `Agendado para ${quando(a.quando)}` : `Era para ${quando(a.quando)}`}</small>
         <div className="redes">{faltando(a).map(([r, nome, cor]) => <span key={r} style={{ borderColor: cor, color: cor }}>{nome}</span>)}</div>
-        <p className="legenda">{a.legenda || a.titulo}</p>
+        <p className="legenda">{a.legendaCelular || a.legenda || a.titulo}</p>
         {prontos[a.id] ? (
           <button className="principal" onClick={() => compartilhar(a)}>📤 Enviar para {faltando(a).map(([, n]) => n).join(' / ')}</button>
         ) : (

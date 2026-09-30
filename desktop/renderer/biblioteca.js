@@ -460,7 +460,7 @@ const Biblioteca = (() => {
           }
         };
         bCopiar.onclick = async () => {
-          await navigator.clipboard.writeText(a.legenda || a.titulo);
+          await navigator.clipboard.writeText(a.legendaCelular || a.legenda || a.titulo);
           avisar('Legenda copiada');
         };
         for (const [r, nome] of faltam(a)) {

@@ -275,6 +275,16 @@ class Fila extends EventEmitter {
         this.salvar();
       }
       if (!fs.existsSync(e.arquivo)) throw new Error(`Vídeo não encontrado: ${e.arquivo}`);
+      // Fábrica: a versão do YouTube ganha o botão animado de like (as outras redes ficam sem)
+      let arquivoEnvio = e.arquivo;
+      if (e.botao && fs.existsSync(e.botao)) {
+        try {
+          arquivoEnvio = await this.aplicarBotao(job, e.arquivo, e.botao, !!e.curto);
+        } catch (err) {
+          if (job.cancelado) throw new Error('CANCELADO');
+          arquivoEnvio = e.arquivo; // se falhar, sobe sem o botão
+        }
+      }
       const canal = this.obterCanal(e.canalId);
       if (!canal) throw new Error('Canal do YouTube não encontrado — conecte de novo em Contas YouTube.');
       this.atualizar(job, { status: 'publicando', etapa: 'Preparando capa' });
@@ -302,7 +312,8 @@ class Fila extends EventEmitter {
         credenciais: cfg.google,
         redirectOriginal: canal.redirect,
         refreshToken: canal.refreshToken,
-        arquivo: e.arquivo,
+        arquivo: arquivoEnvio,
+        conteudoIa: e.conteudoIa ?? cfg.conteudoIa !== false,
         titulo: e.titulo,
         descricao: e.descricao,
         tags: e.tags,
@@ -476,6 +487,28 @@ class Fila extends EventEmitter {
     this.emitir();
     this.proximo();
     return job;
+  }
+
+  /** Botão animado "Deixe seu like / Inscreva-se" por cima de um vídeo pronto (versão do YouTube). */
+  async aplicarBotao(job, arquivo, botao, curto) {
+    const info = await probe(arquivo);
+    const W = info.largura, H = info.altura, total = info.duracao || 60;
+    if (!W || !H) return arquivo;
+    const cfgBotao = curto
+      ? { tamanho: 46, posicao: 'topo', primeiroSeg: 5, intervaloMin: 0.5 } // Short: no alto, aos 5 s e aos 35 s
+      : { tamanho: 28, posicao: 'inf_dir', primeiroSeg: 10, intervaloMin: 5 };
+    const b = R.filtroInscrever(cfgBotao, W, H, total);
+    const saida = arquivo.replace(/\.mp4$/i, '') + '-youtube.mp4';
+    this.atualizar(job, { etapa: 'Colocando o botão de like' }, false);
+    const r = rodar([
+      '-i', arquivo, '-stream_loop', '-1', '-i', botao,
+      '-filter_complex', `[1:v]${b.cadeia}[b];[0:v][b]overlay=${b.x}:${b.y}:format=auto:eof_action=pass:enable='${b.quando}',format=yuv420p[v]`,
+      '-map', '[v]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-c:a', 'copy',
+      '-t', total.toFixed(3), '-movflags', '+faststart', '-y', saida,
+    ], { duracaoTotal: total, onProgresso: (x) => this.atualizar(job, { etapa: `Colocando o botão de like ${Math.round(x * 100)}%` }, false) });
+    this.cancelamentos.set(job.id, r.cancelar);
+    await r.promise;
+    return saida;
   }
 
   /** Capa chamativa para o YouTube (frase de efeito grande). Devolve o caminho ou null se falhar. */
@@ -838,6 +871,7 @@ class Fila extends EventEmitter {
           redirectOriginal: canal.redirect,
           refreshToken: canal.refreshToken,
           arquivo: saida,
+          conteudoIa: cfg.conteudoIa !== false,
           titulo,
           descricao: YT.montarDescricao({
             descricao: descricaoBase,

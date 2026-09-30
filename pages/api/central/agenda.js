@@ -3,6 +3,7 @@
 // POST   /api/central/agenda  { itens: [...] } -> cria (1 documento por vídeo/horário)
 // PATCH  /api/central/agenda  { id, rede, acao: 'repetir' | 'feito' } -> tenta de novo / marca Kwai como postado
 // DELETE /api/central/agenda?id=...          -> apaga
+import { legendaCelular } from '../../../lib/fabrica';
 import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 
@@ -36,6 +37,8 @@ export default async function handler(req, res) {
         lote.set(ref, {
           titulo: String(it.titulo || '').slice(0, 150),
           legenda: String(it.legenda || '').slice(0, 2200),
+          // TikTok e Kwai: frase pronta sobre a Bíblia/Jesus + título + hashtags
+          legendaCelular: legendaCelular(it.titulo, it.legenda),
           videoUrl: it.videoUrl,
           thumbnailUrl: it.thumbnailUrl || null,
           curto: !!it.curto,

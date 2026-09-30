@@ -1094,6 +1094,7 @@ async function abrirConfig(msg) {
   $('#cfgNuvemAuto').checked = config.nuvemAuto !== false;
   $('#cfgCapaChamativa').checked = config.capaChamativa !== false;
   $('#cfgCapaIa').checked = config.capaIa !== false;
+  $('#cfgConteudoIa').checked = config.conteudoIa !== false;
   $('#resCentral').textContent = '';
   $('#cfgClientId').value = config.google.clientId || '';
   $('#cfgClientSecret').value = config.google.clientSecret || '';
@@ -1147,6 +1148,8 @@ async function iniciar() {
   };
   window.api.ao('app:progressoAtualizacao', (p) => { $('#btnAtualizar').textContent = `Baixando ${Math.round(p * 100)}%`; });
   setTimeout(checarAtualizacao, 4000);
+  // Deixa pronto o botão animado de like (a Fábrica usa nos vídeos do YouTube)
+  setTimeout(() => window.api.botao.existe('v2-pt').then((f) => f || prepararBotao('pt')).catch(() => {}), 12000);
   setInterval(checarAtualizacao, 3 * 3600 * 1000);
   // Créditos das IAs: chip amarelo/vermelho quando algum está acabando
   const mostrarCreditos = (c) => {
@@ -1348,6 +1351,7 @@ async function iniciar() {
       nuvemAuto: $('#cfgNuvemAuto').checked,
       capaChamativa: $('#cfgCapaChamativa').checked,
       capaIa: $('#cfgCapaIa').checked,
+      conteudoIa: $('#cfgConteudoIa').checked,
     });
     $('#modalConfig').close();
     avisar('Configurações salvas');

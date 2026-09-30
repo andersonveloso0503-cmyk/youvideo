@@ -365,6 +365,8 @@ app.whenReady().then(() => {
           agendarPara: quando ? quando.toISOString() : null,
           curto: true,
           fabricaId: it.id,
+          conteudoIa: true, // histórias feitas com IA: marca no YouTube
+          botao: (() => { const f = path.join(app.getPath('userData'), 'cache', 'botao', 'v2-pt', 'botao.mov'); return fs.existsSync(f) ? f : null; })(),
         }]);
       }
     } catch {
