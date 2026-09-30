@@ -148,14 +148,11 @@ class Fila extends EventEmitter {
     for (const j of this.jobs) {
       if (EM_ANDAMENTO.includes(j.status) || j.status === 'aguardando') {
         if (EM_ANDAMENTO.includes(j.status)) {
-          j.status = 'interrompido';
-          j.etapa = 'Processamento interrompido';
-          // Pedido do site: recomeça sozinho (o site está esperando)
-          if (j.tipo === 'montagem' && j.pedidoId) {
-            j.status = 'aguardando';
-            j.etapa = 'Aguardando para montar';
-            j.progresso = 0;
-          }
+          // O app fechou no meio: recomeça sozinho (do começo desse vídeo)
+          j.status = 'aguardando';
+          j.etapa = 'Recomeçando (o app foi fechado no meio)';
+          j.progresso = 0;
+          j.restanteSeg = null;
         }
       }
     }
@@ -166,9 +163,27 @@ class Fila extends EventEmitter {
     this.salvar();
   }
 
+  // Grava a fila no disco no máximo 1 vez por segundo (antes gravava a cada mudança)
   salvar() {
+    if (this.tSalvar) return;
+    this.tSalvar = setTimeout(() => this.salvarAgora(), 1000);
+  }
+
+  salvarAgora() {
+    clearTimeout(this.tSalvar);
+    this.tSalvar = null;
     fs.mkdirSync(this.dirDados, { recursive: true });
-    fs.writeFileSync(this.arquivo, JSON.stringify(this.jobs, null, 1));
+    const tmp = this.arquivo + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(this.jobs));
+    fs.renameSync(tmp, this.arquivo); // não corrompe se o PC desligar no meio
+  }
+
+  /** App fechando: interrompe os ffmpeg em andamento (continuam na próxima vez). */
+  pararTudo() {
+    this.saindo = true;
+    for (const [, cancelar] of this.cancelamentos) {
+      try { cancelar(); } catch {}
+    }
   }
 
   lista() {
@@ -180,6 +195,7 @@ class Fila extends EventEmitter {
   }
 
   atualizar(job, campos, salvar = true) {
+    if (this.saindo) return; // fechando: mantém como estava (vira "interrompido" e recomeça)
     Object.assign(job, campos);
     if (salvar) this.salvar();
     this.emitir();

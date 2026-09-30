@@ -304,9 +304,32 @@ app.whenReady().then(() => {
     for (const j of fila.lista()) if (j.status === 'interrompido') fila.retentar(j.id);
   }
   fila.proximo(); // retoma o que ficou aguardando na última vez
-  fila.on('mudou', (jobs) => {
-    enviar('fila:mudou', jobs);
-    atualizarBloqueioSono(jobs);
+  // A tela recebe a fila "enxuta" (sem roteiro, palavras da legenda etc.) e no máximo
+  // ~3 vezes por segundo — antes ia tudo a cada % de progresso e a tela travava (ficava preta)
+  const paraTela = (j) => {
+    const { receita, projeto, envio, nuvem, ...resto } = j;
+    return {
+      ...resto,
+      ...(projeto ? { projeto: { formato: projeto.formato, musicas: { length: projeto.musicas?.length || 0 }, fundos: { length: projeto.fundos?.length || 0 } } } : {}),
+      ...(receita ? { receita: { duracao: receita.duracao, categoria: receita.categoria, titulo: receita.titulo } } : {}),
+      ...(envio ? { envio: { canalId: envio.canalId, agendarPara: envio.agendarPara, fabricaId: envio.fabricaId } } : {}),
+      ...(nuvem ? { nuvem: { quando: nuvem.quando, redes: nuvem.redes } } : {}),
+    };
+  };
+  let tMudou = null;
+  fila.on('mudou', () => {
+    if (tMudou) return;
+    tMudou = setTimeout(() => {
+      tMudou = null;
+      const jobs = fila.lista();
+      enviar('fila:mudou', jobs.map(paraTela));
+      atualizarBloqueioSono(jobs);
+    }, 350);
+  });
+  // Fechou o app no meio: grava a fila e para o ffmpeg (não fica rodando escondido)
+  app.on('before-quit', () => {
+    try { fila.salvarAgora(); } catch {}
+    try { fila.pararTudo(); } catch {}
   });
 
   // ---------- Montar no PC: pega os vídeos que o site mandou montar aqui ----------
@@ -626,7 +649,7 @@ app.whenReady().then(() => {
   });
 
   // ---------- Fila ----------
-  ipcMain.handle('fila:listar', () => fila.lista());
+  ipcMain.handle('fila:listar', () => fila.lista().map(paraTela));
   ipcMain.handle('fila:adicionar', (_e, projeto) => fila.adicionar(projeto).length);
   ipcMain.handle('fila:cancelar', (_e, id) => fila.cancelar(id));
   ipcMain.handle('fila:remover', (_e, id) => fila.remover(id));
