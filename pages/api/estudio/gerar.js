@@ -51,6 +51,25 @@ const CANTORES = [
   { id: 'pop', teste: /\bpop\b/i, cantor: 'modern pop singer, polished catchy delivery, breathy verses and bright chorus' },
 ];
 
+// Estilos que o motor da ElevenLabs recebe como lista (o "plano da música"): o que QUER e o que NÃO QUER.
+// É bem mais forte que só escrever no texto — é aqui que o rock deixa de sair com cara de sertanejo.
+const SEM_SERTANEJO = ['sertanejo', 'sertanejo universitario', 'brazilian country', 'country', 'twangy vocals', 'viola caipira', 'arrocha', 'modao'];
+const GENEROS = {
+  rock: { pos: ['rock', 'brazilian rock', 'hard rock', 'distorted electric guitars', 'heavy guitar riffs', 'powerful live rock drums', 'electric bass', 'raspy powerful rock vocals', 'rock band energy'], neg: [...SEM_SERTANEJO, 'acoustic ballad', 'pop ballad', 'accordion', 'pagode', 'soft vocals', 'romantic ballad'] },
+  forro: { pos: ['forro', 'piseiro', 'northeastern brazilian music', 'accordion lead', 'zabumba', 'triangle', 'danceable', 'nordestino vocals'], neg: [...SEM_SERTANEJO, 'rock', 'electric guitar solo'] },
+  pagode: { pos: ['pagode', 'samba', 'cavaquinho', 'pandeiro', 'tantan', 'swing', 'group backing vocals'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars'] },
+  funk: { pos: ['brazilian funk', 'funk carioca', 'tamborzao beat', 'heavy 808', 'mc vocals'], neg: [...SEM_SERTANEJO, 'acoustic guitar', 'rock'] },
+  blues: { pos: ['blues', 'soul', 'hammond organ', 'bluesy electric guitar', 'soulful gritty vocals'], neg: [...SEM_SERTANEJO] },
+  gospel: { pos: ['gospel', 'contemporary worship', 'louvor', 'piano', 'atmospheric pads', 'soaring worship vocals'], neg: [...SEM_SERTANEJO] },
+  'gospel-animado': { pos: ['upbeat gospel', 'praise', 'celebratory', 'live band', 'gospel choir responses'], neg: [...SEM_SERTANEJO] },
+  mpb: { pos: ['mpb', 'bossa nova', 'nylon guitar', 'intimate vocals'], neg: [...SEM_SERTANEJO, 'rock'] },
+  pop: { pos: ['pop', 'modern pop production', 'catchy hook', 'polished pop vocals'], neg: [...SEM_SERTANEJO] },
+  lofi: { pos: ['lo-fi', 'chill', 'soft breathy vocals'], neg: [...SEM_SERTANEJO] },
+  infantil: { pos: ["children's music", 'playful', 'cheerful clear vocals'], neg: [...SEM_SERTANEJO, 'rock'] },
+  gaucha: { pos: ['gaucho music', 'milonga', 'nativist', 'nylon guitar', 'accordion', 'deep baritone vocals'], neg: ['rock', 'pop'] },
+  sertanejo: { pos: ['sertanejo'], neg: [] },
+};
+
 function cantorDoEstilo(estilo) {
   return CANTORES.find((c) => c.teste.test(estilo || '')) || null;
 }
@@ -80,20 +99,55 @@ function montarPrompt({ modo, descricao, letra, estilo, voz, instrumental, durac
   return partes.join('\n');
 }
 
-async function gerarElevenLabs(prompt, { instrumental, duracaoSeg }) {
+// Pede à ElevenLabs o plano da música (não gasta crédito) e reforça o gênero:
+// junta os estilos do gênero e proíbe o sertanejo em todas as partes.
+async function planoComGenero(key, modelo, prompt, duracaoMs, genero) {
+  const g = genero && GENEROS[genero.id];
+  if (!g) return null;
+  try {
+    const r = await fetch('https://api.elevenlabs.io/v1/music/plan', {
+      method: 'POST',
+      headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt.slice(0, 4100), music_length_ms: duracaoMs, model_id: modelo }),
+    });
+    if (!r.ok) return null;
+    const plano = await r.json();
+    if (!Array.isArray(plano?.sections) || !plano.sections.length) return null;
+    const proibidos = g.neg.map((x) => x.toLowerCase());
+    const limpa = (lista) => (Array.isArray(lista) ? lista : []).filter((x) => !proibidos.some((p) => String(x).toLowerCase().includes(p)));
+    const uniq = (lista) => [...new Map(lista.map((x) => [String(x).toLowerCase(), x])).values()];
+    return {
+      ...plano,
+      positive_global_styles: uniq([...g.pos, ...limpa(plano.positive_global_styles)]).slice(0, 20),
+      negative_global_styles: uniq([...(plano.negative_global_styles || []), ...g.neg]).slice(0, 20),
+      sections: plano.sections.map((sec) => ({
+        ...sec,
+        positive_local_styles: limpa(sec.positive_local_styles),
+        negative_local_styles: uniq([...(sec.negative_local_styles || []), ...g.neg.slice(0, 5)]),
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function gerarElevenLabs(prompt, { instrumental, duracaoSeg, genero }) {
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) throw new Error('ELEVENLABS_API_KEY não está configurada na Vercel.');
   const modelo = process.env.ELEVENLABS_MUSIC_MODEL || 'music_v2_5';
-  const r = await fetch('https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128', {
+  const duracaoMs = Math.max(10, Math.min(300, duracaoSeg || 150)) * 1000;
+  let plano = instrumental ? null : await planoComGenero(key, modelo, prompt, duracaoMs, genero);
+  const compor = (corpo) => fetch('https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128', {
     method: 'POST',
     headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      prompt: prompt.slice(0, 4100),
-      music_length_ms: Math.max(10, Math.min(300, duracaoSeg || 150)) * 1000,
-      model_id: modelo,
-      force_instrumental: !!instrumental,
-    }),
+    body: JSON.stringify(corpo),
   });
+  const porTexto = { prompt: prompt.slice(0, 4100), music_length_ms: duracaoMs, model_id: modelo, force_instrumental: !!instrumental };
+  let r = await compor(plano ? { composition_plan: plano, model_id: modelo } : porTexto);
+  if (!r.ok && plano && r.status !== 401 && r.status !== 402) {
+    plano = null; // o plano foi recusado: gera do jeito antigo (só pelo texto)
+    r = await compor(porTexto);
+  }
   if (!r.ok) {
     const txt = await r.text();
     let msg = txt;
@@ -107,7 +161,7 @@ async function gerarElevenLabs(prompt, { instrumental, duracaoSeg }) {
     throw new Error(`ElevenLabs: ${String(msg).slice(0, 300)}`);
   }
   const buffer = Buffer.from(await r.arrayBuffer());
-  return { buffer, modelo, mime: 'audio/mpeg', letraGerada: '' };
+  return { buffer, modelo, mime: 'audio/mpeg', letraGerada: '', plano };
 }
 
 async function gerarLyria(prompt) {
@@ -172,7 +226,8 @@ export default async function handler(req, res) {
   const prompt = montarPrompt(dados);
 
   try {
-    const r = motor === 'lyria' ? await gerarLyria(prompt) : await gerarElevenLabs(prompt, dados);
+    const genero = cantorDoEstilo(`${dados.estilo} ${modo === 'simples' ? dados.descricao : ''}`);
+    const r = motor === 'lyria' ? await gerarLyria(prompt) : await gerarElevenLabs(prompt, { ...dados, genero });
 
     const ext = r.mime.includes('wav') ? 'wav' : 'mp3';
     const blob = await put(`estudio-musica/${Date.now()}-${motor}.${ext}`, r.buffer, {
@@ -197,6 +252,8 @@ export default async function handler(req, res) {
       instrumental,
       duracaoSeg,
       prompt,
+      genero: genero?.id || '',
+      plano: r.plano ? JSON.stringify({ pos: r.plano.positive_global_styles, neg: r.plano.negative_global_styles, partes: r.plano.sections.map((x) => x.section_name) }).slice(0, 3000) : '',
       audioUrl: blob.url,
       capaUrl: '',
       favorito: false,
