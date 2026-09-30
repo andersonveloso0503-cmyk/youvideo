@@ -54,6 +54,11 @@ contextBridge.exposeInMainWorld('api', {
     abrirReceita: chamar('fila:abrirReceita'),
     outrosPcs: chamar('fila:outrosPcs'),
   },
+  fabrica: {
+    listar: chamar('fabrica:listar'),
+    criar: chamar('fabrica:criar'),
+    acao: chamar('fabrica:acao'),
+  },
   caminhoDoArquivo: (file) => webUtils.getPathForFile(file),
   ao: (canal, fn) => {
     const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download', 'sync:feito'];

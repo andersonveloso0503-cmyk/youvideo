@@ -1300,6 +1300,7 @@ async function iniciar() {
   };
   window.api.ao('sync:feito', () => {});
   $('#btnBiblioteca').onclick = () => Biblioteca.abrir({ recarregar: true });
+  $('#btnFabrica').onclick = () => Fabrica.abrir();
   $('#btnTestarCentral').onclick = async () => {
     const r = $('#resCentral');
     r.textContent = 'Testando...';

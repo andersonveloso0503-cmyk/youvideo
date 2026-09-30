@@ -315,9 +315,16 @@ class Fila extends EventEmitter {
         aviso: r.miniaturaErro || null,
         concluidoEm: new Date().toISOString(),
       });
+      // Vídeo da Fábrica: avisa o site que já está agendado no YouTube
+      if (e.fabricaId) {
+        Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: e.fabricaId, acao: 'youtube-feito', url: r.url || '' } }).catch(() => {});
+      }
     } catch (err) {
       const cancelado = err.message === 'CANCELADO' || job.cancelado;
       let msg = err.message;
+      if (e.fabricaId) {
+        Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: e.fabricaId, acao: 'youtube-erro', erro: cancelado ? 'Cancelado no PC' : msg } }).catch(() => {});
+      }
       if (/quota|uploadLimitExceeded/i.test(msg)) msg = 'O YouTube recusou: limite de envios do dia atingido. Tente de novo amanhã.';
       if (/invalid_grant/i.test(msg)) msg = 'A autorização desse canal expirou. Em Contas YouTube, desconecte e conecte o canal de novo.';
       this.atualizar(job, { status: cancelado ? 'cancelado' : 'erro', etapa: cancelado ? 'Cancelado' : 'Erro', erro: cancelado ? null : msg });

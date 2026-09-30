@@ -28,6 +28,10 @@
         <svg viewBox="0 0 24 24"><path d="M4 5h4v14H4zM10 5h4v14h-4zM16 6l3.5-1 3 13.5-3.5 1z"/></svg>
         Biblioteca
       </button>
+      <button class="btn-topo" id="btnFabrica" title="Cria Shorts sozinho (histórias e narrados) e agenda nas redes">
+        <svg viewBox="0 0 24 24"><path d="M3 20V10l5 3V10l5 3V6h4l1 14z"/><path d="M3 20h18"/></svg>
+        Fábrica
+      </button>
       <button class="btn-topo" id="btnSubir">
         <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M12 15V9M9 11.5 12 9l3 2.5"/></svg>
         Subir p/ YouTube
@@ -355,6 +359,37 @@
     <p class="modal-erro" id="erroCanais"></p>
   </dialog>
 
+  <!-- Modal: Fábrica de Shorts -->
+  <dialog class="modal largo" id="modalFabrica">
+    <div class="modal-topo"><h2>🏭 Fábrica de Shorts</h2><button class="fechar" data-fechar>×</button></div>
+    <p class="nota">A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.</p>
+    <div class="fab-config">
+      <div class="campo-config"><label>Quantos dias</label>
+        <select id="fabDias"><option value="3">3 dias</option><option value="7" selected>7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></div>
+      <div class="campo-config"><label>Shorts por dia</label>
+        <select id="fabPorDia"><option value="2" selected>2 (YouTube recebe 1)</option><option value="1">1</option></select></div>
+      <div class="campo-config"><label>1º horário (vai também no YouTube)</label><input type="time" id="fabHora1" value="12:00" /></div>
+      <div class="campo-config"><label>2º horário</label><input type="time" id="fabHora2" value="19:00" /></div>
+      <div class="campo-config"><label>Animação</label>
+        <select id="fabAnimacao"><option value="metade" selected>Metade (as histórias animadas)</option><option value="tudo">Tudo animado</option><option value="nada">Nenhum (imagens com zoom)</option></select></div>
+      <div class="campo-config"><label>Canal do YouTube</label><select id="fabCanal"></select></div>
+    </div>
+    <div class="fab-redes">
+      <label class="interruptor"><input type="checkbox" id="fabYoutube" checked /><span></span> YouTube (1 por dia)</label>
+      <label class="interruptor"><input type="checkbox" id="fabFacebook" checked /><span></span> Facebook</label>
+      <label class="interruptor"><input type="checkbox" id="fabInstagram" checked /><span></span> Instagram</label>
+      <label class="interruptor"><input type="checkbox" id="fabTiktok" checked /><span></span> TikTok <small>(celular)</small></label>
+      <label class="interruptor"><input type="checkbox" id="fabKwai" checked /><span></span> Kwai <small>(celular)</small></label>
+    </div>
+    <div class="linha-botoes">
+      <button class="btn-primario" id="btnFabCriar">🏭 Criar lote</button>
+      <span class="nota" id="fabCusto"></span>
+    </div>
+    <p class="erro" id="fabErro"></p>
+    <div class="fab-topo-lista"><h3>Vídeos da fábrica</h3><button class="btn-mini" id="btnFabAtualizar">↻ Atualizar</button></div>
+    <div id="fabLista"><p class="nota">Carregando...</p></div>
+  </dialog>
+
   <!-- Modal: fila dos outros PCs -->
   <dialog class="modal" id="modalPcs">
     <div class="modal-topo"><h2>🖥 Fila dos outros PCs</h2><button class="fechar" data-fechar>×</button></div>
@@ -569,6 +604,7 @@
   <script src="botao-inscrever.js"></script>
   <script src="subir.js"></script>
   <script src="biblioteca.js"></script>
+  <script src="fabrica.js"></script>
   <script src="criar.js"></script>
   <script src="app.js"></script>
 </body>

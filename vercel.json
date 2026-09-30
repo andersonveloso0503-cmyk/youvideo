@@ -1,5 +1,12 @@
 {
   "crons": [
-    { "path": "/api/central/publicar", "schedule": "*/10 * * * *" }
+    {
+      "path": "/api/central/publicar",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/fila-processar?fabrica=1",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }

@@ -334,6 +334,51 @@ app.whenReady().then(() => {
   setTimeout(buscarPedidosDoSite, 8000);
   setInterval(buscarPedidosDoSite, 45000);
 
+  // ---------- Fábrica: sobe no YouTube (agendado) os Shorts que ficaram prontos ----------
+  let buscandoFabrica = false;
+  async function fabricaParaYoutube() {
+    const cfg = store.ler();
+    if (buscandoFabrica || !cfg.centralToken) return;
+    buscandoFabrica = true;
+    try {
+      const { itens = [] } = await Central.chamar(cfg, '/api/central/fabrica', { query: { youtube: '1' } });
+      for (const it of itens) {
+        const canalId = it.canalYoutube?.id;
+        if (!canalId || !store.canal(canalId)) continue; // esse canal está conectado em outro PC
+        if (fila.lista().some((j) => j.envio?.fabricaId === it.id && !['erro', 'cancelado'].includes(j.status))) continue;
+        const { ok } = await Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: it.id, acao: 'youtube-pegar', pc: os.hostname() } });
+        if (!ok) continue;
+        let quando = it.quandoYoutube ? new Date(it.quandoYoutube) : null;
+        if (quando && quando.getTime() < Date.now() + 20 * 60e3) quando = new Date(Date.now() + 20 * 60e3); // ficou pronto atrasado
+        const tags = Array.isArray(it.tags) ? it.tags : String(it.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
+        fila.adicionarEnvios([{
+          arquivo: null,
+          baixarDe: it.videoUrl,
+          chaveArquivo: `fabrica-${it.id}`,
+          capa: null,
+          capaUrl: null,
+          titulo: String(it.titulo || it.tema || 'Short').slice(0, 95),
+          descricao: `${it.descricao || ''}\n\n#Shorts`.trim(),
+          tags,
+          canalId,
+          privacidade: 'private',
+          agendarPara: quando ? quando.toISOString() : null,
+          curto: true,
+          fabricaId: it.id,
+        }]);
+      }
+    } catch {
+      // sem internet: tenta na próxima volta
+    } finally {
+      buscandoFabrica = false;
+    }
+  }
+  setTimeout(fabricaParaYoutube, 15000);
+  setInterval(fabricaParaYoutube, 120000);
+  ipcMain.handle('fabrica:listar', () => Central.chamar(store.ler(), '/api/central/fabrica'));
+  ipcMain.handle('fabrica:criar', (_e, dados) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { ...dados, acao: 'criar' } }));
+  ipcMain.handle('fabrica:acao', (_e, { id, acao }) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao } }));
+
   // ---------- Fila deste PC na nuvem (para acompanhar de outro computador) ----------
   let tFilaNuvem = null;
   let ultimaFilaNuvem = 0;
