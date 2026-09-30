@@ -668,6 +668,25 @@ export default function EstudioMusica() {
     }
   }
 
+  // Exclui as marcadas da biblioteca e apaga os arquivos (libera espaço)
+  async function excluirMarcadas() {
+    const ids = [...marcadas];
+    if (!ids.length) return;
+    if (!window.confirm(`Excluir ${ids.length} música(s) de vez? Os arquivos são apagados para liberar espaço e não dá para recuperar. Baixe antes se for usar.`)) return;
+    setLoteRodando(`Excluindo ${ids.length}…`);
+    try {
+      const d = await api('/api/estudio/biblioteca', { method: 'POST', body: JSON.stringify({ acao: 'excluir', ids }) });
+      setMusicas((ms) => ms.filter((x) => !ids.includes(x.id)));
+      if (tocando && ids.includes(tocando.id)) { audioRef.current?.pause(); setTocando(null); }
+      setMarcadas([]);
+      setAviso(`${d.apagados} música(s) excluída(s).${d.mantidos?.length ? ` O áudio de ${d.mantidos.length} foi mantido porque ainda está sendo usado num vídeo ou medley em andamento.` : ''}`);
+    } catch (e) {
+      setAviso(e.message);
+    } finally {
+      setLoteRodando('');
+    }
+  }
+
   function reutilizar(m) {
     setModo(m.modo === 'personalizado' ? 'personalizado' : 'simples');
     setDescricao(m.descricao || '');
@@ -926,7 +945,7 @@ export default function EstudioMusica() {
   }
 
   async function excluir(m) {
-    if (!window.confirm(`Excluir "${m.titulo}" da biblioteca?`)) return;
+    if (!window.confirm(`Excluir "${m.titulo}" de vez? O arquivo é apagado para liberar espaço.`)) return;
     setMusicas((ms) => ms.filter((x) => x.id !== m.id));
     if (tocando?.id === m.id) { audioRef.current?.pause(); setTocando(null); }
     try { await api(`/api/estudio/biblioteca?id=${m.id}`, { method: 'DELETE' }); } catch (e) { setAviso(e.message); }
@@ -1224,6 +1243,7 @@ export default function EstudioMusica() {
                     </select>
                     <button className="est-btn-sec" onClick={novaVersaoMarcadas}>🔁 Nova versão</button>
                     <button className="est-btn-sec" disabled={!!loteRodando} onClick={baixarMarcadas}>⬇ Baixar {marcadas.length > 1 ? `(${marcadas.length})` : ''}</button>
+                    <button className="est-btn-sec perigo" disabled={!!loteRodando} onClick={excluirMarcadas}>🗑 Excluir</button>
                     <button className="est-btn-link" onClick={() => setMarcadas([])}>Desmarcar</button>
                   </>
                 ) : (
@@ -1579,6 +1599,7 @@ export default function EstudioMusica() {
         .est-lote { flex-wrap: wrap; gap: 8px; }
         .est-lote:not(.cheia) { background: transparent; border-style: dashed; border-color: var(--border); color: var(--text-muted); }
         .est-lote select { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+        .est-lote .perigo { color: #e38b77; border-color: #e38b77; }
         .est-btn-link { background: none; border: 0; color: var(--gold); text-decoration: underline; cursor: pointer; font-size: 13px; }
         .est-marca { width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; accent-color: var(--gold); cursor: pointer; }
         .est-player-abrir { font-size: 12px; color: var(--gold); white-space: nowrap; text-decoration: underline; }
