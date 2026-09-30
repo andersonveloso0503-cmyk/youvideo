@@ -611,7 +611,7 @@ export default function EstudioMusica() {
     });
   }
 
-  // Nova versão de várias músicas de uma vez (mesma letra, estilo e voz; 3 músicas por vez)
+  // Nova versão de várias músicas de uma vez (mesma letra, estilo e voz)
   async function novaVersaoMarcadas() {
     const lista = musicas.filter((m) => marcadas.includes(m.id) && m.tipo !== 'medley');
     if (!lista.length) return;
@@ -629,7 +629,10 @@ export default function EstudioMusica() {
         setLoteRodando(feitas < lista.length ? `Criando ${feitas} de ${lista.length}…` : '');
       }
     };
-    await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
+    // A ElevenLabs do seu plano aceita só 2 músicas ao mesmo tempo; o Lyria aguenta mais
+    const usaEleven = motorLote === 'elevenlabs' || (!motorLote && lista.some((m) => m.motor !== 'lyria'));
+    const vezes = usaEleven ? Math.max(1, Math.floor(2 / versoesLote)) : 3;
+    await Promise.all(Array.from({ length: vezes }, trabalhador));
     setLoteRodando('');
   }
 

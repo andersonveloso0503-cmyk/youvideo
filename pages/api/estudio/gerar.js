@@ -143,11 +143,21 @@ async function gerarElevenLabs(prompt, { instrumental, duracaoSeg, genero }) {
   const modelo = process.env.ELEVENLABS_MUSIC_MODEL || 'music_v2_5';
   const duracaoMs = Math.max(10, Math.min(300, duracaoSeg || 150)) * 1000;
   let plano = instrumental ? null : await planoComGenero(key, modelo, prompt, duracaoMs, genero);
-  const compor = (corpo) => fetch('https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128', {
-    method: 'POST',
-    headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify(corpo),
-  });
+  // Limite do plano (2 pedidos ao mesmo tempo na ElevenLabs, contando a voz da fábrica):
+  // espera a vez e tenta de novo, em vez de dar erro
+  const compor = async (corpo) => {
+    for (let vez = 0; ; vez++) {
+      const resp = await fetch('https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128', {
+        method: 'POST',
+        headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify(corpo),
+      });
+      if (resp.status !== 429 || vez >= 8) return resp;
+      const txt = await resp.clone().text();
+      if (!/concurrent|too many|rate/i.test(txt)) return resp;
+      await new Promise((ok) => setTimeout(ok, 12000 + Math.random() * 6000));
+    }
+  };
   const porTexto = { prompt: prompt.slice(0, 4100), music_length_ms: duracaoMs, model_id: modelo, force_instrumental: !!instrumental };
   let r = await compor(plano ? { composition_plan: plano, model_id: modelo } : porTexto);
   if (!r.ok && plano && r.status !== 401 && r.status !== 402) {
