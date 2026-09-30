@@ -284,11 +284,14 @@ export default async function handler(req, res) {
     if (!docs.length) return res.status(200).json({ mensagem: 'Fila vazia, nada a processar.' });
 
     // Até ~3 min por chamada, um passo de cada item
+    let roteiros = 0;
     while (Date.now() - inicio < 170e3 && feitos.length < 6) {
-      const doc = await escolherProximo(docs.filter((d) => !vistos.has(d.id)));
+      // No máximo 1 roteiro por rodada: a Groq grátis tem limite por minuto
+      const doc = await escolherProximo(docs.filter((d) => !vistos.has(d.id) && !(roteiros >= 1 && d.data().status === 'pendente')));
       if (!doc) break;
       vistos.add(doc.id);
       const statusAnterior = doc.data().status;
+      if (statusAnterior === 'pendente') roteiros++;
       try {
         await passo(doc);
         feitos.push({ id: doc.id, statusAnterior });
