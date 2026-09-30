@@ -458,6 +458,9 @@ export default function EstudioMusica() {
   // Seleção para juntar
   const [selecionando, setSelecionando] = useState(false);
   const [selecao, setSelecao] = useState([]); // ids em ordem
+  const [marcadas, setMarcadas] = useState([]); // músicas marcadas para "Nova versão" em lote
+  const [versoesLote, setVersoesLote] = useState(1);
+  const [loteRodando, setLoteRodando] = useState('');
 
   // Biblioteca
   const [musicas, setMusicas] = useState([]);
@@ -572,7 +575,8 @@ export default function EstudioMusica() {
     if (p.modo === 'personalizado' && !p.instrumental && !p.letra.trim()) { setAviso('Escreva ou gere a letra primeiro (ou marque Instrumental).'); return; }
 
     const motorEscolhido = parametrosFixos?.motor || motor;
-    const motores = motorEscolhido === 'comparar' ? ['elevenlabs', 'lyria'] : [motorEscolhido, motorEscolhido];
+    const qtdVersoes = parametrosFixos?.qtdVersoes === 1 ? 1 : 2;
+    const motores = motorEscolhido === 'comparar' ? ['elevenlabs', 'lyria'] : Array(qtdVersoes).fill(motorEscolhido);
     const grupoId = `g${Date.now()}`;
     const jobs = motores.map((m, i) => ({ chave: `${grupoId}-${i}`, motor: m, inicio: Date.now(), titulo: p.titulo || p.descricao }));
     setGerando((g) => [...jobs, ...g]);
@@ -581,7 +585,7 @@ export default function EstudioMusica() {
       try {
         const d = await api('/api/estudio/gerar', {
           method: 'POST',
-          body: JSON.stringify({ ...p, motor: job.motor, grupoId, versao: i + 1 }),
+          body: JSON.stringify({ ...p, qtdVersoes: undefined, motor: job.motor, grupoId, versao: i + 1 }),
         });
         setMusicas((ms) => [d.musica, ...ms]);
         setGerando((g) => g.filter((x) => x.chave !== job.chave));
@@ -591,8 +595,9 @@ export default function EstudioMusica() {
     }));
   }
 
-  function variacao(m) {
-    criar({
+  function variacao(m, qtdVersoes = 2) {
+    return criar({
+      qtdVersoes,
       motor: m.motor,
       modo: m.modo,
       descricao: m.descricao || '',
@@ -603,6 +608,28 @@ export default function EstudioMusica() {
       instrumental: !!m.instrumental,
       duracaoSeg: m.duracaoSeg || 150,
     });
+  }
+
+  // Nova versão de várias músicas de uma vez (mesma letra, estilo e voz; 3 músicas por vez)
+  async function novaVersaoMarcadas() {
+    const lista = musicas.filter((m) => marcadas.includes(m.id) && m.tipo !== 'medley');
+    if (!lista.length) return;
+    const total = lista.length * versoesLote;
+    if (!confirm(`Fazer nova versão de ${lista.length} música(s)? Vão ser geradas ${total} músicas (${versoesLote} de cada), gastando crédito.`)) return;
+    setMarcadas([]);
+    let feitas = 0;
+    const fila = [...lista];
+    setLoteRodando(`Criando 0 de ${lista.length}…`);
+    const trabalhador = async () => {
+      while (fila.length) {
+        const m = fila.shift();
+        await variacao(m, versoesLote);
+        feitas += 1;
+        setLoteRodando(feitas < lista.length ? `Criando ${feitas} de ${lista.length}…` : '');
+      }
+    };
+    await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
+    setLoteRodando('');
   }
 
   function reutilizar(m) {
@@ -1145,6 +1172,27 @@ export default function EstudioMusica() {
               </button>
             </div>
 
+            {!selecionando && (
+              <div className={`est-selbar est-lote ${marcadas.length ? "cheia" : ""}`}>
+                {marcadas.length ? (
+                  <>
+                    <span>{marcadas.length} marcada{marcadas.length > 1 ? 's' : ''}</span>
+                    <select value={versoesLote} onChange={(e) => setVersoesLote(Number(e.target.value))}>
+                      <option value={1}>1 versão de cada</option>
+                      <option value={2}>2 versões de cada</option>
+                    </select>
+                    <button className="est-btn-sec" onClick={novaVersaoMarcadas}>🔁 Nova versão</button>
+                    <button className="est-btn-link" onClick={() => setMarcadas([])}>Desmarcar</button>
+                  </>
+                ) : (
+                  <>
+                    <span>{loteRodando || 'Marque ☐ as músicas para fazer nova versão de várias de uma vez'}</span>
+                    <button className="est-btn-link" onClick={() => setMarcadas(lista.filter((m) => m.tipo !== 'medley').map((m) => m.id))}>Marcar todas</button>
+                  </>
+                )}
+              </div>
+            )}
+
             {selecionando && (
               <div className="est-selbar">
                 <span>{selecao.length ? `${selecao.length} selecionadas, na ordem em que você clicou` : 'Clique nas músicas na ordem em que devem tocar'}</span>
@@ -1218,6 +1266,16 @@ export default function EstudioMusica() {
                   </button>
                   <div className="est-info">
                     <div className="est-titulo" onClick={() => setAberta(aberta === m.id ? null : m.id)}>
+                      {!selecionando && m.tipo !== 'medley' && (
+                        <input
+                          type="checkbox"
+                          className="est-marca"
+                          title="Marcar para nova versão"
+                          checked={marcadas.includes(m.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => setMarcadas((xs) => (xs.includes(m.id) ? xs.filter((x) => x !== m.id) : [...xs, m.id]))}
+                        />
+                      )}
                       {m.titulo}
                       {m.versao ? <span className="est-v">v{m.versao}</span> : null}
                     </div>
@@ -1476,6 +1534,11 @@ export default function EstudioMusica() {
           .est-vol { width: 100%; justify-content: center; order: 5; }
           .est-vol input[type='range'] { flex: 1; width: auto; }
         }
+        .est-lote { flex-wrap: wrap; gap: 8px; }
+        .est-lote:not(.cheia) { background: transparent; border-style: dashed; border-color: var(--border); color: var(--text-muted); }
+        .est-lote select { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+        .est-btn-link { background: none; border: 0; color: var(--gold); text-decoration: underline; cursor: pointer; font-size: 13px; }
+        .est-marca { width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; accent-color: var(--gold); cursor: pointer; }
         .est-player-abrir { font-size: 12px; color: var(--gold); white-space: nowrap; text-decoration: underline; }
         @media (max-width: 640px) { .est-player-abrir { order: 4; } }
         .est-player-x { background: none; border: 0; color: var(--text-muted); font-size: 18px; cursor: pointer; }
