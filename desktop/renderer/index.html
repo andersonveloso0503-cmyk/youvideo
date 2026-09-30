@@ -43,6 +43,7 @@
     </nav>
     <div class="topo-status">
       <button class="btn-atualizar" id="btnAtualizar" hidden>⬆ Nova versão</button>
+      <button class="chip chip-creditos" id="chipCreditos" hidden title="Créditos das IAs">💳 Créditos</button>
       <span class="chip" id="chipEncoder" title="Como o vídeo está sendo codificado">—</span>
       <span class="chip chip-cpu" title="Uso do processador agora"><span class="cpu-barra"><i id="cpuBarra"></i></span><span id="cpuTexto">CPU 0%</span></span>
       <span class="chip discreto" id="versao">v1.0.0</span>
@@ -414,6 +415,8 @@
         <button class="btn-mini destaque" id="btnSyncPuxar" title="Traz as chaves e canais salvos por outro PC">⬇ Puxar do outro PC</button>
       </div>
       <label class="interruptor"><input type="checkbox" id="cfgNuvemAuto" /><span></span> Subir sozinho para a nuvem os vídeos que ficam prontos (aparecem na Biblioteca de todos os PCs)</label>
+      <label class="interruptor"><input type="checkbox" id="cfgCapaChamativa" /><span></span> Capa chamativa no YouTube (frase de efeito grande, feita pela IA)</label>
+      <label class="interruptor"><input type="checkbox" id="cfgCapaIa" /><span></span> Turbinar a imagem da capa com IA (Nano Banana, ~US$ 0,04 por capa, usa a chave da fal.ai)</label>
       <small class="nota" id="resSync">No PC já configurado: clique em "Salvar configurações na nuvem". No outro PC: cole a senha, clique em Testar e depois em "Puxar do outro PC".</small>
     </div>
     <div class="grade-config">

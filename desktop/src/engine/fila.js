@@ -11,6 +11,7 @@ const { separar } = require('./separar');
 const { transcrever } = require('./legenda');
 const YT = require('./youtube');
 const { gerarMiniatura, capaAoLado } = require('./miniatura');
+const { gerarCapaChamativa } = require('./capa');
 const Central = require('./central');
 const { resumoClima } = require('./analise');
 const IA = require('./ia');
@@ -278,7 +279,15 @@ class Fila extends EventEmitter {
       if (!canal) throw new Error('Canal do YouTube não encontrado — conecte de novo em Contas YouTube.');
       this.atualizar(job, { status: 'publicando', etapa: 'Preparando capa' });
       let miniatura = e.capa && fs.existsSync(e.capa) ? e.capa : null;
-      if (miniatura) {
+      // Capa escolhida à mão é respeitada; senão, faz a capa chamativa (frase de efeito)
+      const chamativa = e.capaManual
+        ? null
+        : await this.capaParaYoutube(job, miniatura || e.arquivo, {
+            titulo: e.titulo, descricao: e.descricao, curto: !!e.curto,
+            destino: path.join(os.tmpdir(), `youvideo-capa-yt-${job.id}.jpg`),
+          });
+      if (chamativa) miniatura = chamativa;
+      else if (miniatura) {
         const pronta = path.join(os.tmpdir(), `youvideo-capa-${job.id}.jpg`);
         try {
           await gerarMiniatura(miniatura, pronta, { vertical: !!e.curto });
@@ -299,7 +308,7 @@ class Fila extends EventEmitter {
         tags: e.tags,
         privacidade: e.privacidade,
         agendarPara: e.agendarPara || null,
-        miniatura: e.curto ? null : miniatura,
+        miniatura: e.curto && !chamativa && !e.capaManual ? null : miniatura,
         onProgresso: (x) => {
           const ini = e.baixarDe ? 0.3 : 0;
           this.atualizar(job, { progresso: ini + x * (0.97 - ini), etapa: `Enviando ${Math.round(x * 100)}%` }, false);
@@ -467,6 +476,22 @@ class Fila extends EventEmitter {
     this.emitir();
     this.proximo();
     return job;
+  }
+
+  /** Capa chamativa para o YouTube (frase de efeito grande). Devolve o caminho ou null se falhar. */
+  async capaParaYoutube(job, base, { titulo, descricao, curto, destino }) {
+    const cfg = this.obterConfig();
+    if (cfg.capaChamativa === false || !base || !fs.existsSync(base)) return null;
+    this.atualizar(job, { etapa: 'Criando capa chamativa' }, false);
+    try {
+      const c = await gerarCapaChamativa(base, {
+        groqKey: cfg.groqKey, falKey: cfg.falKey, usarIa: cfg.capaIa !== false,
+        titulo, descricao, curto, fontsDir: this.fontsDir, destino,
+      });
+      return c.arquivo;
+    } catch {
+      return null;
+    }
   }
 
   /** Vídeo pedido pelo site: sobe para a nuvem e avisa o site, que continua o fluxo (YouTube, redes...). */
@@ -798,6 +823,16 @@ class Fila extends EventEmitter {
           const ini = new Date(p.publicar.agendar.inicio).getTime();
           agendarPara = new Date(ini + (job.parte - 1) * (Number(p.publicar.agendar.intervaloHoras) || 24) * 3600e3);
         }
+        // Capa chamativa (frase de efeito) — fica salva ao lado do vídeo no lugar da capa simples
+        const chamativa = await this.capaParaYoutube(job, primeiraImg || miniatura || saida, {
+          titulo, descricao: descricaoBase, curto: p.formato.tipo === 'curto',
+          destino: miniatura || saida.replace(/\.mp4$/i, '.jpg'),
+        });
+        if (chamativa) {
+          miniatura = chamativa;
+          this.atualizar(job, { capa: chamativa });
+        }
+        this.atualizar(job, { etapa: 'Enviando para o YouTube' });
         const r = await YT.publicar({
           credenciais: cfg.google,
           redirectOriginal: canal.redirect,
@@ -814,7 +849,7 @@ class Fila extends EventEmitter {
           tags,
           privacidade: p.publicar.privacidade,
           agendarPara,
-          miniatura: p.formato.tipo === 'curto' ? null : miniatura,
+          miniatura: p.formato.tipo === 'curto' && !chamativa ? null : miniatura,
           onProgresso: (x) => {
             progP(x);
             this.atualizar(job, { etapa: `Enviando para o YouTube ${Math.round(x * 100)}%` }, false);

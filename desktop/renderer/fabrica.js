@@ -186,6 +186,11 @@ const Fabrica = (() => {
     custo();
     if (!q('#modalFabrica').open) q('#modalFabrica').showModal();
     carregar();
+    window.api.creditos.ler().then((c) => {
+      if (!c?.itens?.length) return;
+      const txt = c.itens.map((i) => `${i.nivel === 'ok' ? '' : '⚠ '}${i.nome.split(' ')[0]}: ${i.texto}`).join(' · ');
+      q('#fabCusto').textContent = `${q('#fabCusto').textContent.split(' | ')[0]} | Créditos: ${txt}`;
+    }).catch(() => {});
   }
 
   return { abrir };

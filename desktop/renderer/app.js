@@ -1092,6 +1092,8 @@ async function abrirConfig(msg) {
   $('#cfgCentralUrl').value = config.centralUrl || '';
   $('#cfgCentralToken').value = config.centralToken || '';
   $('#cfgNuvemAuto').checked = config.nuvemAuto !== false;
+  $('#cfgCapaChamativa').checked = config.capaChamativa !== false;
+  $('#cfgCapaIa').checked = config.capaIa !== false;
   $('#resCentral').textContent = '';
   $('#cfgClientId').value = config.google.clientId || '';
   $('#cfgClientSecret').value = config.google.clientSecret || '';
@@ -1146,6 +1148,19 @@ async function iniciar() {
   window.api.ao('app:progressoAtualizacao', (p) => { $('#btnAtualizar').textContent = `Baixando ${Math.round(p * 100)}%`; });
   setTimeout(checarAtualizacao, 4000);
   setInterval(checarAtualizacao, 3 * 3600 * 1000);
+  // Créditos das IAs: chip amarelo/vermelho quando algum está acabando
+  const mostrarCreditos = (c) => {
+    const chip = $('#chipCreditos');
+    if (!c?.itens?.length) return;
+    const pior = c.itens.some((i) => i.nivel === 'critico') ? 'critico' : c.itens.some((i) => i.nivel === 'baixo') ? 'baixo' : 'ok';
+    chip.hidden = pior === 'ok';
+    chip.className = `chip chip-creditos ${pior}`;
+    chip.textContent = pior === 'critico' ? '⚠ Crédito acabando' : '💳 Crédito baixo';
+    chip.title = c.itens.map((i) => `${i.nivel === 'ok' ? '✓' : '⚠'} ${i.nome}: ${i.texto}`).join('\n');
+    chip.onclick = () => alert(`Créditos das IAs:\n\n${chip.title}\n\nfal.ai: fal.ai/dashboard/billing\nFlux: dashboard.bfl.ai\nElevenLabs: elevenlabs.io/app/subscription`);
+  };
+  window.api.ao('creditos:status', mostrarCreditos);
+  setTimeout(() => window.api.creditos.ler().then(mostrarCreditos).catch(() => {}), 25000);
   window.api.ao('sistema:cpu', (v) => {
     $('#cpuTexto').textContent = `CPU ${v}%`;
     const b = $('#cpuBarra');
@@ -1331,6 +1346,8 @@ async function iniciar() {
       simultaneos: Number($('#cfgSimultaneos').value) || 1,
       encoder: $('#cfgEncoder').value,
       nuvemAuto: $('#cfgNuvemAuto').checked,
+      capaChamativa: $('#cfgCapaChamativa').checked,
+      capaIa: $('#cfgCapaIa').checked,
     });
     $('#modalConfig').close();
     avisar('Configurações salvas');

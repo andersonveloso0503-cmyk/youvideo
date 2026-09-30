@@ -166,6 +166,7 @@ const Subir = (() => {
         const c = await window.api.envio.escolherCapa();
         if (!c) return;
         v.capa = c;
+        v.capaManual = true; // escolhida à mão: não troca pela capa automática
         v.previa = await window.api.envio.previaCapa({ arquivo: v.arquivo, capa: c, vertical: !!v.curto }).catch(() => null);
         renderLista();
       };
@@ -278,6 +279,7 @@ const Subir = (() => {
       privacidade: S.privacidade === 'agendado' ? 'private' : S.privacidade,
       agendarPara: S.privacidade === 'agendado' ? hs[i].toISOString() : null,
       capa: v.capa || v.previa || null,
+      capaManual: !!v.capaManual,
       curto: v.curto,
     }));
     try {

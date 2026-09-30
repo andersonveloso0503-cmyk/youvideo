@@ -700,3 +700,6 @@ body { grid-template-columns: minmax(0, 1fr); }
 .fab-yt { margin-left: 6px; }
 .fab-yt.ok { color: #7cc48a; cursor: pointer; }
 .fab-yt.erro { color: var(--terracota); cursor: pointer; }
+
+.chip-creditos { cursor: pointer; border: 1px solid var(--ouro); color: var(--ouro); background: var(--ouro-suave); }
+.chip-creditos.critico { border-color: var(--terracota); color: #fff; background: var(--terracota); }

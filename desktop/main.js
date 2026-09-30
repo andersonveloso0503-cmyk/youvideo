@@ -1,5 +1,5 @@
 // Youvideo Compilador — processo principal (janela, arquivos, fila e YouTube)
-const { app, BrowserWindow, WebContentsView, session, ipcMain, dialog, shell, safeStorage, powerSaveBlocker, nativeTheme } = require('electron');
+const { app, BrowserWindow, WebContentsView, session, ipcMain, dialog, shell, safeStorage, powerSaveBlocker, nativeTheme, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -356,7 +356,7 @@ app.whenReady().then(() => {
           baixarDe: it.videoUrl,
           chaveArquivo: `fabrica-${it.id}`,
           capa: null,
-          capaUrl: null,
+          capaUrl: it.thumbnailUrl || null, // cena do vídeo: base da capa chamativa
           titulo: String(it.titulo || it.tema || 'Short').slice(0, 95),
           descricao: `${it.descricao || ''}\n\n#Shorts`.trim(),
           tags,
@@ -373,6 +373,61 @@ app.whenReady().then(() => {
       buscandoFabrica = false;
     }
   }
+  // ---------- Créditos: avisa quando fal.ai, Flux (imagens) ou ElevenLabs estão acabando ----------
+  let ultimosCreditos = null;
+  const avisados = {};
+  async function checarCreditos() {
+    const cfg = store.ler();
+    try {
+      const base = String(cfg.centralUrl || Central.URL_PADRAO).replace(/\/+$/, '');
+      const r = await fetch(`${base}/api/orcamento`, { signal: AbortSignal.timeout(20000) });
+      if (!r.ok) return;
+      const { servicos = {} } = await r.json();
+      const itens = [];
+      const add = (servico, nome, nivel, texto) => itens.push({ servico, nome, nivel, texto });
+      const fal = servicos.fal;
+      if (fal?.ok && fal.saldo != null) {
+        const n = fal.saldo < 1.5 ? 'critico' : fal.saldo < 5 ? 'baixo' : 'ok';
+        add('fal', 'fal.ai (animação)', n, `US$ ${Number(fal.saldo).toFixed(2)}`);
+      }
+      const flux = servicos.flux;
+      if (flux?.ok && flux.saldo != null) {
+        const n = flux.saldo < 100 ? 'critico' : flux.saldo < 300 ? 'baixo' : 'ok';
+        add('flux', 'Flux (imagens)', n, `${Math.round(flux.saldo)} créditos`);
+      }
+      const el = servicos.elevenlabs;
+      if (el?.ok && el.saldo != null) {
+        const limite = Number(el.limite) || 0;
+        const n = el.saldo < 5000 ? 'critico' : el.saldo < Math.max(20000, limite * 0.1) ? 'baixo' : 'ok';
+        add('elevenlabs', 'ElevenLabs (voz)', n, `${Math.round(el.saldo / 1000)} mil caracteres`);
+      }
+      ultimosCreditos = { itens, em: Date.now() };
+      enviar('creditos:status', ultimosCreditos);
+      // Notificação do Windows: uma vez por dia para cada serviço baixo/crítico
+      const hoje = new Date().toISOString().slice(0, 10);
+      for (const i of itens) {
+        if (i.nivel === 'ok') continue;
+        const chave = `${i.servico}-${i.nivel}-${hoje}`;
+        if (avisados[chave]) continue;
+        avisados[chave] = true;
+        if (Notification.isSupported()) {
+          new Notification({
+            title: i.nivel === 'critico' ? `⚠ ${i.nome}: crédito acabando` : `${i.nome}: crédito baixo`,
+            body: `Restam ${i.texto}. Recarregue para a Fábrica e as histórias não pararem.`,
+          }).show();
+        }
+      }
+    } catch {
+      // sem internet: tenta depois
+    }
+  }
+  setTimeout(checarCreditos, 20000);
+  setInterval(checarCreditos, 30 * 60e3);
+  ipcMain.handle('creditos:ler', async () => {
+    if (!ultimosCreditos || Date.now() - ultimosCreditos.em > 5 * 60e3) await checarCreditos();
+    return ultimosCreditos;
+  });
+
   setTimeout(fabricaParaYoutube, 15000);
   setInterval(fabricaParaYoutube, 120000);
   ipcMain.handle('fabrica:listar', () => Central.chamar(store.ler(), '/api/central/fabrica'));

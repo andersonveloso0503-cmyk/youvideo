@@ -1,6 +1,7 @@
 import { getDb } from '../../lib/firebase-admin';
 import { escolherProximo } from '../../lib/montarPc';
 import { agendarItemPronto } from '../../lib/fabrica';
+import { buscarSaldoFal } from '../../lib/orcamento';
 import {
   gerarRoteiro,
   gerarNarracao,
@@ -87,7 +88,13 @@ export default async function handler(req, res) {
         const ultimaPalavra = (item.narracao.palavras || []).filter((p) => p.end != null).pop();
         const duracaoAlvo = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
 
-        if (item.animar === false) {
+        // Fábrica sem crédito na fal.ai: sai com imagens em zoom em vez de travar
+        let semCreditoFal = false;
+        if (item.fabrica && item.animar !== false) {
+          const saldo = await buscarSaldoFal();
+          semCreditoFal = saldo.ok && saldo.saldo != null && saldo.saldo < 1;
+        }
+        if (item.animar === false || semCreditoFal) {
           // Vídeo estático (mais barato): pula a animação e já manda montar
           // direto com as imagens paradas.
           const renderId = await iniciarMontagemViaApi({
