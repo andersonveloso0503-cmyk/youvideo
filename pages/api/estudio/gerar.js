@@ -37,6 +37,8 @@ const VOZES = {
 // aqui entra o jeito de cantar do gênero.
 const CANTORES = [
   { id: 'forro', teste: /forr[oó]|piseiro|xote|bai[aã]o|zabumba/i, cantor: 'Northeastern Brazilian forró / piseiro singer with a nordestino accent, bright and slightly nasal tone, rhythmic syncopated phrasing typical of forró and piseiro, festive and danceable delivery' },
+  { id: 'reggae', teste: /reggae|ska\b|dub\b/i, cantor: 'Brazilian reggae singer, relaxed warm and smooth tone, laid-back sunny phrasing on the offbeat, positive vibe' },
+  { id: 'metal', teste: /heavy metal|\bmetal\b|thrash|power metal/i, cantor: 'heavy metal singer, powerful high operatic tenor, soaring sustained notes and wails, dramatic and epic delivery' },
   { id: 'rock', teste: /\brock\b|metal|grunge|punk|hard rock/i, cantor: 'rock band frontman, gritty powerful rock vocals with raspy belting and attitude, sustained high notes and energy in the chorus, sung like Brazilian rock (rock nacional), not pop, not sertanejo' },
   { id: 'blues', teste: /blues|soul/i, cantor: 'soulful blues singer, gritty warm tone, bluesy bends and runs, expressive and emotional phrasing' },
   { id: 'funk', teste: /\bfunk\b|baile/i, cantor: 'Brazilian funk MC, rhythmic half-spoken half-sung delivery, confident street style, catchy chant-like hook' },
@@ -55,6 +57,8 @@ const CANTORES = [
 // É bem mais forte que só escrever no texto — é aqui que o rock deixa de sair com cara de sertanejo.
 const SEM_SERTANEJO = ['sertanejo', 'sertanejo universitario', 'brazilian country', 'country', 'twangy vocals', 'viola caipira', 'arrocha', 'modao'];
 const GENEROS = {
+  reggae: { pos: ['reggae', 'brazilian reggae', 'offbeat skank guitar', 'deep groovy bass', 'one drop drums', 'laid-back groove', 'relaxed warm vocals'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars', 'accordion'] },
+  metal: { pos: ['heavy metal', 'galloping bass and guitars', 'twin harmonized lead guitars', 'fast double kick drums', 'high operatic metal vocals', 'epic'], neg: [...SEM_SERTANEJO, 'pop', 'acoustic ballad', 'accordion', 'pagode', 'soft vocals'] },
   rock: { pos: ['rock', 'brazilian rock', 'hard rock', 'distorted electric guitars', 'heavy guitar riffs', 'powerful live rock drums', 'electric bass', 'raspy powerful rock vocals', 'rock band energy'], neg: [...SEM_SERTANEJO, 'acoustic ballad', 'pop ballad', 'accordion', 'pagode', 'soft vocals', 'romantic ballad'] },
   forro: { pos: ['forro', 'piseiro', 'northeastern brazilian music', 'accordion lead', 'zabumba', 'triangle', 'danceable', 'nordestino vocals'], neg: [...SEM_SERTANEJO, 'rock', 'electric guitar solo'] },
   pagode: { pos: ['pagode', 'samba', 'cavaquinho', 'pandeiro', 'tantan', 'swing', 'group backing vocals'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars'] },
@@ -234,7 +238,7 @@ export default async function handler(req, res) {
     modo,
     descricao: String(b.descricao || '').slice(0, 1000),
     letra: String(b.letra || '').slice(0, 3500),
-    estilo: String(b.estilo || '').slice(0, 400),
+    estilo: String(b.estilo || '').slice(0, 900),
     voz: String(b.voz || ''),
     instrumental,
     duracaoSeg,

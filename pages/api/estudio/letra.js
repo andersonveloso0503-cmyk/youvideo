@@ -27,7 +27,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido.' });
   if (!process.env.GROQ_API_KEY) return res.status(500).json({ erro: 'GROQ_API_KEY não configurada.' });
 
-  const { acao, tema, estilo, voz, letraAtual, detalhes, evitar } = req.body || {};
+  const { acao, tema, estilo, voz, letraAtual, detalhes, evitar, referencia } = req.body || {};
   const temSolo = /solo|intro instrumental|drop|pausa/i.test(detalhes || '');
 
   try {
@@ -36,6 +36,28 @@ export default async function handler(req, res) {
 
 Ideia: ${tema || ''}`, 200);
       return res.status(200).json({ estilo: txt.replace(/^["']|["']$/g, '') });
+    }
+
+    // "Parecido com": transforma um artista/banda de referência em descrição musical SEM nomes
+    // (os motores de música recusam nome de artista, e assim a música sai original)
+    if (acao === 'referencia') {
+      const ref = String(req.body.referencia || '').trim().slice(0, 120);
+      if (!ref) return res.status(400).json({ erro: 'Escreva o artista ou banda de referência.' });
+      for (let t = 1; t <= 2; t++) {
+        const txt = await groq(`Um produtor quer uma música ORIGINAL com o som parecido com: "${ref}".
+Descreva as características musicais desse som SEM citar nomes de artistas, bandas, músicas ou álbuns.
+
+Responda SÓ com JSON neste formato:
+{"estilo": "descrição em INGLÊS para um gerador de música com IA: gênero e subgênero, época, instrumentos e timbres, levada/ritmo, andamento em bpm, produção e clima (máximo 45 palavras, sem nomes)",
+ "voz": "como é o vocal em INGLÊS: timbre, extensão, jeito de cantar (máximo 20 palavras, sem nomes)",
+ "resumo": "em português, 1 frase curta explicando o estilo para o usuário (sem nomes)"}`, 1500);
+        try {
+          const j = JSON.parse((txt.match(/\{[\s\S]*\}/) || [''])[0]);
+          const semNome = (x) => String(x || '').replace(new RegExp(ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '').trim();
+          if (j.estilo) return res.status(200).json({ estilo: semNome(j.estilo), voz: semNome(j.voz), resumo: semNome(j.resumo) });
+        } catch { /* tenta de novo */ }
+      }
+      return res.status(500).json({ erro: 'Não consegui entender esse estilo agora. Tente de novo.' });
     }
 
     // Medley: planeja N músicas DIFERENTES entre si a partir do tema geral
@@ -82,6 +104,7 @@ Regras:
 - Português do Brasil, linguagem natural e emocionante.
 ${estilo ? `- Estilo musical: ${estilo}. Escreva com o vocabulário, as gírias, o jeito de falar e o clima TÍPICOS desse estilo (forró com jeito nordestino e festeiro, rock com atitude e energia, pagode com swing, gospel com adoração...). Não escreva tudo com cara de sertanejo.` : ''}
 ${voz ? `- Vai ser cantada por: ${voz}.` : ''}
+${referencia ? `- O clima e o jeito da letra lembram o estilo de ${referencia}, mas a letra é 100% ORIGINAL: não use títulos, frases, refrões nem nomes dessas músicas.` : ''}
 ${detalhes ? `- Arranjo pedido: ${detalhes}.` : ''}
 ${Array.isArray(evitar) && evitar.length ? `- Esta música faz parte de um medley. Ela precisa ser COMPLETAMENTE diferente destas outras músicas do medley — não repita título, refrão, frases, rimas nem imagens delas:\n${evitar.slice(0, 14).map((x) => `  • ${x}`).join('\n')}` : ''}
 ${temSolo ? '- Inclua na estrutura as partes instrumentais pedidas, cada uma em linha própria SEM letra, por exemplo [Instrumental Intro], [Guitar Solo], [Trumpet Solo], [Sax Solo], [Piano Solo], [Violin Solo] ou [Instrumental Break] (geralmente o solo vem depois do segundo refrão).' : ''}

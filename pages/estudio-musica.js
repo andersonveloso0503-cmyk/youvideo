@@ -14,6 +14,8 @@ const ESTILOS = [
   { id: 'mpb', nome: 'MPB / Acústico', base: 'Brazilian MPB, acoustic, bossa nova touch, intimate' },
   { id: 'pop', nome: 'Pop', base: 'modern pop, catchy hook, clean production' },
   { id: 'rock', nome: 'Rock', base: 'rock, electric guitars, powerful drums, energetic' },
+  { id: 'metal', nome: 'Heavy Metal', base: 'heavy metal, distorted guitars, galloping rhythm, twin lead guitars, powerful drums, epic' },
+  { id: 'reggae', nome: 'Reggae', base: 'reggae, offbeat skank guitar, groovy bass, one drop drums, laid-back sunny vibe' },
   { id: 'funk', nome: 'Funk BR', base: 'Brazilian funk, heavy beat, catchy' },
   { id: 'blues', nome: 'Blues Gospel', base: 'soulful blues gospel, organ, electric guitar, emotional' },
   { id: 'lofi', nome: 'Lo-fi / Relax', base: 'lo-fi chill, soft beats, calm, relaxing' },
@@ -439,6 +441,9 @@ export default function EstudioMusica() {
   const [temaLetra, setTemaLetra] = useState('');
   const [estiloId, setEstiloId] = useState('gospel');
   const [estiloExtra, setEstiloExtra] = useState('');
+  const [referencia, setReferencia] = useState(''); // "parecido com" (artista/banda)
+  const [refInfo, setRefInfo] = useState(null); // { de, estilo, voz, resumo }
+  const [analisandoRef, setAnalisandoRef] = useState(false);
   const [ideias, setIdeias] = useState([]);
   const [ritmo, setRitmo] = useState('');
   const [voz, setVoz] = useState('masculina');
@@ -504,8 +509,28 @@ export default function EstudioMusica() {
 
   const estiloTexto = useMemo(() => {
     const base = ESTILOS.find((e) => e.id === estiloId)?.base || '';
-    return [base, ritmoEn(ritmo), ideiasEmTexto(ideias), estiloExtra.trim()].filter(Boolean).join(', ');
-  }, [estiloId, estiloExtra, ideias, ritmo]);
+    const ref = refInfo && refInfo.de === referencia.trim() ? [refInfo.estilo, refInfo.voz ? `vocals: ${refInfo.voz}` : ''] : [];
+    return [base, ...ref, ritmoEn(ritmo), ideiasEmTexto(ideias), estiloExtra.trim()].filter(Boolean).join(', ');
+  }, [estiloId, estiloExtra, ideias, ritmo, refInfo, referencia]);
+
+  // "Parecido com": a IA descreve o som do artista sem citar nomes (os motores recusam nomes)
+  async function analisarReferencia() {
+    const de = referencia.trim();
+    if (!de) { setRefInfo(null); return null; }
+    if (refInfo && refInfo.de === de) return refInfo;
+    setAnalisandoRef(true);
+    try {
+      const d = await api('/api/estudio/letra', { method: 'POST', body: JSON.stringify({ acao: 'referencia', referencia: de }) });
+      const info = { de, ...d };
+      setRefInfo(info);
+      return info;
+    } catch (e) {
+      setAviso(e.message);
+      return null;
+    } finally {
+      setAnalisandoRef(false);
+    }
+  }
 
   const nomesIdeias = ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean).join(', ');
 
@@ -547,6 +572,7 @@ export default function EstudioMusica() {
           estilo: ESTILOS.find((e) => e.id === estiloId)?.nome,
           voz: VOZES.find((v) => v.id === voz)?.nome,
           detalhes: nomesIdeias,
+          referencia: referencia.trim(),
           letraAtual: melhorar ? letra : '',
         }),
       });
@@ -562,12 +588,20 @@ export default function EstudioMusica() {
   // ── Criar música ──
   async function criar(parametrosFixos) {
     setAviso('');
+    let estiloFinal = estiloTexto;
+    if (!parametrosFixos && referencia.trim() && !(refInfo && refInfo.de === referencia.trim())) {
+      const info = await analisarReferencia();
+      if (info) {
+        const base = ESTILOS.find((e) => e.id === estiloId)?.base || '';
+        estiloFinal = [base, info.estilo, info.voz ? `vocals: ${info.voz}` : '', ritmoEn(ritmo), ideiasEmTexto(ideias), estiloExtra.trim()].filter(Boolean).join(', ');
+      }
+    }
     const p = parametrosFixos || {
       modo,
       descricao,
       titulo,
       letra,
-      estilo: estiloTexto,
+      estilo: estiloFinal,
       voz: instrumental ? '' : voz,
       instrumental,
       duracaoSeg: duracao,
@@ -1165,6 +1199,20 @@ export default function EstudioMusica() {
               ))}
             </div>
 
+            <label className="est-rot">Parecido com (opcional)</label>
+            <div className="est-ref">
+              <input
+                value={referencia}
+                onChange={(e) => setReferencia(e.target.value)}
+                onBlur={() => referencia.trim() && analisarReferencia()}
+                placeholder="Ex.: Armandinho, Iron Maiden, Legião Urbana…"
+              />
+              <button className="est-btn-sec" disabled={analisandoRef || !referencia.trim()} onClick={analisarReferencia}>{analisandoRef ? 'Analisando…' : '🔍 Entender'}</button>
+            </div>
+            {refInfo && refInfo.de === referencia.trim() && (
+              <small className="est-ref-ok">🎯 {refInfo.resumo || 'Estilo entendido.'} A música sai original, só com o som parecido.</small>
+            )}
+
             <label className="est-rot">Ritmo</label>
             <EscolherRitmo valor={ritmo} onChange={setRitmo} />
 
@@ -1600,6 +1648,9 @@ export default function EstudioMusica() {
         .est-lote:not(.cheia) { background: transparent; border-style: dashed; border-color: var(--border); color: var(--text-muted); }
         .est-lote select { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
         .est-lote .perigo { color: #e38b77; border-color: #e38b77; }
+        .est-ref { display: flex; gap: 8px; }
+        .est-ref input { flex: 1; min-width: 0; }
+        .est-ref-ok { display: block; margin-top: 6px; color: var(--gold); font-size: 13px; line-height: 1.4; }
         .est-btn-link { background: none; border: 0; color: var(--gold); text-decoration: underline; cursor: pointer; font-size: 13px; }
         .est-marca { width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; accent-color: var(--gold); cursor: pointer; }
         .est-player-abrir { font-size: 12px; color: var(--gold); white-space: nowrap; text-decoration: underline; }
