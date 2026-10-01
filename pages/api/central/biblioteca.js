@@ -43,6 +43,7 @@ async function medleys(db) {
       id: m.id,
       categoria: m.categoria && CATEGORIAS[m.categoria] ? m.categoria : 'medleys',
       titulo: m.titulo || 'Medley',
+      estilo: typeof m.estilo === 'string' ? m.estilo : '',
       descricao: m.descricao || '',
       videoUrl: m.videoUrl,
       thumbnailUrl: m.thumbnailUrl || null,
@@ -64,6 +65,7 @@ async function musicasFila(db) {
       id: m.id,
       categoria: m.categoria && CATEGORIAS[m.categoria] ? m.categoria : 'musicas',
       titulo: m.titulo || 'Música',
+      estilo: m.estilo || '', // gênero da música: a IA do título usa
       descricao: m.letra ? String(m.letra).slice(0, 1500) : '',
       videoUrl: m.videoUrl,
       thumbnailUrl: m.thumbnailUrl || null,

@@ -267,6 +267,8 @@ const Biblioteca = (() => {
     const chave = cats.join(',');
     if (B.ultimaSelecaoCats !== chave) {
       B.ultimaSelecaoCats = chave;
+      // Estilo/tema que a IA usa: o último usado para este tipo de vídeo
+      q('#bibPedido').value = (cats.length === 1 && config.envioPrefs?.pedidoPorCategoria?.[cats[0]]) || '';
       sel.value = lembrado && canais.find((c) => c.id === lembrado) ? lembrado : '';
     } else if (document.activeElement !== sel) {
       sel.value = atual && canais.find((c) => c.id === atual) ? atual : '';
@@ -337,6 +339,7 @@ const Biblioteca = (() => {
           btn.textContent = `✨ Escrevendo ${k + 1} de ${itens.length}...`;
           try {
             const r = await window.api.envio.gerarTextos({
+              pedido: q('#bibPedido').value.trim() || i.estilo || '',
               nome: i.titulo,
               musicas: (i.musicas || []).map((m) => m.titulo),
               duracaoSeg: i.duracao || 0,
@@ -370,6 +373,12 @@ const Biblioteca = (() => {
         config.envioPrefs = { ...(config.envioPrefs || {}), canalPorCategoria: mapa };
         window.api.config.salvar({ envioPrefs: config.envioPrefs }).catch(() => {});
       }
+      // Lembra o estilo/tema digitado para este tipo de vídeo
+      const pedidoUsado = q('#bibPedido').value.trim();
+      const mapaPedido = { ...(config.envioPrefs?.pedidoPorCategoria || {}) };
+      itens.forEach((i) => (mapaPedido[i.categoria] = pedidoUsado));
+      config.envioPrefs = { ...(config.envioPrefs || {}), pedidoPorCategoria: mapaPedido };
+      window.api.config.salvar({ envioPrefs: config.envioPrefs }).catch(() => {});
       const partes = [];
       if (r.youtube) partes.push(`${r.youtube} no YouTube (acompanhe na Fila)`);
       if (r.nuvem) partes.push(`${r.nuvem} nas redes`);
