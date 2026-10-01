@@ -503,7 +503,10 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px;
 .bib-grade-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .bib-filtros { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid var(--borda); }
 .bib-filtros .segmentado { width: 290px; }
-.bib-grade { flex: 1; overflow-y: auto; padding: 14px 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 12px; align-content: start; }
+.bib-grade { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); grid-auto-rows: max-content; gap: 12px; align-content: start; }
+.bib-dia { grid-column: 1 / -1; margin: 10px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--borda); font-size: 13px; color: var(--ouro, #d8a24a); text-transform: capitalize; }
+.bib-dia:first-child { margin-top: 0; }
+.bib-card > * { flex-shrink: 0; } /* com muitos vídeos os cartões eram espremidos e a capa sumia */
 .bib-vazio { color: var(--mudo); grid-column: 1 / -1; text-align: center; padding: 40px; }
 .bib-card { position: relative; background: var(--bg-2); border: 1px solid var(--borda); border-radius: 10px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; }
 .bib-card:hover { border-color: var(--borda-forte); }

@@ -59,7 +59,7 @@ const Biblioteca = (() => {
       if (B.formato === 'longo' && i.curto) return false;
       if (B.naoPublicados && i.publicado?.youtube) return false;
       return true;
-    });
+    }).sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''))); // mais novos primeiro
   }
 
   function renderCategorias() {
@@ -100,7 +100,25 @@ const Biblioteca = (() => {
       return;
     }
     grade.innerHTML = '';
+    const nomeDia = (d) => {
+      const dia = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+      const dif = Math.round((dia(new Date()) - dia(d)) / 864e5);
+      if (dif === 0) return 'Hoje';
+      if (dif === 1) return 'Ontem';
+      return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+    };
+    let diaAtual = null;
     for (const i of lista) {
+      // Separador com a data em que os vídeos foram criados
+      const diaTxt = i.criadoEm ? nomeDia(new Date(i.criadoEm)) : 'Sem data';
+      if (diaTxt !== diaAtual) {
+        diaAtual = diaTxt;
+        const qtd = lista.filter((x) => (x.criadoEm ? nomeDia(new Date(x.criadoEm)) : 'Sem data') === diaTxt).length;
+        const h = document.createElement('h4');
+        h.className = 'bib-dia';
+        h.textContent = `${diaTxt} · ${qtd} vídeo${qtd === 1 ? '' : 's'}`;
+        grade.appendChild(h);
+      }
       const card = document.createElement('div');
       const marcado = B.sel.includes(i.chave);
       card.className = 'bib-card' + (marcado ? ' sel' : '');
@@ -231,13 +249,18 @@ const Biblioteca = (() => {
     q('#bibQtdSel').textContent = itens.length;
     const sel = q('#redeYoutubeCanal');
     const atual = sel.value;
-    sel.innerHTML = canais.length ? '' : '<option value="">Nenhum canal conectado</option>';
-    canais.forEach((c) => {
-      const o = document.createElement('option');
-      o.value = c.id;
-      o.textContent = c.titulo;
-      sel.appendChild(o);
-    });
+    // Só refaz a lista de canais se ela mudou (refazer enquanto a lista está aberta fechava a escolha)
+    const assinatura = canais.map((c) => `${c.id}:${c.titulo}`).join('|');
+    if (sel.dataset.canais !== assinatura) {
+      sel.dataset.canais = assinatura;
+      sel.innerHTML = canais.length ? '<option value="">— escolha o canal —</option>' : '<option value="">Nenhum canal conectado</option>';
+      canais.forEach((c) => {
+        const o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = c.titulo;
+        sel.appendChild(o);
+      });
+    }
     // Cada tipo de vídeo lembra o seu canal (bíblicos num canal, músicas em outro...)
     const cats = [...new Set(itens.map((i) => i.categoria))];
     const lembrado = cats.length === 1 ? config.envioPrefs?.canalPorCategoria?.[cats[0]] : null;
@@ -245,12 +268,8 @@ const Biblioteca = (() => {
     if (B.ultimaSelecaoCats !== chave) {
       B.ultimaSelecaoCats = chave;
       sel.value = lembrado && canais.find((c) => c.id === lembrado) ? lembrado : '';
-    } else {
+    } else if (document.activeElement !== sel) {
       sel.value = atual && canais.find((c) => c.id === atual) ? atual : '';
-    }
-    if (!sel.value) {
-      if (!sel.querySelector('option[value=""]')) sel.insertAdjacentHTML('afterbegin', '<option value="">— escolha o canal —</option>');
-      sel.value = '';
     }
     const avisoCanal = q('#bibAvisoCanal');
     avisoCanal.textContent =
