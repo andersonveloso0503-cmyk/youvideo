@@ -19,6 +19,7 @@ const Criar = (() => {
       titulo: 'Música — Nova Frequência e Aqui Tem Música',
       cor: '#b1432f',
       itens: [
+        ['/estudio-musica', '🎼', 'Estúdio de Música', 'Crie músicas com IA: letra, estilo, instrumentos e voz'],
         ['/musica', '🎵', 'Música', 'Uma música, do áudio até o vídeo pronto'],
         ['/musica-fila', '📋', 'Fila de músicas', 'Suba várias e deixe gerar sozinho'],
         ['/medley', '🎶', 'Medley', 'Junte músicas de estilos diferentes numa faixa só'],
