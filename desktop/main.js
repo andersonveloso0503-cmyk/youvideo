@@ -967,9 +967,18 @@ app.whenReady().then(() => {
     if (!fs.existsSync(destino)) await gerarMiniatura(origem, destino, { vertical: !!vertical });
     return destino;
   });
+  // Guarda os últimos títulos e começos de descrição para a IA não repetir de um lote para o outro
   ipcMain.handle('envio:gerarTextos', async (_e, info) => {
     const cfg = store.ler();
-    return IA.gerarTextosVideo(cfg.groqKey, info);
+    const hist = Array.isArray(cfg.historicoTextos) ? cfg.historicoTextos : [];
+    const r = await IA.gerarTextosVideo(cfg.groqKey, {
+      ...info,
+      evitar: [...new Set([...(info.evitar || []), ...hist.map((h) => h.t)])].slice(-20),
+      evitarInicios: hist.map((h) => h.d).filter(Boolean).slice(-10),
+    });
+    const inicio = String(r.descricao || '').split(/(?<=[.!?])\s/)[0].slice(0, 140);
+    store.salvar({ historicoTextos: [...hist, { t: r.titulo, d: inicio }].slice(-40) });
+    return r;
   });
   ipcMain.handle('envio:ultimoAgendado', async (_e, canalId) => {
     const canal = store.canal(canalId);

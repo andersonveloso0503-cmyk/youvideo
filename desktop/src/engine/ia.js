@@ -324,7 +324,9 @@ EXEMPLOS DO PADRÃO CERTO (só a forma — o gênero é sempre o do vídeo/pedid
 DESCRIÇÃO
 - 1ª frase (até 150 caracteres) começa com a palavra_principal — é o que aparece na busca.
 - Depois 2 ou 3 parágrafos curtos e naturais usando outras buscas da lista (sem virar lista de palavras).
-- Convite para curtir, comentar e se inscrever.
+- Convite para curtir, comentar e se inscrever — escrito com palavras diferentes a cada vídeo.
+- Cada descrição precisa soar ÚNICA: varie o jeito de começar (pergunta, cena, benefício, convite, curiosidade), o tamanho das frases e o convite final.
+- Comece cada frase com letra maiúscula (português correto), mesmo que a busca da lista esteja em minúsculas.
 - Termine com 3 a 5 hashtags relevantes (a primeira = palavra_principal sem espaços).
 - NÃO escreva lista de músicas nem minutagem (o app coloca sozinho).
 
@@ -347,6 +349,10 @@ ${
 ${
     info.evitar?.length
       ? `TÍTULOS JÁ USADOS EM OUTROS VÍDEOS DESTA MESMA LEVA (mesmas músicas em outra ordem) — os seus 3 títulos precisam ser CLARAMENTE DIFERENTES destes: comece com OUTRAS palavras, use outra palavra_principal da lista, outra ocasião e outro gancho (o YouTube trata títulos repetidos como spam). Não repita a mesma estrutura:\n${info.evitar.map((t) => `- ${t}`).join('\n')}\n\n`
+      : ''
+  }${
+    info.evitarInicios?.length
+      ? `COMEÇOS DE DESCRIÇÃO JÁ USADOS (a sua descrição NÃO pode começar igual nem parecido com estes):\n${info.evitarInicios.map((t) => `- ${t}`).join('\n')}\n\n`
       : ''
   }PESQUISADO NO YOUTUBE (buscas reais, das mais populares para as menos):
 ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi possível consultar — use os termos mais buscados que você conhece para esse nicho)'}`;
@@ -395,7 +401,10 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
 
   // Hashtags no título (o YouTube mostra como link e ajuda a cair na busca daquele assunto)
   const principal = String(j.palavra_principal || '').trim();
-  opcoes = opcoes.map((t) => comHashtags(t, [principal, ...tags], !!info.curto));
+  // Primeira letra maiúscula (as buscas do YouTube vêm em minúsculas)
+  const maiuscula = (t) => String(t || '').replace(/^([^\p{L}]*)(\p{Ll})/u, (_, a, b) => a + b.toUpperCase());
+  opcoes = opcoes.map((t) => comHashtags(maiuscula(t), [principal, ...tags], !!info.curto));
+  j.descricao = String(j?.descricao || '').split('\n').map(maiuscula).join('\n');
 
   return {
     titulo: opcoes[melhor],
