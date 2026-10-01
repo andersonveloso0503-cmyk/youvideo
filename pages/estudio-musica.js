@@ -1172,6 +1172,33 @@ export default function EstudioMusica() {
     });
   }
 
+  // Capa própria: corta em quadrado, deixa em até 3000×3000 e guarda na música
+  function enviarCapa(m, arquivo) {
+    if (!arquivo) return;
+    comTrabalho(m.id, 'Enviando a sua capa…', async () => {
+      const img = await new Promise((ok, erro) => {
+        const i = new Image();
+        i.onload = () => ok(i);
+        i.onerror = () => erro(new Error('Não consegui abrir essa imagem. Use JPG ou PNG.'));
+        i.src = URL.createObjectURL(arquivo);
+      });
+      const lado = Math.min(img.naturalWidth, img.naturalHeight);
+      const tam = Math.min(3000, Math.max(1024, lado));
+      const c = document.createElement('canvas');
+      c.width = tam;
+      c.height = tam;
+      const g = c.getContext('2d');
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(img, (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2, lado, lado, 0, 0, tam, tam);
+      const blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.9));
+      const { upload } = await import('@vercel/blob/client');
+      const r = await upload(`estudio-musica/capas/${Date.now()}.jpg`, blob, { access: 'public', handleUploadUrl: '/api/imagem-upload', contentType: 'image/jpeg' });
+      await api('/api/estudio/biblioteca', { method: 'PATCH', body: JSON.stringify({ id: m.id, capaUrl: r.url }) });
+      atualizarLocal(m.id, { capaUrl: r.url });
+      if (lado < 1500) setAviso('Capa enviada. Ela é pequena (menos de 1500 px): vai ser aumentada para 3000×3000, mas pode ficar um pouco sem nitidez.');
+    });
+  }
+
   function separarStems(m) {
     comTrabalho(m.id, 'Separando voz e instrumentos…', async (msg) => {
       const job = await api('/api/cover/fal', { method: 'POST', body: JSON.stringify({ tipo: 'separar', audioUrl: m.audioUrl }) });
@@ -1599,6 +1626,10 @@ export default function EstudioMusica() {
                           </>
                         )}
                         <button disabled={!!ocupado} onClick={() => gerarCapa(m)}>🎨 {m.capaUrl ? 'Nova capa' : 'Gerar capa'}</button>
+                        <label className={`est-enviar-capa ${ocupado ? 'off' : ''}`}>
+                          🖼 Enviar minha capa
+                          <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={!!ocupado} onChange={(e) => { enviarCapa(m, e.target.files?.[0]); e.target.value = ''; }} />
+                        </label>
                         <button disabled={!!ocupado} onClick={() => separarStems(m)}>🎚 Separar voz/instrumental</button>
                         {m.tipo !== 'medley' && <button disabled={!!ocupado} onClick={() => mandarParaFila(m)}>📺 Mandar p/ fila do canal</button>}
                         <a className="est-mais-a" href="/cover">🎤 Fazer cover com voz IA</a>
@@ -1775,8 +1806,9 @@ export default function EstudioMusica() {
 
         .est-mais { grid-column: 1 / -1; border-top: 1px solid var(--border); padding-top: 12px; }
         .est-mais-btns { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
-        .est-mais-btns button, .est-mais-a { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 11px 12px; text-align: left; cursor: pointer; font-size: 14px; text-decoration: none; }
+        .est-mais-btns button, .est-mais-a, .est-enviar-capa { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 11px 12px; text-align: left; cursor: pointer; font-size: 14px; text-decoration: none; }
         .est-mais-btns button:disabled { opacity: 0.4; }
+        .est-enviar-capa.off { opacity: 0.4; pointer-events: none; }
         .est-mais-btns .perigo { color: #e38b77; }
         .est-stems { margin-top: 12px; display: grid; gap: 6px; }
         .est-stem { display: grid; grid-template-columns: 80px 1fr auto; gap: 8px; align-items: center; font-size: 14px; }
