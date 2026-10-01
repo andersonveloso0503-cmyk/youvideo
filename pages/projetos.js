@@ -14,7 +14,50 @@ async function compartilhar(arquivo, titulo, setStatus) {
   }
 }
 
+const REDES_POST = [
+  { id: 'youtube', nome: 'YouTube' },
+  { id: 'tiktok', nome: 'TikTok' },
+  { id: 'kwai', nome: 'Kwai' },
+  { id: 'facebook', nome: 'Facebook' },
+  { id: 'instagram', nome: 'Instagram' },
+];
+
+// Mostra em quais redes o vídeo já foi postado (automático pela Agenda/Fábrica + o que você marcar)
+function JaPostado({ projeto, onMudar }) {
+  const feitos = projeto.postadoEm || {};
+  const dataTxt = (v) => (v && v !== 'sim' ? new Date(v).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '');
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 12, color: '#999', marginBottom: 6 }}>Redes: ✓ verde = já postado · 🕒 amarelo = agendado · toque para marcar/desmarcar</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {REDES_POST.map((r) => {
+          const ok = !!feitos[r.id];
+          const agend = !ok && projeto.agendadoEm?.[r.id];
+          return (
+            <button
+              key={r.id}
+              onClick={() => {
+                if (ok && !confirm(`Desmarcar ${r.nome}? (use se marcou por engano)`)) return;
+                onMudar(r.id, !ok);
+              }}
+              style={{
+                marginTop: 0, width: 'auto', padding: '6px 10px', fontSize: 12, borderRadius: 999,
+                background: ok ? '#123d2c' : agend ? '#3a2f12' : 'transparent', color: ok ? '#8fd6c1' : agend ? '#e8c46a' : '#888',
+                border: `1px solid ${ok ? '#2f8f6b' : agend ? '#a8872f' : '#444'}`,
+              }}
+              title={agend ? 'Já está agendado nessa rede (Agenda)' : ''}
+            >
+              {ok ? '✓ ' : agend ? '🕒 ' : ''}{r.nome}{ok && dataTxt(feitos[r.id]) ? ` ${dataTxt(feitos[r.id])}` : ''}{agend ? ` ${dataTxt(agend)}` : ''}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Projetos() {
+  const [filtroPost, setFiltroPost] = useState('todos'); // 'todos' | 'falta' | rede
   const [montandoPc, setMontandoPc] = useState({});
   const [projetos, setProjetos] = useState(null);
   const [erro, setErro] = useState(null);
@@ -26,6 +69,18 @@ export default function Projetos() {
   const [arquivoExterno, setArquivoExterno] = useState(null);
   const [enviandoExterno, setEnviandoExterno] = useState(false);
   const [erroExterno, setErroExterno] = useState(null);
+
+  async function marcarPostado(id, rede, feito) {
+    setProjetos((ps) => ps.map((p) => {
+      if (p.id !== id) return p;
+      const postadoEm = { ...(p.postadoEm || {}) };
+      if (feito) postadoEm[rede] = new Date().toISOString(); else delete postadoEm[rede];
+      return { ...p, postadoEm };
+    }));
+    try {
+      await fetch('/api/projeto-postado', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, rede, feito }) });
+    } catch { /* tenta de novo na próxima vez que marcar */ }
+  }
 
   function recarregarProjetos() {
     fetch('/api/list-projects')
@@ -192,9 +247,27 @@ export default function Projetos() {
 
       {projetos && !projetos.length && <div className="card">Nenhum projeto salvo ainda.</div>}
 
-      {projetos?.map((p) => (
+      {projetos?.length > 0 && (
+        <div className="card" style={{ padding: '10px 14px' }}>
+          <label style={{ marginTop: 0 }}>Mostrar</label>
+          <select value={filtroPost} onChange={(e) => setFiltroPost(e.target.value)}>
+            <option value="todos">Todos os projetos</option>
+            <option value="falta">Falta postar em alguma rede</option>
+            {REDES_POST.map((r) => <option key={r.id} value={r.id}>Ainda não postados no {r.nome}</option>)}
+          </select>
+        </div>
+      )}
+
+      {projetos?.filter((p) => {
+        if (filtroPost === 'todos') return true;
+        const f = p.postadoEm || {};
+        const ag = p.agendadoEm || {};
+        if (filtroPost === 'falta') return REDES_POST.some((r) => !f[r.id] && !ag[r.id]);
+        return !f[filtroPost] && !ag[filtroPost];
+      }).map((p) => (
         <div key={p.id} className="card">
           <h2>{p.titulo}</h2>
+          {p.videoUrl && <JaPostado projeto={p} onMudar={(rede, feito) => marcarPostado(p.id, rede, feito)} />}
           {p.thumbnailUrl && (
             <img src={p.thumbnailUrl} alt={p.titulo} style={{ width: '100%', maxWidth: 300, borderRadius: 6, marginBottom: 10 }} />
           )}
@@ -279,8 +352,8 @@ export default function Projetos() {
                 </a>
               </div>
 
-              <PublicarSocialBotao midiaUrl={p.videoUrl} legenda={p.titulo} />
-              <PublicarTiktokBotao videoUrl={p.videoUrl} titulo={p.titulo} descricao={p.descricao} />
+              <PublicarSocialBotao midiaUrl={p.videoUrl} legenda={p.titulo} onPostado={(rede) => marcarPostado(p.id, rede, true)} />
+              <PublicarTiktokBotao videoUrl={p.videoUrl} titulo={p.titulo} descricao={p.descricao} onPostado={() => marcarPostado(p.id, 'tiktok', true)} />
               {p.narracaoTexto && <VerTextoLegenda texto={p.narracaoTexto} />}
 
               <div style={{ marginTop: 12, borderTop: '1px solid #333', paddingTop: 10 }}>
@@ -331,7 +404,7 @@ export default function Projetos() {
   );
 }
 
-function PublicarSocialBotao({ midiaUrl, legenda }) {
+function PublicarSocialBotao({ midiaUrl, legenda, onPostado }) {
   const [publicando, setPublicando] = useState(false);
   const [resultado, setResultado] = useState(null);
 
@@ -346,6 +419,8 @@ function PublicarSocialBotao({ midiaUrl, legenda }) {
       });
       const data = await res.json();
       setResultado(data);
+      if (data.facebook && !data.facebook.erro) onPostado?.('facebook');
+      if (data.instagram && !data.instagram.erro) onPostado?.('instagram');
     } catch (err) {
       setResultado({ erro: err.message });
     } finally {
@@ -377,7 +452,7 @@ function PublicarSocialBotao({ midiaUrl, legenda }) {
   );
 }
 
-function PublicarTiktokBotao({ videoUrl, titulo, descricao }) {
+function PublicarTiktokBotao({ videoUrl, titulo, descricao, onPostado }) {
   const [publicando, setPublicando] = useState(false);
   const [resultado, setResultado] = useState(null);
 
@@ -393,6 +468,7 @@ function PublicarTiktokBotao({ videoUrl, titulo, descricao }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao publicar no TikTok');
       setResultado({ ok: true });
+      onPostado?.();
     } catch (err) {
       setResultado({ erro: err.message });
     } finally {
