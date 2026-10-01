@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
+import { avaliarStreaming, escolhidas, letraLimpa, paraWav, capa3000, ficha } from '../lib/streaming';
+
+// Nome do gênero como aparece na lista das distribuidoras
+const GENERO_STREAMING = [
+  [/reggae/i, 'Reggae'], [/heavy metal|\bmetal\b/i, 'Metal'], [/\brock\b/i, 'Rock'], [/forr[oó]|piseiro|xote|bai[aã]o/i, 'Forró (Brazilian)'],
+  [/sertanej/i, 'Sertanejo (Brazilian)'], [/ga[uú]ch|milonga|nativis/i, 'Brazilian / Regional'], [/pagode|samba/i, 'Samba / Pagode (Brazilian)'],
+  [/\bfunk\b/i, 'Funk Carioca (Brazilian)'], [/\bmpb\b|bossa/i, 'MPB (Brazilian)'], [/blues|soul/i, 'Blues'], [/gospel|worship|louvor/i, 'Christian & Gospel'],
+  [/lo-?fi|chill/i, 'Electronic / Lo-fi'], [/children|infantil/i, "Children's Music"], [/\bpop\b/i, 'Pop'],
+];
+const generoStreaming = (m) => (GENERO_STREAMING.find(([re]) => re.test(`${m.genero || ''} ${m.estilo || ''}`)) || [, ''])[1];
 
 // ───────────────────────── Estilos prontos (chips) ─────────────────────────
 
@@ -816,6 +826,67 @@ export default function EstudioMusica() {
     }
   }
 
+  // Pacote para a distribuidora: WAV, MP3, capa 3000×3000, letra e ficha (um .zip; várias músicas = uma pasta cada)
+  async function prepararStreaming(lista) {
+    if (!lista.length) return;
+    let artista = '';
+    let compositor = '';
+    try { artista = localStorage.getItem('estudio-artista') || ''; compositor = localStorage.getItem('estudio-compositor') || ''; } catch { /* sem armazenamento */ }
+    artista = window.prompt('Nome do intérprete / artista que vai aparecer no Spotify (use sempre o mesmo):', artista || 'Aqui Tem Música');
+    if (!artista) return;
+    compositor = window.prompt('Seu nome completo (vai como compositor e produtor na ficha):', compositor || '') || '';
+    try { localStorage.setItem('estudio-artista', artista); localStorage.setItem('estudio-compositor', compositor); } catch { /* sem armazenamento */ }
+    const fracas = lista.filter((m) => !avaliacao(m).pronta);
+    if (fracas.length && !window.confirm(`${fracas.length} música(s) ainda têm pontos para ajustar (veja em ⋯). Preparar mesmo assim?`)) return;
+    try {
+      const { Zip, ZipPassThrough } = await import('fflate');
+      const partes = [];
+      const zip = new Zip((err, pedaco) => { if (err) throw err; partes.push(pedaco); });
+      const add = (nome, dados) => { const f = new ZipPassThrough(nome); zip.add(f); f.push(dados, true); };
+      const texto = (t) => new TextEncoder().encode(t);
+      for (let i = 0; i < lista.length; i++) {
+        let m = lista[i];
+        const pasta = lista.length > 1 ? `${String(i + 1).padStart(2, '0')}-${arquivoNome(m.titulo, '').replace(/\.$/, '')}/` : '';
+        const etapa = (t) => setLoteRodando(`${lista.length > 1 ? `${i + 1}/${lista.length} · ` : ''}${t}`);
+        if (!m.capaUrl) {
+          etapa('Criando a capa…');
+          try {
+            const d = await api('/api/estudio/capa', { method: 'POST', body: JSON.stringify({ id: m.id, titulo: m.titulo, estilo: m.estilo, descricao: m.descricao }) });
+            atualizarLocal(m.id, { capaUrl: d.capaUrl });
+            m = { ...m, capaUrl: d.capaUrl };
+          } catch { /* segue sem capa */ }
+        }
+        etapa('Baixando o áudio…');
+        const audio = await fetch(m.audioUrl).then((r) => { if (!r.ok) throw new Error(`não baixou "${m.titulo}"`); return r.arrayBuffer(); });
+        add(`${pasta}audio.mp3`, new Uint8Array(audio));
+        etapa('Convertendo para WAV…');
+        try { add(`${pasta}audio.wav`, await paraWav(audio)); } catch { /* fica só o mp3 */ }
+        if (m.capaUrl) {
+          etapa('Capa 3000×3000…');
+          try { add(`${pasta}capa-3000.jpg`, await capa3000(m.capaUrl)); } catch {
+            try { add(`${pasta}capa-original.jpg`, new Uint8Array(await fetch(m.capaUrl).then((r) => r.arrayBuffer()))); } catch { /* sem capa */ }
+          }
+        }
+        if (!m.instrumental && m.letra) add(`${pasta}letra.txt`, texto(letraLimpa(m.letra)));
+        add(`${pasta}ficha.txt`, texto(ficha(m, { artista, compositor, genero: generoStreaming(m) })));
+      }
+      zip.end();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(partes, { type: 'application/zip' }));
+      const semAcento = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      a.download = lista.length > 1 ? `spotify-${lista.length}-musicas.zip` : `spotify-${semAcento(arquivoNome(lista[0].titulo, 'zip'))}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 120000);
+      setAviso('Pacote pronto! Abra a ficha.txt e siga os campos no site da distribuidora.');
+    } catch (e) {
+      setAviso(`Não consegui preparar: ${e.message}`);
+    } finally {
+      setLoteRodando('');
+    }
+  }
+
   function reutilizar(m) {
     setModo(m.modo === 'personalizado' ? 'personalizado' : 'simples');
     setDescricao(m.descricao || '');
@@ -1145,7 +1216,10 @@ export default function EstudioMusica() {
     });
   }
 
-  const lista = musicas.filter((m) => {
+  const escolha = useMemo(() => escolhidas(musicas), [musicas]);
+  const avaliacao = (m) => avaliarStreaming(m, escolha);
+  let lista = musicas.filter((m) => {
+    if (filtro === 'streaming' && m.tipo === 'medley') return false;
     if (filtro === 'favoritas' && !m.favorito) return false;
     if (filtro === 'elevenlabs' && m.motor !== 'elevenlabs') return false;
     if (filtro === 'lyria' && m.motor !== 'lyria') return false;
@@ -1153,6 +1227,7 @@ export default function EstudioMusica() {
     if (busca && !`${m.titulo} ${m.estilo} ${m.descricao}`.toLowerCase().includes(busca.toLowerCase())) return false;
     return true;
   });
+  if (filtro === 'streaming') lista = [...lista].sort((a, b) => avaliacao(b).nota - avaliacao(a).nota);
 
   const podeCriar = modo === 'simples' ? descricao.trim() : (instrumental || letra.trim());
 
@@ -1362,7 +1437,7 @@ export default function EstudioMusica() {
               <input className="est-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar…" />
             </div>
             <div className="est-chips est-filtros">
-              {[['todas', 'Todas'], ['favoritas', '★ Favoritas'], ['medley', 'Medleys'], ['elevenlabs', 'ElevenLabs'], ['lyria', 'Lyria']].map(([id, nome]) => (
+              {[['todas', 'Todas'], ['favoritas', '★ Favoritas'], ['medley', 'Medleys'], ['elevenlabs', 'ElevenLabs'], ['lyria', 'Lyria'], ['streaming', '🎧 Streaming']].map(([id, nome]) => (
                 <button key={id} className={filtro === id ? 'on' : ''} onClick={() => setFiltro(id)}>{nome}</button>
               ))}
               <button className={`est-juntar-toggle ${selecionando ? 'on' : ''}`} onClick={() => { setSelecionando(!selecionando); setSelecao([]); }}>
@@ -1385,6 +1460,7 @@ export default function EstudioMusica() {
                       <option value="">com o mesmo motor</option>
                     </select>
                     <button className="est-btn-sec" onClick={novaVersaoMarcadas}>🔁 Nova versão</button>
+                    <button className="est-btn-sec" disabled={!!loteRodando} onClick={() => prepararStreaming(musicas.filter((x) => marcadas.includes(x.id) && x.tipo !== 'medley'))}>📦 Spotify</button>
                     <button className="est-btn-sec" disabled={!!loteRodando} onClick={baixarMarcadas}>⬇ Baixar {marcadas.length > 1 ? `(${marcadas.length})` : ''}</button>
                     <button className="est-btn-sec perigo" disabled={!!loteRodando} onClick={excluirMarcadas}>🗑 Excluir</button>
                     <button className="est-btn-link" onClick={() => setMarcadas([])}>Desmarcar</button>
@@ -1488,6 +1564,10 @@ export default function EstudioMusica() {
                       <span className={`est-badge ${m.motor}`}>{nomeMotor(m.motor)}</span>
                       {m.tipo === 'medley' ? ` ${(m.faixas || []).length} músicas · ` : m.instrumental ? ' Instrumental · ' : ' '}
                       {fmtTempo(m.duracaoSeg)} · {new Date(m.criadoEm).toLocaleDateString('pt-BR')}
+                      {filtro === 'streaming' && (() => {
+                        const av = avaliacao(m);
+                        return <span className={`est-stream ${av.pronta ? 'ok' : ''}`} title={av.itens.filter((x) => !x.ok).map((x) => x.texto).join('\n')}>{av.pronta ? `🎧 Pronta ${av.nota}` : `🎧 Ajustar ${av.nota}`}</span>;
+                      })()}
                     </div>
                     {ocupado && <div className="est-ocupado"><span className="est-spin" /> {ocupado}</div>}
                   </div>
@@ -1502,7 +1582,14 @@ export default function EstudioMusica() {
                       {m.tipo === 'medley' && (
                         <EstilosDoMedley medley={m} biblioteca={musicas} />
                       )}
+                      {m.tipo !== 'medley' && (
+                        <div className="est-check">
+                          <b>🎧 Para Spotify e outras plataformas ({avaliacao(m).nota}/100)</b>
+                          {avaliacao(m).itens.map((x, k) => <div key={k} className={x.ok ? 'ok' : 'nao'}>{x.ok ? '✓' : '⚠'} {x.texto}</div>)}
+                        </div>
+                      )}
                       <div className="est-mais-btns">
+                        {m.tipo !== 'medley' && <button disabled={!!ocupado || !!loteRodando} onClick={() => prepararStreaming([m])}>📦 Preparar para Spotify</button>}
                         {m.tipo === 'medley' ? (
                           <button disabled={!!ocupado} onClick={() => mandarParaMedleyCanal(m)}>📺 Mandar p/ Medley do canal</button>
                         ) : (
@@ -1747,6 +1834,12 @@ export default function EstudioMusica() {
         .est-ref { display: flex; gap: 8px; }
         .est-ref input { flex: 1; min-width: 0; }
         .est-ref-ok { display: block; margin-top: 6px; color: var(--gold); font-size: 13px; line-height: 1.4; }
+        .est-stream { margin-left: 6px; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: #3a2f12; color: #e8c46a; }
+        .est-stream.ok { background: #123d2c; color: #8fd6c1; }
+        .est-check { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; line-height: 1.6; }
+        .est-check b { display: block; margin-bottom: 4px; }
+        .est-check .ok { color: #8fd6c1; }
+        .est-check .nao { color: #e8c46a; }
         .est-btn-link { background: none; border: 0; color: var(--gold); text-decoration: underline; cursor: pointer; font-size: 13px; }
         .est-marca { width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; accent-color: var(--gold); cursor: pointer; }
         .est-player-abrir { font-size: 12px; color: var(--gold); white-space: nowrap; text-decoration: underline; }
