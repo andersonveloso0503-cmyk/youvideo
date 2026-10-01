@@ -407,8 +407,8 @@ app.whenReady().then(() => {
         const serie = it.serie && it.serie.total > 1 ? it.serie : null;
         if (serie) {
           const sufixo = ` (Parte ${serie.parte}/${serie.total})`;
-          const base = titulo.replace(/\s*[-–—|(]*\s*parte\s*\d+\s*(\/\s*\d+|de\s*\d+)?\s*\)?\s*/gi, ' ').replace(/\s*#shorts\b/gi, '').trim();
-          titulo = `${base.slice(0, 100 - sufixo.length)}${sufixo}`;
+          const base = titulo.replace(/\s*[-–—|(]*\s*parte\s*\d+\s*(\/\s*\d+|de\s*\d+)?\s*\)?\s*/gi, ' ').replace(/\s*#[\p{L}\p{N}_]+/gu, '').trim();
+          titulo = IA.comHashtags(`${base.slice(0, 100 - sufixo.length)}${sufixo}`, [serie.nome, ...tags], true);
           const aviso = serie.parte < serie.total
             ? `👉 Esta é a PARTE ${serie.parte} de ${serie.total} da série "${serie.nome}". Inscreva-se para não perder a parte ${serie.parte + 1}!`
             : `✅ Parte final da série "${serie.nome}". Veja as outras partes no canal e inscreva-se para a próxima série!`;

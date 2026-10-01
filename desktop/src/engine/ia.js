@@ -240,6 +240,31 @@ function descreverVideo(info) {
  * Gera { titulo, opcoes: [3 títulos], descricao, tags, pesquisados }.
  * info = { nome, musicas: [titulos], duracaoSeg, curto, canal, contexto, pedido, idioma, clima, evitar }
  */
+// Junta até 2 hashtags curtas no fim do título (Shorts: 1 + #Shorts), sem passar de 100 caracteres
+function comHashtags(titulo, candidatas, curto) {
+  let base = String(titulo || '').replace(/\s*#shorts\b/gi, '').trim();
+  const ja = (base.match(/#[\p{L}\p{N}_]+/gu) || []).map((h) => h.toLowerCase());
+  const virar = (t) => '#' + String(t).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').trim().split(/\s+/).join('');
+  const escolhidas = [];
+  for (const c of candidatas) {
+    if (!c) continue;
+    const palavras = String(c).trim().split(/\s+/);
+    if (palavras.length > 3) continue;
+    const h = virar(c);
+    if (h.length < 4 || h.length > 22) continue;
+    if (ja.includes(h) || escolhidas.includes(h)) continue;
+    escolhidas.push(h);
+    if (escolhidas.length >= (curto ? 1 : 2)) break;
+  }
+  const fim = [...escolhidas, ...(curto ? ['#Shorts'] : [])];
+  while (fim.length) {
+    const t = `${base} ${fim.join(' ')}`.trim();
+    if (t.length <= 100) return t;
+    fim.shift(); // não coube: tira uma hashtag (o #Shorts fica por último)
+  }
+  return base.slice(0, 100);
+}
+
 async function gerarTextosVideo(groqKey, info) {
   if (!groqKey) throw new Error('Para gerar com IA, cadastre a chave da Groq em Configurações.');
   const idiomaCodigo = info.idioma === 'en' ? 'en' : info.idioma === 'es' ? 'es' : 'pt';
@@ -368,6 +393,10 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   }
   tags = cabem.slice(0, 30);
 
+  // Hashtags no título (o YouTube mostra como link e ajuda a cair na busca daquele assunto)
+  const principal = String(j.palavra_principal || '').trim();
+  opcoes = opcoes.map((t) => comHashtags(t, [principal, ...tags], !!info.curto));
+
   return {
     titulo: opcoes[melhor],
     opcoes,
@@ -378,4 +407,4 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   };
 }
 
-module.exports = { gerarTextosVideo, limparNome, sugestoesYoutube };
+module.exports = { gerarTextosVideo, limparNome, sugestoesYoutube, comHashtags };
