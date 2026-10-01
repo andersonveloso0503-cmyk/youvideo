@@ -16,7 +16,6 @@ const Central = require('./central');
 const { resumoClima } = require('./analise');
 const IA = require('./ia');
 const M = require('./montagem');
-const { aplicarTelaFinal } = require('./telaFinal');
 
 const EM_ANDAMENTO = ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'];
 
@@ -302,18 +301,6 @@ class Fila extends EventEmitter {
           arquivoEnvio = e.arquivo; // se falhar, sobe sem o botão
         }
       }
-      // Vídeo longo: fundo de tela final nos últimos 20 s (é só "Importar do vídeo" no Studio)
-      const temporarios = arquivoEnvio !== e.arquivo ? [arquivoEnvio] : [];
-      if (!e.curto && cfg.telaFinal !== false) {
-        this.atualizar(job, { status: 'publicando', etapa: 'Preparando a tela final' });
-        const antes = arquivoEnvio;
-        arquivoEnvio = await aplicarTelaFinal(arquivoEnvio, {
-          fontsDir: this.fontsDir,
-          onProgresso: (x) => this.atualizar(job, { etapa: `Preparando a tela final ${Math.round(x * 100)}%` }, false),
-          onCancelar: (fn) => this.cancelamentos.set(job.id, fn),
-        });
-        if (arquivoEnvio !== antes) temporarios.push(arquivoEnvio);
-      }
       const canal = this.obterCanal(e.canalId);
       if (!canal) throw new Error('Canal do YouTube não encontrado — conecte de novo em Contas YouTube.');
       this.atualizar(job, { status: 'publicando', etapa: 'Preparando capa' });
@@ -355,7 +342,6 @@ class Fila extends EventEmitter {
         },
       });
       this.registrarEnvio();
-      for (const t of temporarios) fs.promises.unlink(t).catch(() => {}); // cópias só para o YouTube
       this.atualizar(job, {
         status: 'concluido',
         etapa: e.agendarPara ? 'Agendado' : 'Enviado',

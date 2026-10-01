@@ -1099,7 +1099,6 @@ async function abrirConfig(msg) {
   $('#cfgCentralToken').value = config.centralToken || '';
   $('#cfgNuvemAuto').checked = config.nuvemAuto !== false;
   $('#cfgCapaChamativa').checked = config.capaChamativa !== false;
-  $('#cfgTelaFinal').checked = config.telaFinal !== false;
   $('#cfgCapaIa').checked = config.capaIa !== false;
   $('#cfgConteudoIa').checked = config.conteudoIa !== false;
   $('#resCentral').textContent = '';
@@ -1371,7 +1370,6 @@ async function iniciar() {
       encoder: $('#cfgEncoder').value,
       nuvemAuto: $('#cfgNuvemAuto').checked,
       capaChamativa: $('#cfgCapaChamativa').checked,
-      telaFinal: $('#cfgTelaFinal').checked,
       capaIa: $('#cfgCapaIa').checked,
       conteudoIa: $('#cfgConteudoIa').checked,
     });
