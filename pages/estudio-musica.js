@@ -92,6 +92,86 @@ const IDEIAS = [
     ],
   },
   {
+    cat: 'Reggae e ska', emoji: '🌴',
+    itens: [
+      { id: 'skank', nome: 'Guitarra skank (contratempo)', en: 'offbeat reggae skank guitar chops' },
+      { id: 'baixo-reggae', nome: 'Baixo reggae grave', en: 'deep round reggae bass lines' },
+      { id: 'one-drop', nome: 'Bateria one drop', en: 'one drop reggae drum groove with rimshots' },
+      { id: 'steppers', nome: 'Bateria steppers', en: 'steppers reggae drum beat with four on the floor kick' },
+      { id: 'orgao-bubble', nome: 'Órgão bubble', en: 'reggae organ bubble rhythm' },
+      { id: 'melodica', nome: 'Melódica', en: 'melodica melody' },
+      { id: 'metais-reggae', nome: 'Metais de reggae', en: 'reggae horn section with trumpet and trombone' },
+      { id: 'dub', nome: 'Efeitos dub (eco e delay)', en: 'dub effects with heavy echo and delay throws' },
+      { id: 'ska', nome: 'Ritmo ska acelerado', en: 'upbeat ska rhythm with fast offbeat guitar' },
+      { id: 'praia', nome: 'Clima de praia / violão reggae', en: 'acoustic beach reggae vibe with acoustic guitar' },
+    ],
+  },
+  {
+    cat: 'Gaúcho e nativista', emoji: '🧉',
+    itens: [
+      { id: 'gaita-gaucha', nome: 'Gaita gaúcha (acordeon)', en: 'southern Brazilian gaucho accordion (gaita) lead' },
+      { id: 'gaita-ponto', nome: 'Gaita ponto (botoneira)', en: 'diatonic button accordion (gaita ponto) melodies' },
+      { id: 'violao-milonga', nome: 'Violão de milonga', en: 'nylon guitar milonga fingerpicking' },
+      { id: 'bombo', nome: 'Bombo leguero', en: 'bombo leguero drum' },
+      { id: 'vanera', nome: 'Ritmo de vanera / vaneirão', en: 'fast vanera gaucho dance rhythm' },
+      { id: 'chamame', nome: 'Ritmo de chamamé', en: 'chamame rhythm in 6/8' },
+      { id: 'milonga-lenta', nome: 'Milonga lenta', en: 'slow melancholic milonga rhythm' },
+      { id: 'contrabaixo-acust', nome: 'Contrabaixo acústico', en: 'acoustic upright bass' },
+      { id: 'declamado', nome: 'Trecho declamado', en: 'short spoken poetic recitation section' },
+    ],
+  },
+  {
+    cat: 'Nordeste', emoji: '🌵',
+    itens: [
+      { id: 'sanfona-forro', nome: 'Sanfona de forró', en: 'forro accordion (sanfona) lead' },
+      { id: 'triangulo', nome: 'Triângulo', en: 'forro triangle' },
+      { id: 'zabumba2', nome: 'Zabumba', en: 'zabumba drum' },
+      { id: 'pifano', nome: 'Pífano', en: 'pifano fife melody' },
+      { id: 'rabeca', nome: 'Rabeca', en: 'rabeca fiddle' },
+      { id: 'xote', nome: 'Ritmo de xote', en: 'xote rhythm' },
+      { id: 'baiao', nome: 'Ritmo de baião', en: 'baiao rhythm' },
+      { id: 'piseiro-teclado', nome: 'Teclado de piseiro', en: 'piseiro keyboard synth lead' },
+    ],
+  },
+  {
+    cat: 'Rock e metal', emoji: '🤘',
+    itens: [
+      { id: 'power-chords', nome: 'Power chords distorcidos', en: 'heavy distorted power chords' },
+      { id: 'palm-mute', nome: 'Palm mute pesado', en: 'chugging palm muted guitar riffs' },
+      { id: 'guitarras-gemeas', nome: 'Guitarras gêmeas (harmonia)', en: 'twin harmonized lead guitars' },
+      { id: 'galope', nome: 'Ritmo galopante', en: 'galloping bass and guitar rhythm' },
+      { id: 'bumbo-duplo', nome: 'Bumbo duplo', en: 'fast double kick drums' },
+      { id: 'grito', nome: 'Grito agudo (metal)', en: 'high-pitched metal screams and wails' },
+      { id: 'baixo-pesado', nome: 'Baixo distorcido', en: 'overdriven heavy bass' },
+      { id: 'rock-anos80', nome: 'Rock anos 80', en: '80s hard rock production' },
+      { id: 'rock-nacional', nome: 'Rock nacional anos 80/90', en: 'Brazilian rock from the 80s and 90s' },
+      { id: 'grunge', nome: 'Grunge', en: 'grunge guitars and raw vocals' },
+    ],
+  },
+  {
+    cat: 'Samba e pagode', emoji: '🥁',
+    itens: [
+      { id: 'pandeiro', nome: 'Pandeiro', en: 'pandeiro' },
+      { id: 'tantan', nome: 'Tantã e repique', en: 'tantan and repique de mao' },
+      { id: 'surdo', nome: 'Surdo', en: 'surdo drum' },
+      { id: 'cuica', nome: 'Cuíca', en: 'cuica' },
+      { id: 'violao7', nome: 'Violão 7 cordas', en: 'seven string guitar bass runs' },
+      { id: 'banjo', nome: 'Banjo de pagode', en: 'pagode banjo' },
+      { id: 'roda', nome: 'Clima de roda de samba', en: 'live samba circle vibe with group vocals' },
+    ],
+  },
+  {
+    cat: 'Eletrônico', emoji: '🎧',
+    itens: [
+      { id: 'edm-drop', nome: 'Drop eletrônico', en: 'EDM build-up and drop' },
+      { id: 'house', nome: 'Batida house', en: 'four on the floor house beat' },
+      { id: 'trap', nome: 'Batida trap', en: 'trap beat with rolling hi-hats and 808' },
+      { id: 'synth-lead', nome: 'Synth lead', en: 'bright synth lead' },
+      { id: 'vocoder', nome: 'Voz com efeito (vocoder)', en: 'vocoder vocal effect' },
+      { id: 'piano-house', nome: 'Piano house', en: 'piano house chords' },
+    ],
+  },
+  {
     cat: 'Vozes e coro', emoji: '🎤',
     itens: [
       { id: 'coro', nome: 'Coral gospel', en: 'big gospel choir' },
@@ -143,6 +223,13 @@ const RECEITAS = [
   { nome: '🌙 Balada ao piano', ids: ['piano', 'cello', 'intima', 'breakdown'] },
   { nome: '🎻 Épico orquestral', ids: ['orquestra', 'solo-violino', 'coro', 'epico', 'final-epico'] },
   { nome: '🕺 Anos 80', ids: ['synth80', 'slap', 'solo-sax', 'anos80'] },
+  { nome: '🌴 Reggae de praia', ids: ['skank', 'baixo-reggae', 'one-drop', 'orgao-bubble', 'praia'] },
+  { nome: '🌴 Reggae com metais', ids: ['skank', 'baixo-reggae', 'one-drop', 'metais-reggae', 'dub'] },
+  { nome: '🧉 Vanera gaúcha', ids: ['gaita-gaucha', 'vanera', 'violao-milonga', 'alegre'] },
+  { nome: '🧉 Milonga nativista', ids: ['violao-milonga', 'milonga-lenta', 'bombo', 'gaita-ponto', 'declamado'] },
+  { nome: '🌵 Forró pé de serra', ids: ['sanfona-forro', 'zabumba2', 'triangulo', 'xote'] },
+  { nome: '🤘 Heavy metal', ids: ['guitarras-gemeas', 'galope', 'bumbo-duplo', 'grito', 'final-epico'] },
+  { nome: '🥁 Roda de samba', ids: ['pandeiro', 'tantan', 'cavaco', 'violao7', 'roda'] },
 ];
 
 // Ritmo / energia da música
@@ -209,8 +296,16 @@ function ideiasEmTexto(ids) {
   return ids.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.en).filter(Boolean).join(', ');
 }
 
-function PainelIdeias({ selecionadas, setSelecionadas }) {
+const ABA_DO_ESTILO = {
+  reggae: 'Reggae e ska', gaucha: 'Gaúcho e nativista', forro: 'Nordeste', rock: 'Rock e metal', metal: 'Rock e metal',
+  pagode: 'Samba e pagode', funk: 'Eletrônico', pop: 'Eletrônico', sertanejo: 'Guitarra', 'sertanejo-potente': 'Guitarra',
+};
+
+function PainelIdeias({ selecionadas, setSelecionadas, estiloId }) {
   const [aba, setAba] = useState(IDEIAS[0].cat);
+  useEffect(() => {
+    if (estiloId && ABA_DO_ESTILO[estiloId]) setAba(ABA_DO_ESTILO[estiloId]);
+  }, [estiloId]);
   const [aberto, setAberto] = useState(false);
   const alternar = (id) => setSelecionadas((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const surpresa = () => {
@@ -1216,7 +1311,7 @@ export default function EstudioMusica() {
             <label className="est-rot">Ritmo</label>
             <EscolherRitmo valor={ritmo} onChange={setRitmo} />
 
-            <PainelIdeias selecionadas={ideias} setSelecionadas={setIdeias} />
+            <PainelIdeias selecionadas={ideias} setSelecionadas={setIdeias} estiloId={estiloId} />
             <input
               style={{ marginTop: 8 }}
               value={estiloExtra}
@@ -1538,7 +1633,8 @@ export default function EstudioMusica() {
         .est-aviso { background: var(--gold-soft); border: 1px solid var(--gold); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
         .est-grid { display: grid; grid-template-columns: 400px 1fr; gap: 24px; align-items: start; }
         @media (max-width: 900px) { .est-grid { grid-template-columns: 1fr; } }
-        .est-grid { padding-bottom: 170px; } /* o player fixo não cobre a última música */
+        .est-grid { padding-bottom: 170px; }
+        .est-grid > * { min-width: 0; } /* o player fixo não cobre a última música */
 
         .est-criar { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 14px; padding: 18px; position: sticky; top: 16px; }
         @media (max-width: 900px) { .est-criar { position: static; } }
