@@ -557,6 +557,18 @@ export default function EstudioMusica() {
   const [escrevendo, setEscrevendo] = useState(false);
   const [gerando, setGerando] = useState([]); // [{ chave, motor, inicio, erro }]
   const [aviso, setAviso] = useState('');
+  // Caixa de pergunta da própria página (o window.prompt não existe no app de PC, e o clique ficava sem resposta)
+  const [pergunta, setPergunta] = useState(null); // { titulo, nota, botao, campos: [{ chave, rotulo, valor, dica }], resolver }
+  function perguntar(titulo, campos, { nota = '', botao = 'Continuar' } = {}) {
+    return new Promise((resolver) => setPergunta({ titulo, nota, botao, campos: campos.map((c) => ({ ...c, valor: c.valor || '' })), resolver }));
+  }
+  function responderPergunta(ok) {
+    if (!pergunta) return;
+    const r = ok ? Object.fromEntries(pergunta.campos.map((c) => [c.chave, c.valor.trim()])) : null;
+    if (ok && pergunta.campos.some((c) => c.obrigatorio && !c.valor.trim())) return;
+    pergunta.resolver(r);
+    setPergunta(null);
+  }
 
   // Medley
   const [medTitulo, setMedTitulo] = useState('');
@@ -572,6 +584,7 @@ export default function EstudioMusica() {
   const [versoesLote, setVersoesLote] = useState(1);
   const [motorLote, setMotorLote] = useState('elevenlabs'); // '' = mesmo motor da música original
   const [loteRodando, setLoteRodando] = useState('');
+  const [preparando, setPreparando] = useState([]); // ids no pacote do Spotify em andamento (mostra o andamento no próprio botão)
 
   // Biblioteca
   const [musicas, setMusicas] = useState([]);
@@ -832,12 +845,21 @@ export default function EstudioMusica() {
     let artista = '';
     let compositor = '';
     try { artista = localStorage.getItem('estudio-artista') || ''; compositor = localStorage.getItem('estudio-compositor') || ''; } catch { /* sem armazenamento */ }
-    artista = window.prompt('Nome do intérprete / artista que vai aparecer no Spotify (use sempre o mesmo):', artista || 'Aqui Tem Música');
-    if (!artista) return;
-    compositor = window.prompt('Seu nome completo (vai como compositor e produtor na ficha):', compositor || '') || '';
-    try { localStorage.setItem('estudio-artista', artista); localStorage.setItem('estudio-compositor', compositor); } catch { /* sem armazenamento */ }
     const fracas = lista.filter((m) => !avaliacao(m).pronta);
-    if (fracas.length && !window.confirm(`${fracas.length} música(s) ainda têm pontos para ajustar (veja em ⋯). Preparar mesmo assim?`)) return;
+    const r = await perguntar(
+      lista.length > 1 ? `📦 Preparar ${lista.length} músicas para o Spotify` : `📦 Preparar "${lista[0].titulo}" para o Spotify`,
+      [
+        { chave: 'artista', rotulo: 'Nome do intérprete / artista (use sempre o mesmo)', valor: artista || 'Aqui Tem Música', obrigatorio: true },
+        { chave: 'compositor', rotulo: 'Seu nome completo (vai como compositor e produtor na ficha)', valor: compositor },
+      ],
+      { botao: 'Preparar pacote', nota: fracas.length ? `⚠ ${fracas.length} música(s) ainda têm pontos para ajustar (veja em ⋯). Dá para preparar mesmo assim.` : '' },
+    );
+    if (!r) return;
+    artista = r.artista;
+    compositor = r.compositor;
+    try { localStorage.setItem('estudio-artista', artista); localStorage.setItem('estudio-compositor', compositor); } catch { /* sem armazenamento */ }
+    setLoteRodando('Preparando o pacote…');
+    setPreparando(lista.map((m) => m.id));
     try {
       const { Zip, ZipPassThrough } = await import('fflate');
       const partes = [];
@@ -884,6 +906,7 @@ export default function EstudioMusica() {
       setAviso(`Não consegui preparar: ${e.message}`);
     } finally {
       setLoteRodando('');
+      setPreparando([]);
     }
   }
 
@@ -1076,8 +1099,9 @@ export default function EstudioMusica() {
       return { ...m, estiloNome: d.estilo || d.extra, ritmoNome: d.ritmo, ideiasNomes: d.ideias };
     });
     if (faixas.length < 2) { setAviso('Selecione pelo menos 2 músicas.'); return; }
-    const t = window.prompt('Título do medley:', `Medley com ${faixas.length} músicas`);
-    if (t === null) return;
+    const rt = await perguntar('Juntar em um medley', [{ chave: 'titulo', rotulo: 'Título do medley', valor: `Medley com ${faixas.length} músicas` }], { botao: 'Juntar' });
+    if (!rt) return;
+    const t = rt.titulo || `Medley com ${faixas.length} músicas`;
     setMedProgresso({ titulo: t, etapas: faixas.map((f, i) => ({ nome: `${i + 1}. ${f.titulo}`, status: 'pronta ✓' })), fase: 'juntando', erro: '' });
     try {
       const d = await api('/api/estudio/juntar', { method: 'POST', body: JSON.stringify({ titulo: t, faixas, crossfade }) });
@@ -1138,7 +1162,8 @@ export default function EstudioMusica() {
   }
 
   async function renomear(m) {
-    const novo = window.prompt('Novo título:', m.titulo);
+    const rn = await perguntar('Renomear música', [{ chave: 'titulo', rotulo: 'Novo título', valor: m.titulo, obrigatorio: true }], { botao: 'Salvar' });
+    const novo = rn?.titulo;
     if (!novo || novo === m.titulo) return;
     atualizarLocal(m.id, { titulo: novo });
     try { await api('/api/estudio/biblioteca', { method: 'PATCH', body: JSON.stringify({ id: m.id, titulo: novo }) }); } catch (e) { setAviso(e.message); }
@@ -1616,7 +1641,7 @@ export default function EstudioMusica() {
                         </div>
                       )}
                       <div className="est-mais-btns">
-                        {m.tipo !== 'medley' && <button disabled={!!ocupado || !!loteRodando} onClick={() => prepararStreaming([m])}>📦 Preparar para Spotify</button>}
+                        {m.tipo !== 'medley' && <button disabled={!!ocupado || !!loteRodando} onClick={() => prepararStreaming([m])}>{preparando.includes(m.id) ? `⏳ ${loteRodando}` : '📦 Preparar para Spotify'}</button>}
                         {m.tipo === 'medley' ? (
                           <button disabled={!!ocupado} onClick={() => mandarParaMedleyCanal(m)}>📺 Mandar p/ Medley do canal</button>
                         ) : (
@@ -1744,7 +1769,42 @@ export default function EstudioMusica() {
         </div>
       )}
 
+      {pergunta && (
+        <div className="est-perg-fundo" onClick={() => responderPergunta(false)}>
+          <form className="est-perg" onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); responderPergunta(true); }}>
+            <b>{pergunta.titulo}</b>
+            {pergunta.nota && <p className="est-perg-nota">{pergunta.nota}</p>}
+            {pergunta.campos.map((c, k) => (
+              <label key={c.chave}>
+                {c.rotulo}
+                <input
+                  type="text"
+                  autoFocus={k === 0}
+                  value={c.valor}
+                  onChange={(e) => { const v = e.target.value; setPergunta((p) => p && { ...p, campos: p.campos.map((x) => (x.chave === c.chave ? { ...x, valor: v } : x)) }); }}
+                  onKeyDown={(e) => { if (e.key === 'Escape') responderPergunta(false); }}
+                />
+              </label>
+            ))}
+            <div className="est-perg-btns">
+              <button type="button" className="est-perg-nao" onClick={() => responderPergunta(false)}>Cancelar</button>
+              <button type="submit" className="est-perg-sim">{pergunta.botao}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <style jsx>{`
+        .est-perg-fundo { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 100; }
+        .est-perg { width: 100%; max-width: 460px; background: var(--bg-elevated); border: 1px solid var(--gold); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+        .est-perg b { font-size: 17px; }
+        .est-perg-nota { margin: 0; font-size: 13px; color: #e8c46a; }
+        .est-perg label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-muted); }
+        .est-perg input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font: inherit; font-size: 16px; }
+        .est-perg-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+        .est-perg-btns button { border-radius: 10px; padding: 11px 16px; font-size: 15px; cursor: pointer; }
+        .est-perg-nao { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .est-perg-sim { background: var(--gold); border: 1px solid var(--gold); color: #1a1408; font-weight: 700; }
         .est { max-width: 1180px; margin: 0 auto; padding: 32px 20px 140px; }
         .est-top h1 { margin: 8px 0 4px; }
         .est-voltar { color: var(--text-muted); text-decoration: none; font-size: 14px; }
