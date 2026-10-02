@@ -3,8 +3,7 @@
 // Usa o "inpainting" da ElevenLabs: envia o áudio, mantém o começo e compõe o que falta.
 //
 // POST { id, extraSeg }   -> { musica }  (cria uma versão nova; a original continua na biblioteca)
-// GET  ?teste=1           -> testa o recurso com um trecho de 12 s e guarda o resultado
-// GET  ?teste=ver         -> mostra o resultado do último teste
+// Testado em 02/10/2026 com um trecho de 12 s: envio e composição responderam 200 nesta conta.
 
 import { put } from '@vercel/blob';
 import { spawn } from 'child_process';
@@ -85,68 +84,9 @@ async function compor(key, plano) {
   }
 }
 
-async function guardarTeste(dados) {
-  try { await getDb().collection('youvideo_config').doc('aumentar_teste').set({ ...dados, em: new Date().toISOString() }); } catch { /* só diagnóstico */ }
-}
-
 export default async function handler(req, res) {
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) return res.status(500).json({ erro: 'ELEVENLABS_API_KEY não está configurada na Vercel.' });
-
-  if (req.method === 'GET' && req.query.teste === 'ver') {
-    const d = await getDb().collection('youvideo_config').doc('aumentar_teste').get();
-    return res.status(200).json(d.exists ? d.data() : { vazio: true });
-  }
-
-  if (req.method === 'GET' && req.query.teste) {
-    const pasta = await fs.mkdtemp(path.join(os.tmpdir(), 'aumentar-'));
-    const saida = { fase: 'inicio' };
-    try {
-      await guardarTeste(saida);
-      const snap = await getDb().collection(COL).orderBy('criadoEm', 'desc').limit(30).get();
-      const m = snap.docs.map((d) => d.data()).find((x) => x.motor === 'elevenlabs' && x.tipo !== 'medley' && /^https:\/\//.test(x.audioUrl || ''));
-      if (!m) { saida.erro = 'sem música da ElevenLabs para testar'; await guardarTeste(saida); return res.status(200).json(saida); }
-      const r = await fetch(m.audioUrl);
-      const inteiro = path.join(pasta, 'a.mp3');
-      const trecho = path.join(pasta, 't.mp3');
-      await fs.writeFile(inteiro, Buffer.from(await r.arrayBuffer()));
-      await rodarFfmpeg(['-i', inteiro, '-t', '12', '-c:a', 'libmp3lame', '-b:a', '128k', trecho]);
-      saida.fase = 'enviando';
-      await guardarTeste(saida);
-      const t0 = Date.now();
-      const up = await enviarParaElevenLabs(key, await fs.readFile(trecho), 'trecho.mp3');
-      const corpoUp = await up.text();
-      saida.envio = { status: up.status, ms: Date.now() - t0, corpo: corpoUp.slice(0, 3500) };
-      saida.fase = 'enviado';
-      await guardarTeste(saida);
-      let songId = '';
-      try { songId = JSON.parse(corpoUp).song_id || ''; } catch { /* não é json */ }
-      if (up.ok && songId) {
-        const ref = { song_id: songId, range: { start_ms: 0, end_ms: 8000 } };
-        const plano = {
-          chunks: [
-            ref,
-            { text: '[Chorus]', duration_ms: 3000, positive_styles: ['same band'], negative_styles: [], context_adherence: 'high', conditioning_ref: ref, condition_strength: 'high' },
-            { text: '[Outro]', duration_ms: 3000, positive_styles: ['soft ending'], negative_styles: [], context_adherence: 'high', conditioning_ref: ref, condition_strength: 'high' },
-          ],
-        };
-        const t1 = Date.now();
-        const c = await compor(key, plano);
-        saida.composicao = { status: c.status, ms: Date.now() - t1, tipo: c.headers.get('content-type') || '' };
-        if (c.ok) saida.composicao.bytes = (await c.arrayBuffer()).byteLength;
-        else saida.composicao.corpo = (await c.text()).slice(0, 1500);
-      }
-      saida.fase = 'fim';
-      await guardarTeste(saida);
-      return res.status(200).json(saida);
-    } catch (e) {
-      saida.erro = e.message;
-      await guardarTeste(saida);
-      return res.status(200).json(saida);
-    } finally {
-      await fs.rm(pasta, { recursive: true, force: true }).catch(() => {});
-    }
-  }
 
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido.' });
 

@@ -1205,6 +1205,22 @@ export default function EstudioMusica() {
     }
   }
 
+  // Aumenta a música: o áudio original fica igual e a IA gera só o trecho novo antes do final.
+  // Cria uma versão nova na biblioteca; a original continua lá.
+  async function aumentar(m) {
+    const r = await perguntar(
+      `⏩ Aumentar "${m.titulo}"`,
+      [{ chave: 'extra', rotulo: 'Quanto aumentar', valor: '30', opcoes: [{ valor: '30', rotulo: '+30 s' }, { valor: '60', rotulo: '+1 min' }, { valor: '90', rotulo: '+1 min 30' }] }],
+      { botao: 'Aumentar', nota: 'O começo da música fica igual. Entra mais um refrão (e estrofe, nas opções maiores) antes do final. A voz pode variar um pouco no trecho novo. Gasta crédito da ElevenLabs parecido com gerar a música de novo.' },
+    );
+    if (!r) return;
+    comTrabalho(m.id, 'Aumentando a música… (1 a 3 min)', async () => {
+      const d = await api('/api/estudio/aumentar', { method: 'POST', body: JSON.stringify({ id: m.id, extraSeg: Number(r.extra) }) });
+      setMusicas((ms) => [d.musica, ...ms]);
+      setAviso(`Pronto: "${d.musica.titulo}" agora tem ${fmtTempo(d.musica.duracaoSeg)}. Ela entrou no topo da lista; a original continua guardada.`);
+    });
+  }
+
   function gerarCapa(m) {
     comTrabalho(m.id, 'Criando a capa…', async () => {
       const d = await api('/api/estudio/capa', {
@@ -1757,6 +1773,7 @@ export default function EstudioMusica() {
                           m.importada ? null : (
                             <>
                               <button disabled={!!ocupado} onClick={() => variacao(m)}>🔁 Nova versão</button>
+                              <button disabled={!!ocupado} onClick={() => aumentar(m)}>⏩ Aumentar música</button>
                               <button onClick={() => reutilizar(m)}>✏️ Editar e recriar</button>
                             </>
                           )
@@ -1887,6 +1904,16 @@ export default function EstudioMusica() {
             <b>{pergunta.titulo}</b>
             {pergunta.nota && <p className="est-perg-nota">{pergunta.nota}</p>}
             {pergunta.campos.map((c, k) => (
+              c.opcoes ? (
+                <div key={c.chave} className="est-perg-campo">
+                  {c.rotulo}
+                  <div className="est-perg-opcoes">
+                    {c.opcoes.map((o) => (
+                      <button type="button" key={o.valor} className={c.valor === o.valor ? 'on' : ''} onClick={() => setPergunta((p) => p && { ...p, campos: p.campos.map((x) => (x.chave === c.chave ? { ...x, valor: o.valor } : x)) })}>{o.rotulo}</button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
               <label key={c.chave}>
                 {c.rotulo}
                 <input
@@ -1897,6 +1924,7 @@ export default function EstudioMusica() {
                   onKeyDown={(e) => { if (e.key === 'Escape') responderPergunta(false); }}
                 />
               </label>
+              )
             ))}
             <div className="est-perg-btns">
               <button type="button" className="est-perg-nao" onClick={() => responderPergunta(false)}>Cancelar</button>
@@ -1911,6 +1939,10 @@ export default function EstudioMusica() {
         .est-perg { width: 100%; max-width: 460px; background: var(--bg-elevated); border: 1px solid var(--gold); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
         .est-perg b { font-size: 17px; }
         .est-perg-nota { margin: 0; font-size: 13px; color: #e8c46a; }
+        .est-perg-campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-muted); }
+        .est-perg-opcoes { display: flex; gap: 8px; flex-wrap: wrap; }
+        .est-perg-opcoes button { flex: 1; min-width: 90px; text-align: center; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 12px 10px; font-size: 15px; cursor: pointer; }
+        .est-perg-opcoes button.on { background: var(--gold-soft); border-color: var(--gold); color: var(--gold); font-weight: 700; }
         .est-perg label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-muted); }
         .est-perg input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font: inherit; font-size: 16px; }
         .est-perg-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
