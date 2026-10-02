@@ -569,6 +569,7 @@ export default function EstudioMusica() {
   const [ideias, setIdeias] = useState([]);
   const [ritmo, setRitmo] = useState('');
   const [voz, setVoz] = useState('masculina');
+  const [idioma, setIdioma] = useState('pt'); // 'pt' | 'en' = letra e canto em inglês
   const [instrumental, setInstrumental] = useState(false);
   const [duracao, setDuracao] = useState(150);
   const [escrevendo, setEscrevendo] = useState(false);
@@ -708,13 +709,15 @@ export default function EstudioMusica() {
           tema: temaLetra || titulo,
           estilo: ESTILOS.find((e) => e.id === estiloId)?.nome,
           voz: VOZES.find((v) => v.id === voz)?.nome,
+          idioma,
           detalhes: nomesIdeias,
           referencia: referencia.trim(),
           letraAtual: melhorar ? letra : '',
         }),
       });
       setLetra(d.letra);
-      if (!titulo && d.titulo) setTitulo(d.titulo);
+      // letra passada para o inglês: o título acompanha (a distribuidora quer título e capa iguais)
+      if (d.titulo && (!titulo || (melhorar && idioma === 'en'))) setTitulo(d.titulo);
     } catch (e) {
       setAviso(e.message);
     } finally {
@@ -740,6 +743,7 @@ export default function EstudioMusica() {
       letra,
       estilo: estiloFinal,
       voz: instrumental ? '' : voz,
+      idioma,
       instrumental,
       duracaoSeg: duracao,
     };
@@ -777,6 +781,7 @@ export default function EstudioMusica() {
       letra: m.letra || '',
       estilo: m.estilo || '',
       voz: m.voz || '',
+      idioma: m.idioma || 'pt',
       instrumental: !!m.instrumental,
       duracaoSeg: m.duracaoSeg || 150,
     });
@@ -948,6 +953,7 @@ export default function EstudioMusica() {
     setLetra(m.letra || '');
     setInstrumental(!!m.instrumental);
     if (m.voz) setVoz(m.voz);
+    setIdioma(m.idioma === 'en' ? 'en' : 'pt');
     if (m.duracaoSeg) setDuracao(m.duracaoSeg);
     let resto = m.estilo || '';
     const achado = ESTILOS.find((e) => resto.startsWith(e.base));
@@ -1537,7 +1543,7 @@ export default function EstudioMusica() {
                     <div className="est-linha">
                       <small>{letra.length}/3500 · use [Verse], [Chorus], [Bridge]</small>
                       {letra.trim() && (
-                        <button className="est-link" disabled={escrevendo} onClick={() => escreverLetra(true)}>Melhorar letra com IA</button>
+                        <button className="est-link" disabled={escrevendo} onClick={() => escreverLetra(true)}>{idioma === 'en' ? '🌎 Passar a letra para inglês / melhorar' : 'Melhorar letra com IA'}</button>
                       )}
                     </div>
                   </>
@@ -1590,6 +1596,12 @@ export default function EstudioMusica() {
                     <button key={v.id} className={voz === v.id ? 'on' : ''} onClick={() => setVoz(v.id)}>{v.nome}</button>
                   ))}
                 </div>
+                <label className="est-rot">Idioma da música</label>
+                <div className="est-chips">
+                  <button className={idioma === 'pt' ? 'on' : ''} onClick={() => setIdioma('pt')}>🇧🇷 Português</button>
+                  <button className={idioma === 'en' ? 'on' : ''} onClick={() => setIdioma('en')}>🇺🇸 Inglês</button>
+                </div>
+                {idioma === 'en' && <small className="est-dica-idioma">A letra e o canto saem em inglês. Se já tem uma letra em português, clique em "Passar a letra para inglês" embaixo dela.</small>}
               </>
             )}
 
@@ -1989,6 +2001,7 @@ export default function EstudioMusica() {
         .est-perg { width: 100%; max-width: 460px; background: var(--bg-elevated); border: 1px solid var(--gold); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
         .est-perg b { font-size: 17px; }
         .est-perg-nota { margin: 0; font-size: 13px; color: #e8c46a; }
+        .est-dica-idioma { display: block; color: var(--text-muted); margin: -2px 0 8px; font-size: 12px; }
         .est-perg-campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-muted); }
         .est-perg-opcoes { display: flex; gap: 8px; flex-wrap: wrap; }
         .est-perg-opcoes button { flex: 1; min-width: 90px; text-align: center; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 12px 10px; font-size: 15px; cursor: pointer; }

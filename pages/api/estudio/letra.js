@@ -28,6 +28,7 @@ export default async function handler(req, res) {
   if (!process.env.GROQ_API_KEY) return res.status(500).json({ erro: 'GROQ_API_KEY não configurada.' });
 
   const { acao, tema, estilo, voz, letraAtual, detalhes, evitar, referencia } = req.body || {};
+  const en = req.body?.idioma === 'en'; // música em inglês
   const temSolo = /solo|intro instrumental|drop|pausa/i.test(detalhes || '');
 
   try {
@@ -94,15 +95,22 @@ Responda SÓ com as linhas, uma por música, neste formato:
       return res.status(400).json({ erro: 'Escreva o tema da música.' });
     }
 
-    const base = letraAtual && letraAtual.trim()
+    let base = letraAtual && letraAtual.trim()
       ? `Melhore a letra abaixo mantendo a ideia, deixando mais cantável, com rimas naturais e refrão forte e fácil de lembrar.\n\nLetra atual:\n${letraAtual}`
       : `Escreva uma letra de música ORIGINAL sobre: ${tema}`;
+    if (en) {
+      base = letraAtual && letraAtual.trim()
+        ? `Passe a letra abaixo para o INGLÊS. Não é tradução ao pé da letra: é uma versão cantável, que mantém a história, a ideia e a estrutura (mesmas partes, na mesma ordem), com rimas naturais em inglês e refrão forte e fácil de lembrar. Se ela já estiver em inglês, só melhore.\n\nLetra atual:\n${letraAtual}`
+        : `Escreva uma letra de música ORIGINAL, em INGLÊS, sobre: ${tema}`;
+    }
 
     const pedido = `${base}
 
 Regras:
-- Português do Brasil, linguagem natural e emocionante.
-${estilo ? `- Estilo musical: ${estilo}. Escreva com o vocabulário, as gírias, o jeito de falar e o clima TÍPICOS desse estilo (forró com jeito nordestino e festeiro, rock com atitude e energia, pagode com swing, gospel com adoração...). Não escreva tudo com cara de sertanejo.` : ''}
+${en ? '- A letra INTEIRA em inglês natural, como um compositor nativo escreveria: nenhuma palavra em português. O título também em inglês.' : '- Português do Brasil, linguagem natural e emocionante.'}
+${estilo ? (en
+    ? `- Estilo musical: ${estilo}. Escreva com o vocabulário, as expressões e o clima típicos desse estilo em inglês.`
+    : `- Estilo musical: ${estilo}. Escreva com o vocabulário, as gírias, o jeito de falar e o clima TÍPICOS desse estilo (forró com jeito nordestino e festeiro, rock com atitude e energia, pagode com swing, gospel com adoração...). Não escreva tudo com cara de sertanejo.`) : ''}
 ${voz ? `- Vai ser cantada por: ${voz}.` : ''}
 ${referencia ? `- O clima e o jeito da letra lembram o estilo de ${referencia}, mas a letra é 100% ORIGINAL: não use títulos, frases, refrões nem nomes dessas músicas.` : ''}
 ${detalhes ? `- Arranjo pedido: ${detalhes}.` : ''}

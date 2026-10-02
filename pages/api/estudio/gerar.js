@@ -8,6 +8,7 @@
 //   titulo, letra,        // modo personalizado
 //   estilo,               // texto de estilo (ex: "Brazilian gospel worship, piano")
 //   voz,                  // chave de VOZES abaixo (ex.: 'masculina', 'masc-potente', 'dupla') | ''
+//   idioma,               // 'pt' (padrão) | 'en' = cantada em inglês
 //   instrumental,         // true = sem voz
 //   duracaoSeg,           // 30..300
 //   grupoId, versao       // para juntar as versões da mesma criação
@@ -94,14 +95,28 @@ const GENEROS = {
   sertanejo: { pos: ['sertanejo'], neg: [] },
 };
 
+// Música em inglês: o cantor é do gênero, mas sem o "brasileiro" (senão a IA puxa o sotaque e o português)
+function cantorEmIngles(texto) {
+  return String(texto)
+    .replace(/, sung like Brazilian rock \(rock nacional\)/i, '')
+    .replace(/ with a nordestino accent/i, '')
+    .replace(/\b(?:Northeastern |Southern )?Brazilian /gi, '')
+    .replace(/\bBahian /gi, '');
+}
+const soBrasil = (x) => /^brazilian (reggae|rock|trap|rap)$|nordestino vocals|^louvor$/i.test(x);
+const estilosDoGenero = (g, idioma) => (idioma === 'en' ? g.pos.filter((x) => !soBrasil(x)) : g.pos);
+
 function cantorDoEstilo(estilo) {
   return CANTORES.find((c) => c.teste.test(estilo || '')) || null;
 }
 
-function montarPrompt({ modo, descricao, letra, estilo, voz, instrumental, duracaoSeg }) {
+function montarPrompt({ modo, descricao, letra, estilo, voz, instrumental, duracaoSeg, idioma }) {
+  const en = idioma === 'en';
   const partes = [];
   const genero = cantorDoEstilo(`${estilo} ${modo === 'simples' ? descricao : ''}`);
-  if (estilo) partes.push(`Style: ${estilo}.`);
+  // Em inglês, "Brazilian gospel/rock/trap..." vira só o gênero (os ritmos que são do Brasil, como forró e pagode, ficam)
+  const estiloTxt = en ? String(estilo || '').replace(/\bBrazilian (?=gospel|hip hop|trap|rock|reggae|pop)/gi, '') : estilo;
+  if (estilo) partes.push(`Style: ${estiloTxt}.`);
   if (modo === 'simples' && descricao) partes.push(`Song idea: ${descricao}.`);
   if (instrumental) {
     partes.push('Instrumental only, no vocals.');
@@ -110,16 +125,18 @@ function montarPrompt({ modo, descricao, letra, estilo, voz, instrumental, durac
     let v = VOZES[voz] || 'lead vocal';
     if (voz === 'dupla' && genero && !['sertanejo', 'gaucha'].includes(genero.id)) v = 'two male lead vocalists singing in harmony';
     partes.push(`Vocals: ${v}.`);
-    if (genero) partes.push(`Singer: ${genero.cantor}.`);
-    partes.push('Sung in Brazilian Portuguese, clear pronunciation.');
-    if (genero && !['sertanejo', 'gaucha', 'country'].includes(genero.id)) {
+    if (genero) partes.push(`Singer: ${en ? cantorEmIngles(genero.cantor) : genero.cantor}.`);
+    partes.push(en
+      ? 'Sung entirely in English by a native English-speaking singer, natural pronunciation. Do not sing in Portuguese.'
+      : 'Sung in Brazilian Portuguese, clear pronunciation.');
+    if (!en && genero && !['sertanejo', 'gaucha', 'country'].includes(genero.id)) {
       partes.push('The singing style must match the genre: do NOT sing like sertanejo, no country twang.');
     }
   }
   // Reforço no texto (o Google Lyria só entende o texto): gênero no começo e o que evitar
   const g = genero && GENEROS[genero.id];
   if (g && g.pos.length > 1) {
-    partes.unshift(`Genre: ${g.pos.slice(0, 6).join(', ')}.`);
+    partes.unshift(`Genre: ${estilosDoGenero(g, idioma).slice(0, 6).join(', ')}.`);
     if (g.neg.length) partes.push(`Avoid: ${g.neg.join(', ')}.`);
   }
   if (duracaoSeg) partes.push(`Length about ${Math.round(duracaoSeg)} seconds.`);
@@ -131,7 +148,7 @@ function montarPrompt({ modo, descricao, letra, estilo, voz, instrumental, durac
 
 // Pede à ElevenLabs o plano da música (não gasta crédito) e reforça o gênero:
 // junta os estilos do gênero e proíbe o sertanejo em todas as partes.
-async function planoComGenero(key, modelo, prompt, duracaoMs, genero) {
+async function planoComGenero(key, modelo, prompt, duracaoMs, genero, idioma) {
   const g = genero && GENEROS[genero.id];
   if (!g) return null;
   try {
@@ -148,7 +165,7 @@ async function planoComGenero(key, modelo, prompt, duracaoMs, genero) {
     const uniq = (lista) => [...new Map(lista.map((x) => [String(x).toLowerCase(), x])).values()];
     return {
       ...plano,
-      positive_global_styles: uniq([...g.pos, ...limpa(plano.positive_global_styles)]).slice(0, 20),
+      positive_global_styles: uniq([...estilosDoGenero(g, idioma), ...limpa(plano.positive_global_styles)]).slice(0, 20),
       negative_global_styles: uniq([...(plano.negative_global_styles || []), ...g.neg]).slice(0, 20),
       sections: plano.sections.map((sec) => ({
         ...sec,
@@ -161,12 +178,12 @@ async function planoComGenero(key, modelo, prompt, duracaoMs, genero) {
   }
 }
 
-async function gerarElevenLabs(prompt, { instrumental, duracaoSeg, genero }) {
+async function gerarElevenLabs(prompt, { instrumental, duracaoSeg, genero, idioma }) {
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) throw new Error('ELEVENLABS_API_KEY não está configurada na Vercel.');
   const modelo = process.env.ELEVENLABS_MUSIC_MODEL || 'music_v2_5';
   const duracaoMs = Math.max(10, Math.min(300, duracaoSeg || 150)) * 1000;
-  let plano = instrumental ? null : await planoComGenero(key, modelo, prompt, duracaoMs, genero);
+  let plano = instrumental ? null : await planoComGenero(key, modelo, prompt, duracaoMs, genero, idioma);
   // Limite do plano (2 pedidos ao mesmo tempo na ElevenLabs, contando a voz da fábrica):
   // espera a vez e tenta de novo, em vez de dar erro
   const compor = async (corpo) => {
@@ -262,6 +279,7 @@ export default async function handler(req, res) {
     voz: String(b.voz || ''),
     instrumental,
     duracaoSeg,
+    idioma: b.idioma === 'en' ? 'en' : 'pt',
   };
   const prompt = montarPrompt(dados);
 
@@ -289,6 +307,7 @@ export default async function handler(req, res) {
       letra: dados.letra || r.letraGerada || '',
       estilo: dados.estilo,
       voz: dados.voz,
+      idioma: dados.idioma,
       instrumental,
       duracaoSeg,
       prompt,
