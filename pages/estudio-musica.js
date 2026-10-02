@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
-import { avaliarStreaming, escolhidas, letraLimpa, paraWav, capa3000, ficha } from '../lib/streaming';
+import { avaliarStreaming, escolhidas, letraLimpa, paraWav, capaQuadrada, ficha } from '../lib/streaming';
 
 // Nome do gênero como aparece na lista das distribuidoras
 const GENERO_STREAMING = [
@@ -867,7 +867,7 @@ export default function EstudioMusica() {
     const r = await perguntar(
       lista.length > 1 ? `📦 Preparar ${lista.length} músicas para o Spotify` : `📦 Preparar "${lista[0].titulo}" para o Spotify`,
       [
-        { chave: 'artista', rotulo: 'Nome do intérprete / artista (use sempre o mesmo)', valor: artista || 'Aqui Tem Música', obrigatorio: true },
+        { chave: 'artista', rotulo: 'Nome do intérprete / artista (um para cada ritmo, sempre escrito igual)', valor: artista || 'Aqui Tem Música', obrigatorio: true },
         { chave: 'compositor', rotulo: 'Seu nome completo (vai como compositor e produtor na ficha)', valor: compositor },
       ],
       { botao: 'Preparar pacote', nota: fracas.length ? `⚠ ${fracas.length} música(s) ainda têm pontos para ajustar (veja em ⋯). Dá para preparar mesmo assim.` : '' },
@@ -902,8 +902,11 @@ export default function EstudioMusica() {
         etapa('Convertendo para WAV…');
         try { add(`${pasta}audio.wav`, await paraWav(audio)); } catch { /* fica só o mp3 */ }
         if (m.capaUrl) {
-          etapa('Capa 3000×3000…');
-          try { add(`${pasta}capa-3000.jpg`, await capa3000(m.capaUrl)); } catch {
+          etapa('Capas 1400 e 3000…');
+          try {
+            add(`${pasta}capa-1400.jpg`, await capaQuadrada(m.capaUrl, 1400));
+            add(`${pasta}capa-3000.jpg`, await capaQuadrada(m.capaUrl, 3000));
+          } catch {
             try { add(`${pasta}capa-original.jpg`, new Uint8Array(await fetch(m.capaUrl).then((r) => r.arrayBuffer()))); } catch { /* sem capa */ }
           }
         }

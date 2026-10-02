@@ -97,7 +97,7 @@ const Fabrica = (() => {
     document.querySelectorAll('#fabMarcaAbas button').forEach((b) => (b.onclick = () => trocarMarca(b.dataset.marca || '')));
     ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs'].forEach((id) => q(id).addEventListener('change', custo));
     q('#btnFabCriar').onclick = criar;
-    q('#btnFabAtualizar').onclick = carregar;
+    q('#btnFabAtualizar').onclick = () => carregar(true);
   }
 
   async function criar() {
@@ -170,18 +170,30 @@ const Fabrica = (() => {
     return '<span class="fab-yt">▶ YouTube: esperando o PC subir</span>';
   }
 
-  async function carregar() {
+  // A fábrica só começa a produzir um vídeo 3 dias antes de ele ir ao ar (o crédito é gasto aos poucos)
+  const JANELA_MS = 3 * 24 * 3600e3;
+  const naEspera = (i) => i.status === 'pendente' && new Date(i.quando).getTime() - Date.now() > JANELA_MS;
+  const comecaEm = (i) => quandoTxt(new Date(new Date(i.quando).getTime() - JANELA_MS).toISOString());
+
+  async function carregar(peloBotao) {
     const box = q('#fabLista');
+    const bt = q('#btnFabAtualizar');
+    if (peloBotao === true) {
+      bt.disabled = true;
+      bt.textContent = '↻ Atualizando...';
+    }
     try {
       const { itens: todos = [] } = await window.api.fabrica.listar();
       const itens = todos.filter((i) => (i.marca || '') === marca); // cada aba mostra só os seus
+      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       if (!itens.length) {
-        box.innerHTML = '<p class="nota">Nenhum vídeo na fábrica ainda. Escolha os dias e clique em "Criar lote".</p>';
+        box.innerHTML = `<p class="nota">Nenhum vídeo na fábrica ainda. Escolha os dias e clique em "Criar lote". <b>Atualizado às ${hora}.</b></p>`;
         return;
       }
       const prontos = itens.filter((i) => i.status === 'concluido').length;
       const erros = itens.filter((i) => i.status === 'erro').length;
-      box.innerHTML = `<p class="nota">${itens.length} vídeos · ${prontos} prontos · ${itens.length - prontos - erros} em produção${erros ? ` · <b style="color:var(--terracota)">${erros} com erro</b>` : ''}. A fábrica anda sozinha a cada 5 min (o PC precisa estar com o app aberto para montar).</p>`;
+      const espera = itens.filter(naEspera).length;
+      box.innerHTML = `<p class="nota">${itens.length} vídeos · ${prontos} prontos · ${itens.length - prontos - erros - espera} em produção${espera ? ` · ${espera} aguardando a vez` : ''}${erros ? ` · <b style="color:var(--terracota)">${erros} com erro</b>` : ''}. A fábrica anda sozinha a cada 5 min e começa cada vídeo 3 dias antes de ele ir ao ar (o PC precisa estar com o app aberto para montar). <b>Atualizado às ${hora}.</b></p>`;
       let dia = '';
       for (const i of itens) {
         const d = new Date(i.quando).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
@@ -198,7 +210,7 @@ const Fabrica = (() => {
           <span class="txt"><b></b><small></small></span>
           <span class="acoes"></span>`;
         l.querySelector('b').textContent = i.titulo || (i.serie ? `${i.serie.nome} (Parte ${i.serie.parte}/${i.serie.total})` : i.tema);
-        l.querySelector('small').innerHTML = `${esc(i.status === 'erro' ? `Erro: ${i.erro || ''}` : ETAPA[i.status] || i.status)} · ${esc(redes)} ${seloYoutube(i)}`;
+        l.querySelector('small').innerHTML = `${esc(i.status === 'erro' ? `Erro: ${i.erro || ''}` : naEspera(i) ? `Aguardando a vez: começa a ser produzido ${comecaEm(i)}` : ETAPA[i.status] || i.status)} · ${esc(redes)} ${seloYoutube(i)}`;
         const acoes = l.querySelector('.acoes');
         const botao = (txt, titulo, fn) => {
           const bt = document.createElement('button');
@@ -225,6 +237,9 @@ const Fabrica = (() => {
       p.className = 'erro';
       p.textContent = msgErro(e);
       box.appendChild(p);
+    } finally {
+      bt.disabled = false;
+      bt.textContent = '↻ Atualizar';
     }
   }
 
