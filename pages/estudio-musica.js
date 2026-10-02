@@ -865,13 +865,23 @@ export default function EstudioMusica() {
     let compositor = '';
     try { artista = localStorage.getItem('estudio-artista') || ''; compositor = localStorage.getItem('estudio-compositor') || ''; } catch { /* sem armazenamento */ }
     const fracas = lista.filter((m) => !avaliacao(m).pronta);
+    const semCapa = lista.filter((m) => !m.capaUrl).length;
+    const notas = [];
+    if (fracas.length) notas.push(`⚠ ${fracas.length} música(s) ainda têm pontos para ajustar (veja em ⋯). Dá para preparar mesmo assim.`);
+    if (lista.length > 10) notas.push(`São ${lista.length} músicas de uma vez: o pacote fica grande e pode demorar. Se travar, prepare de 10 em 10.`);
     const r = await perguntar(
-      lista.length > 1 ? `📦 Preparar ${lista.length} músicas para o Spotify` : `📦 Preparar "${lista[0].titulo}" para o Spotify`,
+      lista.length > 1 ? `📦 Preparar ${lista.length} músicas para streaming` : `📦 Preparar "${lista[0].titulo}" para o Spotify`,
       [
         { chave: 'artista', rotulo: 'Nome do intérprete / artista (um para cada ritmo, sempre escrito igual)', valor: artista || 'Aqui Tem Música', obrigatorio: true },
         { chave: 'compositor', rotulo: 'Seu nome completo (vai como compositor e produtor na ficha)', valor: compositor },
+        {
+          chave: 'capas',
+          rotulo: `Capas: ${semCapa === lista.length ? 'nenhuma tem capa ainda' : semCapa ? `${semCapa} de ${lista.length} sem capa` : lista.length > 1 ? 'todas já têm capa' : 'já tem capa'} (cada capa nova gasta um pouco de crédito do Flux)`,
+          valor: 'faltam',
+          opcoes: [{ valor: 'faltam', rotulo: semCapa ? 'Criar só nas sem capa' : 'Manter as capas' }, { valor: 'todas', rotulo: lista.length > 1 ? 'Capa nova em todas' : 'Fazer capa nova' }],
+        },
       ],
-      { botao: 'Preparar pacote', nota: fracas.length ? `⚠ ${fracas.length} música(s) ainda têm pontos para ajustar (veja em ⋯). Dá para preparar mesmo assim.` : '' },
+      { botao: 'Preparar pacote', nota: notas.join(' ') },
     );
     if (!r) return;
     artista = r.artista;
@@ -889,7 +899,7 @@ export default function EstudioMusica() {
         let m = lista[i];
         const pasta = lista.length > 1 ? `${String(i + 1).padStart(2, '0')}-${arquivoNome(m.titulo, '').replace(/\.$/, '')}/` : '';
         const etapa = (t) => setLoteRodando(`${lista.length > 1 ? `${i + 1}/${lista.length} · ` : ''}${t}`);
-        if (!m.capaUrl) {
+        if (!m.capaUrl || r.capas === 'todas') {
           etapa('Criando a capa…');
           try {
             const capaUrl = await criarCapa(m, etapa);
@@ -922,7 +932,7 @@ export default function EstudioMusica() {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 120000);
-      setAviso('Pacote pronto! Abra a ficha.txt e siga os campos no site da distribuidora.');
+      setAviso(lista.length > 1 ? `Pacote pronto com ${lista.length} músicas, uma pasta para cada. Em cada pasta, abra a ficha.txt e siga os campos no site da distribuidora.` : 'Pacote pronto! Abra a ficha.txt e siga os campos no site da distribuidora.');
     } catch (e) {
       setAviso(`Não consegui preparar: ${e.message}`);
     } finally {
@@ -1658,14 +1668,14 @@ export default function EstudioMusica() {
                       <option value="">com o mesmo motor</option>
                     </select>
                     <button className="est-btn-sec" onClick={novaVersaoMarcadas}>🔁 Nova versão</button>
-                    <button className="est-btn-sec" disabled={!!loteRodando} onClick={() => prepararStreaming(musicas.filter((x) => marcadas.includes(x.id) && x.tipo !== 'medley'))}>📦 Spotify</button>
+                    <button className="est-btn-sec" disabled={!!loteRodando} onClick={() => prepararStreaming(musicas.filter((x) => marcadas.includes(x.id) && x.tipo !== 'medley'))} title="Um pacote só, com uma pasta por música: áudio, capa com o título, letra e ficha">📦 Preparar para streaming{marcadas.length > 1 ? ` (${marcadas.length})` : ''}</button>
                     <button className="est-btn-sec" disabled={!!loteRodando} onClick={baixarMarcadas}>⬇ Baixar {marcadas.length > 1 ? `(${marcadas.length})` : ''}</button>
                     <button className="est-btn-sec perigo" disabled={!!loteRodando} onClick={excluirMarcadas}>🗑 Excluir</button>
                     <button className="est-btn-link" onClick={() => setMarcadas([])}>Desmarcar</button>
                   </>
                 ) : (
                   <>
-                    <span>{loteRodando || 'Marque ☐ as músicas para baixar ou fazer nova versão de várias de uma vez'}</span>
+                    <span>{loteRodando || 'Marque ☐ as músicas para preparar para streaming, baixar ou fazer nova versão de várias de uma vez'}</span>
                     <button className="est-btn-link" onClick={() => setMarcadas(lista.map((m) => m.id))}>Marcar todas</button>
                   </>
                 )}
