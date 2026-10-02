@@ -1214,7 +1214,7 @@ export default function EstudioMusica() {
     const r = await perguntar(
       `⏩ Aumentar "${m.titulo}"`,
       [{ chave: 'extra', rotulo: 'Quanto aumentar', valor: '30', opcoes: [{ valor: '30', rotulo: '+30 s' }, { valor: '60', rotulo: '+1 min' }, { valor: '90', rotulo: '+1 min 30' }] }],
-      { botao: 'Aumentar', nota: 'O começo da música fica igual. Entra mais um refrão (e estrofe, nas opções maiores) antes do final. A voz pode variar um pouco no trecho novo. Gasta crédito da ElevenLabs parecido com gerar a música de novo.' },
+      { botao: 'Aumentar', nota: 'O começo da música fica igual. Entra mais um refrão (e estrofe, nas opções maiores) antes do final. A voz pode variar um pouco no trecho novo. Gasta crédito da ElevenLabs parecido com gerar a música de novo.' + (m.importada ? ' Nesta música importada, o trecho novo é feito pela ElevenLabs' + (String(m.letra || '').trim() ? '.' : '; como ela está sem letra salva, pode sair só instrumental (salve a letra em 📝 Letra e estilo antes).') : '') },
     );
     if (!r) return;
     comTrabalho(m.id, 'Aumentando a música… (1 a 3 min)', async () => {
@@ -1773,13 +1773,12 @@ export default function EstudioMusica() {
                         {m.tipo === 'medley' ? (
                           <button disabled={!!ocupado} onClick={() => mandarParaMedleyCanal(m)}>📺 Mandar p/ Medley do canal</button>
                         ) : (
-                          m.importada ? null : (
-                            <>
-                              <button disabled={!!ocupado} onClick={() => variacao(m)}>🔁 Nova versão</button>
-                              <button disabled={!!ocupado} onClick={() => aumentar(m)}>⏩ Aumentar música</button>
-                              <button onClick={() => reutilizar(m)}>✏️ Editar e recriar</button>
-                            </>
-                          )
+                          <>
+                            {!m.importada && <button disabled={!!ocupado} onClick={() => variacao(m)}>🔁 Nova versão</button>}
+                            {/* Aumentar vale também para as importadas (Nuivi, Suno...): o áudio é enviado como está */}
+                            <button disabled={!!ocupado} onClick={() => aumentar(m)}>⏩ Aumentar música</button>
+                            {!m.importada && <button onClick={() => reutilizar(m)}>✏️ Editar e recriar</button>}
+                          </>
                         )}
                         {m.tipo !== 'medley' && <button onClick={() => setEditandoLetra({ id: m.id, letra: m.letra || '', estilo: m.estilo || '', instrumental: !!m.instrumental })}>📝 Letra e estilo</button>}
                         <button disabled={!!ocupado} onClick={() => gerarCapa(m)}>🎨 {m.capaUrl ? 'Nova capa' : 'Gerar capa'}</button>
