@@ -707,3 +707,6 @@ body { grid-template-columns: minmax(0, 1fr); }
 .chip-creditos { cursor: pointer; border: 1px solid var(--ouro); color: var(--ouro); background: var(--ouro-suave); }
 .chip-creditos.critico { border-color: var(--terracota); color: #fff; background: var(--terracota); }
 .chip-creditos[hidden], .btn-atualizar[hidden] { display: none !important; }
+
+/* O atributo hidden vale sempre (sem isto, display:grid/flex mostrava campos que deviam estar escondidos, ex.: aba LCS da Fábrica) */
+[hidden] { display: none !important; }
