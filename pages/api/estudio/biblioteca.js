@@ -21,13 +21,16 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'PATCH') {
-      const { id, titulo, favorito, stems, capaUrl } = req.body || {};
+      const { id, titulo, favorito, stems, capaUrl, letra, estilo, instrumental } = req.body || {};
       if (!id) return res.status(400).json({ erro: 'id faltando.' });
       const upd = {};
       if (typeof titulo === 'string') upd.titulo = titulo.slice(0, 120);
       if (typeof favorito === 'boolean') upd.favorito = favorito;
       if (stems && typeof stems === 'object') upd.stems = stems;
       if (typeof capaUrl === 'string') upd.capaUrl = capaUrl;
+      if (typeof letra === 'string') upd.letra = letra.slice(0, 6000);
+      if (typeof estilo === 'string') upd.estilo = estilo.slice(0, 400);
+      if (typeof instrumental === 'boolean') upd.instrumental = instrumental;
       await db.collection(COL).doc(id).update(upd);
       return res.status(200).json({ ok: true });
     }

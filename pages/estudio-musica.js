@@ -496,7 +496,7 @@ function fmtTempo(s) {
 
 function nomeMotor(m) {
   if (m === 'medley') return 'Medley';
-  return m === 'lyria' ? 'Lyria' : 'ElevenLabs';
+  return { lyria: 'Lyria', suno: 'Suno', nuivi: 'Nuivi', outra: 'Importada' }[m] || 'ElevenLabs';
 }
 
 const MEDLEY_PADRAO = [
@@ -580,6 +580,8 @@ export default function EstudioMusica() {
   // Seleção para juntar
   const [selecionando, setSelecionando] = useState(false);
   const [selecao, setSelecao] = useState([]); // ids em ordem
+  const [importando, setImportando] = useState(null); // { origem, status } enquanto o painel de importar está aberto
+  const [editandoLetra, setEditandoLetra] = useState(null); // { id, letra, estilo, instrumental }
   const [marcadas, setMarcadas] = useState([]); // músicas marcadas para "Nova versão" em lote
   const [versoesLote, setVersoesLote] = useState(1);
   const [motorLote, setMotorLote] = useState('elevenlabs'); // '' = mesmo motor da música original
@@ -765,7 +767,7 @@ export default function EstudioMusica() {
 
   // Nova versão de várias músicas de uma vez (mesma letra, estilo e voz)
   async function novaVersaoMarcadas() {
-    const lista = musicas.filter((m) => marcadas.includes(m.id) && m.tipo !== 'medley');
+    const lista = musicas.filter((m) => marcadas.includes(m.id) && m.tipo !== 'medley' && !m.importada);
     if (!lista.length) return;
     const total = lista.length * versoesLote;
     if (!confirm(`Fazer nova versão de ${lista.length} música(s)? Vão ser geradas ${total} músicas (${versoesLote} de cada), gastando crédito.`)) return;
@@ -1224,6 +1226,54 @@ export default function EstudioMusica() {
     });
   }
 
+  // Traz músicas feitas em outra plataforma (Suno, Nuivi...): envia os arquivos e põe na biblioteca
+  async function importarArquivos(arquivos) {
+    const lista = [...(arquivos || [])].filter((f) => /^audio\//.test(f.type) || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(f.name));
+    if (!lista.length) { setAviso('Escolha arquivos de áudio (MP3, WAV, M4A...).'); return; }
+    const origem = importando?.origem || 'suno';
+    const { upload } = await import('@vercel/blob/client');
+    let feitas = 0;
+    const falhas = [];
+    for (let i = 0; i < lista.length; i++) {
+      const f = lista[i];
+      setImportando({ origem, status: `Enviando ${i + 1} de ${lista.length}: ${f.name}` });
+      try {
+        // duração lida do próprio arquivo
+        const duracaoSeg = await new Promise((ok) => {
+          const a = new Audio();
+          a.preload = 'metadata';
+          a.onloadedmetadata = () => ok(isFinite(a.duration) ? a.duration : 0);
+          a.onerror = () => ok(0);
+          a.src = URL.createObjectURL(f);
+        });
+        const ext = (f.name.match(/\.(\w+)$/) || [, 'mp3'])[1].toLowerCase();
+        const tipo = f.type && f.type.startsWith('audio/') ? f.type : ({ wav: 'audio/wav', m4a: 'audio/mp4', aac: 'audio/aac', flac: 'audio/flac', ogg: 'audio/ogg' }[ext] || 'audio/mpeg');
+        const r = await upload(`estudio-musica/importadas/${Date.now()}.${ext}`, f, { access: 'public', handleUploadUrl: '/api/musica-audio-upload', contentType: tipo });
+        const titulo = f.name.replace(/\.\w+$/, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+        const d = await api('/api/estudio/importar', { method: 'POST', body: JSON.stringify({ titulo, audioUrl: r.url, duracaoSeg, origem }) });
+        setMusicas((ms) => [d.musica, ...ms]);
+        feitas += 1;
+      } catch (e) {
+        falhas.push(`${f.name} (${e.message})`);
+      }
+    }
+    setImportando(null);
+    setFiltro('todas');
+    setAviso(`${feitas} música(s) importada(s).${falhas.length ? ` Não entraram: ${falhas.join('; ')}` : ''} Toque em ⋯ para colocar a letra, o estilo e a capa.`);
+  }
+
+  async function salvarLetra() {
+    const e = editandoLetra;
+    if (!e) return;
+    try {
+      await api('/api/estudio/biblioteca', { method: 'PATCH', body: JSON.stringify({ id: e.id, letra: e.letra, estilo: e.estilo, instrumental: e.instrumental }) });
+      atualizarLocal(e.id, { letra: e.letra, estilo: e.estilo, instrumental: e.instrumental });
+      setEditandoLetra(null);
+    } catch (err) {
+      setAviso(err.message);
+    }
+  }
+
   function separarStems(m) {
     comTrabalho(m.id, 'Separando voz e instrumentos…', async (msg) => {
       const job = await api('/api/cover/fal', { method: 'POST', body: JSON.stringify({ tipo: 'separar', audioUrl: m.audioUrl }) });
@@ -1272,6 +1322,7 @@ export default function EstudioMusica() {
   const avaliacao = (m) => avaliarStreaming(m, escolha);
   let lista = musicas.filter((m) => {
     if (filtro === 'streaming' && m.tipo === 'medley') return false;
+    if (filtro === 'importadas' && !m.importada) return false;
     if (filtro === 'favoritas' && !m.favorito) return false;
     if (filtro === 'elevenlabs' && m.motor !== 'elevenlabs') return false;
     if (filtro === 'lyria' && m.motor !== 'lyria') return false;
@@ -1489,13 +1540,38 @@ export default function EstudioMusica() {
               <input className="est-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar…" />
             </div>
             <div className="est-chips est-filtros">
-              {[['todas', 'Todas'], ['favoritas', '★ Favoritas'], ['medley', 'Medleys'], ['elevenlabs', 'ElevenLabs'], ['lyria', 'Lyria'], ['streaming', '🎧 Streaming']].map(([id, nome]) => (
+              {[['todas', 'Todas'], ['favoritas', '★ Favoritas'], ['medley', 'Medleys'], ['elevenlabs', 'ElevenLabs'], ['lyria', 'Lyria'], ['importadas', 'Importadas'], ['streaming', '🎧 Streaming']].map(([id, nome]) => (
                 <button key={id} className={filtro === id ? 'on' : ''} onClick={() => setFiltro(id)}>{nome}</button>
               ))}
               <button className={`est-juntar-toggle ${selecionando ? 'on' : ''}`} onClick={() => { setSelecionando(!selecionando); setSelecao([]); }}>
                 {selecionando ? 'Cancelar seleção' : '🔗 Juntar músicas'}
               </button>
+              <button className={`est-juntar-toggle ${importando ? 'on' : ''}`} onClick={() => setImportando(importando ? null : { origem: 'suno', status: '' })}>
+                {importando ? 'Fechar' : '⬆ Importar músicas'}
+              </button>
             </div>
+
+            {importando && (
+              <div className="est-selbar est-importar">
+                <div>
+                  <b>Trazer músicas de outra plataforma</b>
+                  <small>Baixe as músicas no Suno, no Nuivi ou onde estiverem (MP3 ou WAV) e escolha os arquivos aqui. Pode escolher várias de uma vez.</small>
+                </div>
+                <select value={importando.origem} disabled={!!importando.status} onChange={(e) => setImportando({ ...importando, origem: e.target.value })}>
+                  <option value="suno">Vieram do Suno</option>
+                  <option value="nuivi">Vieram do Nuivi</option>
+                  <option value="outra">Outra origem</option>
+                </select>
+                {importando.status ? (
+                  <span><span className="est-spin" /> {importando.status}</span>
+                ) : (
+                  <label className="est-btn-sec est-escolher">
+                    📂 Escolher arquivos
+                    <input type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg" multiple hidden onChange={(e) => { importarArquivos(e.target.files); e.target.value = ''; }} />
+                  </label>
+                )}
+              </div>
+            )}
 
             {!selecionando && (
               <div className={`est-selbar est-lote ${marcadas.length ? "cheia" : ""}`}>
@@ -1640,16 +1716,36 @@ export default function EstudioMusica() {
                           {avaliacao(m).itens.map((x, k) => <div key={k} className={x.ok ? 'ok' : 'nao'}>{x.ok ? '✓' : '⚠'} {x.texto}</div>)}
                         </div>
                       )}
+                      {editandoLetra?.id === m.id && (
+                        <div className="est-editar-letra">
+                          <label>Estilo / gênero (ex.: reggae, rock, sertanejo)</label>
+                          <input value={editandoLetra.estilo} onChange={(e) => setEditandoLetra({ ...editandoLetra, estilo: e.target.value })} placeholder="reggae" />
+                          <label className="est-toggle"><input type="checkbox" checked={editandoLetra.instrumental} onChange={(e) => setEditandoLetra({ ...editandoLetra, instrumental: e.target.checked })} /><span>Instrumental (sem voz)</span></label>
+                          {!editandoLetra.instrumental && (
+                            <>
+                              <label>Letra (cole aqui a letra que você usou)</label>
+                              <textarea rows={8} value={editandoLetra.letra} onChange={(e) => setEditandoLetra({ ...editandoLetra, letra: e.target.value })} placeholder="Cole a letra da música…" />
+                            </>
+                          )}
+                          <div className="est-linha">
+                            <button className="est-btn-sec" onClick={salvarLetra}>Salvar</button>
+                            <button className="est-btn-link" onClick={() => setEditandoLetra(null)}>Cancelar</button>
+                          </div>
+                        </div>
+                      )}
                       <div className="est-mais-btns">
                         {m.tipo !== 'medley' && <button disabled={!!ocupado || !!loteRodando} onClick={() => prepararStreaming([m])}>{preparando.includes(m.id) ? `⏳ ${loteRodando}` : '📦 Preparar para Spotify'}</button>}
                         {m.tipo === 'medley' ? (
                           <button disabled={!!ocupado} onClick={() => mandarParaMedleyCanal(m)}>📺 Mandar p/ Medley do canal</button>
                         ) : (
-                          <>
-                            <button disabled={!!ocupado} onClick={() => variacao(m)}>🔁 Nova versão</button>
-                            <button onClick={() => reutilizar(m)}>✏️ Editar e recriar</button>
-                          </>
+                          m.importada ? null : (
+                            <>
+                              <button disabled={!!ocupado} onClick={() => variacao(m)}>🔁 Nova versão</button>
+                              <button onClick={() => reutilizar(m)}>✏️ Editar e recriar</button>
+                            </>
+                          )
                         )}
+                        {m.tipo !== 'medley' && <button onClick={() => setEditandoLetra({ id: m.id, letra: m.letra || '', estilo: m.estilo || '', instrumental: !!m.instrumental })}>📝 Letra e estilo</button>}
                         <button disabled={!!ocupado} onClick={() => gerarCapa(m)}>🎨 {m.capaUrl ? 'Nova capa' : 'Gerar capa'}</button>
                         <label className={`est-enviar-capa ${ocupado ? 'off' : ''}`}>
                           🖼 Enviar minha capa
@@ -1932,6 +2028,15 @@ export default function EstudioMusica() {
         .est-check b { display: block; margin-bottom: 4px; }
         .est-check .ok { color: #8fd6c1; }
         .est-check .nao { color: #e8c46a; }
+        .est-importar { flex-wrap: wrap; align-items: center; }
+        .est-importar > div { flex: 1 1 220px; }
+        .est-importar small { display: block; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+        .est-importar select { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+        .est-escolher { cursor: pointer; display: inline-block; }
+        .est-editar-letra { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .est-editar-letra label { font-size: 12px; color: var(--text-muted); }
+        .est-editar-letra textarea, .est-editar-letra input[type='text'], .est-editar-letra input:not([type]) { width: 100%; }
+        .est-badge.suno, .est-badge.nuivi, .est-badge.outra { background: #1d2b3a; color: #8fc1e8; }
         .est-btn-link { background: none; border: 0; color: var(--gold); text-decoration: underline; cursor: pointer; font-size: 13px; }
         .est-marca { width: 20px; height: 20px; margin-right: 8px; vertical-align: middle; accent-color: var(--gold); cursor: pointer; }
         .est-player-abrir { font-size: 12px; color: var(--gold); white-space: nowrap; text-decoration: underline; }

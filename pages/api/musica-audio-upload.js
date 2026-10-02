@@ -8,7 +8,7 @@ export default async function handler(req, res) {
       token: process.env.MEDIA_READ_WRITE_TOKEN,
       onBeforeGenerateToken: async () => {
         return {
-          allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp3'],
+          allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/flac', 'audio/ogg'],
           addRandomSuffix: true,
         };
       },
