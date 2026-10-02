@@ -39,6 +39,17 @@ Ideia: ${tema || ''}`, 200);
       return res.status(200).json({ estilo: txt.replace(/^["']|["']$/g, '') });
     }
 
+    // Título em inglês (para a versão em inglês de uma música que já existe)
+    if (acao === 'tituloIngles') {
+      const original = String(req.body.titulo || '').trim().slice(0, 120);
+      if (!original) return res.status(400).json({ erro: 'Faltou o título.' });
+      const txt = await groq(`Passe este título de música para o INGLÊS: curto e natural, como um título de música de verdade (não precisa ser ao pé da letra). Responda só com o título, sem aspas e sem explicação.
+
+Título: ${original}`, 300);
+      const titulo = txt.split('\n')[0].replace(/^["'“]|["'”.]$/g, '').replace(/[*#]/g, '').trim().slice(0, 100);
+      return res.status(200).json({ titulo: titulo || original });
+    }
+
     // "Parecido com": transforma um artista/banda de referência em descrição musical SEM nomes
     // (os motores de música recusam nome de artista, e assim a música sai original)
     if (acao === 'referencia') {

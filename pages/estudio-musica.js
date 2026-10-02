@@ -812,6 +812,13 @@ export default function EstudioMusica() {
         letraEn = d.letra;
         if (d.titulo) tituloEn = d.titulo;
       }
+      // O nome da música também vai para o inglês (a capa e a ficha usam esse nome)
+      if (tituloEn === m.titulo) {
+        try {
+          const t = await api('/api/estudio/letra', { method: 'POST', body: JSON.stringify({ acao: 'tituloIngles', titulo: m.titulo }) });
+          if (t.titulo) tituloEn = t.titulo;
+        } catch { /* fica com o nome original */ }
+      }
       etapa('Gerando a versão em inglês…');
       await criar({
         qtdVersoes: Number(r.qtd) === 2 ? 2 : 1,
@@ -826,7 +833,7 @@ export default function EstudioMusica() {
         instrumental: false,
         duracaoSeg: m.duracaoSeg || 150,
       });
-      if (!letraEn) setAviso('Versão em inglês criada a partir da ideia da música. O título ficou em português: troque em ✎ Renomear.');
+
     });
   }
 
