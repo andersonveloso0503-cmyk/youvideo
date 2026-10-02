@@ -58,7 +58,13 @@ export default async function handler(req, res) {
         const d = (await ref.get()).data();
         if (!d) continue;
         const urls = [d.audioUrl, d.capaUrl, ...Object.values(d.stems || {})].filter((u) => typeof u === 'string' && u.includes('blob.vercel-storage.com'));
-        const livres = urls.filter((u) => !usado(u));
+        // A capa pode ser a mesma de outra versão da música (ex.: a versão aumentada): só apaga se ninguém mais usa
+        let capaDeOutra = false;
+        if (d.capaUrl) {
+          const mesma = await db.collection(COL).where('capaUrl', '==', d.capaUrl).limit(ids.length + 1).get().catch(() => ({ docs: [] }));
+          capaDeOutra = mesma.docs.some((x) => !ids.includes(x.id));
+        }
+        const livres = urls.filter((u) => !usado(u) && !(capaDeOutra && u === d.capaUrl));
         if (livres.length < urls.length) mantidos.push(d.titulo || id);
         if (livres.length && token) await del(livres, { token }).catch(() => {});
         await ref.delete();

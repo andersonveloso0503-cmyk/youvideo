@@ -40,16 +40,26 @@ const CANTORES = [
   { id: 'reggae', teste: /reggae|ska\b|dub\b/i, cantor: 'Brazilian reggae singer, relaxed warm and smooth tone, laid-back sunny phrasing on the offbeat, positive vibe' },
   { id: 'metal', teste: /heavy metal|\bmetal\b|thrash|power metal/i, cantor: 'heavy metal singer, powerful high operatic tenor, soaring sustained notes and wails, dramatic and epic delivery' },
   { id: 'rock', teste: /\brock\b|metal|grunge|punk|hard rock/i, cantor: 'rock band frontman, gritty powerful rock vocals with raspy belting and attitude, sustained high notes and energy in the chorus, sung like Brazilian rock (rock nacional), not pop, not sertanejo' },
+  { id: 'rnb', teste: /r&b|\brnb\b/i, cantor: 'contemporary R&B singer, silky smooth tone, melismatic runs and soft falsetto, intimate and sensual delivery' },
+  { id: 'soul', teste: /\bsoul\b|motown/i, cantor: 'soul singer, warm rich and powerful voice, gospel-influenced runs and ad-libs, deeply emotional delivery' },
+  { id: 'jazz', teste: /\bjazz\b/i, cantor: 'jazz vocalist, smooth relaxed and sophisticated phrasing, behind-the-beat swing, intimate tone' },
   { id: 'blues', teste: /blues|soul/i, cantor: 'soulful blues singer, gritty warm tone, bluesy bends and runs, expressive and emotional phrasing' },
+  { id: 'trap', teste: /\btrap\b/i, cantor: 'Brazilian trap artist, melodic half-sung rap with autotune, laid-back confident flow, ad-libs' },
+  { id: 'rap', teste: /\brap\b|hip.?hop|boom bap/i, cantor: 'Brazilian rapper, rhythmic confident flow with clear diction in the verses, sung melodic hook in the chorus' },
+  { id: 'eletronica', teste: /\bedm\b|electronic dance|house beat|house music|eletr[oô]nica/i, cantor: 'dance-pop vocalist, bright clean and catchy topline, processed airy vocals, energetic hook' },
+  { id: 'axe', teste: /\bax[eé](?![a-zà-ú])/i, cantor: 'Bahian axé singer, bright energetic festive voice, call-and-response with the crowd, carnival energy' },
   { id: 'funk', teste: /\bfunk\b|baile/i, cantor: 'Brazilian funk MC, rhythmic half-spoken half-sung delivery, confident street style, catchy chant-like hook' },
   { id: 'pagode', teste: /pagode|samba|cavaquinho/i, cantor: 'Brazilian pagode / samba singer, smooth swinging carioca phrasing, relaxed and romantic, group backing vocals answering in the chorus' },
   { id: 'gaucha', teste: /ga[uú]ch|nativis|milonga|chamam[eé]|vanera/i, cantor: 'Southern Brazilian gaucho nativist singer, deep warm baritone, proud storytelling delivery, milonga phrasing' },
+  { id: 'country', teste: /american country|\bcountry music\b/i, cantor: 'country singer, warm storytelling voice with a gentle twang, heartfelt delivery' },
   { id: 'sertanejo', teste: /sertanej|viola caipira|country/i, cantor: 'Brazilian sertanejo singer, typical sertanejo vocal style with emotional twang' },
+  { id: 'bossa', teste: /^(?![\s\S]*\bmpb\b)[\s\S]*bossa nova/i, cantor: 'bossa nova singer, very soft, almost whispered, intimate and relaxed phrasing, close to the microphone' },
   { id: 'mpb', teste: /\bmpb\b|bossa/i, cantor: 'Brazilian MPB singer, intimate and natural, soft bossa nova phrasing, close to the microphone' },
   { id: 'lofi', teste: /lo-?fi|chill/i, cantor: 'soft breathy laid-back vocals, relaxed and intimate' },
   { id: 'infantil', teste: /children|infantil|kids/i, cantor: 'cheerful friendly singer for a children\'s song, very clear, simple and playful' },
   { id: 'gospel-animado', teste: /upbeat.*gospel|gospel.*(festive|danceable|upbeat)/i, cantor: 'energetic Brazilian gospel singer, joyful celebratory vocals, call-and-response with backing singers' },
   { id: 'gospel', teste: /gospel|worship|louvor/i, cantor: 'Brazilian contemporary worship (louvor) singer, heartfelt clean tone, soaring gospel runs in the chorus' },
+  { id: 'balada', teste: /romantic ballad|\bballad\b|balada/i, cantor: 'romantic ballad singer, expressive and emotional, gentle verses building to a powerful sustained chorus' },
   { id: 'pop', teste: /\bpop\b/i, cantor: 'modern pop singer, polished catchy delivery, breathy verses and bright chorus' },
 ];
 
@@ -63,6 +73,16 @@ const GENEROS = {
   forro: { pos: ['forro', 'piseiro', 'northeastern brazilian music', 'accordion lead', 'zabumba', 'triangle', 'danceable', 'nordestino vocals'], neg: [...SEM_SERTANEJO, 'rock', 'electric guitar solo'] },
   pagode: { pos: ['pagode', 'samba', 'cavaquinho', 'pandeiro', 'tantan', 'swing', 'group backing vocals'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars'] },
   funk: { pos: ['brazilian funk', 'funk carioca', 'tamborzao beat', 'heavy 808', 'mc vocals'], neg: [...SEM_SERTANEJO, 'acoustic guitar', 'rock'] },
+  soul: { pos: ['soul', 'classic soul', 'electric piano', 'horn section', 'groovy bass', 'warm soulful vocals', 'gospel-tinged backing vocals'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars', 'accordion'] },
+  rnb: { pos: ['r&b', 'contemporary r&b', 'smooth groove', '808 bass', 'lush chords', 'silky smooth vocals', 'vocal runs'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars', 'accordion'] },
+  jazz: { pos: ['jazz', 'smooth jazz', 'upright bass', 'brushed drums', 'jazz piano', 'saxophone', 'smooth jazz vocals'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars', 'accordion'] },
+  trap: { pos: ['trap', 'brazilian trap', '808 bass', 'fast hi-hats', 'dark synths', 'melodic autotune vocals'], neg: [...SEM_SERTANEJO, 'acoustic guitar', 'rock', 'accordion'] },
+  rap: { pos: ['hip hop', 'brazilian rap', 'boom bap drums', 'deep bass', 'rap verses', 'sung hook'], neg: [...SEM_SERTANEJO, 'rock', 'accordion'] },
+  eletronica: { pos: ['electronic dance music', 'house', 'four-on-the-floor kick', 'synth leads', 'build-up and drop', 'processed pop vocals'], neg: [...SEM_SERTANEJO, 'acoustic guitar', 'accordion', 'rock'] },
+  axe: { pos: ['axe music', 'bahia carnival', 'timbau and surdo percussion', 'brass section', 'festive', 'energetic call-and-response vocals'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars'] },
+  country: { pos: ['country', 'american country', 'steel guitar', 'fiddle', 'acoustic guitar', 'warm country vocals'], neg: ['sertanejo', 'arrocha', 'accordion', 'pagode'] },
+  bossa: { pos: ['bossa nova', 'nylon guitar', 'soft syncopated rhythm', 'light percussion', 'soft intimate vocals'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars'] },
+  balada: { pos: ['romantic ballad', 'piano', 'strings', 'slow tempo', 'emotional vocals', 'big chorus'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars'] },
   blues: { pos: ['blues', 'soul', 'hammond organ', 'bluesy electric guitar', 'soulful gritty vocals'], neg: [...SEM_SERTANEJO] },
   gospel: { pos: ['gospel', 'contemporary worship', 'louvor', 'piano', 'atmospheric pads', 'soaring worship vocals'], neg: [...SEM_SERTANEJO] },
   'gospel-animado': { pos: ['upbeat gospel', 'praise', 'celebratory', 'live band', 'gospel choir responses'], neg: [...SEM_SERTANEJO] },
@@ -92,7 +112,7 @@ function montarPrompt({ modo, descricao, letra, estilo, voz, instrumental, durac
     partes.push(`Vocals: ${v}.`);
     if (genero) partes.push(`Singer: ${genero.cantor}.`);
     partes.push('Sung in Brazilian Portuguese, clear pronunciation.');
-    if (genero && !['sertanejo', 'gaucha'].includes(genero.id)) {
+    if (genero && !['sertanejo', 'gaucha', 'country'].includes(genero.id)) {
       partes.push('The singing style must match the genre: do NOT sing like sertanejo, no country twang.');
     }
   }

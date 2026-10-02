@@ -6,8 +6,11 @@ import { avaliarStreaming, escolhidas, letraLimpa, paraWav, capa3000, ficha } fr
 const GENERO_STREAMING = [
   [/reggae/i, 'Reggae'], [/heavy metal|\bmetal\b/i, 'Metal'], [/\brock\b/i, 'Rock'], [/forr[oó]|piseiro|xote|bai[aã]o/i, 'Forró (Brazilian)'],
   [/sertanej/i, 'Sertanejo (Brazilian)'], [/ga[uú]ch|milonga|nativis/i, 'Brazilian / Regional'], [/pagode|samba/i, 'Samba / Pagode (Brazilian)'],
-  [/\bfunk\b/i, 'Funk Carioca (Brazilian)'], [/\bmpb\b|bossa/i, 'MPB (Brazilian)'], [/blues|soul/i, 'Blues'], [/gospel|worship|louvor/i, 'Christian & Gospel'],
-  [/lo-?fi|chill/i, 'Electronic / Lo-fi'], [/children|infantil/i, "Children's Music"], [/\bpop\b/i, 'Pop'],
+  [/\bfunk\b/i, 'Funk Carioca (Brazilian)'], [/\bmpb\b|bossa/i, 'MPB (Brazilian)'],
+  [/r&b|\brnb\b|\bsoul\b/i, 'R&B / Soul'], [/\bjazz\b/i, 'Jazz'], [/\btrap\b|\brap\b|hip.?hop/i, 'Hip Hop / Rap'],
+  [/electronic dance|\bedm\b|eletronica/i, 'Electronic / Dance'], [/\bax[eé](?![a-zà-ú])/i, 'Axé (Brazilian)'], [/\bcountry\b/i, 'Country'],
+  [/blues|soul/i, 'Blues'], [/gospel|worship|louvor/i, 'Christian & Gospel'],
+  [/lo-?fi|chill/i, 'Electronic / Lo-fi'], [/children|infantil/i, "Children's Music"], [/ballad|balada/i, 'Pop'], [/\bpop\b/i, 'Pop'],
 ];
 const generoStreaming = (m) => (GENERO_STREAMING.find(([re]) => re.test(`${m.genero || ''} ${m.estilo || ''}`)) || [, ''])[1];
 
@@ -28,6 +31,17 @@ const ESTILOS = [
   { id: 'reggae', nome: 'Reggae', base: 'reggae, offbeat skank guitar, groovy bass, one drop drums, laid-back sunny vibe' },
   { id: 'funk', nome: 'Funk BR', base: 'Brazilian funk, heavy beat, catchy' },
   { id: 'blues', nome: 'Blues Gospel', base: 'soulful blues gospel, organ, electric guitar, emotional' },
+  { id: 'blues-raiz', nome: 'Blues', base: 'classic blues, 12-bar shuffle, electric guitar licks, harmonica, walking bass, raw and soulful' },
+  { id: 'soul', nome: 'Soul', base: 'soul music, warm vintage groove, electric piano, horn section, tight rhythm section, heartfelt and emotional' },
+  { id: 'rnb', nome: 'R&B', base: 'contemporary R&B, smooth groove, lush chords, 808 bass, silky vocals, sensual and modern' },
+  { id: 'jazz', nome: 'Jazz', base: 'smooth jazz, upright bass, brushed drums, piano, saxophone, sophisticated and swinging' },
+  { id: 'bossa', nome: 'Bossa Nova', base: 'bossa nova, soft nylon guitar, gentle syncopated rhythm, light percussion, intimate and elegant' },
+  { id: 'balada', nome: 'Balada Romântica', base: 'romantic ballad, piano and strings, slow tempo, emotional, big chorus' },
+  { id: 'rap', nome: 'Rap / Hip Hop', base: 'Brazilian hip hop, boom bap beat, deep bass, rhythmic rap verses, sung hook' },
+  { id: 'trap', nome: 'Trap', base: 'Brazilian trap, hard 808 bass, fast hi-hats, dark atmospheric synths, melodic autotune vocals' },
+  { id: 'eletronica', nome: 'Eletrônica / Dance', base: 'electronic dance music, four-on-the-floor house beat, synth leads, build-ups and drops, energetic' },
+  { id: 'axe', nome: 'Axé', base: 'Brazilian axe music from Bahia, carnival percussion, timbau and surdo, brass stabs, festive and danceable' },
+  { id: 'country', nome: 'Country', base: 'American country music, steel guitar, fiddle, acoustic guitar, storytelling, warm and heartfelt' },
   { id: 'lofi', nome: 'Lo-fi / Relax', base: 'lo-fi chill, soft beats, calm, relaxing' },
   { id: 'infantil', nome: 'Infantil', base: "children's song, playful, cheerful, simple melody" },
 ];
@@ -309,6 +323,8 @@ function ideiasEmTexto(ids) {
 const ABA_DO_ESTILO = {
   reggae: 'Reggae e ska', gaucha: 'Gaúcho e nativista', forro: 'Nordeste', rock: 'Rock e metal', metal: 'Rock e metal',
   pagode: 'Samba e pagode', funk: 'Eletrônico', pop: 'Eletrônico', sertanejo: 'Guitarra', 'sertanejo-potente': 'Guitarra',
+  soul: 'Metais e sopros', rnb: 'Teclados', jazz: 'Metais e sopros', 'blues-raiz': 'Guitarra', bossa: 'Guitarra', balada: 'Cordas e orquestra',
+  rap: 'Eletrônico', trap: 'Eletrônico', eletronica: 'Eletrônico', axe: 'Ritmo e percussão', country: 'Guitarra',
 };
 
 function PainelIdeias({ selecionadas, setSelecionadas, estiloId }) {
