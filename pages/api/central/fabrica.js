@@ -8,6 +8,7 @@ import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 import { horarioBrasilia, diaBrasilia, somarDias } from '../../../lib/fabrica';
 import { empresa, faltaConfigurar, temasEmpresa } from '../../../lib/empresa';
+import { testarConta } from '../../../lib/publicarSocial';
 
 export const config = { maxDuration: 60 };
 
@@ -103,6 +104,10 @@ export default async function handler(req, res) {
   const col = db.collection(COL);
 
   try {
+    // GET ?conexao=lcs -> confere se a Página/Instagram da empresa estão ligados (não publica nada)
+    if (req.method === 'GET' && req.query.conexao) {
+      return res.status(200).json(await testarConta(String(req.query.conexao)));
+    }
     if (req.method === 'GET') {
       const snap = await col.where('fabrica.ativo', '==', true).get();
       let itens = snap.docs.map((d) => {
