@@ -1,6 +1,7 @@
 import { getDb } from '../../lib/firebase-admin';
 import { escolherProximo } from '../../lib/montarPc';
 import { agendarItemPronto } from '../../lib/fabrica';
+import { empresa, gerarRoteiroEmpresa } from '../../lib/empresa';
 import { buscarSaldoFal } from '../../lib/orcamento';
 import {
   gerarRoteiro,
@@ -26,13 +27,13 @@ export default async function handler(req, res) {
   // pros dois de uma vez. Também repassa audioSegments quando a narração
   // foi dividida em mais de um pedaço (textos longos passam do limite de
   // caracteres da ElevenLabs numa chamada só).
-  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo }) => {
+  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta }) => {
     const temVariosPedacos = (audioSegments || []).length > 1;
     const r = await fetch(`${baseUrl}/api/assemble-video`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila' }
+        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}) }
       ),
     });
     const data = await r.json();
@@ -53,6 +54,12 @@ export default async function handler(req, res) {
     const ref = doc.ref;
     switch (item.status) {
       case 'pendente': {
+        if (item.marca) {
+          // Vídeo de divulgação da empresa: roteiro publicitário
+          const roteiroEmp = await gerarRoteiroEmpresa(item.marca, { tema: item.tema, duracaoDesejada: item.duracaoDesejada });
+          await ref.update({ roteiro: roteiroEmp, status: 'roteiro_ok' });
+          break;
+        }
         const roteiro = await gerarRoteiro({
           tema: item.tema,
           estilo: item.estilo,
@@ -68,6 +75,8 @@ export default async function handler(req, res) {
         const narracao = await gerarNarracao({
           texto: item.roteiro.narracao,
           modelo: item.modelo || process.env.ELEVENLABS_MODELO_PADRAO,
+          // empresa: voz própria, se configurada (LCS_VOICE_ID); senão, a voz padrão
+          ...(item.marca && process.env[`${item.marca.toUpperCase()}_VOICE_ID`] ? { vozId: process.env[`${item.marca.toUpperCase()}_VOICE_ID`] } : {}),
         });
         await ref.update({ narracao, status: 'voz_ok' });
         break;
@@ -105,6 +114,8 @@ export default async function handler(req, res) {
             cenas: item.arquivos,
             formato: item.formato,
             palavras: item.narracao.palavras,
+            marca: item.marca ? empresa(item.marca)?.marca : '',
+            cta: item.marca ? empresa(item.marca)?.cta : '',
           });
           await ref.update({ duracaoAlvo, renderId, status: 'montando' });
           break;
@@ -187,7 +198,8 @@ export default async function handler(req, res) {
           const agendaId = await agendarItemPronto(item, check.videoUrl, thumbnailUrl);
           await db.collection('youvideo_projects').add({
             origem: 'fabrica',
-            categoria: item.estilo === 'desenho' ? 'historias' : 'series',
+            categoria: item.marca ? 'empresa' : item.estilo === 'desenho' ? 'historias' : 'series',
+            ...(item.marca ? { canal: item.marca } : {}),
             tema: item.tema,
             estilo: item.estilo,
             formato: item.formato,

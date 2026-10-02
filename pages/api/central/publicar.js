@@ -12,7 +12,7 @@ const ORCAMENTO_MS = 240e3; // para antes do limite de 300 s da Vercel
 
 async function publicarEm(rede, item) {
   const legenda = item.legenda || item.titulo;
-  if (rede === 'facebook') return publicarVideoFacebook({ videoUrl: item.videoUrl, legenda });
+  if (rede === 'facebook') return publicarVideoFacebook({ videoUrl: item.videoUrl, legenda, conta: item.conta || '' });
   throw new Error('Rede desconhecida');
 }
 
@@ -49,19 +49,19 @@ export default async function handler(req, res) {
           try {
             let creationId = st.creationId;
             if (st.status === 'pendente' || !creationId) {
-              creationId = await criarContainerInstagram({ tipo: 'video', midiaUrl: item.videoUrl, legenda: item.legenda || item.titulo });
+              creationId = await criarContainerInstagram({ tipo: 'video', midiaUrl: item.videoUrl, legenda: item.legenda || item.titulo, conta: item.conta || '' });
               await doc.ref.update({ 'redes.instagram': { status: 'processando', creationId, desde: new Date().toISOString(), em: new Date().toISOString(), tentativas: (st.tentativas || 0) + 1 } });
             }
             // Espera até ~1 min nesta rodada; se ainda não ficou pronto, volta na próxima
             let codigo = 'IN_PROGRESS';
             let detalhe = '';
             for (let i = 0; i < 12; i++) {
-              ({ codigo, detalhe } = await statusContainerInstagram(creationId));
+              ({ codigo, detalhe } = await statusContainerInstagram(creationId, item.conta || ''));
               if (codigo !== 'IN_PROGRESS') break;
               await new Promise((r) => setTimeout(r, 5000));
             }
             if (codigo === 'FINISHED') {
-              const r = await publicarContainerInstagram(creationId);
+              const r = await publicarContainerInstagram(creationId, item.conta || '');
               await doc.ref.update({ 'redes.instagram': { status: 'ok', em: new Date().toISOString(), id: r.id, url: null } });
               feitos.push({ id: doc.id, rede, ok: true });
             } else if (codigo === 'IN_PROGRESS') {

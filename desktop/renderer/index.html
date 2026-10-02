@@ -373,8 +373,19 @@
   <!-- Modal: Fábrica de Shorts -->
   <dialog class="modal largo" id="modalFabrica">
     <div class="modal-topo"><h2>🏭 Fábrica de Shorts</h2><button class="fechar" data-fechar>×</button></div>
-    <p class="nota">A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.</p>
-    <div class="fab-config">
+    <div class="segmentado" id="fabMarcaAbas" style="max-width:520px;margin-bottom:10px">
+      <button type="button" class="ativo" data-marca="">📖 Histórias bíblicas</button>
+      <button type="button" data-marca="lcs">🏢 LCS Terceirização</button>
+    </div>
+    <p class="nota" id="fabNota">A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.</p>
+    <div class="fab-config" id="fabConfigLcs" hidden>
+      <div class="campo-config"><label>Por quantas semanas</label>
+        <select id="fabSemanas"><option value="2">2 semanas (6 vídeos)</option><option value="4" selected>4 semanas (12 vídeos)</option><option value="8">8 semanas (24 vídeos)</option></select></div>
+      <div class="campo-config"><label>Dias</label>
+        <select id="fabDiasSemana"><option value="1,3,5" selected>Segunda, quarta e sexta</option><option value="2,4,6">Terça, quinta e sábado</option><option value="1,2,3,4,5">Segunda a sexta</option></select></div>
+      <div class="campo-config"><label>Horário do post</label><input type="time" id="fabHoraLcs" value="11:30" /></div>
+    </div>
+    <div class="fab-config" id="fabConfigBiblia">
       <div class="campo-config"><label>Quantos dias</label>
         <select id="fabDias"><option value="3">3 dias</option><option value="7" selected>7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></div>
       <div class="campo-config"><label>Shorts por dia</label>
@@ -388,11 +399,11 @@
       <div class="campo-config"><label>Canal do YouTube</label><select id="fabCanal"></select></div>
     </div>
     <div class="fab-redes">
-      <label class="interruptor"><input type="checkbox" id="fabYoutube" checked /><span></span> YouTube (1 por dia)</label>
+      <label class="interruptor so-biblia"><input type="checkbox" id="fabYoutube" checked /><span></span> YouTube (1 por dia)</label>
       <label class="interruptor"><input type="checkbox" id="fabFacebook" checked /><span></span> Facebook</label>
       <label class="interruptor"><input type="checkbox" id="fabInstagram" checked /><span></span> Instagram</label>
-      <label class="interruptor"><input type="checkbox" id="fabTiktok" checked /><span></span> TikTok <small>(celular)</small></label>
-      <label class="interruptor"><input type="checkbox" id="fabKwai" checked /><span></span> Kwai <small>(celular)</small></label>
+      <label class="interruptor so-biblia"><input type="checkbox" id="fabTiktok" checked /><span></span> TikTok <small>(celular)</small></label>
+      <label class="interruptor so-biblia"><input type="checkbox" id="fabKwai" checked /><span></span> Kwai <small>(celular)</small></label>
     </div>
     <div class="linha-botoes">
       <button class="btn-primario" id="btnFabCriar">🏭 Criar lote</button>

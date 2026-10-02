@@ -4,6 +4,22 @@
 const Fabrica = (() => {
   const q = (s) => document.querySelector(s);
   let ligado = false;
+  let marca = ''; // '' = histórias bíblicas; 'lcs' = vídeos de divulgação da LCS
+  const NOTAS = {
+    '': 'A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.',
+    lcs: 'Vídeos curtos (cerca de 30 s) divulgando a <b>LCS Terceirização</b>: a IA escolhe o assunto (limpeza, portaria, zeladoria; condomínios e empresas), escreve o roteiro, narra, cria as imagens, o seu PC monta com o WhatsApp da LCS na tela, e cada um é publicado sozinho na <b>Página e no Instagram da LCS</b>.',
+  };
+
+  function trocarMarca(nova) {
+    marca = nova;
+    document.querySelectorAll('#fabMarcaAbas button').forEach((b) => b.classList.toggle('ativo', (b.dataset.marca || '') === marca));
+    q('#fabNota').innerHTML = NOTAS[marca];
+    q('#fabConfigLcs').hidden = marca !== 'lcs';
+    q('#fabConfigBiblia').hidden = marca === 'lcs';
+    document.querySelectorAll('#modalFabrica .so-biblia').forEach((el) => (el.hidden = marca === 'lcs'));
+    custo();
+    carregar();
+  }
 
   const ETAPA = {
     pendente: 'Na fila: escrevendo roteiro',
@@ -36,6 +52,11 @@ const Fabrica = (() => {
   }
 
   function custo() {
+    if (marca === 'lcs') {
+      const qtd = Number(q('#fabSemanas').value) * q('#fabDiasSemana').value.split(',').length;
+      q('#fabCusto').textContent = `${qtd} vídeos · custo aproximado US$ ${(qtd * 0.35).toFixed(0)} (imagens e voz)`;
+      return;
+    }
     const n = Number(q('#fabDias').value) * Number(q('#fabPorDia').value);
     const anim = q('#fabAnimacao').value;
     const animados = anim === 'tudo' ? n : anim === 'nada' ? 0 : Math.ceil(n / 2);
@@ -73,6 +94,8 @@ const Fabrica = (() => {
         q('#fabHora2').disabled = q('#fabPorDia').value === '1';
       })
     );
+    document.querySelectorAll('#fabMarcaAbas button').forEach((b) => (b.onclick = () => trocarMarca(b.dataset.marca || '')));
+    ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs'].forEach((id) => q(id).addEventListener('change', custo));
     q('#btnFabCriar').onclick = criar;
     q('#btnFabAtualizar').onclick = carregar;
   }
@@ -81,6 +104,7 @@ const Fabrica = (() => {
     const erro = q('#fabErro');
     erro.textContent = '';
     if (!config.temCentral) return (erro.textContent = 'Cadastre a senha da Central em Configurações.');
+    if (marca === 'lcs') return criarEmpresa(erro);
     const redes = {
       youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked,
       tiktok: q('#fabTiktok').checked, kwai: q('#fabKwai').checked,
@@ -115,6 +139,27 @@ const Fabrica = (() => {
     }
   }
 
+  async function criarEmpresa(erro) {
+    const redes = { facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked };
+    if (!redes.facebook && !redes.instagram) return (erro.textContent = 'Marque Facebook ou Instagram.');
+    const diasSemana = q('#fabDiasSemana').value.split(',').map(Number);
+    const qtd = Number(q('#fabSemanas').value) * diasSemana.length;
+    if (!confirm(`Criar ${qtd} vídeos de divulgação da LCS? ${q('#fabCusto').textContent.split('·')[1] || ''}\nA IA escolhe os assuntos e eles já ficam agendados na Página e no Instagram da LCS.`)) return;
+    const b = q('#btnFabCriar');
+    b.disabled = true;
+    b.textContent = '🏭 A IA está escolhendo os assuntos...';
+    try {
+      const r = await window.api.fabrica.criar({ marca: 'lcs', semanas: Number(q('#fabSemanas').value), diasSemana, horarios: [q('#fabHoraLcs').value], redes });
+      avisar(`${r.criados.length} vídeos da LCS na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}`);
+      carregar();
+    } catch (e) {
+      erro.textContent = msgErro(e);
+    } finally {
+      b.disabled = false;
+      b.textContent = '🏭 Criar lote';
+    }
+  }
+
   function seloYoutube(i) {
     if (!i.redes?.youtube) return '';
     const y = i.youtube;
@@ -128,7 +173,8 @@ const Fabrica = (() => {
   async function carregar() {
     const box = q('#fabLista');
     try {
-      const { itens = [] } = await window.api.fabrica.listar();
+      const { itens: todos = [] } = await window.api.fabrica.listar();
+      const itens = todos.filter((i) => (i.marca || '') === marca); // cada aba mostra só os seus
       if (!itens.length) {
         box.innerHTML = '<p class="nota">Nenhum vídeo na fábrica ainda. Escolha os dias e clique em "Criar lote".</p>';
         return;
@@ -148,7 +194,7 @@ const Fabrica = (() => {
         l.className = `fab-item st-${i.status}`;
         l.innerHTML = `
           <span class="hora">${esc(new Date(i.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))}</span>
-          <span class="tipo" title="${i.animar ? 'Animado' : 'Imagens com zoom'}">${i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar ? '✨' : ''}</span>
+          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.animar ? 'Animado' : 'Imagens com zoom'}">${i.marca ? '🏢' : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
           <span class="txt"><b></b><small></small></span>
           <span class="acoes"></span>`;
         l.querySelector('b').textContent = i.titulo || (i.serie ? `${i.serie.nome} (Parte ${i.serie.parte}/${i.serie.total})` : i.tema);

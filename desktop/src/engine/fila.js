@@ -652,7 +652,7 @@ class Fila extends EventEmitter {
       let assArquivo = null;
       if (rc.legenda !== false && (rc.palavras || []).length || rc.marca) {
         assArquivo = path.join(dir, 'legenda.ass');
-        fs.writeFileSync(assArquivo, M.gerarAssNarracao({ W, H, palavras: rc.legenda === false ? [] : rc.palavras, duracao: rc.duracao, marca: rc.marca, curto }));
+        fs.writeFileSync(assArquivo, M.gerarAssNarracao({ W, H, palavras: rc.legenda === false ? [] : rc.palavras, duracao: rc.duracao, marca: rc.marca, curto, cta: rc.cta }));
         const fontsTmp = path.join(dir, 'fonts');
         fs.mkdirSync(fontsTmp, { recursive: true });
         for (const f of fs.readdirSync(this.fontsDir)) fs.copyFileSync(path.join(this.fontsDir, f), path.join(fontsTmp, f));

@@ -197,6 +197,7 @@ export default async function handler(req, res) {
       formato: isVertical ? 'short' : 'longo',
       duracao: duracaoTotalAudio,
       marca: marca || '',
+      cta: String(req.body.cta || '').slice(0, 60), // chamada grande nos últimos segundos (ex.: WhatsApp da empresa)
       audio: temAudioSegments
         ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length }))
         : [{ url: audioUrl, start: 0, length: duracaoTotalAudio }],

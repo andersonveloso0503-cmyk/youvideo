@@ -7,6 +7,7 @@
 import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 import { horarioBrasilia, diaBrasilia, somarDias } from '../../../lib/fabrica';
+import { empresa, faltaConfigurar, temasEmpresa } from '../../../lib/empresa';
 
 export const config = { maxDuration: 60 };
 
@@ -125,6 +126,7 @@ export default async function handler(req, res) {
           youtube: x.fabrica.youtube || null,
           lote: x.fabrica.lote,
           serie: x.serie || null,
+          marca: x.marca || '',
         };
       });
       if (req.query.youtube === '1') {
@@ -147,8 +149,61 @@ export default async function handler(req, res) {
 
     if (b.acao === 'criar') {
       if (!process.env.GROQ_API_KEY) return res.status(500).json({ erro: 'GROQ_API_KEY não configurada na Vercel.' });
-      const dias = Math.max(1, Math.min(31, Number(b.dias) || 7));
       const hora = (h, pad) => (/^\d{2}:\d{2}$/.test(String(h || '')) ? h : pad);
+
+      // ── Vídeos de divulgação da empresa (LCS): 3 por semana (seg, qua, sex), só Facebook e Instagram da empresa ──
+      if (b.marca) {
+        const emp = empresa(b.marca);
+        if (!emp) return res.status(400).json({ erro: 'Empresa desconhecida.' });
+        const redesEmp = { youtube: false, facebook: !!b.redes?.facebook, instagram: !!b.redes?.instagram, tiktok: false, kwai: false };
+        if (!redesEmp.facebook && !redesEmp.instagram) return res.status(400).json({ erro: 'Marque Facebook ou Instagram.' });
+        const falta = faltaConfigurar(b.marca, redesEmp);
+        if (falta.length) {
+          return res.status(400).json({ erro: `Falta ligar a Página/Instagram da ${emp.nome} ao Youvideo. Na Vercel (projeto youvideo → Settings → Environment Variables) crie: ${falta.join(', ')} e faça um novo deploy.` });
+        }
+        const semanas = Math.max(1, Math.min(12, Number(b.semanas) || 4));
+        const diasSemana = (Array.isArray(b.diasSemana) && b.diasSemana.length ? b.diasSemana : [1, 3, 5]).map(Number); // 1 = segunda
+        const horario = hora(b.horarios?.[0], '11:30');
+        const todos = await col.where('fabrica.ativo', '==', true).get();
+        const daEmpresa = todos.docs.filter((d) => d.data().marca === b.marca);
+        const ultimoEmp = daEmpresa.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
+        const amanhaEmp = somarDias(diaBrasilia(), 1);
+        let dia = ultimoEmp && diaBrasilia(new Date(ultimoEmp)) >= amanhaEmp ? somarDias(diaBrasilia(new Date(ultimoEmp)), 1) : amanhaEmp;
+        const qtdEmp = semanas * diasSemana.length;
+        const datas = [];
+        for (let guarda = 0; datas.length < qtdEmp && guarda < 400; guarda++) {
+          if (diasSemana.includes(new Date(`${dia}T12:00:00Z`).getUTCDay())) datas.push(dia);
+          dia = somarDias(dia, 1);
+        }
+        const usadosEmp = daEmpresa.map((d) => d.data().tema).filter(Boolean);
+        let temasEmp = await temasEmpresa(b.marca, qtdEmp, usadosEmp);
+        if (temasEmp.length < qtdEmp) temasEmp = [...temasEmp, ...(await temasEmpresa(b.marca, qtdEmp - temasEmp.length, [...usadosEmp, ...temasEmp]))];
+        if (!temasEmp.length) return res.status(500).json({ erro: 'A IA não devolveu temas. Tente de novo.' });
+        const loteEmp = Date.now().toString(36);
+        const batchEmp = db.batch();
+        const criadosEmp = [];
+        temasEmp.slice(0, datas.length).forEach((tema, i) => {
+          const quando = horarioBrasilia(datas[i], horario);
+          const ref = col.doc();
+          batchEmp.set(ref, {
+            tema,
+            marca: b.marca,
+            estilo: 'realista',
+            formato: 'short',
+            duracaoDesejada: '30',
+            animar: false,
+            status: 'pendente',
+            origem: 'fabrica',
+            criadoEm: new Date().toISOString(),
+            fabrica: { ativo: true, lote: loteEmp, quando, quandoYoutube: null, redes: redesEmp, canalYoutube: null, conta: b.marca },
+          });
+          criadosEmp.push({ id: ref.id, tema, quando });
+        });
+        await batchEmp.commit();
+        return res.status(200).json({ lote: loteEmp, criados: criadosEmp, primeiroDia: datas[0] });
+      }
+
+      const dias = Math.max(1, Math.min(31, Number(b.dias) || 7));
       const horarios = [hora(b.horarios?.[0], '12:00'), hora(b.horarios?.[1], '19:00')];
       const redes = {
         youtube: !!b.redes?.youtube && !!b.canalYoutube?.id,
@@ -162,7 +217,8 @@ export default async function handler(req, res) {
       const animacao = ['tudo', 'metade', 'nada'].includes(b.animacao) ? b.animacao : 'metade';
 
       // Continua depois do último horário já reservado pela fábrica (não encavala lotes)
-      const ativos = await col.where('fabrica.ativo', '==', true).get();
+      const todosAtivos = await col.where('fabrica.ativo', '==', true).get();
+      const ativos = { docs: todosAtivos.docs.filter((d) => !d.data().marca) }; // os vídeos da empresa têm agenda própria
       const ultimo = ativos.docs.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
       const amanha = somarDias(diaBrasilia(), 1);
       const primeiroDia = ultimo && diaBrasilia(new Date(ultimo)) >= amanha ? somarDias(diaBrasilia(new Date(ultimo)), 1) : amanha;

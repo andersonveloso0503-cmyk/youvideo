@@ -119,7 +119,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
 }
 
 /** Legenda estilo karaokê: blocos de palavras em caixa alta, a palavra falada em destaque. */
-function gerarAssNarracao({ W, H, palavras, duracao, marca, curto }) {
+function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta }) {
   const tempo = (s) => {
     s = Math.max(0, s);
     const h = Math.floor(s / 3600);
@@ -149,6 +149,13 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto }) {
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
   ];
   if (marca) linhas.push(`Dialogue: 1,${tempo(0)},${tempo(duracao)},Marca,,0,0,0,,${limpar(marca)}`);
+  // Chamada da empresa (ex.: WhatsApp) em destaque nos últimos segundos, numa faixa no alto da tela
+  if (cta && duracao > 6) {
+    const tamCta = Math.round(menor * (curto ? 0.07 : 0.06));
+    linhas.splice(linhas.indexOf('[Events]') - 1, 0,
+      `Style: Cta,Montserrat ExtraBold,${tamCta},&H00FFFFFF,&H000000FF,&H001E7A12,&H001E7A12,-1,0,0,0,100,100,0,0,3,${Math.round(tamCta * 0.35)},0,8,${Math.round(W * 0.06)},${Math.round(W * 0.06)},${Math.round(H * (curto ? 0.16 : 0.1))},1`);
+    linhas.push(`Dialogue: 2,${tempo(Math.max(0, duracao - 5))},${tempo(duracao)},Cta,,0,0,0,,{\\fad(400,0)}${limpar(cta)}`);
+  }
 
   const validas = (palavras || []).filter((p) => p && p.start != null && p.end != null && p.end > p.start && String(p.texto || '').trim());
   const POR_BLOCO = curto ? 3 : 4;
