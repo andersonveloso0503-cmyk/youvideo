@@ -21,13 +21,14 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'PATCH') {
-      const { id, titulo, favorito, stems, capaUrl, letra, estilo, instrumental } = req.body || {};
+      const { id, titulo, favorito, stems, capaUrl, capaArteUrl, letra, estilo, instrumental } = req.body || {};
       if (!id) return res.status(400).json({ erro: 'id faltando.' });
       const upd = {};
       if (typeof titulo === 'string') upd.titulo = titulo.slice(0, 120);
       if (typeof favorito === 'boolean') upd.favorito = favorito;
       if (stems && typeof stems === 'object') upd.stems = stems;
       if (typeof capaUrl === 'string') upd.capaUrl = capaUrl;
+      if (typeof capaArteUrl === 'string') upd.capaArteUrl = capaArteUrl; // arte sem o título (para refazer o título ao renomear)
       if (typeof letra === 'string') upd.letra = letra.slice(0, 6000);
       if (typeof estilo === 'string') upd.estilo = estilo.slice(0, 400);
       if (typeof instrumental === 'boolean') upd.instrumental = instrumental;
@@ -57,15 +58,16 @@ export default async function handler(req, res) {
         const ref = db.collection(COL).doc(id);
         const d = (await ref.get()).data();
         if (!d) continue;
-        const urls = [d.audioUrl, d.capaUrl, ...Object.values(d.stems || {})].filter((u) => typeof u === 'string' && u.includes('blob.vercel-storage.com'));
-        // A capa pode ser a mesma de outra versão da música (ex.: a versão aumentada): só apaga se ninguém mais usa
-        let capaDeOutra = false;
-        if (d.capaUrl) {
-          const mesma = await db.collection(COL).where('capaUrl', '==', d.capaUrl).limit(ids.length + 1).get().catch(() => ({ docs: [] }));
-          capaDeOutra = mesma.docs.some((x) => !ids.includes(x.id));
+        const urls = [d.audioUrl, d.capaUrl, d.capaArteUrl, ...Object.values(d.stems || {})].filter((u) => typeof u === 'string' && u.includes('blob.vercel-storage.com'));
+        // A capa (e a arte sem título) pode ser a mesma de outra versão da música (ex.: a versão aumentada): só apaga se ninguém mais usa
+        const deOutra = new Set();
+        for (const campo of ['capaUrl', 'capaArteUrl']) {
+          if (!d[campo]) continue;
+          const mesma = await db.collection(COL).where(campo, '==', d[campo]).limit(ids.length + 1).get().catch(() => ({ docs: [] }));
+          if (mesma.docs.some((x) => !ids.includes(x.id))) deOutra.add(d[campo]);
         }
-        const livres = urls.filter((u) => !usado(u) && !(capaDeOutra && u === d.capaUrl));
-        if (livres.length < urls.length) mantidos.push(d.titulo || id);
+        const livres = [...new Set(urls)].filter((u) => !usado(u) && !deOutra.has(u));
+        if (livres.length < new Set(urls).size) mantidos.push(d.titulo || id);
         if (livres.length && token) await del(livres, { token }).catch(() => {});
         await ref.delete();
         apagados += 1;

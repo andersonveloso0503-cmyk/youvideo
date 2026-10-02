@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { avaliarStreaming, escolhidas, letraLimpa, paraWav, capaQuadrada, ficha } from '../lib/streaming';
+import { capaComTitulo } from '../lib/capaTitulo';
 
 // Nome do gênero como aparece na lista das distribuidoras
 const GENERO_STREAMING = [
@@ -891,9 +892,8 @@ export default function EstudioMusica() {
         if (!m.capaUrl) {
           etapa('Criando a capa…');
           try {
-            const d = await api('/api/estudio/capa', { method: 'POST', body: JSON.stringify({ id: m.id, titulo: m.titulo, estilo: m.estilo, descricao: m.descricao }) });
-            atualizarLocal(m.id, { capaUrl: d.capaUrl });
-            m = { ...m, capaUrl: d.capaUrl };
+            const capaUrl = await criarCapa(m, etapa);
+            m = { ...m, capaUrl };
           } catch { /* segue sem capa */ }
         }
         etapa('Baixando o áudio…');
@@ -1187,7 +1187,10 @@ export default function EstudioMusica() {
     const novo = rn?.titulo;
     if (!novo || novo === m.titulo) return;
     atualizarLocal(m.id, { titulo: novo });
-    try { await api('/api/estudio/biblioteca', { method: 'PATCH', body: JSON.stringify({ id: m.id, titulo: novo }) }); } catch (e) { setAviso(e.message); }
+    try { await api('/api/estudio/biblioteca', { method: 'PATCH', body: JSON.stringify({ id: m.id, titulo: novo }) }); } catch (e) { setAviso(e.message); return; }
+    // O título da capa acompanha o nome novo (a distribuidora recusa capa com texto diferente do título)
+    if (m.capaArteUrl) comTrabalho(m.id, 'Atualizando o título na capa…', () => porTitulo(m, m.capaArteUrl, novo));
+    else if (m.capaUrl) setAviso('Nome trocado. Se a capa tem o nome antigo escrito, troque a capa: a distribuidora recusa capa com texto diferente do título.');
   }
 
   async function excluir(m) {
@@ -1224,13 +1227,45 @@ export default function EstudioMusica() {
     });
   }
 
+  // Escreve o nome da música por cima da arte e guarda as duas: a capa (com título) e a arte limpa,
+  // que serve para refazer o título quando a música muda de nome.
+  async function porTitulo(m, arteUrl, titulo = m.titulo) {
+    const blob = await capaComTitulo(arteUrl, titulo);
+    const { upload } = await import('@vercel/blob/client');
+    const r = await upload(`estudio-musica/capas/${Date.now()}-titulo.jpg`, blob, { access: 'public', handleUploadUrl: '/api/imagem-upload', contentType: 'image/jpeg' });
+    await api('/api/estudio/biblioteca', { method: 'PATCH', body: JSON.stringify({ id: m.id, capaUrl: r.url, capaArteUrl: arteUrl }) });
+    atualizarLocal(m.id, { capaUrl: r.url, capaArteUrl: arteUrl });
+    return r.url;
+  }
+
+  // Capa nova: a IA desenha a arte a partir da letra e o Estúdio escreve o título por cima
+  async function criarCapa(m, etapa = () => {}) {
+    const d = await api('/api/estudio/capa', {
+      method: 'POST',
+      body: JSON.stringify({ id: m.id, titulo: m.titulo, estilo: m.estilo, descricao: m.descricao }),
+    });
+    atualizarLocal(m.id, { capaUrl: d.capaUrl, capaArteUrl: '' });
+    try {
+      etapa('Escrevendo o título na capa…');
+      return await porTitulo(m, d.capaUrl);
+    } catch (e) {
+      setAviso(`A capa foi criada, mas não consegui escrever o título nela: ${e.message}`);
+      return d.capaUrl;
+    }
+  }
+
   function gerarCapa(m) {
-    comTrabalho(m.id, 'Criando a capa…', async () => {
-      const d = await api('/api/estudio/capa', {
-        method: 'POST',
-        body: JSON.stringify({ id: m.id, titulo: m.titulo, estilo: m.estilo, descricao: m.descricao }),
-      });
-      atualizarLocal(m.id, { capaUrl: d.capaUrl });
+    comTrabalho(m.id, 'Criando a capa…', (etapa) => criarCapa(m, etapa));
+  }
+
+  function tituloNaCapa(m) {
+    comTrabalho(m.id, 'Escrevendo o título na capa…', () => porTitulo(m, m.capaArteUrl || m.capaUrl));
+  }
+
+  function tirarTituloDaCapa(m) {
+    comTrabalho(m.id, 'Tirando o título da capa…', async () => {
+      await api('/api/estudio/biblioteca', { method: 'PATCH', body: JSON.stringify({ id: m.id, capaUrl: m.capaArteUrl, capaArteUrl: '' }) });
+      atualizarLocal(m.id, { capaUrl: m.capaArteUrl, capaArteUrl: '' });
     });
   }
 
@@ -1255,8 +1290,8 @@ export default function EstudioMusica() {
       const blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.9));
       const { upload } = await import('@vercel/blob/client');
       const r = await upload(`estudio-musica/capas/${Date.now()}.jpg`, blob, { access: 'public', handleUploadUrl: '/api/imagem-upload', contentType: 'image/jpeg' });
-      await api('/api/estudio/biblioteca', { method: 'PATCH', body: JSON.stringify({ id: m.id, capaUrl: r.url }) });
-      atualizarLocal(m.id, { capaUrl: r.url });
+      await api('/api/estudio/biblioteca', { method: 'PATCH', body: JSON.stringify({ id: m.id, capaUrl: r.url, capaArteUrl: '' }) });
+      atualizarLocal(m.id, { capaUrl: r.url, capaArteUrl: '' });
       if (lado < 1500) setAviso('Capa enviada. Ela é pequena (menos de 1500 px): vai ser aumentada para 3000×3000, mas pode ficar um pouco sem nitidez.');
     });
   }
@@ -1782,6 +1817,9 @@ export default function EstudioMusica() {
                         )}
                         {m.tipo !== 'medley' && <button onClick={() => setEditandoLetra({ id: m.id, letra: m.letra || '', estilo: m.estilo || '', instrumental: !!m.instrumental })}>📝 Letra e estilo</button>}
                         <button disabled={!!ocupado} onClick={() => gerarCapa(m)}>🎨 {m.capaUrl ? 'Nova capa' : 'Gerar capa'}</button>
+                        {m.capaUrl && (m.capaArteUrl
+                          ? <button disabled={!!ocupado} onClick={() => tirarTituloDaCapa(m)}>🔤 Tirar o título da capa</button>
+                          : <button disabled={!!ocupado} onClick={() => tituloNaCapa(m)}>🔤 Pôr o título na capa</button>)}
                         <label className={`est-enviar-capa ${ocupado ? 'off' : ''}`}>
                           🖼 Enviar minha capa
                           <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={!!ocupado} onChange={(e) => { enviarCapa(m, e.target.files?.[0]); e.target.value = ''; }} />
