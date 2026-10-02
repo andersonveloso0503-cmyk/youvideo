@@ -787,6 +787,49 @@ export default function EstudioMusica() {
     });
   }
 
+  // Versão em inglês de uma música que já existe: a IA passa a letra para o inglês (versão cantável)
+  // e o Estúdio gera a música de novo com o mesmo estilo e voz. A original continua na biblioteca.
+  async function versaoEmIngles(m) {
+    const temLetra = !!String(m.letra || '').trim();
+    if (!temLetra && !(m.modo === 'simples' && String(m.descricao || '').trim())) {
+      setAviso('Essa música está sem letra salva. Salve a letra em "📝 Letra e estilo" e tente de novo.');
+      return;
+    }
+    const r = await perguntar(
+      `🌎 Versão em inglês de "${m.titulo}"`,
+      [{ chave: 'qtd', rotulo: 'Quantas versões gerar', valor: '1', opcoes: [{ valor: '1', rotulo: '1 versão' }, { valor: '2', rotulo: '2 versões' }] }],
+      { botao: 'Criar em inglês', nota: 'É uma gravação nova: mesmo estilo e tipo de voz, com a letra em inglês. A melodia e a voz não ficam iguais às da original, que continua guardada. Gasta crédito como criar uma música.' },
+    );
+    if (!r) return;
+    comTrabalho(m.id, 'Passando a letra para inglês…', async (etapa) => {
+      let letraEn = '';
+      let tituloEn = m.titulo;
+      if (temLetra) {
+        const d = await api('/api/estudio/letra', {
+          method: 'POST',
+          body: JSON.stringify({ acao: 'letra', idioma: 'en', tema: m.titulo, estilo: m.estilo, letraAtual: m.letra }),
+        });
+        letraEn = d.letra;
+        if (d.titulo) tituloEn = d.titulo;
+      }
+      etapa('Gerando a versão em inglês…');
+      await criar({
+        qtdVersoes: Number(r.qtd) === 2 ? 2 : 1,
+        motor: m.motor === 'lyria' ? 'lyria' : 'elevenlabs',
+        modo: letraEn ? 'personalizado' : 'simples',
+        descricao: m.descricao || '',
+        titulo: tituloEn,
+        letra: letraEn,
+        estilo: m.estilo || '',
+        voz: m.voz || '',
+        idioma: 'en',
+        instrumental: false,
+        duracaoSeg: m.duracaoSeg || 150,
+      });
+      if (!letraEn) setAviso('Versão em inglês criada a partir da ideia da música. O título ficou em português: troque em ✎ Renomear.');
+    });
+  }
+
   // Nova versão de várias músicas de uma vez (mesma letra, estilo e voz)
   async function novaVersaoMarcadas() {
     const lista = musicas.filter((m) => marcadas.includes(m.id) && m.tipo !== 'medley' && !m.importada);
@@ -1835,6 +1878,7 @@ export default function EstudioMusica() {
                             {/* Aumentar vale também para as importadas (Nuivi, Suno...): o áudio é enviado como está */}
                             <button disabled={!!ocupado} onClick={() => aumentar(m)}>⏩ Aumentar música</button>
                             {!m.importada && <button onClick={() => reutilizar(m)}>✏️ Editar e recriar</button>}
+                            {!m.instrumental && m.idioma !== 'en' && <button disabled={!!ocupado} onClick={() => versaoEmIngles(m)}>🌎 Versão em inglês</button>}
                           </>
                         )}
                         {m.tipo !== 'medley' && <button onClick={() => setEditandoLetra({ id: m.id, letra: m.letra || '', estilo: m.estilo || '', instrumental: !!m.instrumental })}>📝 Letra e estilo</button>}
