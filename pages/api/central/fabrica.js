@@ -132,7 +132,10 @@ export default async function handler(req, res) {
         itens = itens.filter(
           (i) =>
             i.status === 'concluido' && i.videoUrl && i.redes?.youtube &&
-            (i.youtube?.status === 'pendente' || (i.youtube?.status === 'enviando' && agora - (i.youtube.em || 0) > 3 * 3600e3))
+            (i.youtube?.status === 'pendente' ||
+              (i.youtube?.status === 'enviando' && agora - (i.youtube.em || 0) > 3 * 3600e3) ||
+              // deu erro (limite do dia, internet...): tenta de novo sozinho depois de 6 h, até 3 vezes
+              (i.youtube?.status === 'erro' && agora - (i.youtube.em || 0) > 6 * 3600e3 && (i.youtube.tentativas || 0) < 3))
         );
       }
       itens.sort((a, b) => String(a.quando).localeCompare(String(b.quando)));
@@ -248,9 +251,12 @@ export default async function handler(req, res) {
         const d = await t.get(ref);
         const y = d.data()?.fabrica?.youtube;
         if (!y) return false;
-        const livre = y.status === 'pendente' || (y.status === 'enviando' && Date.now() - (y.em || 0) > 3 * 3600e3);
+        const livre =
+          y.status === 'pendente' ||
+          (y.status === 'enviando' && Date.now() - (y.em || 0) > 3 * 3600e3) ||
+          (y.status === 'erro' && Date.now() - (y.em || 0) > 6 * 3600e3 && (y.tentativas || 0) < 3);
         if (!livre) return false;
-        t.update(ref, { 'fabrica.youtube': { status: 'enviando', em: Date.now(), pc: String(b.pc || '').slice(0, 60) } });
+        t.update(ref, { 'fabrica.youtube': { status: 'enviando', em: Date.now(), pc: String(b.pc || '').slice(0, 60), tentativas: y.tentativas || 0 } });
         return true;
       });
       return res.status(200).json({ ok });
@@ -260,7 +266,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
     if (b.acao === 'youtube-erro') {
-      await ref.update({ 'fabrica.youtube': { status: 'erro', em: Date.now(), erro: String(b.erro || '').slice(0, 400) } });
+      const antes = (await ref.get()).data()?.fabrica?.youtube || {};
+      await ref.update({ 'fabrica.youtube': { status: 'erro', em: Date.now(), erro: String(b.erro || '').slice(0, 400), tentativas: (antes.tentativas || 0) + 1 } });
       return res.status(200).json({ ok: true });
     }
     if (b.acao === 'youtube-repetir') {

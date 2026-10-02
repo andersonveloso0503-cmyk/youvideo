@@ -17,6 +17,17 @@ const { resumoClima } = require('./analise');
 const IA = require('./ia');
 const M = require('./montagem');
 
+/** Quando o limite diário do YouTube renova: próxima meia-noite do horário do Pacífico (+10 min de folga). */
+function proximaMeiaNoitePacifico() {
+  const agora = Date.now();
+  for (let h = 1; h <= 26; h++) {
+    const t = new Date(Math.ceil(agora / 3600e3) * 3600e3 + (h - 1) * 3600e3);
+    const hora = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: '2-digit' }).format(t));
+    if (hora === 0 || hora === 24) return new Date(t.getTime() + 10 * 60e3);
+  }
+  return new Date(agora + 6 * 3600e3);
+}
+
 const EM_ANDAMENTO = ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'];
 
 function nomeSeguro(n) {
@@ -275,6 +286,7 @@ class Fila extends EventEmitter {
     const cfg = this.obterConfig();
     const e = job.envio;
     job.cancelado = false;
+    job.naoAntesDe = null;
     try {
       // Vídeo da Biblioteca (na nuvem): baixa primeiro
       if (e.baixarDe && (!e.arquivo || !fs.existsSync(e.arquivo))) {
@@ -358,6 +370,22 @@ class Fila extends EventEmitter {
     } catch (err) {
       const cancelado = err.message === 'CANCELADO' || job.cancelado;
       let msg = err.message;
+      // Limite diário do YouTube ou falha de internet: não vira erro — o app tenta de novo sozinho
+      const limiteDia = /quota|uploadLimitExceeded|rateLimitExceeded|dailyLimit/i.test(msg);
+      const passageiro = /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|network|fetch failed|backendError|\b50[0234]\b|timeout/i.test(msg);
+      job.tentativasEnvio = (job.tentativasEnvio || 0) + 1;
+      if (!cancelado && (limiteDia || passageiro) && job.tentativasEnvio <= 6) {
+        const quando = limiteDia ? proximaMeiaNoitePacifico() : new Date(Date.now() + 10 * 60e3);
+        const hora = quando.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        this.atualizar(job, {
+          status: 'aguardando',
+          naoAntesDe: quando.toISOString(),
+          progresso: 0,
+          erro: null,
+          etapa: limiteDia ? `Limite de envios do YouTube atingido hoje — tenta de novo sozinho em ${hora}` : `Sem conexão com o YouTube — tenta de novo às ${hora}`,
+        });
+        return;
+      }
       if (e.fabricaId) {
         Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: e.fabricaId, acao: 'youtube-erro', erro: cancelado ? 'Cancelado no PC' : msg } }).catch(() => {});
       }
@@ -459,6 +487,8 @@ class Fila extends EventEmitter {
   }
 
   proximo() {
+    // Envios que esperam o limite do YouTube renovar: confere de novo a cada 5 min
+    if (!this.relogioEspera) this.relogioEspera = setInterval(() => this.jobs.some((x) => x.status === 'aguardando' && x.naoAntesDe) && this.proximo(), 5 * 60e3);
     const cfg = this.obterConfig();
     const limite = cfg.modo === 'maximo' ? Math.max(1, Math.min(3, Number(cfg.simultaneos) || 1)) : 1;
     // Geração (usa o processador) e envio (usa a internet) andam em paralelo, cada um na sua vez
@@ -466,7 +496,8 @@ class Fila extends EventEmitter {
     const rodandoDe = (tipo) => [...this.rodando].filter((id) => vaga(this.jobs.find((j) => j.id === id)) === tipo).length;
     for (const [tipo, max] of [['video', limite], ['rede', 1]]) {
       while (rodandoDe(tipo) < max) {
-        const j = this.jobs.find((x) => x.status === 'aguardando' && !this.rodando.has(x.id) && vaga(x) === tipo);
+        const agora = Date.now();
+        const j = this.jobs.find((x) => x.status === 'aguardando' && !this.rodando.has(x.id) && vaga(x) === tipo && !(x.naoAntesDe && new Date(x.naoAntesDe).getTime() > agora));
         if (!j) break;
         this.rodando.add(j.id);
         this.processar(j)

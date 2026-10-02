@@ -365,6 +365,7 @@ app.whenReady().then(() => {
 
   // ---------- Fábrica: sobe no YouTube (agendado) os Shorts que ficaram prontos ----------
   let buscandoFabrica = false;
+  const seoFalhas = {}; // quantas vezes a IA de título falhou em cada vídeo da fábrica
   async function fabricaParaYoutube() {
     const cfg = store.ler();
     if (buscandoFabrica || !cfg.centralToken) return;
@@ -383,6 +384,7 @@ app.whenReady().then(() => {
         let titulo = String(it.titulo || it.tema || 'Short');
         let descricao = it.descricao || '';
         // SEO de verdade: título, descrição e tags com base no que as pessoas buscam no YouTube
+        let seoOk = false;
         if (cfg.groqKey) {
           try {
             const usados = fila.lista().filter((j) => j.envio?.fabricaId).map((j) => j.nome).slice(-12);
@@ -399,10 +401,29 @@ app.whenReady().then(() => {
             if (r.titulo) titulo = r.titulo;
             if (r.descricao) descricao = r.descricao;
             if (r.tags?.length) tags = r.tags;
+            seoOk = !!r.titulo;
           } catch {
-            // Groq fora do ar: usa o título e as tags do roteiro
+            // Groq ocupada / fora do ar
           }
         }
+        if (!seoOk) {
+          // A IA não respondeu: devolve o vídeo para a fila do site e tenta de novo na próxima volta (2 min).
+          // Depois de 4 tentativas sobe com um texto enxuto feito aqui mesmo (nunca com o texto longo do roteiro).
+          seoFalhas[it.id] = (seoFalhas[it.id] || 0) + 1;
+          const temTempo = !it.quandoYoutube || new Date(it.quandoYoutube).getTime() - Date.now() > 40 * 60e3;
+          if (cfg.groqKey && seoFalhas[it.id] <= 4 && temTempo) {
+            await Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: it.id, acao: 'youtube-repetir' } }).catch(() => {});
+            continue;
+          }
+          const frases = String(it.descricao || '').replace(/#[\p{L}\p{N}_]+/gu, '').split(/(?<=[.!?])\s+/).filter(Boolean);
+          const resumo = frases.slice(0, 2).join(' ').slice(0, 320).trim();
+          const fixas = ['histórias bíblicas', 'história da bíblia', 'jesus', 'bíblia', 'fé', 'palavra de deus', 'shorts cristãos'];
+          tags = [...new Set([...tags, ...fixas].map((t) => String(t).trim().toLowerCase()).filter(Boolean))].slice(0, 20);
+          const hashtags = ['#historiasbiblicas', '#jesus', '#fé', '#biblia', '#Shorts'].join(' ');
+          descricao = `${resumo}\n\n🙏 Inscreva-se para receber uma história da Bíblia por dia.\n\n${hashtags}`;
+          titulo = IA.comHashtags(titulo.replace(/\s*#[\p{L}\p{N}_]+/gu, '').trim(), ['histórias bíblicas', 'jesus'], true);
+        }
+        delete seoFalhas[it.id];
         // Série: o título no YouTube sempre mostra a parte, e a descrição lembra de seguir o canal
         const serie = it.serie && it.serie.total > 1 ? it.serie : null;
         if (serie) {

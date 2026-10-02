@@ -332,7 +332,7 @@ DESCRIÇÃO
 
 TAGS
 - 15 a 25 tags: primeiro as buscas exatas da lista que combinam com o vídeo, depois variações e termos amplos. Sem "#". Total até 450 caracteres.${
-    info.curto ? '\n\nÉ um YouTube Shorts: títulos de até 60 caracteres, com #Shorts no fim do título e nas hashtags.' : ''
+    info.curto ? '\n\nÉ um YouTube Shorts: títulos de até 60 caracteres, com #Shorts no fim do título e nas hashtags. A DESCRIÇÃO do Short é CURTA: no máximo 3 frases (até 350 caracteres) — a 1ª com a palavra_principal, depois o convite para se inscrever — e as hashtags. Nada de vários parágrafos.' : ''
   }`;
 
   const usuario = `${descreverVideo(info)}
