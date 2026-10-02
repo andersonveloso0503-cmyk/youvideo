@@ -789,52 +789,99 @@ export default function EstudioMusica() {
 
   // Versão em inglês de uma música que já existe: a IA passa a letra para o inglês (versão cantável)
   // e o Estúdio gera a música de novo com o mesmo estilo e voz. A original continua na biblioteca.
+  const temOQueTraduzir = (m) => !!String(m.letra || '').trim() || (m.modo === 'simples' && !!String(m.descricao || '').trim());
+  const podeIngles = (m) => m.tipo !== 'medley' && !m.instrumental && m.idioma !== 'en' && temOQueTraduzir(m);
+
+  async function gerarEmIngles(m, qtd, etapa = () => {}) {
+    let letraEn = '';
+    let tituloEn = m.titulo;
+    if (String(m.letra || '').trim()) {
+      const d = await api('/api/estudio/letra', {
+        method: 'POST',
+        body: JSON.stringify({ acao: 'letra', idioma: 'en', tema: m.titulo, estilo: m.estilo, letraAtual: m.letra }),
+      });
+      letraEn = d.letra;
+      if (d.titulo) tituloEn = d.titulo;
+    }
+    // O nome da música também vai para o inglês (a capa e a ficha usam esse nome)
+    if (tituloEn === m.titulo) {
+      try {
+        const t = await api('/api/estudio/letra', { method: 'POST', body: JSON.stringify({ acao: 'tituloIngles', titulo: m.titulo }) });
+        if (t.titulo) tituloEn = t.titulo;
+      } catch { /* fica com o nome original */ }
+    }
+    etapa('Gerando a versão em inglês…');
+    await criar({
+      qtdVersoes: qtd === 2 ? 2 : 1,
+      motor: m.motor === 'lyria' ? 'lyria' : 'elevenlabs',
+      modo: letraEn ? 'personalizado' : 'simples',
+      descricao: m.descricao || '',
+      titulo: tituloEn,
+      letra: letraEn,
+      estilo: m.estilo || '',
+      voz: m.voz || '',
+      idioma: 'en',
+      instrumental: false,
+      duracaoSeg: m.duracaoSeg || 150,
+    });
+  }
+
+  const NOTA_INGLES = 'É uma gravação nova: mesmo estilo e tipo de voz, com a letra e o nome em inglês. A melodia e a voz não ficam iguais às da original, que continua guardada.';
+
   async function versaoEmIngles(m) {
-    const temLetra = !!String(m.letra || '').trim();
-    if (!temLetra && !(m.modo === 'simples' && String(m.descricao || '').trim())) {
+    if (!temOQueTraduzir(m)) {
       setAviso('Essa música está sem letra salva. Salve a letra em "📝 Letra e estilo" e tente de novo.');
       return;
     }
     const r = await perguntar(
       `🌎 Versão em inglês de "${m.titulo}"`,
       [{ chave: 'qtd', rotulo: 'Quantas versões gerar', valor: '1', opcoes: [{ valor: '1', rotulo: '1 versão' }, { valor: '2', rotulo: '2 versões' }] }],
-      { botao: 'Criar em inglês', nota: 'É uma gravação nova: mesmo estilo e tipo de voz, com a letra em inglês. A melodia e a voz não ficam iguais às da original, que continua guardada. Gasta crédito como criar uma música.' },
+      { botao: 'Criar em inglês', nota: `${NOTA_INGLES} Gasta crédito como criar uma música.` },
     );
     if (!r) return;
-    comTrabalho(m.id, 'Passando a letra para inglês…', async (etapa) => {
-      let letraEn = '';
-      let tituloEn = m.titulo;
-      if (temLetra) {
-        const d = await api('/api/estudio/letra', {
-          method: 'POST',
-          body: JSON.stringify({ acao: 'letra', idioma: 'en', tema: m.titulo, estilo: m.estilo, letraAtual: m.letra }),
-        });
-        letraEn = d.letra;
-        if (d.titulo) tituloEn = d.titulo;
-      }
-      // O nome da música também vai para o inglês (a capa e a ficha usam esse nome)
-      if (tituloEn === m.titulo) {
-        try {
-          const t = await api('/api/estudio/letra', { method: 'POST', body: JSON.stringify({ acao: 'tituloIngles', titulo: m.titulo }) });
-          if (t.titulo) tituloEn = t.titulo;
-        } catch { /* fica com o nome original */ }
-      }
-      etapa('Gerando a versão em inglês…');
-      await criar({
-        qtdVersoes: Number(r.qtd) === 2 ? 2 : 1,
-        motor: m.motor === 'lyria' ? 'lyria' : 'elevenlabs',
-        modo: letraEn ? 'personalizado' : 'simples',
-        descricao: m.descricao || '',
-        titulo: tituloEn,
-        letra: letraEn,
-        estilo: m.estilo || '',
-        voz: m.voz || '',
-        idioma: 'en',
-        instrumental: false,
-        duracaoSeg: m.duracaoSeg || 150,
-      });
+    comTrabalho(m.id, 'Passando a letra para inglês…', (etapa) => gerarEmIngles(m, Number(r.qtd), etapa));
+  }
 
-    });
+  // Versão em inglês de todas as músicas marcadas, de uma vez
+  async function inglesMarcadas() {
+    const marcadasAgora = musicas.filter((m) => marcadas.includes(m.id));
+    const lista = marcadasAgora.filter(podeIngles);
+    const fora = marcadasAgora.length - lista.length;
+    if (!lista.length) {
+      setAviso('Nenhuma das músicas marcadas pode ir para o inglês: ficam de fora as instrumentais, os medleys, as que já são em inglês e as que estão sem letra salva.');
+      return;
+    }
+    const r = await perguntar(
+      `🌎 Versão em inglês de ${lista.length} música${lista.length > 1 ? 's' : ''}`,
+      [{ chave: 'qtd', rotulo: 'Quantas versões de cada', valor: '1', opcoes: [{ valor: '1', rotulo: '1 de cada' }, { valor: '2', rotulo: '2 de cada' }] }],
+      {
+        botao: 'Criar em inglês',
+        nota: `${NOTA_INGLES} Gasta crédito como criar ${lista.length} música${lista.length > 1 ? 's' : ''} (o dobro com 2 de cada).${fora ? ` ${fora} marcada${fora > 1 ? 's ficam' : ' fica'} de fora (instrumental, medley, já em inglês ou sem letra salva).` : ''}`,
+      },
+    );
+    if (!r) return;
+    const qtd = Number(r.qtd) === 2 ? 2 : 1;
+    setMarcadas([]);
+    let feitas = 0;
+    const falhas = [];
+    const fila = [...lista];
+    setLoteRodando(`Em inglês: 0 de ${lista.length}…`);
+    const trabalhador = async () => {
+      while (fila.length) {
+        const m = fila.shift();
+        try { await gerarEmIngles(m, qtd); } catch (e) { falhas.push(`${m.titulo}: ${e.message}`); }
+        feitas += 1;
+        setLoteRodando(feitas < lista.length ? `Em inglês: ${feitas} de ${lista.length}…` : '');
+      }
+    };
+    // A ElevenLabs do plano aceita só 2 músicas ao mesmo tempo; o Lyria aguenta mais
+    const usaEleven = lista.some((m) => m.motor !== 'lyria');
+    const vezes = usaEleven ? Math.max(1, Math.floor(2 / qtd)) : 3;
+    await Promise.all(Array.from({ length: vezes }, trabalhador));
+    setLoteRodando('');
+    setAviso(falhas.length
+      ? `Versões em inglês: ${lista.length - falhas.length} de ${lista.length} pedidas. Não deu certo em: ${falhas.join(' · ')}`
+      : `Versões em inglês pedidas para ${lista.length} música${lista.length > 1 ? 's' : ''}. Elas aparecem no topo da lista quando ficam prontas.`);
   }
 
   // Nova versão de várias músicas de uma vez (mesma letra, estilo e voz)
@@ -1730,6 +1777,7 @@ export default function EstudioMusica() {
                       <option value="">com o mesmo motor</option>
                     </select>
                     <button className="est-btn-sec" onClick={novaVersaoMarcadas}>🔁 Nova versão</button>
+                    <button className="est-btn-sec" disabled={!!loteRodando} onClick={inglesMarcadas} title="Faz a versão em inglês de cada música marcada: letra e nome em inglês, mesma voz e estilo">🌎 Em inglês{marcadas.length > 1 ? ` (${marcadas.length})` : ''}</button>
                     <button className="est-btn-sec" disabled={!!loteRodando} onClick={() => prepararStreaming(musicas.filter((x) => marcadas.includes(x.id) && x.tipo !== 'medley'))} title="Um pacote só, com uma pasta por música: áudio, capa com o título, letra e ficha">📦 Preparar para streaming{marcadas.length > 1 ? ` (${marcadas.length})` : ''}</button>
                     <button className="est-btn-sec" disabled={!!loteRodando} onClick={baixarMarcadas}>⬇ Baixar {marcadas.length > 1 ? `(${marcadas.length})` : ''}</button>
                     <button className="est-btn-sec perigo" disabled={!!loteRodando} onClick={excluirMarcadas}>🗑 Excluir</button>
@@ -1885,7 +1933,7 @@ export default function EstudioMusica() {
                             {/* Aumentar vale também para as importadas (Nuivi, Suno...): o áudio é enviado como está */}
                             <button disabled={!!ocupado} onClick={() => aumentar(m)}>⏩ Aumentar música</button>
                             {!m.importada && <button onClick={() => reutilizar(m)}>✏️ Editar e recriar</button>}
-                            {!m.instrumental && m.idioma !== 'en' && <button disabled={!!ocupado} onClick={() => versaoEmIngles(m)}>🌎 Versão em inglês</button>}
+                            {!m.instrumental && m.idioma !== 'en' && m.tipo !== 'medley' && <button disabled={!!ocupado} onClick={() => versaoEmIngles(m)}>🌎 Versão em inglês</button>}
                           </>
                         )}
                         {m.tipo !== 'medley' && <button onClick={() => setEditandoLetra({ id: m.id, letra: m.letra || '', estilo: m.estilo || '', instrumental: !!m.instrumental })}>📝 Letra e estilo</button>}
