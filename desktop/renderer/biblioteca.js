@@ -525,7 +525,9 @@ const Biblioteca = (() => {
       l.innerHTML = `<span class="hora">${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
         ${a.thumbnailUrl ? `<img src="${esc(a.thumbnailUrl)}" />` : '<span class="sem-img"></span>'}
         <span class="titulo"></span><span class="chips"></span><span class="acoes"></span>`;
-      l.querySelector('.titulo').textContent = a.titulo;
+      // Mostra em qual conta o post sai (para não confundir os vídeos da empresa com os bíblicos)
+      l.querySelector('.titulo').textContent = `${a.conta === 'lcs' ? '🏢 LCS · ' : ''}${a.titulo}`;
+      if (a.conta === 'lcs') l.title = 'Publica na Página e no Instagram da LCS Terceirização';
       const chips = l.querySelector('.chips');
       for (const [r, st] of Object.entries(a.redes || {})) chips.appendChild(chip(r, st, a));
       const acoes = l.querySelector('.acoes');

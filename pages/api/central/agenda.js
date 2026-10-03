@@ -7,6 +7,7 @@ import { legendaCelular, legendasCriativas, hashtagsDe } from '../../../lib/fabr
 
 export const config = { maxDuration: 60 };
 import { getDb } from '../../../lib/firebase-admin';
+import { empresa } from '../../../lib/empresa';
 import { exigirToken } from '../../../lib/central';
 
 const REDES = ['facebook', 'instagram', 'tiktok', 'kwai'];
@@ -26,6 +27,9 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const itens = Array.isArray(req.body?.itens) ? req.body.itens : [];
       if (!itens.length) return res.status(400).json({ erro: 'Nada para agendar.' });
+      // Vídeos da empresa (LCS) agendados pela Biblioteca: publicam na conta da LCS, só Facebook e Instagram
+      const empresaSnap = await db.collection('youvideo_projects').where('categoria', '==', 'empresa').get().catch(() => ({ docs: [] }));
+      const daEmpresa = new Map(empresaSnap.docs.map((d) => [d.data().videoUrl, d.data().canal || 'lcs']));
       // Legendas criativas (gancho + chamada para ação) para cada vídeo, 4 por vez; sem IA fica a legenda enviada
       const criativas = [];
       const fila = itens.slice(0, 200).map((it, k) => [it, k]);
@@ -33,7 +37,14 @@ export default async function handler(req, res) {
       await Promise.all(Array.from({ length: 4 }, async () => {
         while (fila.length && Date.now() - inicio < 40000) {
           const [it, k] = fila.shift();
-          criativas[k] = it.legendaPronta ? null : await legendasCriativas({ titulo: it.titulo, resumo: it.legenda });
+          const emp = empresa(daEmpresa.get(it.videoUrl));
+          criativas[k] = it.legendaPronta
+            ? null
+            : await legendasCriativas({
+                titulo: it.titulo,
+                resumo: it.legenda,
+                ...(emp ? { obrigatorio: emp.chamadaLegenda, acoes: emp.acoesLegenda, perfil: `${emp.nome}, empresa de terceirização de ${emp.servicos.join(', ')} em ${emp.cidade}` } : {}),
+              });
         }
       }));
       const lote = db.batch();
@@ -43,16 +54,18 @@ export default async function handler(req, res) {
         if (!/^https:\/\//.test(it.videoUrl || '')) return res.status(400).json({ erro: `Vídeo sem link público: ${it.titulo}` });
         const quando = new Date(it.quando);
         if (isNaN(quando)) return res.status(400).json({ erro: `Data inválida: ${it.titulo}` });
+        const conta = daEmpresa.get(it.videoUrl) || '';
         const redes = {};
-        for (const r of REDES) if (it.redes?.includes(r)) redes[r] = { status: MANUAIS.includes(r) ? 'manual' : 'pendente' };
+        for (const r of REDES) if (it.redes?.includes(r) && !(conta && MANUAIS.includes(r))) redes[r] = { status: MANUAIS.includes(r) ? 'manual' : 'pendente' };
         if (!Object.keys(redes).length) continue;
         const ref = db.collection(COL).doc();
         lote.set(ref, {
           titulo: String(it.titulo || '').slice(0, 150),
-          legenda: (cr ? `${cr.redes}\n\n${hashtagsDe(it.legenda, [], 8).join(' ')}` : String(it.legenda || '')).trim().slice(0, 2200),
+          legenda: (cr ? `${cr.redes}\n\n${hashtagsDe(it.legenda, conta ? empresa(conta)?.hashtags || [] : [], 8).join(' ')}` : String(it.legenda || '')).trim().slice(0, 2200),
           // TikTok e Kwai: chamada criativa + hashtags (sem IA: frase pronta + título + hashtags)
           legendaCelular: cr ? `${cr.celular}\n\n${hashtagsDe(it.legenda, [], 8).join(' ')}`.trim().slice(0, 2200) : legendaCelular(it.titulo, it.legenda),
           videoUrl: it.videoUrl,
+          conta,
           thumbnailUrl: it.thumbnailUrl || null,
           curto: !!it.curto,
           chaveBiblioteca: it.chaveBiblioteca || null,
