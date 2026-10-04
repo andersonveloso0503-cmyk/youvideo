@@ -48,7 +48,9 @@ function fontsDir() {
 
 // ---------- Aba "Criar": as ferramentas do Youvideo abertas dentro do app ----------
 let vistaCriar = null;
-let vistaNoAr = false;
+let vistaOfertas = null; // navegador de ofertas (sites de fora), separado das telas do Youvideo
+let vistaAtual = null; // qual das duas ocupa o espaço da aba Criar
+let vistaNoAr = null; // a vista que está presa na janela agora (ou null)
 
 function baseYouvideo() {
   return String(store.ler().centralUrl || 'https://youvideors2.vercel.app').replace(/\/+$/, '');
@@ -103,17 +105,94 @@ function criarVista() {
     }
     return { action: 'deny' };
   });
+  const atual = () => vistaAtual === vistaCriar;
   const avisarNavegacao = () =>
-    enviar('criar:navegou', { url: wc.getURL(), titulo: wc.getTitle(), voltar: wc.navigationHistory.canGoBack() });
+    atual() && enviar('criar:navegou', { url: wc.getURL(), titulo: wc.getTitle(), voltar: wc.navigationHistory.canGoBack() });
   wc.on('did-navigate', avisarNavegacao);
   wc.on('did-navigate-in-page', avisarNavegacao);
   wc.on('page-title-updated', avisarNavegacao);
-  wc.on('did-start-loading', () => enviar('criar:carregando', true));
-  wc.on('did-stop-loading', () => enviar('criar:carregando', false));
+  wc.on('did-start-loading', () => atual() && enviar('criar:carregando', true));
+  wc.on('did-stop-loading', () => atual() && enviar('criar:carregando', false));
   wc.on('did-fail-load', (_e, codigo, desc, url, principal) => {
-    if (principal && codigo !== -3) enviar('criar:erro', `Não consegui abrir o Youvideo (${desc}). Confira a internet.`);
+    if (atual() && principal && codigo !== -3) enviar('criar:erro', `Não consegui abrir o Youvideo (${desc}). Confira a internet.`);
   });
   return vistaCriar;
+}
+
+// ---------- Navegador de ofertas: sites de fora (mercado da Hotmart, Kiwify, páginas de venda) ----------
+// Fica numa sessão própria, sem acesso a nada do app: sem preload, sem permissões, sem downloads.
+// Quem navega é você; o app só lê o texto da página aberta quando você clica em "Criar oferta desta página".
+const PAINEIS_SEM_OFERTA = ['app.hotmart.com', 'app-vlc.hotmart.com', 'sso.hotmart.com', 'dashboard.kiwify.com', 'dashboard.kiwify.com.br', 'facebook.com', 'www.facebook.com', 'm.facebook.com'];
+
+function enderecoHttp(texto) {
+  let t = String(texto || '').trim();
+  if (!t) return '';
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = 'https://' + t;
+  try {
+    const u = new URL(t);
+    return ['http:', 'https:'].includes(u.protocol) ? u.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
+function criarVistaOfertas() {
+  if (vistaOfertas) return vistaOfertas;
+  const sessao = session.fromPartition('persist:ofertas');
+  // Alguns sites recusam navegadores embutidos: aqui o app se apresenta como um Chrome comum
+  sessao.setUserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`);
+  sessao.setPermissionRequestHandler((_wc, _permissao, responder) => responder(false));
+  sessao.on('will-download', (e) => e.preventDefault()); // nada da página de origem é baixado
+  vistaOfertas = new WebContentsView({ webPreferences: { session: sessao, contextIsolation: true, sandbox: true, nodeIntegration: false } });
+  vistaOfertas.setBackgroundColor('#ffffff');
+  const wc = vistaOfertas.webContents;
+  const atual = () => vistaAtual === vistaOfertas;
+  // Links que abririam outra janela (como "ver página de vendas") abrem aqui mesmo
+  wc.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) wc.loadURL(url);
+    return { action: 'deny' };
+  });
+  wc.on('will-navigate', (e, url) => {
+    if (!/^https?:\/\//i.test(url)) e.preventDefault();
+  });
+  const avisarNavegacao = () =>
+    atual() && enviar('criar:navegou', { url: wc.getURL(), titulo: wc.getTitle(), voltar: wc.navigationHistory.canGoBack(), externo: true });
+  wc.on('did-navigate', avisarNavegacao);
+  wc.on('did-navigate-in-page', avisarNavegacao);
+  wc.on('page-title-updated', avisarNavegacao);
+  wc.on('did-start-loading', () => atual() && enviar('criar:carregando', true));
+  wc.on('did-stop-loading', () => atual() && enviar('criar:carregando', false));
+  wc.on('did-fail-load', (_e, codigo, desc, url, principal) => {
+    if (atual() && principal && codigo !== -3) enviar('criar:erro', `Não consegui abrir essa página (${desc}). Confira o endereço e a internet.`);
+  });
+  return vistaOfertas;
+}
+
+/** Lê o texto da página aberta no navegador de ofertas e pede a análise ao Youvideo. Devolve a análise. */
+async function capturarOferta() {
+  if (!vistaOfertas) throw new Error('Abra uma página de vendas primeiro.');
+  const wc = vistaOfertas.webContents;
+  const url = wc.getURL();
+  let host = '';
+  try { host = new URL(url).hostname.toLowerCase(); } catch {}
+  if (!host) throw new Error('Abra uma página de vendas primeiro.');
+  if (PAINEIS_SEM_OFERTA.includes(host)) {
+    throw new Error('Esta é a tela do mercado, não a página de vendas. Abra a página de vendas do produto (a que o comprador vê) e clique de novo.');
+  }
+  const texto = String(await wc.executeJavaScript('document.body ? document.body.innerText : ""', true)).slice(0, 200000);
+  if ((texto.match(/[\p{L}\p{N}]+/gu) || []).length < 150) {
+    throw new Error('Esta página tem pouco texto para analisar. Abra a página de vendas completa do produto.');
+  }
+  let r;
+  try {
+    r = await fetch(baseYouvideo() + '/api/ofertas/analises', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, texto }) });
+  } catch {
+    throw new Error('Não consegui falar com o Youvideo. Confira a internet.');
+  }
+  const d = await r.json().catch(() => null);
+  if (r.status === 404) throw new Error('O Radar de Ofertas ainda não existe no site — o deploy novo do Youvideo já terminou na Vercel?');
+  if (!r.ok || !d?.analise?.id) throw new Error(d?.erro || `Youvideo respondeu ${r.status}`);
+  return d.analise;
 }
 
 // Cada PC tem um código próprio (não vai junto na sincronização de configurações)
@@ -127,13 +206,15 @@ function identidadePc() {
 }
 
 function mostrarVista(visivel) {
-  if (!vistaCriar || !janela) return;
-  if (visivel && !vistaNoAr) {
-    janela.contentView.addChildView(vistaCriar);
-    vistaNoAr = true;
-  } else if (!visivel && vistaNoAr) {
-    janela.contentView.removeChildView(vistaCriar);
-    vistaNoAr = false;
+  if (!janela) return;
+  const alvo = visivel ? vistaAtual : null;
+  if (vistaNoAr && vistaNoAr !== alvo) {
+    janela.contentView.removeChildView(vistaNoAr);
+    vistaNoAr = null;
+  }
+  if (alvo && !vistaNoAr) {
+    janela.contentView.addChildView(alvo);
+    vistaNoAr = alvo;
   }
 }
 
@@ -168,7 +249,7 @@ function criarJanela() {
       await new Promise((r) => setTimeout(r, 1200));
       const img = await janela.webContents.capturePage();
       fs.writeFileSync(process.env.COMPILADOR_CAPTURA, img.toPNG());
-      if (vistaCriar && vistaNoAr) fs.writeFileSync(process.env.COMPILADOR_CAPTURA + '.vista.png', (await vistaCriar.webContents.capturePage()).toPNG());
+      if (vistaNoAr) fs.writeFileSync(process.env.COMPILADOR_CAPTURA + '.vista.png', (await vistaNoAr.webContents.capturePage()).toPNG());
       app.exit(0);
     }, 2500));
   }
@@ -788,14 +869,49 @@ app.whenReady().then(() => {
   ipcMain.handle('criar:abrir', (_e, { rota, limites }) => {
     const v = criarVista();
     if (limites) v.setBounds(limites);
+    vistaAtual = v;
     mostrarVista(true);
     v.webContents.loadURL(baseYouvideo() + (rota || '/'));
     return true;
   });
   ipcMain.handle('criar:limites', (_e, limites) => {
-    if (vistaCriar && limites) vistaCriar.setBounds(limites);
+    if (vistaAtual && limites) vistaAtual.setBounds(limites);
   });
   ipcMain.handle('criar:visivel', (_e, v) => mostrarVista(!!v));
+
+  // ---------- Navegador de ofertas (dentro da aba Criar) ----------
+  ipcMain.handle('ofertas:abrir', (_e, { url, limites }) => {
+    const destino = enderecoHttp(url);
+    if (!destino) throw new Error('Esse endereço não parece válido.');
+    const v = criarVistaOfertas();
+    if (limites) v.setBounds(limites);
+    vistaAtual = v;
+    mostrarVista(true);
+    v.webContents.loadURL(destino);
+    return true;
+  });
+  ipcMain.handle('ofertas:acao', (_e, acao) => {
+    if (!vistaOfertas) return;
+    const wc = vistaOfertas.webContents;
+    if (acao === 'voltar' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
+    if (acao === 'recarregar') wc.reload();
+    if (acao === 'navegador' && /^https?:\/\//i.test(wc.getURL())) shell.openExternal(wc.getURL());
+    if (acao && acao.ir) {
+      const destino = enderecoHttp(acao.ir);
+      if (!destino) throw new Error('Esse endereço não parece válido.');
+      wc.loadURL(destino);
+    }
+  });
+  ipcMain.handle('ofertas:capturar', async (_e, { limites } = {}) => {
+    const analise = await capturarOferta();
+    // análise pronta: volta para as telas do Youvideo, já no passo "o seu produto"
+    const v = criarVista();
+    if (limites) v.setBounds(limites);
+    vistaAtual = v;
+    mostrarVista(true);
+    v.webContents.loadURL(`${baseYouvideo()}/ofertas?analise=${encodeURIComponent(analise.id)}`);
+    return { id: analise.id, nicho: analise.esqueleto?.nicho || '' };
+  });
   ipcMain.handle('criar:acao', (_e, acao) => {
     if (!vistaCriar) return;
     const wc = vistaCriar.webContents;

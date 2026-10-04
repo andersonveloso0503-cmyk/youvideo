@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   abrir: { pasta: chamar('abrir:pasta'), link: chamar('abrir:link') },
   botao: { existe: chamar('botao:existe'), salvar: chamar('botao:salvar') },
   criar: { abrir: chamar('criar:abrir'), limites: chamar('criar:limites'), visivel: chamar('criar:visivel'), acao: chamar('criar:acao') },
+  ofertas: { abrir: chamar('ofertas:abrir'), acao: chamar('ofertas:acao'), capturar: chamar('ofertas:capturar') },
   central: {
     biblioteca: chamar('central:biblioteca'),
     categoria: chamar('central:categoria'),

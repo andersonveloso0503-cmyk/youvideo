@@ -30,11 +30,21 @@ const Criar = (() => {
       ],
     },
     {
+      titulo: 'Ofertas — vender os seus livros',
+      cor: '#b1432f',
+      itens: [
+        ['/ofertas', '🧭', 'Radar de Ofertas', 'Suas análises e ofertas: página de vendas, cadastro e divulgação'],
+        // endereço começando com http abre no navegador de ofertas, com o botão "Criar oferta desta página"
+        ['https://app.hotmart.com/market', '🔥', 'Mercado da Hotmart', 'Veja o que está em alta pela temperatura e crie a sua oferta a partir da página de vendas'],
+        ['https://dashboard.kiwify.com.br/marketplace', '🥝', 'Mercado da Kiwify', 'Navegue pelos produtos e crie a sua oferta a partir da página de vendas'],
+        ['https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR', '📣', 'Biblioteca de Anúncios', 'Anúncio ativo há muito tempo costuma ser oferta que dá resultado'],
+      ],
+    },
+    {
       titulo: 'Canais e ideias',
       cor: '#4a7a6e',
       itens: [
         ['/radar', '📡', 'Radar', 'Canais e vídeos em alta no YouTube para modelar'],
-        ['/ofertas', '🧭', 'Radar de Ofertas', 'Cole o link de uma oferta em alta e monte a sua completa: kit, página, cadastro e divulgação'],
         ['/canal', '📺', 'Meus canais', 'Temas, status e reformatar vídeos por canal'],
         ['/novo-canal', '➕', 'Novo canal', 'Criar um canal do zero, passo a passo'],
         ['/projetos', '🗂', 'Meus projetos', 'Tudo que já foi criado no Youvideo'],
@@ -46,6 +56,7 @@ const Criar = (() => {
   let modo = 'compilar';
   let navegando = false;
   let ligado = false;
+  let externo = false; // true = navegador de ofertas (site de fora); false = tela do Youvideo
 
   function limites() {
     const r = q('#criarVista').getBoundingClientRect();
@@ -84,15 +95,48 @@ const Criar = (() => {
     }
   }
 
+  function modoExterno(sim) {
+    externo = sim;
+    q('#criarNavegador').classList.toggle('externo', sim);
+    q('#ofertasEndereco').hidden = !sim;
+    q('#ofertasCapturar').hidden = !sim;
+  }
+
   async function abrirFerramenta(rota, nome) {
     navegando = true;
     q('#criarHub').hidden = true;
     q('#criarNavegador').hidden = false;
     q('#criarTitulo').textContent = nome;
     q('#criarErro').textContent = '';
+    const fora = /^https?:\/\//i.test(rota);
+    modoExterno(fora);
+    if (fora) q('#ofertasEndereco').value = rota;
     await new Promise((r) => requestAnimationFrame(r));
-    await window.api.criar.abrir({ rota, limites: limites() });
+    if (fora) await window.api.ofertas.abrir({ url: rota, limites: limites() });
+    else await window.api.criar.abrir({ rota, limites: limites() });
     ajustarVisibilidade();
+  }
+
+  // Lê a página aberta, pede a análise e já abre o Radar de Ofertas no passo "o seu produto"
+  async function capturarOferta() {
+    const b = q('#ofertasCapturar');
+    const rotulo = b.textContent;
+    b.disabled = true;
+    b.textContent = 'Analisando a página… (até 1 minuto)';
+    try {
+      await new Promise((r) => requestAnimationFrame(r));
+      const r = await window.api.ofertas.capturar({ limites: limites() });
+      modoExterno(false);
+      q('#criarTitulo').textContent = 'Radar de Ofertas';
+      await new Promise((ok) => requestAnimationFrame(ok));
+      window.api.criar.limites(limites());
+      avisar(`Oferta analisada${r.nicho ? ` (${r.nicho})` : ''}. Agora informe o seu produto.`);
+    } catch (e) {
+      avisar(String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), true);
+    } finally {
+      b.disabled = false;
+      b.textContent = rotulo;
+    }
   }
 
   function voltarAoHub() {
@@ -117,15 +161,28 @@ const Criar = (() => {
     renderHub();
     document.querySelectorAll('#modos .modo').forEach((b) => (b.onclick = () => trocarModo(b.dataset.v)));
     q('#criarFerramentas').onclick = voltarAoHub;
-    q('#criarVoltar').onclick = () => window.api.criar.acao('voltar');
-    q('#criarRecarregar').onclick = () => window.api.criar.acao('recarregar');
-    q('#criarNavegadorExterno').onclick = () => window.api.criar.acao('navegador');
+    const acao = (a) => (externo ? window.api.ofertas.acao(a) : window.api.criar.acao(a));
+    q('#criarVoltar').onclick = () => acao('voltar');
+    q('#criarRecarregar').onclick = () => acao('recarregar');
+    q('#criarNavegadorExterno').onclick = () => acao('navegador');
+    q('#ofertasCapturar').onclick = capturarOferta;
+    q('#ofertasEndereco').onkeydown = (e) => {
+      if (e.key !== 'Enter') return;
+      q('#criarErro').textContent = '';
+      window.api.ofertas.acao({ ir: e.target.value }).catch(() => avisar('Esse endereço não parece válido.', true));
+      e.target.blur();
+    };
     const abrirBib = () => Biblioteca.abrir({ recarregar: true });
     q('#criarBib').onclick = abrirBib;
     q('#lnkCriarBib').onclick = abrirBib;
 
     window.api.ao('criar:navegou', (d) => {
-      if (d.titulo) q('#criarTitulo').textContent = d.titulo.replace(/\s*[|·-]\s*Youvideo.*$/i, '') || 'Youvideo';
+      if (!!d.externo !== externo) return; // aviso da vista que não está na tela
+      if (d.externo) {
+        const campo = q('#ofertasEndereco');
+        if (document.activeElement !== campo) campo.value = d.url || '';
+        q('#criarErro').textContent = '';
+      } else if (d.titulo) q('#criarTitulo').textContent = d.titulo.replace(/\s*[|·-]\s*Youvideo.*$/i, '') || 'Youvideo';
       q('#criarVoltar').disabled = !d.voltar;
     });
     window.api.ao('criar:carregando', (v) => (q('#criarCarregando').hidden = !v));

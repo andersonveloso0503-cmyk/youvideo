@@ -91,7 +91,14 @@ export default function Ofertas() {
   const [sujo, setSujo] = useState(false);
 
   useEffect(() => {
-    api('/api/ofertas/analises').then((d) => setAnalises(d.analises || [])).catch((e) => setAviso(e.message));
+    api('/api/ofertas/analises').then((d) => {
+      const lista = d.analises || [];
+      setAnalises(lista);
+      // o navegador de ofertas do Compilador abre esta tela já na análise recém-feita
+      const pedida = new URLSearchParams(window.location.search).get('analise');
+      const achada = pedida && lista.find((a) => a.id === pedida);
+      if (achada) setAnalise(achada);
+    }).catch((e) => setAviso(e.message));
     api('/api/ofertas').then((d) => setOfertas(d.ofertas || [])).catch(() => {});
     api('/api/livros').then((d) => setLivros(d.livros || [])).catch(() => {});
     try {

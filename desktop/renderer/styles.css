@@ -595,6 +595,11 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px;
 .criar-barra { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-bottom: 1px solid var(--borda); background: var(--bg-2); }
 .criar-titulo { font-weight: 700; margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .criar-carregando { color: var(--ouro); font-size: 12px; }
+.criar-endereco { flex: 1; min-width: 120px; padding: 5px 9px; font-size: 12px; }
+.criar-endereco[hidden], #ofertasCapturar[hidden] { display: none; }
+#ofertasCapturar { white-space: nowrap; }
+.criar-navegador.externo .criar-titulo { display: none; }
+.criar-navegador.externo .criar-download { margin-left: 0; }
 .criar-download { margin-left: auto; color: var(--ouro); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
 .criar-vista { flex: 1; position: relative; }
 .criar-erro { color: #e89a88; padding: 30px; text-align: center; }
