@@ -34,6 +34,7 @@ const Criar = (() => {
       cor: '#4a7a6e',
       itens: [
         ['/radar', '📡', 'Radar', 'Canais e vídeos em alta no YouTube para modelar'],
+        ['/ofertas', '🧭', 'Radar de Ofertas', 'Cole o link de uma oferta em alta e monte a sua completa: kit, página, cadastro e divulgação'],
         ['/canal', '📺', 'Meus canais', 'Temas, status e reformatar vídeos por canal'],
         ['/novo-canal', '➕', 'Novo canal', 'Criar um canal do zero, passo a passo'],
         ['/projetos', '🗂', 'Meus projetos', 'Tudo que já foi criado no Youvideo'],

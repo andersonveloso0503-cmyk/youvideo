@@ -276,6 +276,10 @@ export default function Home() {
           <div className="hub-tile-title">Youvideo Radar</div>
           <div className="hub-tile-desc">Canais e vídeos em alta no YouTube pra modelar: busca por score, crescimento, tendências e spy de canal</div>
         </a>
+        <a href="/ofertas" className="hub-tile hub-tile--terracotta">
+          <div className="hub-tile-title">Radar de Ofertas</div>
+          <div className="hub-tile-desc">Cole o link de uma oferta em alta e monte a sua completa: kit, página de vendas, cadastro e divulgação</div>
+        </a>
         <a href="/novo-canal" className="hub-tile hub-tile--gold">
           <div className="hub-tile-title">Novo canal</div>
           <div className="hub-tile-desc">Criar um canal novo do zero (wizard guiado)</div>
