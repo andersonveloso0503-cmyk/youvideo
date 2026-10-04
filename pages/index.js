@@ -284,6 +284,10 @@ export default function Home() {
           <div className="hub-tile-title">Meus canais</div>
           <div className="hub-tile-desc">Adicionar temas, ver status e reformatar vídeos por canal</div>
         </a>
+        <a href="/livros" className="hub-tile hub-tile--gold">
+          <div className="hub-tile-title">Livros bíblicos</div>
+          <div className="hub-tile-desc">Você escolhe a história: infantil ilustrado ou devocional, em PDF e Word editável</div>
+        </a>
         <a href="/estudio-musica" className="hub-tile hub-tile--gold">
           <div className="hub-tile-title">Estúdio de Música</div>
           <div className="hub-tile-desc">Crie músicas completas com IA (letra, voz, estilo) — tipo Suno</div>

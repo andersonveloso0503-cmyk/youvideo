@@ -11,6 +11,7 @@ const Criar = (() => {
         ['/series', '👤', 'Séries e personagens', 'Personagens com rosto consistente entre os vídeos'],
         ['/oracao', '🌅', 'Orações matinais', 'Oração calma com 1 imagem em loop'],
         ['/oracao-falada', '🙏', 'Oração falada', 'Personagem falando a oração'],
+        ['/livros', '📚', 'Livros bíblicos', 'Você escolhe a história: infantil ilustrado ou devocional, em PDF e Word'],
         ['/temas', '💡', 'Temas', 'Banco de ideias para os vídeos narrados'],
         ['/agendar', '⏰', 'Fila automática', 'Vídeos bíblicos narrados gerados sozinhos, 1 por dia'],
       ],
