@@ -111,6 +111,24 @@ export default function ConexaoTiktok() {
             {temChaves ? (
               <>
                 {linha(true, `As chaves ${r.chaves.sandbox ? 'de teste (Sandbox)' : 'do aplicativo'} estão na Vercel${r.chaves.final ? ` (a chave termina em …${r.chaves.final})` : ''}.`)}
+                {r.validacao && r.validacao.ok === true && linha(true, 'O TikTok reconheceu essas chaves.')}
+                {r.validacao && r.validacao.ok === false && (
+                  <>
+                    {linha(false, `O TikTok NÃO reconhece essas chaves (resposta dele: ${r.validacao.erro}).`)}
+                    <p style={nota}>
+                      Enquanto isso não ficar verde, o botão Conectar vai dar erro de client_key. Confira no site do TikTok, na tela do <b>Sandbox</b>:
+                      o <b>Client key</b> termina em …{r.chaves.final}? Se não termina, o valor na Vercel é de outro lugar (cole de novo o do Sandbox).
+                      Se termina igual, o problema é o <b>Client secret</b> (copie de novo) ou faltou clicar em <b>Apply changes</b> no Sandbox.
+                    </p>
+                  </>
+                )}
+                {r.validacao && r.validacao.ok === null && <p style={nota}>Não consegui confirmar as chaves agora: {r.validacao.erro}.</p>}
+                {r.tamanhos && (
+                  <p style={{ ...nota, fontSize: 12.5, opacity: 0.8 }}>
+                    Tamanho do que está na Vercel — Sandbox: chave {r.tamanhos.sandboxKey} letras, segredo {r.tamanhos.sandboxSecret} letras · Normal: chave {r.tamanhos.key}, segredo {r.tamanhos.secret}.
+                    (0 quer dizer que a variável não existe neste projeto ou está vazia.)
+                  </p>
+                )}
                 {!r.chaves.sandbox && !r.conectado && (
                   <p style={nota}>
                     Se ao conectar o TikTok mostrar <b>erro de client_key</b>, é porque o aplicativo ainda não foi aprovado e essa chave só vale depois da aprovação.

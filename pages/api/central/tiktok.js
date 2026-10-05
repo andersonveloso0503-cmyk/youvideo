@@ -5,9 +5,15 @@
 // POST { acao: 'desconectar' }         -> esquece a conexão
 import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
-import { chavesTiktok, redirectTiktok, tiktokConectado, contaTiktok, enviarRascunhoTiktok, statusEnvioTiktok, desconectarTiktok } from '../../../lib/publicarTiktok';
+import { chavesTiktok, validarChavesTiktok, redirectTiktok, tiktokConectado, contaTiktok, enviarRascunhoTiktok, statusEnvioTiktok, desconectarTiktok } from '../../../lib/publicarTiktok';
 
 export const config = { maxDuration: 120 };
+
+// Só o tamanho de cada chave (nunca o valor): ajuda a ver se a chave e o segredo foram colados trocados
+function tamanhosChaves() {
+  const t = (n) => String(process.env[n] || '').trim().length;
+  return { sandboxKey: t('TIKTOK_SANDBOX_CLIENT_KEY'), sandboxSecret: t('TIKTOK_SANDBOX_CLIENT_SECRET'), key: t('TIKTOK_CLIENT_KEY'), secret: t('TIKTOK_CLIENT_SECRET') };
+}
 
 export default async function handler(req, res) {
   if (!exigirToken(req, res)) return;
@@ -16,6 +22,9 @@ export default async function handler(req, res) {
       const chaves = chavesTiktok();
       const saida = { chaves, redirect: redirectTiktok(req.headers.host), conectado: false, conta: null, erro: null, escopos: '' };
       if (!chaves.key || !chaves.secret) return res.status(200).json(saida);
+      // O TikTok reconhece essas chaves? (é o que decide se o botão Conectar vai funcionar)
+      saida.validacao = await validarChavesTiktok();
+      saida.tamanhos = tamanhosChaves();
       saida.conectado = await tiktokConectado();
       if (saida.conectado) {
         const guardado = (await getDb().collection('youvideo_central').doc('tiktok').get()).data() || {};
