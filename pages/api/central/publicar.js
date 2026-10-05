@@ -10,9 +10,30 @@ export const config = { maxDuration: 300 };
 const COL = 'youvideo_agenda';
 const ORCAMENTO_MS = 240e3; // para antes do limite de 300 s da Vercel
 
+// Convite para o canal do YouTube nos posts da Página "Em Nome de Jesus" (só no Facebook: no Instagram o link não é clicável).
+// Vale para os vídeos da Fábrica (histórias e orações); os da empresa (LCS) têm a chamada do WhatsApp.
+const CANAL_YOUTUBE = process.env.YOUTUBE_CANAL_LINK || 'https://www.youtube.com/@EmNomedeJesus-h5x?sub_confirmation=1';
+const CONVITES = [
+  '▶ Veja mais histórias da Bíblia no nosso canal do YouTube:',
+  '▶ Tem uma história nova todo dia no nosso canal do YouTube. Inscreva-se:',
+  '▶ Gostou? No YouTube tem muito mais. Inscreva-se no canal:',
+  '▶ Acompanhe todas as histórias e orações no nosso canal do YouTube:',
+];
+function comConviteYoutube(legenda, item) {
+  if (item.conta || item.origem !== 'fabrica' || /youtube\.com|youtu\.be/i.test(legenda)) return legenda;
+  const dia = Math.floor(new Date(item.quando || Date.now()).getTime() / 86400e3);
+  const convite = `${CONVITES[dia % CONVITES.length]} ${CANAL_YOUTUBE}`;
+  // As hashtags continuam por último
+  const partes = String(legenda).trim().split(/\n\s*\n/);
+  const ultima = partes[partes.length - 1] || '';
+  const soHashtags = partes.length > 1 && /^(#[\p{L}\p{N}_]+\s*)+$/u.test(ultima.trim());
+  const texto = soHashtags ? [...partes.slice(0, -1), convite, ultima].join('\n\n') : `${String(legenda).trim()}\n\n${convite}`;
+  return texto.length <= 2200 ? texto : legenda;
+}
+
 async function publicarEm(rede, item) {
   const legenda = item.legenda || item.titulo;
-  if (rede === 'facebook') return publicarVideoFacebook({ videoUrl: item.videoUrl, legenda, conta: item.conta || '' });
+  if (rede === 'facebook') return publicarVideoFacebook({ videoUrl: item.videoUrl, legenda: comConviteYoutube(legenda, item), conta: item.conta || '' });
   throw new Error('Rede desconhecida');
 }
 
