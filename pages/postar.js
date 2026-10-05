@@ -132,6 +132,12 @@ export default function Postar() {
         <small>{cedo ? `Agendado para ${quando(a.quando)}` : `Era para ${quando(a.quando)}`}</small>
         <div className="redes">{faltando(a).map(([r, nome, cor]) => <span key={r} style={{ borderColor: cor, color: cor }}>{nome}</span>)}</div>
         <p className="legenda">{a.legendaCelular || a.legenda || a.titulo}</p>
+        {a.redes?.tiktok?.status !== 'ok' && a.redes?.tiktok?.rascunho?.status === 'ok' && (
+          <p className="no-tiktok">📥 Este vídeo já está dentro do seu TikTok. Copie a legenda, abra o TikTok, toque no aviso do vídeo na caixa de entrada, cole e publique. Para o Kwai, use os botões abaixo.</p>
+        )}
+        {a.redes?.tiktok?.status !== 'ok' && a.redes?.tiktok?.rascunho?.status === 'erro' && (
+          <p className="msg">Não consegui mandar direto para o TikTok ({a.redes.tiktok.rascunho.erro}). Poste pelo botão abaixo.</p>
+        )}
         {prontos[a.id] ? (
           <button className="principal" onClick={() => compartilhar(a)}>📤 Enviar para {faltando(a).map(([, n]) => n).join(' / ')}</button>
         ) : (
@@ -156,7 +162,7 @@ export default function Postar() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <h1>📱 Postar no TikTok e no Kwai</h1>
-      <p className="topo-links"><a href="/">← Youvideo</a> · <a href="/projetos">Meus projetos</a></p>
+      <p className="topo-links"><a href="/">← Youvideo</a> · <a href="/projetos">Meus projetos</a> · <a href="/tiktok">Conexão do TikTok</a></p>
       {!token ? (
         <div className="entrar">
           <p>Digite a senha da Central (a mesma do Youvideo Compilador). Fica guardada neste celular.</p>
@@ -209,6 +215,7 @@ export default function Postar() {
         .entrar input { font: inherit; padding: 12px; border-radius: 10px; border: 1px solid #3a3228; background: #211d17; color: #f3ead9; }
         .erro { color: #ff8a7a; }
         .msg { color: #d9a441; font-size: 13px; margin: 0; }
+        .no-tiktok { background: #10282a; border: 1px solid #25f4ee; color: #bff8f5; border-radius: 10px; padding: 10px; margin: 0; font-size: 13.5px; }
         .hoje { background: #2a1a22; border: 1px solid #ff3b5c; border-radius: 12px; padding: 12px; margin: 6px 0 4px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
         .topo-links { margin: -8px 0 12px; font-size: 13px; }
         .topo-links a { color: #d9a441; }

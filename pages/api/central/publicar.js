@@ -4,6 +4,7 @@
 import { getDb } from '../../../lib/firebase-admin';
 import { autorizado } from '../../../lib/central';
 import { publicarVideoFacebook, criarContainerInstagram, statusContainerInstagram, publicarContainerInstagram } from '../../../lib/publicarSocial';
+import { tiktokConectado, enviarRascunhoTiktok } from '../../../lib/publicarTiktok';
 
 export const config = { maxDuration: 300 };
 
@@ -114,6 +115,31 @@ export default async function handler(req, res) {
         }
       }
       await atualizarPendente(doc.ref);
+    }
+
+    // TikTok: na hora do post, manda o vídeo como RASCUNHO para dentro do TikTok (só se a conta estiver conectada em /tiktok).
+    // O dono toca no aviso dentro do TikTok, cola a legenda e publica. Só vídeos das últimas 6 h: nada de despejar os antigos.
+    if (Date.now() - inicio < ORCAMENTO_MS - 90e3 && (await tiktokConectado())) {
+      const desde = new Date(Date.now() - 6 * 3600e3).toISOString();
+      const recentes = await db.collection(COL).where('quando', '>=', desde).where('quando', '<=', agora).get();
+      const paraTiktok = recentes.docs
+        .filter((d) => {
+          const x = d.data();
+          return !x.conta && x.videoUrl && x.redes?.tiktok?.status === 'manual' && !x.redes.tiktok.rascunho;
+        })
+        .slice(0, 2);
+      for (const doc of paraTiktok) {
+        if (Date.now() - inicio > ORCAMENTO_MS - 60e3) break;
+        await doc.ref.update({ 'redes.tiktok.rascunho': { status: 'enviando', em: new Date().toISOString() } });
+        try {
+          const r = await enviarRascunhoTiktok({ videoUrl: doc.data().videoUrl });
+          await doc.ref.update({ 'redes.tiktok.rascunho': { status: 'ok', id: r.id, em: new Date().toISOString() } });
+          feitos.push({ id: doc.id, rede: 'tiktok', ok: true, obs: 'rascunho' });
+        } catch (e) {
+          await doc.ref.update({ 'redes.tiktok.rascunho': { status: 'erro', erro: String(e.message).slice(0, 300), em: new Date().toISOString() } });
+          feitos.push({ id: doc.id, rede: 'tiktok', ok: false, erro: e.message });
+        }
+      }
     }
     return res.status(200).json({ feitos });
   } catch (e) {
