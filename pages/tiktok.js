@@ -108,7 +108,19 @@ export default function ConexaoTiktok() {
         <>
           <div className="card">
             <h2>1. Chaves do aplicativo</h2>
-            {temChaves ? linha(true, 'As chaves do aplicativo do TikTok estão na Vercel.') : (
+            {temChaves ? (
+              <>
+                {linha(true, `As chaves ${r.chaves.sandbox ? 'de teste (Sandbox)' : 'do aplicativo'} estão na Vercel${r.chaves.final ? ` (a chave termina em …${r.chaves.final})` : ''}.`)}
+                {!r.chaves.sandbox && !r.conectado && (
+                  <p style={nota}>
+                    Se ao conectar o TikTok mostrar <b>erro de client_key</b>, é porque o aplicativo ainda não foi aprovado e essa chave só vale depois da aprovação.
+                    Nesse caso use as chaves de teste: no site developers.tiktok.com abra o aplicativo, mude para <b>Sandbox</b> (no alto da página), crie o Sandbox,
+                    e crie na Vercel duas variáveis novas com os valores de lá: <b>TIKTOK_SANDBOX_CLIENT_KEY</b> e <b>TIKTOK_SANDBOX_CLIENT_SECRET</b>. Depois faça o Redeploy.
+                    Não precisa apagar as que já existem.
+                  </p>
+                )}
+              </>
+            ) : (
               <>
                 {linha(false, `Falta na Vercel: ${[!r.chaves?.key && 'TIKTOK_CLIENT_KEY', !r.chaves?.secret && 'TIKTOK_CLIENT_SECRET'].filter(Boolean).join(' e ')}`)}
                 <p style={nota}>

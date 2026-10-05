@@ -1,6 +1,6 @@
 // Volta da autorização do TikTok: troca o código pela conexão e guarda (não precisa colar nada na Vercel).
 import { getDb } from '../../../lib/firebase-admin';
-import { redirectTiktok, salvarTokensTiktok } from '../../../lib/publicarTiktok';
+import { redirectTiktok, salvarTokensTiktok, credenciaisTiktok } from '../../../lib/publicarTiktok';
 
 const pagina = (res, status, titulo, texto) =>
   res.status(status).setHeader('Content-Type', 'text/html; charset=utf-8').send(
@@ -23,8 +23,8 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_key: process.env.TIKTOK_CLIENT_KEY || '',
-        client_secret: process.env.TIKTOK_CLIENT_SECRET || '',
+        client_key: credenciaisTiktok().key,
+        client_secret: credenciaisTiktok().secret,
         code: String(code),
         grant_type: 'authorization_code',
         redirect_uri: redirectTiktok(req.headers.host),
