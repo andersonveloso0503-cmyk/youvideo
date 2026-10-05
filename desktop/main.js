@@ -466,7 +466,16 @@ app.whenReady().then(() => {
         let descricao = it.descricao || '';
         // SEO de verdade: título, descrição e tags com base no que as pessoas buscam no YouTube
         let seoOk = false;
-        if (cfg.groqKey) {
+        if (it.oracao) {
+          // Oração do dia: o título já vem pronto no formato que as pessoas procuram ("Oração da Manhã de 7 de Outubro: ...")
+          const periodo = it.oracao.periodo === 'noite' ? 'oraçãodanoite' : 'oraçãodamanhã';
+          const limpo = titulo.replace(/\s*#[\p{L}\p{N}_]+/gu, '').trim();
+          titulo = [`${limpo} #oração #${periodo}`, `${limpo} #oração`, limpo].find((t) => t.length <= 100) || limpo.slice(0, 100);
+          const fixas = ['oração', it.oracao.periodo === 'noite' ? 'oração da noite' : 'oração da manhã', 'oração do dia', 'oração de hoje', 'oração poderosa', 'deus', 'jesus', 'fé'];
+          tags = [...new Set([...fixas, ...tags].map((t) => String(t).trim().toLowerCase()).filter(Boolean))].slice(0, 20);
+          descricao = `${String(descricao).replace(/#[\p{L}\p{N}_]+/gu, '').trim()}\n\n🙏 Inscreva-se para orar com a gente todos os dias.\n\n#oração #${periodo} #fé #Shorts`;
+          seoOk = true;
+        } else if (cfg.groqKey) {
           try {
             const usados = fila.lista().filter((j) => j.envio?.fabricaId).map((j) => j.nome).slice(-12);
             const r = await IA.gerarTextosVideo(cfg.groqKey, {
@@ -474,6 +483,7 @@ app.whenReady().then(() => {
               musicas: [],
               duracaoSeg: 60,
               curto: true,
+              tipo: 'historia', // título começa pelo nome da história (nada de "Por Que...?" em todo vídeo)
               canal: it.canalYoutube?.titulo || '',
               pedido: `história bíblica: ${it.serie?.nome || it.tema}`,
               contexto: `Canal cristão de histórias da Bíblia em Shorts (${it.estilo === 'desenho' ? 'desenho animado' : 'narração com imagens realistas'}). Resumo: ${String(it.descricao || '').slice(0, 400)}`,
@@ -530,6 +540,7 @@ app.whenReady().then(() => {
           agendarPara: quando ? quando.toISOString() : null,
           curto: true,
           fabricaId: it.id,
+          tipo: it.oracao ? 'oracao' : 'historias', // categoria "Pessoas e blogs" e idioma português (não "Música")
           conteudoIa: true, // histórias feitas com IA: marca no YouTube
           botao: (() => { const f = path.join(app.getPath('userData'), 'cache', 'botao', 'v2-pt', 'botao.mov'); return fs.existsSync(f) ? f : null; })(),
         }]);
@@ -806,6 +817,40 @@ app.whenReady().then(() => {
     sincronizarDepois();
     return store.canaisParaTela();
   });
+  // ---------- Arrumar os vídeos que já estão no canal (categoria, idioma e títulos fracos) ----------
+  ipcMain.handle('canais:conferir', async (_e, id) => {
+    const canal = store.canal(id);
+    if (!canal) throw new Error('Canal não encontrado. Conecte de novo em Contas YouTube.');
+    const cfg = store.ler();
+    const r = await YT.conferirCanal({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect });
+    // Títulos novos sugeridos pela IA para os fracos (o dono confere e pode mudar antes de aplicar)
+    const fracos = r.videos.filter((v) => v.motivoTitulo);
+    let avisoIa = '';
+    if (fracos.length) {
+      if (!cfg.groqKey) avisoIa = 'Cadastre a chave da Groq em Configurações para a IA sugerir os títulos novos.';
+      else {
+        try {
+          const novos = await IA.titulosHistoria(cfg.groqKey, fracos);
+          for (const v of fracos) v.tituloNovo = novos[v.id] || '';
+        } catch (e) {
+          avisoIa = `A IA não respondeu agora (${String(e.message || e).slice(0, 80)}). Dá para escrever os títulos à mão ou conferir de novo depois.`;
+        }
+      }
+    }
+    return { ...r, avisoIa };
+  });
+  ipcMain.handle('canais:corrigir', async (_e, { id, itens, categoria, idioma }) => {
+    const canal = store.canal(id);
+    if (!canal) throw new Error('Canal não encontrado. Conecte de novo em Contas YouTube.');
+    if (!Array.isArray(itens) || !itens.length) throw new Error('Nada para arrumar.');
+    const cfg = store.ler();
+    return YT.corrigirVideos({
+      credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect,
+      itens: itens.map((i) => ({ id: String(i.id), titulo: i.titulo ? String(i.titulo) : '' })),
+      categoria: categoria || undefined, idioma: idioma || undefined,
+      onProgresso: (x) => enviar('canais:progresso', x),
+    });
+  });
   ipcMain.handle('canais:remover', (_e, id) => {
     store.removerCanal(id);
     sincronizarDepois();
@@ -1024,6 +1069,7 @@ app.whenReady().then(() => {
           privacidade: 'private',
           agendarPara: it.quando,
           curto: !!v.curto,
+          tipo: v.categoria || null, // histórias, séries, músicas...: decide a categoria no YouTube
         });
       }
       if (redesNuvem.length) {

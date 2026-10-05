@@ -132,7 +132,23 @@ function limparTags(tags) {
 // O YouTube recusa < e > no título e na descrição
 const semSinais = (t) => String(t || '').replace(/[<>]/g, '');
 
-async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, titulo, descricao, tags, privacidade, miniatura, categoria, agendarPara, onProgresso, conteudoIa = false }) {
+/**
+ * Categoria do vídeo no YouTube: 10 = Música; 22 = Pessoas e blogs (histórias bíblicas, orações, vídeos falados).
+ * Vale, nesta ordem: a categoria do próprio envio, o tipo do vídeo na Biblioteca e, por fim, o nome do canal.
+ */
+const CATEGORIA_MUSICA = '10';
+const CATEGORIA_FALADO = '22';
+const TIPOS_MUSICA = ['musicas', 'medleys', 'cover', 'compilacoes'];
+const TIPOS_FALADO = ['historias', 'series', 'cortes', 'empresa', 'oracao'];
+const canalFalado = (titulo) => /jesus|cristo|b[ií]bli|\bdeus\b|ora[cç][aã]o|evangel|hist[oó]rias/i.test(String(titulo || ''));
+function categoriaDoVideo({ categoria, tipo, canalTitulo } = {}) {
+  if (/^\d+$/.test(String(categoria || ''))) return String(categoria);
+  if (TIPOS_MUSICA.includes(tipo)) return CATEGORIA_MUSICA;
+  if (TIPOS_FALADO.includes(tipo)) return CATEGORIA_FALADO;
+  return canalFalado(canalTitulo) ? CATEGORIA_FALADO : CATEGORIA_MUSICA;
+}
+
+async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, titulo, descricao, tags, privacidade, miniatura, categoria, idioma, agendarPara, onProgresso, conteudoIa = false }) {
   const auth = cliente(credenciais, redirectOriginal || REDIRECT);
   auth.setCredentials({ refresh_token: refreshToken });
   const yt = google.youtube({ version: 'v3', auth });
@@ -159,22 +175,33 @@ async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, 
     status.publishAt = new Date(agendarPara).toISOString();
   }
 
-  const r = await yt.videos.insert(
-    {
-      part: ['snippet', 'status'],
-      requestBody: {
-        snippet: {
-          title: semSinais(titulo).replace(/\s+/g, ' ').trim().slice(0, 100) || 'Compilação',
-          description: semSinais(descricao).slice(0, 4900),
-          tags: limparTags(tags),
-          categoryId: categoria || '10', // Música
+  const inserir = (comIdioma) =>
+    yt.videos.insert(
+      {
+        part: ['snippet', 'status'],
+        requestBody: {
+          snippet: {
+            title: semSinais(titulo).replace(/\s+/g, ' ').trim().slice(0, 100) || 'Compilação',
+            description: semSinais(descricao).slice(0, 4900),
+            tags: limparTags(tags),
+            categoryId: categoria || CATEGORIA_MUSICA,
+            // idioma do vídeo: ajuda o YouTube a mostrar para quem fala a língua (só vídeos falados; música pode ser em outra língua)
+            ...(comIdioma && idioma ? { defaultLanguage: idioma, defaultAudioLanguage: idioma } : {}),
+          },
+          status,
         },
-        status,
+        media: { body: fs.createReadStream(arquivo) },
       },
-      media: { body: fs.createReadStream(arquivo) },
-    },
-    { onUploadProgress: (e) => onProgresso && onProgresso(Math.min(1, e.bytesRead / tamanho)) }
-  );
+      { onUploadProgress: (e) => onProgresso && onProgresso(Math.min(1, e.bytesRead / tamanho)) }
+    );
+  let r;
+  try {
+    r = await inserir(true);
+  } catch (e) {
+    // Se o YouTube recusar o idioma, o vídeo sobe mesmo assim (sem o idioma marcado)
+    if (!idioma || !/language/i.test(String(e?.errors?.[0]?.reason || '') + String(e?.message || ''))) throw e;
+    r = await inserir(false);
+  }
   const id = r.data.id;
 
   let miniaturaErro = null;
@@ -212,5 +239,145 @@ async function ultimoAgendado({ credenciais, refreshToken, redirectOriginal }) {
   return datas.length ? new Date(Math.max(...datas)).toISOString() : null;
 }
 
+// ───────── Arrumar os vídeos que já estão no canal ─────────
+
+/** Por que um título é fraco (texto curto para mostrar na tela), ou '' se está bom. */
+function tituloFraco(titulo) {
+  const t = String(titulo || '').replace(/\s*#[\p{L}\p{N}_]+/gu, '').trim();
+  if (!t) return 'Sem título';
+  if (/^\d{1,2} de [\p{L}]+ de \d{4}$/iu.test(t)) return 'Só a data, sem dizer do que é o vídeo';
+  if (/^(v[ií]deo|short|compila[cç][aã]o)\b/i.test(t) && t.length < 25) return 'Título genérico';
+  if (/^(descubra|veja|conhe[cç]a|saiba|entenda)\s+(como|o que|por ?que|quem|a história)/i.test(t)) return 'Uma frase inteira no lugar do título';
+  if (t.length > 78 && /[.?!]$/.test(t) && !/[|—–:]/.test(t)) return 'Uma frase inteira no lugar do título';
+  if (/^por ?que\b/i.test(t)) return 'Começa com "Por Que", igual a vários outros vídeos';
+  return '';
+}
+
+const segundosIso = (iso) => {
+  const m = String(iso || '').match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+  return m ? (Number(m[1]) || 0) * 3600 + (Number(m[2]) || 0) * 60 + (Number(m[3]) || 0) : 0;
+};
+
+function youtubeDoCanal({ credenciais, refreshToken, redirectOriginal }) {
+  const auth = cliente(credenciais, redirectOriginal || REDIRECT);
+  auth.setCredentials({ refresh_token: refreshToken });
+  return google.youtube({ version: 'v3', auth });
+}
+
+/**
+ * Lê os vídeos do canal e diz o que há para arrumar em cada um. NÃO muda nada no YouTube.
+ * Devolve { canal, categoriaCerta, idiomaCerto, videos: [{ id, titulo, descricao, categoria, idioma, motivoTitulo, arrumarFicha, ... }] }.
+ */
+async function conferirCanal({ credenciais, refreshToken, redirectOriginal, maximo = 300 }) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const c = await yt.channels.list({ part: ['contentDetails', 'snippet'], mine: true });
+  const canal = c.data.items?.[0];
+  const uploads = canal?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploads) throw new Error('Não achei os vídeos deste canal.');
+  const canalTitulo = canal.snippet?.title || '';
+  const falado = categoriaDoVideo({ canalTitulo }) === CATEGORIA_FALADO;
+  const categoriaCerta = falado ? CATEGORIA_FALADO : CATEGORIA_MUSICA;
+  const idiomaCerto = falado ? 'pt-BR' : '';
+
+  const ids = [];
+  let pageToken;
+  do {
+    const r = await yt.playlistItems.list({ part: ['contentDetails'], playlistId: uploads, maxResults: 50, pageToken });
+    ids.push(...(r.data.items || []).map((i) => i.contentDetails?.videoId).filter(Boolean));
+    pageToken = r.data.nextPageToken;
+  } while (pageToken && ids.length < maximo);
+
+  const videos = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const v = await yt.videos.list({ part: ['snippet', 'status', 'contentDetails'], id: ids.slice(i, i + 50) });
+    for (const x of v.data.items || []) {
+      const sn = x.snippet || {};
+      const categoriaErrada = String(sn.categoryId || '') !== categoriaCerta;
+      const semIdioma = !!idiomaCerto && (!sn.defaultLanguage || !sn.defaultAudioLanguage);
+      videos.push({
+        id: x.id,
+        titulo: sn.title || '',
+        descricao: String(sn.description || '').slice(0, 600),
+        categoria: String(sn.categoryId || ''),
+        idioma: sn.defaultAudioLanguage || sn.defaultLanguage || '',
+        thumb: sn.thumbnails?.medium?.url || sn.thumbnails?.default?.url || null,
+        privacidade: x.status?.privacyStatus || '',
+        agendadoPara: x.status?.publishAt || null,
+        publicadoEm: sn.publishedAt || null,
+        duracaoSeg: segundosIso(x.contentDetails?.duration),
+        // Só canal de vídeo falado tem título revisado (em canal de música o título segue outra regra)
+        motivoTitulo: falado ? tituloFraco(sn.title) : '',
+        arrumarFicha: categoriaErrada || semIdioma,
+        categoriaErrada,
+        semIdioma,
+      });
+    }
+  }
+  return { canal: canalTitulo, falado, categoriaCerta, idiomaCerto, videos };
+}
+
+/**
+ * Aplica os consertos. itens = [{ id, titulo? }]: troca categoria e idioma (e o título, se vier).
+ * Sempre relê o vídeo antes de gravar, para não apagar descrição nem tags.
+ * Devolve { feitos: [id], falhas: [{ id, erro }], parou: texto|null }.
+ */
+async function corrigirVideos({ credenciais, refreshToken, redirectOriginal, itens, categoria, idioma, onProgresso }) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const atuais = {};
+  const ids = itens.map((i) => i.id);
+  for (let i = 0; i < ids.length; i += 50) {
+    const v = await yt.videos.list({ part: ['snippet'], id: ids.slice(i, i + 50) });
+    for (const x of v.data.items || []) atuais[x.id] = x.snippet;
+  }
+  const feitos = [];
+  const falhas = [];
+  let parou = null;
+  for (const [n, it] of itens.entries()) {
+    const sn = atuais[it.id];
+    if (!sn) {
+      falhas.push({ id: it.id, erro: 'Vídeo não encontrado no canal' });
+      continue;
+    }
+    try {
+      const novoTitulo = semSinais(it.titulo || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+      const lingua = idioma || sn.defaultLanguage || '';
+      const linguaAudio = idioma || sn.defaultAudioLanguage || '';
+      const gravar = (comIdiomaNovo) =>
+        yt.videos.update({
+          part: ['snippet'],
+          requestBody: {
+            id: it.id,
+            snippet: {
+              title: novoTitulo || sn.title,
+              description: sn.description || '',
+              tags: sn.tags || [],
+              categoryId: categoria || sn.categoryId,
+              ...((comIdiomaNovo ? lingua : sn.defaultLanguage) ? { defaultLanguage: comIdiomaNovo ? lingua : sn.defaultLanguage } : {}),
+              ...((comIdiomaNovo ? linguaAudio : sn.defaultAudioLanguage) ? { defaultAudioLanguage: comIdiomaNovo ? linguaAudio : sn.defaultAudioLanguage } : {}),
+            },
+          },
+        });
+      try {
+        await gravar(true);
+      } catch (e) {
+        // O YouTube recusou o idioma: grava o resto (categoria e título) sem mexer no idioma
+        if (!idioma || !/language/i.test(String(e?.errors?.[0]?.reason || '') + String(e?.message || ''))) throw e;
+        await gravar(false);
+      }
+      feitos.push(it.id);
+    } catch (e) {
+      const msg = String(e?.errors?.[0]?.reason || e?.message || e);
+      if (/quota|rateLimit|dailyLimit/i.test(msg)) {
+        parou = 'O YouTube atingiu o limite de alterações de hoje. Clique em "Conferir" de novo amanhã para terminar o que faltou.';
+        break;
+      }
+      falhas.push({ id: it.id, erro: msg.slice(0, 160) });
+    }
+    if (onProgresso) onProgresso((n + 1) / itens.length);
+  }
+  return { feitos, falhas, parou };
+}
+
 module.exports = {
-  limparTags, autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT };
+  limparTags, autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT,
+  categoriaDoVideo, tituloFraco, conferirCanal, corrigirVideos, CATEGORIA_MUSICA, CATEGORIA_FALADO };

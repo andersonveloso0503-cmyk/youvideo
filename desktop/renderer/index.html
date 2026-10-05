@@ -362,6 +362,23 @@
     <p class="modal-erro" id="erroCanais"></p>
   </dialog>
 
+  <!-- Modal: arrumar os vídeos que já estão no canal -->
+  <dialog class="modal largo" id="modalArrumar">
+    <div class="modal-topo"><h2 id="arrTitulo">Arrumar vídeos do canal</h2><button class="fechar" data-fechar>×</button></div>
+    <p class="modal-texto" id="arrResumo">Conferindo o canal...</p>
+    <label class="interruptor" id="arrFichaLinha" hidden><input type="checkbox" id="arrFicha" checked /><span></span> <b id="arrFichaTxt"></b></label>
+    <div id="arrTitulosBox" hidden>
+      <h3 class="arr-sub">Títulos fracos <small id="arrTitulosQtd"></small></h3>
+      <p class="nota">A IA sugeriu um título novo para cada um. Leia, mude o que quiser e desmarque os que não quer trocar.</p>
+      <div id="arrLista" class="arr-lista"></div>
+    </div>
+    <p class="modal-erro" id="arrErro"></p>
+    <div class="modal-acoes">
+      <button class="btn-primario" id="btnArrAplicar" hidden>✅ Aplicar no YouTube</button>
+      <span class="nota" id="arrNota"></span>
+    </div>
+  </dialog>
+
   <!-- Modal: atualizar o app -->
   <dialog class="modal" id="modalAtualizar">
     <div class="modal-topo"><h2>⬆ Nova versão</h2><button class="fechar" data-fechar>×</button></div>
@@ -375,8 +392,9 @@
   <!-- Modal: Fábrica de Shorts -->
   <dialog class="modal largo" id="modalFabrica">
     <div class="modal-topo"><h2>🏭 Fábrica de Shorts</h2><button class="fechar" data-fechar>×</button></div>
-    <div class="segmentado" id="fabMarcaAbas" style="max-width:520px;margin-bottom:10px">
+    <div class="segmentado" id="fabMarcaAbas" style="max-width:720px;margin-bottom:10px">
       <button type="button" class="ativo" data-marca="">📖 Histórias bíblicas</button>
+      <button type="button" data-marca="oracao">🙏 Oração do dia</button>
       <button type="button" data-marca="lcs">🏢 LCS Terceirização</button>
     </div>
     <p class="nota" id="fabNota">A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.</p>
@@ -386,6 +404,14 @@
       <div class="campo-config"><label>Dias</label>
         <select id="fabDiasSemana"><option value="1,3,5" selected>Segunda, quarta e sexta</option><option value="2,4,6">Terça, quinta e sábado</option><option value="1,2,3,4,5">Segunda a sexta</option></select></div>
       <div class="campo-config"><label>Horário do post</label><input type="time" id="fabHoraLcs" value="11:30" /></div>
+    </div>
+    <div class="fab-config" id="fabConfigOracao" hidden>
+      <div class="campo-config"><label>Quantos dias</label>
+        <select id="fabOrDias"><option value="7" selected>7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></div>
+      <div class="campo-config"><label>Oração</label>
+        <select id="fabOrPeriodo"><option value="manha" selected>Da manhã</option><option value="noite">Da noite</option></select></div>
+      <div class="campo-config"><label>Horário do post</label><input type="time" id="fabOrHora" value="06:00" /></div>
+      <div class="campo-config"><label>Canal do YouTube</label><select id="fabOrCanal"></select></div>
     </div>
     <div class="fab-config" id="fabConfigBiblia">
       <div class="campo-config"><label>Quantos dias</label>
@@ -635,6 +661,7 @@
   <script src="subir.js"></script>
   <script src="biblioteca.js"></script>
   <script src="fabrica.js"></script>
+  <script src="arrumar.js"></script>
   <script src="criar.js"></script>
   <script src="app.js"></script>
 </body>

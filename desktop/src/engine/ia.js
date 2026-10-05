@@ -236,6 +236,55 @@ function descreverVideo(info) {
     .join('\n');
 }
 
+// Título de história bíblica: nome claro do acontecimento + o que dá vontade de assistir.
+// (É o formato dos canais novos de histórias bíblicas que mais crescem; "Por Que...?" em todo vídeo não funciona.)
+const COMECO_FRACO = /^\s*(por ?que|descubra|voc[eê] sabia|conhe[cç]a|veja|saiba|entenda)\b/i;
+const REGRAS_TITULO_HISTORIA = `ESTE VÍDEO É UMA HISTÓRIA BÍBLICA NARRADA (não é música). Para ele, as REGRAS DO TÍTULO acima são TROCADAS por estas:
+1. Comece pelo NOME do acontecimento ou do personagem, do jeito que as pessoas procuram ("Daniel na Cova dos Leões", "Davi e Golias", "A Multiplicação dos Pães").
+2. Depois de ": " ou " — ", complete com a lição da história ou com o detalhe que dá vontade de assistir.
+3. Entre 35 e 60 caracteres. Português correto e natural: leia em voz alta — se soar estranho ou não fizer sentido, reescreva.
+4. PROIBIDO começar com "Por Que", "Descubra", "Você Sabia", "Conheça", "Veja", "Saiba". Proibido frase inteira no lugar do título e proibido inventar fato que não está na Bíblia.
+5. As 3 opções: (a) nome + "a História Bíblica de [tema]", (b) nome + a lição, (c) nome + o detalhe curioso.
+6. Sem emoji no meio. Sem aspas. Sem hashtag (o app coloca).
+Exemplos só da FORMA: "Davi e Golias: a Pedra que Derrubou o Gigante", "Rute e Noemi — a Lealdade que Mudou uma Família", "Elias no Monte Carmelo: a História Bíblica do Fogo do Céu".
+A palavra_principal continua sendo a busca da lista que melhor descreve a história.`;
+
+/**
+ * Títulos novos para vídeos de história bíblica que já estão no canal com título fraco.
+ * videos = [{ id, titulo, descricao }] -> { id: 'título novo' } (só os que a IA conseguiu melhorar).
+ */
+async function titulosHistoria(groqKey, videos) {
+  if (!groqKey) throw new Error('Para gerar com IA, cadastre a chave da Groq em Configurações.');
+  const saida = {};
+  for (let i = 0; i < videos.length; i += 12) {
+    const lote = videos.slice(i, i + 12);
+    const j = await chamarGroq(
+      groqKey,
+      [
+        {
+          role: 'system',
+          content:
+            'Você escreve títulos de vídeos de histórias bíblicas para o YouTube, em português do Brasil. ' +
+            'Responda SOMENTE com JSON: {"titulos": [{"id": "...", "titulo": "..."}]} — um para cada vídeo recebido, com o mesmo id.\n' +
+            'Descubra de qual história é cada vídeo pelo título atual e pela descrição. Se não der para saber qual é a história, devolva "titulo": "" para aquele id (não invente).\n' +
+            REGRAS_TITULO_HISTORIA.split('\n').slice(1, 7).join('\n') +
+            '\nCada título precisa ser diferente dos outros da lista.',
+        },
+        { role: 'user', content: lote.map((v) => `id: ${v.id}\ntítulo atual: ${v.titulo}\ndescrição: ${String(v.descricao || '').replace(/\s+/g, ' ').slice(0, 350)}`).join('\n\n') },
+      ],
+      { temperatura: 0.7, tokens: 1800 }
+    );
+    for (const t of Array.isArray(j.titulos) ? j.titulos : []) {
+      const novo = String(t?.titulo || '').replace(/^["'“]|["'”]$/g, '').replace(/\s*#[\p{L}\p{N}_]+/gu, '').replace(/\s+/g, ' ').trim();
+      const original = lote.find((v) => v.id === t?.id);
+      if (!original || novo.length < 12 || COMECO_FRACO.test(novo)) continue;
+      // Mantém o #Shorts se o título antigo já tinha
+      saida[original.id] = comHashtags(novo.slice(0, 80), ['histórias da bíblia'], /#shorts\b/i.test(original.titulo));
+    }
+  }
+  return saida;
+}
+
 /**
  * Gera { titulo, opcoes: [3 títulos], descricao, tags, pesquisados }.
  * info = { nome, musicas: [titulos], duracaoSeg, curto, canal, contexto, pedido, idioma, clima, evitar }
@@ -273,7 +322,9 @@ async function gerarTextosVideo(groqKey, info) {
 
   const { pesquisados } = await palavrasPesquisadas(groqKey, info, idiomaCodigo);
   const evitar = (info.evitar || []).filter(Boolean);
-  const aberturasUsadas = [...new Set(evitar.map(abertura).filter(Boolean))];
+  // História bíblica: o título começa pelo nome do personagem/acontecimento (regras próprias, mais abaixo)
+  const historia = info.tipo === 'historia';
+  const aberturasUsadas = historia ? [] : [...new Set(evitar.map(abertura).filter(Boolean))];
   // Cada vídeo do lote ganha uma palavra-chave de abertura diferente
   let chaveObrigatoria = '';
   if (evitar.length) {
@@ -333,6 +384,8 @@ DESCRIÇÃO
 TAGS
 - 15 a 25 tags: primeiro as buscas exatas da lista que combinam com o vídeo, depois variações e termos amplos. Sem "#". Total até 450 caracteres.${
     info.curto ? '\n\nÉ um YouTube Shorts: títulos de até 60 caracteres, com #Shorts no fim do título e nas hashtags. A DESCRIÇÃO do Short é CURTA: no máximo 3 frases (até 350 caracteres) — a 1ª com a palavra_principal, depois o convite para se inscrever — e as hashtags. Nada de vários parágrafos.' : ''
+  }${
+    historia ? `\n\n${REGRAS_TITULO_HISTORIA}` : ''
   }`;
 
   const usuario = `${descreverVideo(info)}
@@ -359,7 +412,10 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
 
   const proibidos = generosProibidos(info.pedido);
   const limparTitulo = (t) => String(t || '').replace(/^["'“]|["'”]$/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
-  const bom = (t) => !violaPedido(t, proibidos) && !evitar.some((e) => parecido(t, e) >= 0.7 || mesmaAbertura(t, e));
+  const bom = (t) =>
+    !violaPedido(t, proibidos) &&
+    !(historia && COMECO_FRACO.test(t)) &&
+    !evitar.some((e) => parecido(t, e) >= 0.7 || (!historia && mesmaAbertura(t, e)));
 
   let j, opcoes = [], melhor = 0, sobras = [];
   for (let tentativa = 0; tentativa < 3; tentativa++) {
@@ -403,7 +459,8 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   const principal = String(j.palavra_principal || '').trim();
   // Primeira letra maiúscula (as buscas do YouTube vêm em minúsculas)
   const maiuscula = (t) => String(t || '').replace(/^([^\p{L}]*)(\p{Ll})/u, (_, a, b) => a + b.toUpperCase());
-  opcoes = opcoes.map((t) => comHashtags(maiuscula(t), [principal, ...tags], !!info.curto));
+  // História bíblica: sempre a mesma hashtag do assunto (a pessoa clica e cai nas outras histórias)
+  opcoes = opcoes.map((t) => comHashtags(maiuscula(t), historia ? ['histórias da bíblia'] : [principal, ...tags], !!info.curto));
   j.descricao = String(j?.descricao || '').split('\n').map(maiuscula).join('\n');
 
   return {
@@ -416,4 +473,4 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   };
 }
 
-module.exports = { gerarTextosVideo, limparNome, sugestoesYoutube, comHashtags };
+module.exports = { gerarTextosVideo, limparNome, sugestoesYoutube, comHashtags, titulosHistoria };

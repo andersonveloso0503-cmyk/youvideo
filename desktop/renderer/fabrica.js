@@ -4,9 +4,12 @@
 const Fabrica = (() => {
   const q = (s) => document.querySelector(s);
   let ligado = false;
-  let marca = ''; // '' = histórias bíblicas; 'lcs' = vídeos de divulgação da LCS
+  let marca = ''; // '' = histórias bíblicas; 'oracao' = oração do dia; 'lcs' = vídeos de divulgação da LCS
+  // Em qual aba cada vídeo da fábrica aparece
+  const abaDe = (i) => i.marca || (i.oracao ? 'oracao' : '');
   const NOTAS = {
     '': 'A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.',
+    oracao: 'Um Short de <b>oração por dia</b> (cerca de 1 minuto), com a data no título — por exemplo "Oração da Manhã de 7 de Outubro" —, que é como as pessoas procuram oração no YouTube. A IA escreve a oração (um assunto diferente por dia), narra com imagens calmas, o seu PC monta, e ela é publicada sozinha no horário.',
     lcs: 'Vídeos curtos (cerca de 30 s) divulgando a <b>LCS Terceirização</b>: a IA escolhe o assunto (limpeza, portaria, zeladoria; condomínios e empresas), escreve o roteiro, narra, cria as imagens, o seu PC monta com o WhatsApp da LCS na tela, e cada um é publicado sozinho na <b>Página e no Instagram da LCS</b>.',
   };
 
@@ -15,7 +18,9 @@ const Fabrica = (() => {
     document.querySelectorAll('#fabMarcaAbas button').forEach((b) => b.classList.toggle('ativo', (b.dataset.marca || '') === marca));
     q('#fabNota').innerHTML = NOTAS[marca];
     q('#fabConfigLcs').hidden = marca !== 'lcs';
-    q('#fabConfigBiblia').hidden = marca === 'lcs';
+    q('#fabConfigOracao').hidden = marca !== 'oracao';
+    q('#fabConfigBiblia').hidden = marca !== '';
+    q('#fabYoutube').parentElement.lastChild.textContent = marca === 'oracao' ? ' YouTube' : ' YouTube (1 por dia)';
     document.querySelectorAll('#modalFabrica .so-biblia').forEach((el) => (el.hidden = marca === 'lcs'));
     custo();
     carregar();
@@ -52,6 +57,11 @@ const Fabrica = (() => {
   }
 
   function custo() {
+    if (marca === 'oracao') {
+      const qtd = Number(q('#fabOrDias').value);
+      q('#fabCusto').textContent = `${qtd} orações · custo aproximado US$ ${Math.max(1, Math.round(qtd * 0.25))} (imagens e voz)`;
+      return;
+    }
     if (marca === 'lcs') {
       const qtd = Number(q('#fabSemanas').value) * q('#fabDiasSemana').value.split(',').length;
       q('#fabCusto').textContent = `${qtd} vídeos · custo aproximado US$ ${(qtd * 0.35).toFixed(0)} (imagens e voz)`;
@@ -65,13 +75,15 @@ const Fabrica = (() => {
   }
 
   function preencherCanais() {
-    const sel = q('#fabCanal');
     const lista = typeof canais !== 'undefined' ? canais : [];
-    sel.innerHTML = lista.length
-      ? lista.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)}</option>`).join('')
-      : '<option value="">Nenhum canal conectado (Contas YouTube)</option>';
     const p = prefs();
-    if (p.canal && lista.some((c) => c.id === p.canal)) sel.value = p.canal;
+    for (const id of ['#fabCanal', '#fabOrCanal']) {
+      const sel = q(id);
+      sel.innerHTML = lista.length
+        ? lista.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)}</option>`).join('')
+        : '<option value="">Nenhum canal conectado (Contas YouTube)</option>';
+      if (p.canal && lista.some((c) => c.id === p.canal)) sel.value = p.canal;
+    }
   }
 
   function ligar() {
@@ -95,7 +107,9 @@ const Fabrica = (() => {
       })
     );
     document.querySelectorAll('#fabMarcaAbas button').forEach((b) => (b.onclick = () => trocarMarca(b.dataset.marca || '')));
-    ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs'].forEach((id) => q(id).addEventListener('change', custo));
+    ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs', '#fabOrDias'].forEach((id) => q(id).addEventListener('change', custo));
+    // Oração da noite: sugere o horário da noite
+    q('#fabOrPeriodo').addEventListener('change', () => (q('#fabOrHora').value = q('#fabOrPeriodo').value === 'noite' ? '21:00' : '06:00'));
     q('#btnFabCriar').onclick = criar;
     q('#btnFabAtualizar').onclick = () => carregar(true);
   }
@@ -105,6 +119,7 @@ const Fabrica = (() => {
     erro.textContent = '';
     if (!config.temCentral) return (erro.textContent = 'Cadastre a senha da Central em Configurações.');
     if (marca === 'lcs') return criarEmpresa(erro);
+    if (marca === 'oracao') return criarOracao(erro);
     const redes = {
       youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked,
       tiktok: q('#fabTiktok').checked, kwai: q('#fabKwai').checked,
@@ -130,6 +145,36 @@ const Fabrica = (() => {
         canalYoutube: redes.youtube && canal ? { id: canal.id, titulo: canal.titulo } : null,
       });
       avisar(`${r.criados.length} Shorts na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}`);
+      carregar();
+    } catch (e) {
+      erro.textContent = msgErro(e);
+    } finally {
+      b.disabled = false;
+      b.textContent = '🏭 Criar lote';
+    }
+  }
+
+  async function criarOracao(erro) {
+    const redes = {
+      youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked,
+      tiktok: q('#fabTiktok').checked, kwai: q('#fabKwai').checked,
+    };
+    if (!Object.values(redes).some(Boolean)) return (erro.textContent = 'Marque pelo menos uma rede.');
+    const canalId = q('#fabOrCanal').value;
+    if (redes.youtube && !canalId) return (erro.textContent = 'Conecte um canal em Contas YouTube (ou desmarque o YouTube).');
+    const dias = Number(q('#fabOrDias').value);
+    const periodo = q('#fabOrPeriodo').value;
+    if (!confirm(`Criar ${dias} orações da ${periodo === 'noite' ? 'noite' : 'manhã'}, uma por dia às ${q('#fabOrHora').value}? ${q('#fabCusto').textContent.split('·')[1] || ''}`)) return;
+    const b = q('#btnFabCriar');
+    b.disabled = true;
+    b.textContent = '🏭 Criando as orações...';
+    try {
+      const canal = (typeof canais !== 'undefined' ? canais : []).find((c) => c.id === canalId);
+      const r = await window.api.fabrica.criar({
+        tipo: 'oracao', dias, periodo, horarios: [q('#fabOrHora').value], redes,
+        canalYoutube: redes.youtube && canal ? { id: canal.id, titulo: canal.titulo } : null,
+      });
+      avisar(`${r.criados.length} orações na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}`);
       carregar();
     } catch (e) {
       erro.textContent = msgErro(e);
@@ -184,7 +229,7 @@ const Fabrica = (() => {
     }
     try {
       const { itens: todos = [] } = await window.api.fabrica.listar();
-      const itens = todos.filter((i) => (i.marca || '') === marca); // cada aba mostra só os seus
+      const itens = todos.filter((i) => abaDe(i) === marca); // cada aba mostra só os seus
       const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       if (!itens.length) {
         box.innerHTML = `<p class="nota">Nenhum vídeo na fábrica ainda. Escolha os dias e clique em "Criar lote". <b>Atualizado às ${hora}.</b></p>`;
@@ -206,7 +251,7 @@ const Fabrica = (() => {
         l.className = `fab-item st-${i.status}`;
         l.innerHTML = `
           <span class="hora">${esc(new Date(i.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))}</span>
-          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.animar ? 'Animado' : 'Imagens com zoom'}">${i.marca ? '🏢' : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
+          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.oracao ? 'Oração do dia' : i.animar ? 'Animado' : 'Imagens com zoom'}">${i.marca ? '🏢' : i.oracao ? '🙏' : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
           <span class="txt"><b></b><small></small></span>
           <span class="acoes"></span>`;
         l.querySelector('b').textContent = i.titulo || (i.serie ? `${i.serie.nome} (Parte ${i.serie.parte}/${i.serie.total})` : i.tema);

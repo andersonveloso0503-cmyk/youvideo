@@ -342,6 +342,11 @@ class Fila extends EventEmitter {
         refreshToken: canal.refreshToken,
         arquivo: arquivoEnvio,
         conteudoIa: e.conteudoIa ?? cfg.conteudoIa !== false,
+        // Categoria certa (história bíblica não é "Música") e idioma do vídeo falado
+        ...(() => {
+          const categoria = YT.categoriaDoVideo({ categoria: e.categoria, tipo: e.tipo, canalTitulo: canal.titulo });
+          return { categoria, idioma: e.idioma || (categoria === YT.CATEGORIA_FALADO ? 'pt-BR' : undefined) };
+        })(),
         titulo: e.titulo,
         descricao: e.descricao,
         tags: e.tags,

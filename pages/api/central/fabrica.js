@@ -8,6 +8,7 @@ import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 import { horarioBrasilia, diaBrasilia, somarDias } from '../../../lib/fabrica';
 import { empresa, faltaConfigurar, temasEmpresa } from '../../../lib/empresa';
+import { PERIODOS, intencaoDoDia, tituloOracao } from '../../../lib/oracaoDia';
 import { testarConta } from '../../../lib/publicarSocial';
 
 export const config = { maxDuration: 60 };
@@ -132,6 +133,7 @@ export default async function handler(req, res) {
           lote: x.fabrica.lote,
           serie: x.serie || null,
           marca: x.marca || '',
+          oracao: x.oracao || null,
         };
       });
       if (req.query.youtube === '1') {
@@ -208,6 +210,57 @@ export default async function handler(req, res) {
         return res.status(200).json({ lote: loteEmp, criados: criadosEmp, primeiroDia: datas[0] });
       }
 
+      // ── Oração do dia: 1 Short de oração por dia, com a data no título, no canal e nas redes escolhidas ──
+      if (b.tipo === 'oracao') {
+        const periodo = b.periodo === 'noite' ? 'noite' : 'manha';
+        const diasOr = Math.max(1, Math.min(31, Number(b.dias) || 7));
+        const horario = hora(b.horarios?.[0], PERIODOS[periodo].hora);
+        const redesOr = {
+          youtube: !!b.redes?.youtube && !!b.canalYoutube?.id,
+          facebook: !!b.redes?.facebook, instagram: !!b.redes?.instagram, tiktok: !!b.redes?.tiktok, kwai: !!b.redes?.kwai,
+        };
+        if (!Object.values(redesOr).some(Boolean)) return res.status(400).json({ erro: 'Marque pelo menos uma rede.' });
+        const todosOr = await col.where('fabrica.ativo', '==', true).get();
+        const minhas = todosOr.docs.filter((d) => d.data().oracao?.periodo === periodo);
+        const ultimaOr = minhas.map((d) => d.data().oracao?.dia).filter(Boolean).sort().pop();
+        let primeiroOr = somarDias(diaBrasilia(), 1);
+        // Precisa de tempo para roteiro, voz, imagens e montagem no PC: se faltar menos de 10 h, começa no dia seguinte
+        if (new Date(horarioBrasilia(primeiroOr, horario)).getTime() - Date.now() < 10 * 3600e3) primeiroOr = somarDias(primeiroOr, 1);
+        if (ultimaOr && ultimaOr >= primeiroOr) primeiroOr = somarDias(ultimaOr, 1); // continua depois da última já criada
+        const loteOr = Date.now().toString(36);
+        const batchOr = db.batch();
+        const criadasOr = [];
+        for (let i = 0; i < diasOr; i++) {
+          const dia = somarDias(primeiroOr, i);
+          const assunto = intencaoDoDia(dia, periodo);
+          const quando = horarioBrasilia(dia, horario);
+          const tema = `${tituloOracao({ dia, periodo })}: ${assunto}`;
+          const ref = col.doc();
+          batchOr.set(ref, {
+            tema,
+            oracao: { periodo, dia, assunto },
+            estilo: 'realista',
+            formato: 'short',
+            duracaoDesejada: '70',
+            animar: false,
+            status: 'pendente',
+            origem: 'fabrica',
+            criadoEm: new Date().toISOString(),
+            fabrica: {
+              ativo: true,
+              lote: loteOr,
+              quando,
+              quandoYoutube: redesOr.youtube ? quando : null,
+              redes: redesOr,
+              canalYoutube: redesOr.youtube ? { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') } : null,
+            },
+          });
+          criadasOr.push({ id: ref.id, tema, quando });
+        }
+        await batchOr.commit();
+        return res.status(200).json({ lote: loteOr, criados: criadasOr, primeiroDia: primeiroOr });
+      }
+
       const dias = Math.max(1, Math.min(31, Number(b.dias) || 7));
       const horarios = [hora(b.horarios?.[0], '12:00'), hora(b.horarios?.[1], '19:00')];
       const redes = {
@@ -223,7 +276,7 @@ export default async function handler(req, res) {
 
       // Continua depois do último horário já reservado pela fábrica (não encavala lotes)
       const todosAtivos = await col.where('fabrica.ativo', '==', true).get();
-      const ativos = { docs: todosAtivos.docs.filter((d) => !d.data().marca) }; // os vídeos da empresa têm agenda própria
+      const ativos = { docs: todosAtivos.docs.filter((d) => !d.data().marca && !d.data().oracao) }; // empresa e oração do dia têm agenda própria
       const ultimo = ativos.docs.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
       const amanha = somarDias(diaBrasilia(), 1);
       const primeiroDia = ultimo && diaBrasilia(new Date(ultimo)) >= amanha ? somarDias(diaBrasilia(new Date(ultimo)), 1) : amanha;

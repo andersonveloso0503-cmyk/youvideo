@@ -2,6 +2,7 @@ import { getDb } from '../../lib/firebase-admin';
 import { escolherProximo } from '../../lib/montarPc';
 import { agendarItemPronto } from '../../lib/fabrica';
 import { empresa, gerarRoteiroEmpresa } from '../../lib/empresa';
+import { gerarRoteiroOracaoDia } from '../../lib/oracaoDia';
 import { buscarSaldoFal } from '../../lib/orcamento';
 import {
   gerarRoteiro,
@@ -60,6 +61,12 @@ export default async function handler(req, res) {
           await ref.update({ roteiro: roteiroEmp, status: 'roteiro_ok' });
           break;
         }
+        if (item.oracao) {
+          // Oração do dia: texto de oração, com a data no título
+          const roteiroOr = await gerarRoteiroOracaoDia(item.oracao);
+          await ref.update({ roteiro: roteiroOr, status: 'roteiro_ok' });
+          break;
+        }
         const roteiro = await gerarRoteiro({
           tema: item.tema,
           estilo: item.estilo,
@@ -87,7 +94,7 @@ export default async function handler(req, res) {
           cenas: item.roteiro.cenas,
           estilo: item.estilo,
           formato: item.formato,
-          visual: item.marca ? 'empresa' : 'biblico', // empresa: nada de personagens bíblicos nas imagens
+          visual: item.marca ? 'empresa' : item.oracao ? 'oracao' : 'biblico', // empresa: nada bíblico; oração: paisagens serenas
         });
         await ref.update({ arquivos, status: 'imagens_ok', ...(item.marca ? { visual: 'empresa' } : {}) });
         break;

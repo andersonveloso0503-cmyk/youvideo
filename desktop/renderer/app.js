@@ -911,9 +911,10 @@ function renderCanais() {
   canais.forEach((c) => {
     const li = document.createElement('li');
     li.className = 'canal';
-    li.innerHTML = `${c.thumb ? `<img src="${c.thumb}" />` : '<span class="sem-foto"></span>'}<span class="info"><b></b><small>conectado em ${new Date(c.conectadoEm).toLocaleDateString('pt-BR')}</small></span><button class="btn-mini perigo">Desconectar</button>`;
+    li.innerHTML = `${c.thumb ? `<img src="${c.thumb}" />` : '<span class="sem-foto"></span>'}<span class="info"><b></b><small>conectado em ${new Date(c.conectadoEm).toLocaleDateString('pt-BR')}</small></span><button class="btn-mini destaque" data-arrumar title="Confere os vídeos que já estão no canal: categoria, idioma e títulos fracos">🛠 Arrumar vídeos</button><button class="btn-mini perigo" data-desconectar>Desconectar</button>`;
     li.querySelector('b').textContent = c.titulo;
-    li.querySelector('button').onclick = async () => {
+    li.querySelector('[data-arrumar]').onclick = () => Arrumar.abrir(c);
+    li.querySelector('[data-desconectar]').onclick = async () => {
       if (!confirm(`Desconectar o canal "${c.titulo}" deste app?`)) return;
       canais = await window.api.canais.remover(c.id);
       renderCanais();
