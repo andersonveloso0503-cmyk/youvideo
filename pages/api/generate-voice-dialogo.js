@@ -131,7 +131,7 @@ async function buscarVozesDisponiveis() {
   });
   const data = await vozesRes.json();
   if (!vozesRes.ok) throw new Error(data.detail?.message || 'Erro ao listar vozes da ElevenLabs');
-  return (data.voices || []).map((v) => ({ id: v.voice_id, nome: v.name }));
+  return (data.voices || []).map((v) => ({ id: v.voice_id, nome: v.name, genero: v.labels?.gender || '' }));
 }
 
 // Monta um mapa fixo "nome do personagem" -> voz da ElevenLabs, na ordem em
@@ -145,6 +145,17 @@ function montarMapaDeVozes(falas, vozes) {
   const outrasVozes = vozes.map((v) => v.id).filter((id) => id !== vozNarrador);
   const poolVozes = outrasVozes.length ? outrasVozes : vozes.map((v) => v.id);
 
+  // Quando a fala traz o sexo de quem fala (roteiro dos Cortes de Filme, na tela e na Fábrica),
+  // o personagem recebe uma voz do mesmo sexo, sem repetir enquanto houver voz sobrando.
+  // Sem essa informação (cortes cômicos), vale o rodízio de sempre.
+  const sexoDaVoz = (v) => (/female|femin/i.test(v.genero || '') ? 'mulher' : /male|mascul/i.test(v.genero || '') ? 'homem' : '');
+  const porSexo = { homem: [], mulher: [] };
+  for (const v of vozes) {
+    const sx = sexoDaVoz(v);
+    if (sx && poolVozes.includes(v.id)) porSexo[sx].push(v.id);
+  }
+  const usadas = new Set();
+
   const mapa = {};
   let proximoIndice = 0;
 
@@ -157,7 +168,15 @@ function montarMapaDeVozes(falas, vozes) {
       continue;
     }
 
+    const doSexo = porSexo[fala.sexo === 'mulher' ? 'mulher' : fala.sexo === 'homem' ? 'homem' : ''] || [];
+    if (doSexo.length) {
+      mapa[chave] = doSexo.find((id) => !usadas.has(id)) || doSexo[usadas.size % doSexo.length];
+      usadas.add(mapa[chave]);
+      continue;
+    }
+
     mapa[chave] = poolVozes[proximoIndice % poolVozes.length] || vozNarrador;
+    usadas.add(mapa[chave]);
     proximoIndice++;
   }
 

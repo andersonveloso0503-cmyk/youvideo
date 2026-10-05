@@ -490,8 +490,12 @@ app.whenReady().then(() => {
               curto: true,
               tipo: 'historia', // título começa pelo nome da história (nada de "Por Que...?" em todo vídeo)
               canal: it.canalYoutube?.titulo || '',
-              pedido: `história bíblica: ${it.serie?.nome || it.tema}`,
-              contexto: `Canal cristão de histórias da Bíblia em Shorts (${it.estilo === 'desenho' ? 'desenho animado' : 'narração com imagens realistas'}). Resumo: ${String(it.descricao || '').slice(0, 400)}`,
+              pedido: it.corte
+                ? `${it.corte.tipo === 'comico' ? 'cena bíblica de humor leve' : 'cena bíblica dramática'}: ${it.tema}`
+                : `história bíblica: ${it.serie?.nome || it.tema}`,
+              contexto: it.corte
+                ? `Canal cristão de histórias da Bíblia em Shorts. Este vídeo é uma cena curta em diálogo, com os personagens falando (${it.corte.tipo === 'comico' ? 'humor leve e respeitoso, em desenho animado' : 'cena dramática, com imagens realistas'}). É criação original: não diga que é trecho de filme ou série. Resumo: ${String(it.descricao || '').slice(0, 400)}`
+                : `Canal cristão de histórias da Bíblia em Shorts (${it.estilo === 'desenho' ? 'desenho animado' : 'narração com imagens realistas'}). Resumo: ${String(it.descricao || '').slice(0, 400)}`,
               evitar: usados,
             });
             if (r.titulo) titulo = r.titulo;

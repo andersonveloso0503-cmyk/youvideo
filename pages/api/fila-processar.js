@@ -42,6 +42,21 @@ export default async function handler(req, res) {
     return data.renderId;
   };
 
+  // Cortes (de filme e cômicos): o roteiro e as vozes vêm das MESMAS rotas que as telas
+  // /cortes-filme e /cortes-comicos usam, para o corte da Fábrica sair igual ao feito à mão.
+  const chamarApi = async (caminho, corpo) => {
+    const r = await fetch(`${baseUrl}${caminho}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || data.erro || `Erro em ${caminho} (${r.status})`);
+    return data;
+  };
+  // Nome que aparece no canto do vídeo (empresa: o dela; cortes: o do canal, como nas telas de cortes)
+  const marcaDe = (item) => (item.marca ? empresa(item.marca)?.marca : item.corte ? 'Em Nome de Jesus' : '');
+
   const checarMontagemViaApi = async (renderId) => {
     const r = await fetch(`${baseUrl}/api/assemble-video?id=${renderId}`);
     const data = await r.json();
@@ -67,6 +82,36 @@ export default async function handler(req, res) {
           await ref.update({ roteiro: roteiroOr, status: 'roteiro_ok' });
           break;
         }
+        if (item.corte) {
+          // Corte: cena em diálogo (cada "cena" do roteiro é a fala de um personagem)
+          const rc = await chamarApi(item.corte.tipo === 'comico' ? '/api/generate-script-comico' : '/api/generate-script-filme', {
+            tema: item.corte.cena ? `${item.tema}. ${item.corte.cena}` : item.tema,
+            estilo: item.estilo,
+            formato: item.formato,
+            duracaoDesejada: item.duracaoDesejada,
+            tom: item.corte.tom || undefined,
+          });
+          const falas = (Array.isArray(rc.cenas) ? rc.cenas : []).filter((c) => c && String(c.textoNarrado || '').trim());
+          if (!falas.length) throw new Error('O roteiro do corte veio sem falas.');
+          const roteiroCorte = {
+            titulo: String(rc.titulo || item.tema),
+            descricao: String(rc.descricao || ''),
+            tags: Array.isArray(rc.tags) ? rc.tags : [],
+            thumbnailTitulo: String(rc.thumbnailTitulo || ''),
+            thumbnailSubtitulo: String(rc.thumbnailSubtitulo || ''),
+            referencia: String(rc.referencia || ''),
+            narracao: falas.map((c) => `${c.personagem || 'Narrador'}: ${c.textoNarrado}`).join('\n'),
+            cenas: falas.map((c) => ({
+              personagem: String(c.personagem || 'Narrador'),
+              sexo: c.sexo === 'mulher' ? 'mulher' : c.sexo === 'homem' ? 'homem' : '',
+              textoNarrado: String(c.textoNarrado).trim(),
+              vozTipo: ['grave', 'aguda'].includes(c.vozTipo) ? c.vozTipo : 'normal',
+              descricao: String(c.descricao || ''),
+            })),
+          };
+          await ref.update({ roteiro: roteiroCorte, status: 'roteiro_ok' });
+          break;
+        }
         const roteiro = await gerarRoteiro({
           tema: item.tema,
           estilo: item.estilo,
@@ -79,6 +124,23 @@ export default async function handler(req, res) {
       }
 
       case 'roteiro_ok': {
+        if (item.corte) {
+          // Uma voz por personagem; a resposta traz o tempo exato de cada fala,
+          // que vira o tempo da imagem daquela cena
+          const modeloVoz = item.modelo || process.env.ELEVENLABS_MODELO_PADRAO;
+          const voz = await chamarApi('/api/generate-voice-dialogo', {
+            falas: item.roteiro.cenas.map((c) => ({ personagem: c.personagem, texto: c.textoNarrado, vozTipo: c.vozTipo, ...(c.sexo ? { sexo: c.sexo } : {}) })),
+            ...(modeloVoz === 'flash' ? { modelo: 'flash' } : {}),
+          });
+          if (!voz.audioSegments?.length) throw new Error('As vozes do corte vieram vazias.');
+          const tempos = voz.cenasComTempo || [];
+          await ref.update({
+            narracao: { audioUrl: voz.audioUrl, audioSegments: voz.audioSegments, palavras: voz.palavras || [] },
+            'roteiro.cenas': item.roteiro.cenas.map((c, i) => ({ ...c, start: tempos[i]?.start ?? null, length: tempos[i]?.length ?? null })),
+            status: 'voz_ok',
+          });
+          break;
+        }
         const narracao = await gerarNarracao({
           texto: item.roteiro.narracao,
           modelo: item.modelo || process.env.ELEVENLABS_MODELO_PADRAO,
@@ -90,12 +152,20 @@ export default async function handler(req, res) {
       }
 
       case 'voz_ok': {
-        const arquivos = await gerarImagens({
+        let arquivos = await gerarImagens({
           cenas: item.roteiro.cenas,
           estilo: item.estilo,
           formato: item.formato,
           visual: item.marca ? 'empresa' : item.oracao ? 'oracao' : 'biblico', // empresa: nada bíblico; oração: paisagens serenas
         });
+        if (item.corte) {
+          // Cada imagem entra e sai junto com a fala da sua cena (mesma ordem do roteiro)
+          arquivos = arquivos.map((a, i) => {
+            const c = item.roteiro.cenas[i];
+            return c && c.start != null && c.length != null ? { ...a, start: c.start, length: c.length } : a;
+          });
+          if (!arquivos.some((a) => a.imageUrl)) throw new Error('Nenhuma imagem do corte passou pelo filtro de conteúdo.');
+        }
         await ref.update({ arquivos, status: 'imagens_ok', ...(item.marca ? { visual: 'empresa' } : {}) });
         break;
       }
@@ -122,7 +192,7 @@ export default async function handler(req, res) {
             cenas: item.arquivos,
             formato: item.formato,
             palavras: item.narracao.palavras,
-            marca: item.marca ? empresa(item.marca)?.marca : '',
+            marca: marcaDe(item),
             cta: item.marca ? empresa(item.marca)?.cta : '',
           });
           await ref.update({ duracaoAlvo, renderId, status: 'montando' });
@@ -189,6 +259,7 @@ export default async function handler(req, res) {
             cenas: arquivosAtualizados,
             formato: item.formato,
             palavras: item.narracao.palavras,
+            marca: marcaDe(item),
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
         } else {
@@ -206,7 +277,7 @@ export default async function handler(req, res) {
           const agendaId = await agendarItemPronto(item, check.videoUrl, thumbnailUrl);
           await db.collection('youvideo_projects').add({
             origem: 'fabrica',
-            categoria: item.marca ? 'empresa' : item.estilo === 'desenho' ? 'historias' : 'series',
+            categoria: item.marca ? 'empresa' : item.corte ? 'cortes' : item.estilo === 'desenho' ? 'historias' : 'series',
             ...(item.marca ? { canal: item.marca } : {}),
             tema: item.tema,
             estilo: item.estilo,

@@ -1,47 +1,6 @@
 import { useState, useEffect } from 'react';
+import { SITUACOES_COMICAS as SITUACOES } from '../lib/cortes';
 
-const SITUACOES = [
-  {
-    nome: 'Noé organizando o embarque dos animais',
-    tema:
-      'Noé tentando organizar a fila de embarque dos animais na arca, dois a dois, e a bagunça que isso vira: animais que não querem entrar, briga por lugar, confusão de quem já embarcou ou não, enquanto a chuva já está quase começando.',
-  },
-  {
-    nome: 'Golias esperando alguém topar o duelo',
-    tema:
-      'Golias, o gigante filisteu, esperando há 40 dias por alguém do exército de Israel que tope duelar com ele, cada vez mais entediado e impaciente, gritando desafios que ninguém responde, até finalmente aparecer um jovem pastor desarmado chamado Davi.',
-  },
-  {
-    nome: 'Jonas tentando negociar pra não ir a Nínive',
-    tema:
-      'Jonas tentando de todo jeito arranjar desculpas pra não obedecer à ordem de ir pregar em Nínive, embarcando escondido num navio pra fugir na direção contrária, até a tempestade e o grande peixe aparecerem no pior momento possível.',
-  },
-  {
-    nome: 'José contando os sonhos pros irmãos',
-    tema:
-      'José contando empolgado pros irmãos mais velhos os sonhos em que todos se curvam diante dele, sem perceber o clima cada vez mais tenso e as caras fechadas dos irmãos ao redor, até a situação virar ciúme total.',
-  },
-  {
-    nome: 'Sansão explicando o corte de cabelo',
-    tema:
-      'Sansão tentando esconder de todo mundo o segredo da sua força vindo do cabelo, e a insistência de Dalila perguntando repetidas vezes qual é o segredo, com ele inventando desculpas cada vez mais esfarrapadas até finalmente contar a verdade.',
-  },
-  {
-    nome: 'Moisés voltando pro Faraó pela enésima vez',
-    tema:
-      'Moisés tendo que voltar ao palácio do Faraó de novo, pedido atrás de pedido pra libertar o povo de Israel, cada vez mais cansado da resposta repetida de "não", enquanto uma praga atrás da outra vai acontecendo no Egito.',
-  },
-  {
-    nome: 'Os discípulos discutindo quem é o maior',
-    tema:
-      'Os discípulos de Jesus discutindo pelo caminho, cada um tentando provar por que merece ser considerado o mais importante do grupo, até Jesus os interromper com uma pergunta que pega todo mundo de surpresa.',
-  },
-  {
-    nome: 'Adão explicando por que comeu o fruto',
-    tema:
-      'Adão tentando se explicar quando é confrontado sobre ter comido o fruto proibido, indo trocando de desculpa e apontando a culpa pra outro lado, numa cena de justificativa cada vez mais sem saída.',
-  },
-];
 
 const VOZ_TIPO_LABEL = {
   normal: 'Normal',

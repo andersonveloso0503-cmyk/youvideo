@@ -4,11 +4,12 @@
 const Fabrica = (() => {
   const q = (s) => document.querySelector(s);
   let ligado = false;
-  let marca = ''; // '' = histórias bíblicas; 'oracao' = oração do dia; 'lcs' = vídeos de divulgação da LCS
+  let marca = ''; // '' = histórias bíblicas; 'cortes' = cortes de filme e cômicos; 'oracao' = oração do dia; 'lcs' = vídeos de divulgação da LCS
   // Em qual aba cada vídeo da fábrica aparece
-  const abaDe = (i) => i.marca || (i.oracao ? 'oracao' : '');
+  const abaDe = (i) => i.marca || (i.oracao ? 'oracao' : i.corte ? 'cortes' : '');
   const NOTAS = {
     '': 'A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.',
+    cortes: 'Cenas curtas em <b>diálogo</b>, com uma voz para cada personagem. <b>Corte de filme</b>: cena bíblica dramática, com imagem realista (cerca de 45 s). <b>Corte cômico</b>: situação engraçada em desenho animado (cerca de 1 min). A IA escolhe as cenas sem repetir, escreve as falas, o seu PC monta, e cada corte é agendado sozinho nas redes.',
     oracao: 'Um Short de <b>oração por dia</b> (cerca de 1 minuto), com a data no título — por exemplo "Oração da Manhã de 7 de Outubro" —, que é como as pessoas procuram oração no YouTube. A IA escreve a oração (um assunto diferente por dia), narra com imagens calmas, o seu PC monta, e ela é publicada sozinha no horário.',
     lcs: 'Vídeos curtos (cerca de 30 s) divulgando a <b>LCS Terceirização</b>: a IA escolhe o assunto (limpeza, portaria, zeladoria; condomínios e empresas), escreve o roteiro, narra, cria as imagens, o seu PC monta com o WhatsApp da LCS na tela, e cada um é publicado sozinho na <b>Página e no Instagram da LCS</b>.',
   };
@@ -19,6 +20,7 @@ const Fabrica = (() => {
     q('#fabNota').innerHTML = NOTAS[marca];
     q('#fabConfigLcs').hidden = marca !== 'lcs';
     q('#fabConfigOracao').hidden = marca !== 'oracao';
+    q('#fabConfigCortes').hidden = marca !== 'cortes';
     q('#fabConfigBiblia').hidden = marca !== '';
     q('#fabYoutube').parentElement.lastChild.textContent = marca === 'oracao' ? ' YouTube' : ' YouTube (1 por dia)';
     document.querySelectorAll('#modalFabrica .so-biblia').forEach((el) => (el.hidden = marca === 'lcs'));
@@ -38,6 +40,8 @@ const Fabrica = (() => {
   };
   // Custo aproximado por Short de 1 min (imagens + voz + animação)
   const CUSTO = { animado: 1.3, parado: 0.45 };
+  // Corte tem mais cenas (uma imagem por fala) e várias vozes: sai um pouco mais caro que um Short narrado
+  const CUSTO_CORTE = { animado: 1.6, parado: 0.55 };
 
   const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const quandoTxt = (iso) =>
@@ -51,12 +55,20 @@ const Fabrica = (() => {
       dias: q('#fabDias').value, porDia: q('#fabPorDia').value, hora1: q('#fabHora1').value, hora2: q('#fabHora2').value,
       animacao: q('#fabAnimacao').value, canal: q('#fabCanal').value, formato: q('#fabFormato').value,
       redes: { youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked, tiktok: q('#fabTiktok').checked, kwai: q('#fabKwai').checked },
+      cortes: { tipo: q('#fabCtTipo').value, dias: q('#fabCtDias').value, porDia: q('#fabCtPorDia').value, hora1: q('#fabCtHora1').value, hora2: q('#fabCtHora2').value, animacao: q('#fabCtAnimacao').value },
     };
     config.fabricaPrefs = p;
     window.api.config.salvar({ fabricaPrefs: p }).catch(() => {});
   }
 
   function custo() {
+    if (marca === 'cortes') {
+      const qtd = Number(q('#fabCtDias').value) * Number(q('#fabCtPorDia').value);
+      const animado = q('#fabCtAnimacao').value !== 'nada';
+      const total = qtd * (animado ? CUSTO_CORTE.animado : CUSTO_CORTE.parado);
+      q('#fabCusto').textContent = `${qtd} cortes · custo aproximado US$ ${Math.max(1, Math.round(total))} (${animado ? 'imagens, vozes e animação' : 'imagens e vozes'})`;
+      return;
+    }
     if (marca === 'oracao') {
       const qtd = Number(q('#fabOrDias').value);
       q('#fabCusto').textContent = `${qtd} orações · custo aproximado US$ ${Math.max(1, Math.round(qtd * 0.25))} (imagens e voz)`;
@@ -77,7 +89,7 @@ const Fabrica = (() => {
   function preencherCanais() {
     const lista = typeof canais !== 'undefined' ? canais : [];
     const p = prefs();
-    for (const id of ['#fabCanal', '#fabOrCanal']) {
+    for (const id of ['#fabCanal', '#fabOrCanal', '#fabCtCanal']) {
       const sel = q(id);
       sel.innerHTML = lista.length
         ? lista.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)}</option>`).join('')
@@ -108,6 +120,19 @@ const Fabrica = (() => {
     );
     document.querySelectorAll('#fabMarcaAbas button').forEach((b) => (b.onclick = () => trocarMarca(b.dataset.marca || '')));
     ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs', '#fabOrDias'].forEach((id) => q(id).addEventListener('change', custo));
+    // Cortes: lembra as escolhas da última vez
+    const pc = p.cortes || {};
+    for (const [chave, id] of [['tipo', '#fabCtTipo'], ['dias', '#fabCtDias'], ['porDia', '#fabCtPorDia'], ['hora1', '#fabCtHora1'], ['hora2', '#fabCtHora2'], ['animacao', '#fabCtAnimacao']]) {
+      if (pc[chave]) q(id).value = pc[chave];
+    }
+    ['#fabCtTipo', '#fabCtDias', '#fabCtPorDia', '#fabCtHora1', '#fabCtHora2', '#fabCtAnimacao', '#fabCtCanal'].forEach((id) =>
+      q(id).addEventListener('change', () => {
+        salvarPrefs();
+        custo();
+        q('#fabCtHora2').disabled = q('#fabCtPorDia').value === '1';
+      })
+    );
+    q('#fabCtHora2').disabled = q('#fabCtPorDia').value === '1';
     // Oração da noite: sugere o horário da noite
     q('#fabOrPeriodo').addEventListener('change', () => (q('#fabOrHora').value = q('#fabOrPeriodo').value === 'noite' ? '21:00' : '06:00'));
     q('#btnFabCriar').onclick = criar;
@@ -120,6 +145,7 @@ const Fabrica = (() => {
     if (!config.temCentral) return (erro.textContent = 'Cadastre a senha da Central em Configurações.');
     if (marca === 'lcs') return criarEmpresa(erro);
     if (marca === 'oracao') return criarOracao(erro);
+    if (marca === 'cortes') return criarCortes(erro);
     const redes = {
       youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked,
       tiktok: q('#fabTiktok').checked, kwai: q('#fabKwai').checked,
@@ -145,6 +171,42 @@ const Fabrica = (() => {
         canalYoutube: redes.youtube && canal ? { id: canal.id, titulo: canal.titulo } : null,
       });
       avisar(`${r.criados.length} Shorts na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}`);
+      carregar();
+    } catch (e) {
+      erro.textContent = msgErro(e);
+    } finally {
+      b.disabled = false;
+      b.textContent = '🏭 Criar lote';
+    }
+  }
+
+  async function criarCortes(erro) {
+    const redes = {
+      youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked,
+      tiktok: q('#fabTiktok').checked, kwai: q('#fabKwai').checked,
+    };
+    if (!Object.values(redes).some(Boolean)) return (erro.textContent = 'Marque pelo menos uma rede.');
+    const canalId = q('#fabCtCanal').value;
+    if (redes.youtube && !canalId) return (erro.textContent = 'Conecte um canal em Contas YouTube (ou desmarque o YouTube).');
+    const dias = Number(q('#fabCtDias').value);
+    const porDia = Number(q('#fabCtPorDia').value);
+    const tipo = q('#fabCtTipo').value;
+    const nomeTipo = { alternar: 'cortes (de filme e cômicos)', filme: 'cortes de filme', comico: 'cortes cômicos' }[tipo];
+    if (!confirm(`Criar ${dias * porDia} ${nomeTipo}? ${q('#fabCusto').textContent.split('·')[1] || ''}\nA IA escolhe as cenas e eles já ficam agendados.`)) return;
+    const b = q('#btnFabCriar');
+    b.disabled = true;
+    b.textContent = '🏭 A IA está escolhendo as cenas...';
+    try {
+      const canal = (typeof canais !== 'undefined' ? canais : []).find((c) => c.id === canalId);
+      const r = await window.api.fabrica.criar({
+        tipo: 'cortes', estiloCorte: tipo, dias, porDia,
+        horarios: [q('#fabCtHora1').value, q('#fabCtHora2').value],
+        animacao: q('#fabCtAnimacao').value,
+        redes,
+        canalYoutube: redes.youtube && canal ? { id: canal.id, titulo: canal.titulo } : null,
+      });
+      const faltou = dias * porDia - r.criados.length;
+      avisar(`${r.criados.length} cortes na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}${faltou > 0 ? ` (${faltou === 1 ? 'faltou 1' : `faltaram ${faltou}`}: a IA não achou mais cenas novas)` : ''}`);
       carregar();
     } catch (e) {
       erro.textContent = msgErro(e);
@@ -251,7 +313,7 @@ const Fabrica = (() => {
         l.className = `fab-item st-${i.status}`;
         l.innerHTML = `
           <span class="hora">${esc(new Date(i.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))}</span>
-          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.oracao ? 'Oração do dia' : i.animar ? 'Animado' : 'Imagens com zoom'}">${i.marca ? '🏢' : i.oracao ? '🙏' : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
+          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.oracao ? 'Oração do dia' : `${i.corte ? (i.corte.tipo === 'comico' ? 'Corte cômico · ' : 'Corte de filme · ') : ''}${i.animar ? 'Animado' : 'Imagens com zoom'}`}">${i.marca ? '🏢' : i.oracao ? '🙏' : i.corte ? (i.corte.tipo === 'comico' ? '😂' : '🎬') : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
           <span class="txt"><b></b><small></small></span>
           <span class="acoes"></span>`;
         l.querySelector('b').textContent = i.titulo || (i.serie ? `${i.serie.nome} (Parte ${i.serie.parte}/${i.serie.total})` : i.tema);

@@ -392,8 +392,9 @@
   <!-- Modal: Fábrica de Shorts -->
   <dialog class="modal largo" id="modalFabrica">
     <div class="modal-topo"><h2>🏭 Fábrica de Shorts</h2><button class="fechar" data-fechar>×</button></div>
-    <div class="segmentado" id="fabMarcaAbas" style="max-width:720px;margin-bottom:10px">
+    <div class="segmentado" id="fabMarcaAbas" style="max-width:860px;margin-bottom:10px">
       <button type="button" class="ativo" data-marca="">📖 Histórias bíblicas</button>
+      <button type="button" data-marca="cortes">🎬 Cortes</button>
       <button type="button" data-marca="oracao">🙏 Oração do dia</button>
       <button type="button" data-marca="lcs">🏢 LCS Terceirização</button>
     </div>
@@ -412,6 +413,19 @@
         <select id="fabOrPeriodo"><option value="manha" selected>Da manhã</option><option value="noite">Da noite</option></select></div>
       <div class="campo-config"><label>Horário do post</label><input type="time" id="fabOrHora" value="06:00" /></div>
       <div class="campo-config"><label>Canal do YouTube</label><select id="fabOrCanal"></select></div>
+    </div>
+    <div class="fab-config" id="fabConfigCortes" hidden>
+      <div class="campo-config"><label>Tipo de corte</label>
+        <select id="fabCtTipo"><option value="alternar" selected>Alternar: de filme e cômico</option><option value="filme">Só cortes de filme</option><option value="comico">Só cortes cômicos</option></select></div>
+      <div class="campo-config"><label>Quantos dias</label>
+        <select id="fabCtDias"><option value="3">3 dias</option><option value="7" selected>7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></div>
+      <div class="campo-config"><label>Cortes por dia</label>
+        <select id="fabCtPorDia"><option value="1" selected>1</option><option value="2">2 (YouTube recebe 1)</option></select></div>
+      <div class="campo-config"><label>1º horário (vai também no YouTube)</label><input type="time" id="fabCtHora1" value="10:00" /></div>
+      <div class="campo-config"><label>2º horário</label><input type="time" id="fabCtHora2" value="16:00" /></div>
+      <div class="campo-config"><label>Animação</label>
+        <select id="fabCtAnimacao"><option value="tudo" selected>Animado (cara de filme)</option><option value="nada">Com zoom (mais barato)</option></select></div>
+      <div class="campo-config"><label>Canal do YouTube</label><select id="fabCtCanal"></select></div>
     </div>
     <div class="fab-config" id="fabConfigBiblia">
       <div class="campo-config"><label>Quantos dias</label>

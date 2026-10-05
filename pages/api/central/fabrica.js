@@ -2,6 +2,8 @@
 // GET                                   -> { itens }  lotes da fábrica (andamento de cada vídeo)
 // GET  ?youtube=1                        -> { itens }  prontos esperando o PC subir no YouTube
 // POST { acao:'criar', dias, horarios, redes, canalYoutube, animacao }  -> cria o lote (a IA escolhe os temas)
+// POST { acao:'criar', tipo:'cortes', estiloCorte:'filme'|'comico'|'alternar', dias, porDia, horarios, animacao, redes, canalYoutube }
+//                                        -> lote de cortes (cenas em diálogo: de filme e/ou cômicos)
 // POST { acao:'youtube-pegar'|'youtube-feito'|'youtube-erro', id, ... }
 // POST { acao:'cancelar', id }
 import { getDb } from '../../../lib/firebase-admin';
@@ -10,6 +12,7 @@ import { horarioBrasilia, diaBrasilia, somarDias } from '../../../lib/fabrica';
 import { empresa, faltaConfigurar, temasEmpresa } from '../../../lib/empresa';
 import { PERIODOS, intencaoDoDia, tituloOracao } from '../../../lib/oracaoDia';
 import { testarConta } from '../../../lib/publicarSocial';
+import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 
 export const config = { maxDuration: 60 };
 
@@ -134,6 +137,7 @@ export default async function handler(req, res) {
           serie: x.serie || null,
           marca: x.marca || '',
           oracao: x.oracao || null,
+          corte: x.corte ? { tipo: x.corte.tipo === 'comico' ? 'comico' : 'filme' } : null,
         };
       });
       if (req.query.youtube === '1') {
@@ -261,6 +265,81 @@ export default async function handler(req, res) {
         return res.status(200).json({ lote: loteOr, criados: criadasOr, primeiroDia: primeiroOr });
       }
 
+      // ── Cortes: cenas curtas em diálogo. De filme (imagem realista, dramático) e/ou cômicos (desenho animado) ──
+      if (b.tipo === 'cortes') {
+        const estiloCorte = ['filme', 'comico', 'alternar'].includes(b.estiloCorte) ? b.estiloCorte : 'alternar';
+        const diasCt = Math.max(1, Math.min(31, Number(b.dias) || 7));
+        const porDiaCt = Number(b.porDia) === 2 ? 2 : 1;
+        const horariosCt = [hora(b.horarios?.[0], '10:00'), hora(b.horarios?.[1], '16:00')];
+        const animarCt = b.animacao !== 'nada';
+        const redesCt = {
+          youtube: !!b.redes?.youtube && !!b.canalYoutube?.id,
+          facebook: !!b.redes?.facebook, instagram: !!b.redes?.instagram, tiktok: !!b.redes?.tiktok, kwai: !!b.redes?.kwai,
+        };
+        if (!Object.values(redesCt).some(Boolean)) return res.status(400).json({ erro: 'Marque pelo menos uma rede.' });
+
+        // Agenda própria dos cortes: continua depois do último corte já reservado
+        const todosCt = await col.where('fabrica.ativo', '==', true).get();
+        const meus = todosCt.docs.filter((d) => d.data().corte);
+        const ultimoCt = meus.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
+        let primeiroCt = somarDias(diaBrasilia(), 1);
+        // Precisa de tempo para roteiro, vozes, imagens e montagem no PC: se faltar menos de 10 h, começa no dia seguinte
+        if (new Date(horarioBrasilia(primeiroCt, horariosCt[0])).getTime() - Date.now() < 10 * 3600e3) primeiroCt = somarDias(primeiroCt, 1);
+        if (ultimoCt && diaBrasilia(new Date(ultimoCt)) >= primeiroCt) primeiroCt = somarDias(diaBrasilia(new Date(ultimoCt)), 1);
+
+        // Já usados (cortes da fábrica + projetos salvos) para não repetir cena
+        const usadosCt = meus.map((d) => d.data().tema);
+        const projCt = await db.collection('youvideo_projects').orderBy('criadoEm', 'desc').limit(200).get();
+        projCt.docs.forEach((d) => usadosCt.push(d.data().tema || d.data().titulo));
+
+        const qtdCt = diasCt * porDiaCt;
+        const tipoDe = (i) => (estiloCorte === 'alternar' ? (i % 2 === 0 ? 'filme' : 'comico') : estiloCorte);
+        const precisa = { filme: 0, comico: 0 };
+        for (let i = 0; i < qtdCt; i++) precisa[tipoDe(i)]++;
+        const temas = {
+          filme: await temasCortesDaIa(precisa.filme, 'filme', usadosCt),
+          comico: await temasCortesDaIa(precisa.comico, 'comico', usadosCt),
+        };
+        const loteCt = Date.now().toString(36);
+        const batchCt = db.batch();
+        const criadosCt = [];
+        const vez = { filme: 0, comico: 0 };
+        for (let i = 0; i < qtdCt; i++) {
+          const tipo = tipoDe(i);
+          const t = temas[tipo][vez[tipo]];
+          if (!t) continue; // a IA e a lista pronta acabaram para esse tipo: o lote sai menor
+          const tom = tipo === 'filme' ? TONS_FILME[vez.filme % TONS_FILME.length] : null;
+          vez[tipo]++;
+          const n = criadosCt.length; // posição na agenda (sem buraco se algum tema faltou)
+          const quando = horarioBrasilia(somarDias(primeiroCt, Math.floor(n / porDiaCt)), horariosCt[n % porDiaCt]);
+          const vaiYoutube = redesCt.youtube && n % porDiaCt === 0; // YouTube recebe 1 por dia (o do 1º horário)
+          const ref = col.doc();
+          batchCt.set(ref, {
+            tema: t.nome,
+            corte: { tipo, cena: t.cena, ...(tom ? { tom } : {}) },
+            estilo: tipo === 'comico' ? 'desenho' : 'realista',
+            formato: 'short',
+            duracaoDesejada: tipo === 'comico' ? '60' : '45',
+            animar: animarCt,
+            status: 'pendente',
+            origem: 'fabrica',
+            criadoEm: new Date().toISOString(),
+            fabrica: {
+              ativo: true,
+              lote: loteCt,
+              quando,
+              quandoYoutube: vaiYoutube ? quando : null,
+              redes: { ...redesCt, youtube: vaiYoutube },
+              canalYoutube: redesCt.youtube ? { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') } : null,
+            },
+          });
+          criadosCt.push({ id: ref.id, tema: t.nome, quando, tipo });
+        }
+        if (!criadosCt.length) return res.status(500).json({ erro: 'Não consegui escolher cenas novas para os cortes. Tente de novo.' });
+        await batchCt.commit();
+        return res.status(200).json({ lote: loteCt, criados: criadosCt, primeiroDia: primeiroCt });
+      }
+
       const dias = Math.max(1, Math.min(31, Number(b.dias) || 7));
       const horarios = [hora(b.horarios?.[0], '12:00'), hora(b.horarios?.[1], '19:00')];
       const redes = {
@@ -276,7 +355,7 @@ export default async function handler(req, res) {
 
       // Continua depois do último horário já reservado pela fábrica (não encavala lotes)
       const todosAtivos = await col.where('fabrica.ativo', '==', true).get();
-      const ativos = { docs: todosAtivos.docs.filter((d) => !d.data().marca && !d.data().oracao) }; // empresa e oração do dia têm agenda própria
+      const ativos = { docs: todosAtivos.docs.filter((d) => !d.data().marca && !d.data().oracao && !d.data().corte) }; // empresa, oração do dia e cortes têm agenda própria
       const ultimo = ativos.docs.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
       const amanha = somarDias(diaBrasilia(), 1);
       const primeiroDia = ultimo && diaBrasilia(new Date(ultimo)) >= amanha ? somarDias(diaBrasilia(new Date(ultimo)), 1) : amanha;

@@ -616,6 +616,7 @@ export default function EstudioMusica() {
 
   // Player
   const audioRef = useRef(null);
+  const faixasRef = useRef(null); // lista de músicas do medley (com barra de rolagem)
   const [tocando, setTocando] = useState(null); // música
   const [pausado, setPausado] = useState(true);
   const [pos, setPos] = useState(0);
@@ -1580,7 +1581,7 @@ export default function EstudioMusica() {
                 <textarea rows={3} value={medTema} onChange={(e) => setMedTema(e.target.value)} placeholder="Ex: gratidão a Deus e esperança no dia a dia" />
 
                 <label className="est-rot">Músicas ({medFaixas.length})</label>
-                <div className="est-faixas">
+                <div className="est-faixas" ref={faixasRef}>
                   {medFaixas.map((f, i) => (
                     <div key={i} className="est-faixa">
                       <span className="est-faixa-n">{i + 1}</span>
@@ -1599,7 +1600,11 @@ export default function EstudioMusica() {
                   ))}
                 </div>
                 {medFaixas.length < 10 && (
-                  <button className="est-btn-sec est-add" onClick={() => setMedFaixas((fs) => [...fs, { estiloId: ESTILOS[fs.length % ESTILOS.length].id, tema: '', ritmo: '' }])}>+ Adicionar música</button>
+                  <button className="est-btn-sec est-add" onClick={() => {
+                    setMedFaixas((fs) => [...fs, { estiloId: ESTILOS[fs.length % ESTILOS.length].id, tema: '', ritmo: '' }]);
+                    // a música nova entra no fim da lista: rola até ela
+                    setTimeout(() => faixasRef.current?.scrollTo({ top: faixasRef.current.scrollHeight, behavior: 'smooth' }), 50);
+                  }}>+ Adicionar música</button>
                 )}
 
                 <label className="est-rot">Instrumentos e arranjo (vale para todas)</label>
@@ -2224,7 +2229,10 @@ export default function EstudioMusica() {
         .est-detalhe pre { white-space: pre-wrap; font-family: inherit; background: var(--bg); border-radius: 8px; padding: 12px; color: var(--text); max-height: 320px; overflow: auto; }
 
         .est select { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 10px; font: inherit; }
-        .est-faixas { display: grid; gap: 8px; }
+        .est-faixas { display: grid; gap: 8px; max-height: min(70vh, 620px); overflow-y: auto; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--gold) var(--bg); overscroll-behavior: contain; }
+        .est-faixas::-webkit-scrollbar { width: 9px; }
+        .est-faixas::-webkit-scrollbar-track { background: var(--bg); border-radius: 6px; }
+        .est-faixas::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 6px; }
         .est-faixa { display: grid; grid-template-columns: 26px 1fr 30px; gap: 8px; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px; }
         .est-faixa-n { width: 26px; height: 26px; border-radius: 50%; background: var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
         .est-faixa-campos { display: grid; gap: 6px; }
