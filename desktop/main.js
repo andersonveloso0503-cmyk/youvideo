@@ -1046,16 +1046,19 @@ app.whenReady().then(() => {
     const cfg = store.ler();
     const redesNuvem = ['facebook', 'instagram', 'tiktok', 'kwai'].filter((r) => redes[r]);
     if (redesNuvem.length && !cfg.centralToken) throw new Error('Cadastre a senha da Central em Configurações.');
-    if (redes.youtube) {
+    // Vídeos da empresa (LCS) nunca vão para o YouTube: saem só na Página e no Instagram da LCS
+    const vaiYoutube = (v) => !!redes.youtube && v?.categoria !== 'empresa';
+    const paraYoutube = itens.filter((it) => vaiYoutube(it.item)).length;
+    if (paraYoutube) {
       const livres = 100 - enviosHoje();
-      if (itens.length > livres) throw new Error(`Hoje só dá para subir mais ${Math.max(0, livres)} vídeo(s) no YouTube (limite de 100 por dia).`);
+      if (paraYoutube > livres) throw new Error(`Hoje só dá para subir mais ${Math.max(0, livres)} vídeo(s) no YouTube (limite de 100 por dia).`);
     }
     const remotos = [];
     const locais = [];
     const envios = [];
     for (const it of itens) {
       const v = it.item;
-      if (redes.youtube) {
+      if (vaiYoutube(v)) {
         envios.push({
           arquivo: v.arquivo || null,
           baixarDe: v.arquivo ? null : v.videoUrl,

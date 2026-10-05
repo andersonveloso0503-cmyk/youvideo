@@ -236,6 +236,8 @@ const Biblioteca = (() => {
   function selecionados() {
     return B.sel.map((k) => B.itens.find((i) => i.chave === k)).filter(Boolean);
   }
+  // Vídeos da empresa (LCS): saem só na Página e no Instagram da LCS — nunca no YouTube
+  const ehEmpresa = (i) => i?.categoria === 'empresa';
   function horarios(n) {
     const base = new Date(`${q('#bibData').value || hojeISO()}T${q('#bibHora').value || '12:00'}:00`);
     const passo = Number(q('#bibIntervalo').value) * 3600e3;
@@ -273,14 +275,22 @@ const Biblioteca = (() => {
     } else if (document.activeElement !== sel) {
       sel.value = atual && canais.find((c) => c.id === atual) ? atual : '';
     }
+    const qtdEmpresa = itens.filter(ehEmpresa).length;
+    const soEmpresa = qtdEmpresa === itens.length;
+    const chkYoutube = q('#redeYoutube');
+    if (soEmpresa) chkYoutube.checked = false;
+    chkYoutube.disabled = soEmpresa;
+    chkYoutube.closest('label').title = soEmpresa ? 'Os vídeos da LCS não vão para o YouTube' : '';
     const avisoCanal = q('#bibAvisoCanal');
-    avisoCanal.textContent =
-      cats.length > 1
-        ? '⚠ Você marcou vídeos de tipos diferentes — confira se o canal está certo para todos.'
-        : lembrado
-          ? `Canal usado da última vez para ${B.categorias[cats[0]] || 'este tipo'}.`
-          : `Primeira vez agendando ${B.categorias[cats[0]] || 'este tipo'}: escolha o canal (o app lembra depois).`;
-    sel.disabled = !q('#redeYoutube').checked;
+    avisoCanal.textContent = soEmpresa
+      ? '🏢 Vídeos da LCS não vão para o YouTube: saem só na Página e no Instagram da LCS.'
+      : (cats.length > 1
+          ? '⚠ Você marcou vídeos de tipos diferentes — confira se o canal está certo para todos.'
+          : lembrado
+            ? `Canal usado da última vez para ${B.categorias[cats[0]] || 'este tipo'}.`
+            : `Primeira vez agendando ${B.categorias[cats[0]] || 'este tipo'}: escolha o canal (o app lembra depois).`) +
+        (qtdEmpresa ? ` 🏢 ${qtdEmpresa} vídeo(s) da LCS ficam fora do YouTube.` : '');
+    sel.disabled = !chkYoutube.checked;
     const hs = horarios(itens.length);
     q('#bibPrevia').innerHTML = itens
       .map((i, k) => `<li><b>${hs[k].toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })} ${q('#bibHora').value}</b><span>${esc(i.titulo)}</span></li>`)
@@ -312,15 +322,21 @@ const Biblioteca = (() => {
     const erro = q('#bibErro');
     erro.textContent = '';
     const itens = selecionados();
+    const qtdEmpresa = itens.filter(ehEmpresa).length;
+    const youtubeMarcado = q('#redeYoutube').checked && qtdEmpresa < itens.length; // só vídeos da LCS: YouTube não entra
     const redes = {
-      youtube: q('#redeYoutube').checked ? q('#redeYoutubeCanal').value : null,
+      youtube: youtubeMarcado ? q('#redeYoutubeCanal').value : null,
       facebook: q('#redeFacebook').checked,
       instagram: q('#redeInstagram').checked,
       tiktok: q('#redeTiktok').checked,
       kwai: q('#redeKwai').checked,
     };
-    if (!redes.youtube && !redes.facebook && !redes.instagram && !redes.tiktok && !redes.kwai) return (erro.textContent = 'Marque pelo menos uma rede.');
-    if (q('#redeYoutube').checked && !redes.youtube) return (erro.textContent = 'Escolha o canal do YouTube (ou conecte um em Contas YouTube).');
+    if (!youtubeMarcado && !redes.facebook && !redes.instagram && !redes.tiktok && !redes.kwai)
+      return (erro.textContent = qtdEmpresa === itens.length ? 'Os vídeos da LCS saem só no Facebook e no Instagram: marque pelo menos um dos dois.' : 'Marque pelo menos uma rede.');
+    if (youtubeMarcado && !redes.youtube) return (erro.textContent = 'Escolha o canal do YouTube (ou conecte um em Contas YouTube).');
+    // Vídeo da LCS junto com outros e só o YouTube marcado: o da LCS ficaria sem lugar nenhum para sair
+    if (qtdEmpresa && !redes.facebook && !redes.instagram)
+      return (erro.textContent = 'Os vídeos da LCS saem só no Facebook e no Instagram: marque um dos dois ou tire os vídeos da LCS da seleção.');
     const hs = horarios(itens.length);
     if (hs[0].getTime() < Date.now() + 15 * 60e3) return (erro.textContent = 'O primeiro horário já passou. Escolha outra data ou horário.');
     const ia = q('#bibIa').checked;
@@ -369,7 +385,7 @@ const Biblioteca = (() => {
       const r = await window.api.central.agendar({ itens: lista, redes });
       if (redes.youtube) {
         const mapa = { ...(config.envioPrefs?.canalPorCategoria || {}) };
-        itens.forEach((i) => (mapa[i.categoria] = redes.youtube));
+        itens.filter((i) => !ehEmpresa(i)).forEach((i) => (mapa[i.categoria] = redes.youtube));
         config.envioPrefs = { ...(config.envioPrefs || {}), canalPorCategoria: mapa };
         window.api.config.salvar({ envioPrefs: config.envioPrefs }).catch(() => {});
       }
