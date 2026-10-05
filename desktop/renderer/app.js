@@ -949,7 +949,7 @@ function renderFila() {
     const montagem = j.tipo === 'montagem';
     const qtd = j.projeto?.musicas?.length || 0;
     const detalhe = j.status === 'erro' ? j.erro
-      : envio ? (rodando ? j.etapa : j.status === 'concluido' ? `${j.youtube?.canal || ''}${j.aviso ? ' · ' + j.aviso : ''}` : `Enviar para ${canais.find((c) => c.id === j.envio.canalId)?.titulo || 'YouTube'}`)
+      : envio ? (rodando ? j.etapa : j.status === 'concluido' ? `${j.youtube?.canal || ''}${j.youtube?.playlist ? ' · playlist "' + j.youtube.playlist + '"' : ''}${j.aviso ? ' · ' + j.aviso : ''}` : `Enviar para ${canais.find((c) => c.id === j.envio.canalId)?.titulo || 'YouTube'}`)
       : rodando ? `${j.etapa}${j.restanteSeg ? ` · falta ~${tempoCurto(j.restanteSeg)}` : ''}`
       : montagem ? (j.status === 'concluido' ? `Montado no PC${j.pedidoId ? ' e devolvido ao site' : ''} · ${tempo(j.duracao)}` : j.status === 'interrompido' ? 'Processamento interrompido' : `Pedido do site${j.receita?.duracao ? ' · ' + tempo(j.receita.duracao) : ''}`)
       : j.status === 'concluido' ? `${qtd} música${qtd > 1 ? 's' : ''} · ${tempo(j.duracao)}`

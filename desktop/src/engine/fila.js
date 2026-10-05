@@ -372,6 +372,24 @@ class Fila extends EventEmitter {
       if (e.fabricaId) {
         Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: e.fabricaId, acao: 'youtube-feito', url: r.url || '' } }).catch(() => {});
       }
+      // Playlist (ex.: "Oração da Manhã" / "Oração da Noite"): o vídeo já subiu — se a playlist falhar, só avisa
+      if (e.playlist?.titulo && r.id) {
+        try {
+          const p = await YT.adicionarNaPlaylist({
+            credenciais: cfg.google,
+            redirectOriginal: canal.redirect,
+            refreshToken: canal.refreshToken,
+            canalId: e.canalId,
+            videoId: r.id,
+            titulo: e.playlist.titulo,
+            descricao: e.playlist.descricao || '',
+          });
+          this.atualizar(job, { youtube: { ...job.youtube, playlist: p.titulo } });
+        } catch (errPlaylist) {
+          const motivo = String(errPlaylist?.message || errPlaylist).slice(0, 160);
+          this.atualizar(job, { aviso: [job.aviso, `Não entrou na playlist "${e.playlist.titulo}" (${motivo}) — coloque pelo YouTube Studio`].filter(Boolean).join(' · ') });
+        }
+      }
     } catch (err) {
       const cancelado = err.message === 'CANCELADO' || job.cancelado;
       let msg = err.message;

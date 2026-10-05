@@ -447,6 +447,11 @@ app.whenReady().then(() => {
   // ---------- Fábrica: sobe no YouTube (agendado) os Shorts que ficaram prontos ----------
   let buscandoFabrica = false;
   const seoFalhas = {}; // quantas vezes a IA de título falhou em cada vídeo da fábrica
+  // Orações do dia entram sozinhas na playlist do período (o app usa a que já existir com esse nome ou cria)
+  const PLAYLISTS_ORACAO = {
+    manha: { titulo: 'Oração da Manhã', descricao: 'Uma oração nova toda manhã para começar o dia com Deus. 🙏 Inscreva-se no canal para orar com a gente todos os dias.' },
+    noite: { titulo: 'Oração da Noite', descricao: 'Uma oração nova toda noite para entregar o dia a Deus e dormir em paz. 🙏 Inscreva-se no canal para orar com a gente todos os dias.' },
+  };
   async function fabricaParaYoutube() {
     const cfg = store.ler();
     if (buscandoFabrica || !cfg.centralToken) return;
@@ -541,6 +546,7 @@ app.whenReady().then(() => {
           curto: true,
           fabricaId: it.id,
           tipo: it.oracao ? 'oracao' : 'historias', // categoria "Pessoas e blogs" e idioma português (não "Música")
+          playlist: it.oracao ? PLAYLISTS_ORACAO[it.oracao.periodo === 'noite' ? 'noite' : 'manha'] : null,
           conteudoIa: true, // histórias feitas com IA: marca no YouTube
           botao: (() => { const f = path.join(app.getPath('userData'), 'cache', 'botao', 'v2-pt', 'botao.mov'); return fs.existsSync(f) ? f : null; })(),
         }]);

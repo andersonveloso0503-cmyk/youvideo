@@ -264,6 +264,62 @@ function youtubeDoCanal({ credenciais, refreshToken, redirectOriginal }) {
   return google.youtube({ version: 'v3', auth });
 }
 
+const semAcento = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const playlistsConhecidas = new Map(); // "canal|título" -> id da playlist (para não procurar toda vez)
+
+/**
+ * Coloca um vídeo numa playlist do canal. Usa a playlist que já existir com esse nome (sem ligar para acento/maiúscula)
+ * ou cria uma nova, pública. Devolve { id, titulo, criada }.
+ */
+async function adicionarNaPlaylist({ credenciais, refreshToken, redirectOriginal, canalId, videoId, titulo, descricao }) {
+  if (!videoId || !titulo) throw new Error('Faltou o vídeo ou o nome da playlist.');
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const opcoes = { timeout: 30000 };
+  const chave = `${canalId || ''}|${semAcento(titulo)}`;
+  const achar = async () => {
+    let pageToken;
+    for (let pagina = 0; pagina < 10; pagina++) {
+      const r = await yt.playlists.list({ part: ['snippet'], mine: true, maxResults: 50, pageToken }, opcoes);
+      const achada = (r.data.items || []).find((p) => semAcento(p.snippet?.title) === semAcento(titulo));
+      if (achada) return achada.id;
+      pageToken = r.data.nextPageToken;
+      if (!pageToken) break;
+    }
+    return null;
+  };
+  const colocar = (playlistId) =>
+    yt.playlistItems.insert({ part: ['snippet'], requestBody: { snippet: { playlistId, resourceId: { kind: 'youtube#video', videoId } } } }, opcoes);
+
+  let id = playlistsConhecidas.get(chave) || null;
+  if (id) {
+    try {
+      await colocar(id);
+      return { id, titulo, criada: false };
+    } catch (e) {
+      // A playlist lembrada foi apagada no YouTube: esquece e procura/cria de novo
+      if (!/playlistNotFound|not ?found|404/i.test(String(e?.errors?.[0]?.reason || '') + String(e?.message || '') + String(e?.code || ''))) throw e;
+      playlistsConhecidas.delete(chave);
+      id = null;
+    }
+  }
+  id = await achar();
+  let criada = false;
+  if (!id) {
+    const r = await yt.playlists.insert(
+      {
+        part: ['snippet', 'status'],
+        requestBody: { snippet: { title: String(titulo).slice(0, 150), description: String(descricao || '').slice(0, 4900), defaultLanguage: 'pt-BR' }, status: { privacyStatus: 'public' } },
+      },
+      opcoes
+    );
+    id = r.data.id;
+    criada = true;
+  }
+  await colocar(id);
+  playlistsConhecidas.set(chave, id);
+  return { id, titulo, criada };
+}
+
 /**
  * Lê os vídeos do canal e diz o que há para arrumar em cada um. NÃO muda nada no YouTube.
  * Devolve { canal, categoriaCerta, idiomaCerto, videos: [{ id, titulo, descricao, categoria, idioma, motivoTitulo, arrumarFicha, ... }] }.
@@ -380,4 +436,4 @@ async function corrigirVideos({ credenciais, refreshToken, redirectOriginal, ite
 
 module.exports = {
   limparTags, autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT,
-  categoriaDoVideo, tituloFraco, conferirCanal, corrigirVideos, CATEGORIA_MUSICA, CATEGORIA_FALADO };
+  categoriaDoVideo, tituloFraco, conferirCanal, corrigirVideos, adicionarNaPlaylist, CATEGORIA_MUSICA, CATEGORIA_FALADO };
