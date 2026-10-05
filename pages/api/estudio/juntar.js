@@ -92,7 +92,8 @@ export default async function handler(req, res) {
       letra: lista.map((f) => (f.letra ? `### ${f.titulo || ''}\n${f.letra}` : '')).filter(Boolean).join('\n\n'),
       estilo: [...new Set(lista.map((f) => f.estiloNome || '').filter(Boolean))].join(', '),
       voz: '',
-      instrumental: false,
+      // Só é instrumental se TODAS as músicas forem (aí a capa e a etiqueta acompanham)
+      instrumental: lista.every((f) => !!f.instrumental),
       duracaoSeg,
       audioUrl: blob.url,
       capaUrl: '',
@@ -102,6 +103,7 @@ export default async function handler(req, res) {
         titulo: f.titulo || '',
         audioUrl: f.audioUrl,
         letra: f.letra || '',
+        instrumental: !!f.instrumental,
         estiloNome: f.estiloNome || '',
         ritmoNome: f.ritmoNome || '',
         ideiasNomes: Array.isArray(f.ideiasNomes) ? f.ideiasNomes.slice(0, 30) : [],

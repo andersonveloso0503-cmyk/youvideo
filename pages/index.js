@@ -348,6 +348,10 @@ export default function Home() {
           <div className="hub-tile-title">Cortes Cômicos</div>
           <div className="hub-tile-desc">Situações engraçadas com personagens bíblicos, em desenho animado, formato Short</div>
         </a>
+        <a href="/cortes-filme" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">Cortes de Filme</div>
+          <div className="hub-tile-desc">Cenas bíblicas com cara de trecho de filme: imagem realista, diálogo e corte rápido, formato Short</div>
+        </a>
         <a href="/oracao" className="hub-tile hub-tile--teal">
           <div className="hub-tile-title">Orações Matinais</div>
           <div className="hub-tile-desc">Oração calma com 1 imagem em loop, pra ouvir de manhã</div>

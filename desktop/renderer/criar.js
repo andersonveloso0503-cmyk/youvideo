@@ -8,6 +8,7 @@ const Criar = (() => {
         ['/', '🎬', 'Vídeo narrado', 'Roteiro, narração, imagens e montagem — séries dos apóstolos e milagres'],
         ['/desenho', '🎨', 'Histórias animadas', 'Histórias bíblicas prontas em desenho animado, só escolher e gerar'],
         ['/cortes-comicos', '😂', 'Cortes cômicos', 'Situações engraçadas com personagens bíblicos, em Short'],
+        ['/cortes-filme', '🎬', 'Cortes de filme', 'Cenas bíblicas com cara de trecho de filme, em Short'],
         ['/series', '👤', 'Séries e personagens', 'Personagens com rosto consistente entre os vídeos'],
         ['/oracao', '🌅', 'Orações matinais', 'Oração calma com 1 imagem em loop'],
         ['/oracao-falada', '🙏', 'Oração falada', 'Personagem falando a oração'],

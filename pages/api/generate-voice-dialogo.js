@@ -28,7 +28,9 @@ const PITCH_FATORES = {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { falas, modelo } = req.body;
+  // vozes (opcional): { "nome do personagem": "id da voz" } escolhido na tela (Cortes de Filme).
+  // Quem não vier aqui continua com a escolha automática de sempre.
+  const { falas, modelo, vozes: vozesEscolhidas } = req.body;
   if (!falas || !falas.length) return res.status(400).json({ error: 'Nenhuma fala recebida' });
 
   if (!process.env.ELEVENLABS_API_KEY) {
@@ -42,6 +44,12 @@ export default async function handler(req, res) {
   try {
     const vozes = await buscarVozesDisponiveis();
     const vozPorPersonagem = montarMapaDeVozes(falas, vozes);
+    if (vozesEscolhidas && typeof vozesEscolhidas === 'object') {
+      const existentes = new Set(vozes.map((v) => v.id));
+      for (const [nome, id] of Object.entries(vozesEscolhidas)) {
+        if (id && existentes.has(id)) vozPorPersonagem[normalizarNome(nome)] = id;
+      }
+    }
 
     const audioSegments = [];
     const palavrasCombinadas = [];

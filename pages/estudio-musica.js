@@ -1089,7 +1089,8 @@ export default function EstudioMusica() {
       faixas: medFaixas.map((f) => ({ ...f })),
       ideias: [...ideias],
       estiloExtra: estiloExtra.trim(),
-      voz,
+      voz: instrumental ? '' : voz,
+      instrumental,
       duracao,
       crossfade,
       tema: medTema,
@@ -1107,6 +1108,33 @@ export default function EstudioMusica() {
       let ultimoErro = '';
       for (let tentativa = 1; tentativa <= 2; tentativa++) {
         try {
+          // Medley instrumental: não tem letra para escrever. O tema só dá o nome da música
+          // (fica guardado na descrição); o som vem do estilo, do ritmo e dos instrumentos.
+          // Vai como "personalizado" para o gênero ser lido só do estilo, e não do texto do tema.
+          if (plano.instrumental) {
+            const ideia = plano.ideiasFaixas?.[k];
+            marcar(k, tentativa > 1 ? 'tentando de novo: música…' : 'criando a música…');
+            const d = await api('/api/estudio/gerar', {
+              method: 'POST',
+              body: JSON.stringify({
+                motor: plano.motor,
+                modo: 'personalizado',
+                titulo: ideia?.titulo || `${plano.titulo} ${k + 1}`,
+                descricao: (ideia?.angulo || f.tema.trim() || plano.tema || est.nome).slice(0, 1000),
+                letra: '',
+                estilo: [est.base, ritmoEn(f.ritmo), ideiasEmTexto(plano.ideias), plano.estiloExtra].filter(Boolean).join(', '),
+                voz: '',
+                instrumental: true,
+                duracaoSeg: plano.duracao,
+                grupoId: plano.grupoId,
+                versao: k + 1,
+              }),
+            });
+            setMusicas((ms) => [d.musica, ...ms]);
+            marcar(k, 'pronta ✓');
+            plano.prontas[k] = { ...d.musica, estiloNome: est.nome, ritmoNome: nomeRitmo(f.ritmo), ideiasNomes: nomesIdeiasPlano };
+            return;
+          }
           marcar(k, tentativa > 1 ? 'tentando de novo: letra…' : 'escrevendo a letra…');
           const l = await api('/api/estudio/letra', {
             method: 'POST',
@@ -1252,7 +1280,9 @@ export default function EstudioMusica() {
   function mandarParaMedleyCanal(m) {
     const faixas = m.faixas || [];
     if (faixas.some((f) => !f.letra || !f.letra.trim())) {
-      setAviso('O Medley do canal precisa da letra de todas as músicas, e alguma faixa está sem letra.');
+      setAviso(m.instrumental
+        ? 'Medley instrumental não tem letra, e o Medley do canal monta o vídeo pela letra. Baixe o MP3 (⬇) e monte o vídeo no Compilador.'
+        : 'O Medley do canal precisa da letra de todas as músicas, e alguma faixa está sem letra.');
       return;
     }
     if (!window.confirm(`Mandar "${m.titulo}" (${faixas.length} músicas) para o Medley do canal? Ele vira vídeo e entra na fila de publicação.`)) return;
@@ -1575,12 +1605,21 @@ export default function EstudioMusica() {
                 <label className="est-rot">Instrumentos e arranjo (vale para todas)</label>
                 <PainelIdeias selecionadas={ideias} setSelecionadas={setIdeias} />
 
-                <label className="est-rot">Voz</label>
-                <div className="est-chips">
-                  {VOZES.map((v) => (
-                    <button key={v.id} className={voz === v.id ? 'on' : ''} onClick={() => setVoz(v.id)}>{v.nome}</button>
-                  ))}
-                </div>
+                <label className="est-toggle">
+                  <input type="checkbox" checked={instrumental} onChange={(e) => setInstrumental(e.target.checked)} />
+                  <span>Instrumental (sem voz) — vale para todas as músicas do medley</span>
+                </label>
+
+                {!instrumental && (
+                  <>
+                    <label className="est-rot">Voz</label>
+                    <div className="est-chips">
+                      {VOZES.map((v) => (
+                        <button key={v.id} className={voz === v.id ? 'on' : ''} onClick={() => setVoz(v.id)}>{v.nome}</button>
+                      ))}
+                    </div>
+                  </>
+                )}
 
                 <label className="est-rot">Duração de cada música: {fmtTempo(duracao)}</label>
                 <input type="range" min={60} max={300} step={15} value={duracao} onChange={(e) => setDuracao(+e.target.value)} />
@@ -1599,9 +1638,11 @@ export default function EstudioMusica() {
                 </div>
 
                 <button className="est-criar-btn" disabled={!!medProgresso} onClick={criarMedley}>
-                  🎶 Criar medley ({medFaixas.length} músicas · ~{fmtTempo(medFaixas.length * duracao)})
+                  🎶 Criar medley {instrumental ? 'instrumental ' : ''}({medFaixas.length} músicas · ~{fmtTempo(medFaixas.length * duracao)})
                 </button>
-                <small className="est-nota">A IA escreve cada letra, cria cada música e junta tudo num MP3 só. Leva uns 3 a 8 minutos. Deixe a tela aberta.</small>
+                <small className="est-nota">{instrumental
+                  ? 'A IA cria cada música sem voz (só os instrumentos) e junta tudo num MP3 só. O tema dá o nome das músicas; o som vem do estilo, do ritmo e dos instrumentos de cada uma. Leva uns 3 a 8 minutos. Deixe a tela aberta.'
+                  : 'A IA escreve cada letra, cria cada música e junta tudo num MP3 só. Leva uns 3 a 8 minutos. Deixe a tela aberta.'}</small>
               </>
             ) : (<>
 
@@ -1880,7 +1921,7 @@ export default function EstudioMusica() {
                     </div>
                     <div className="est-meta">
                       <span className={`est-badge ${m.motor}`}>{nomeMotor(m.motor)}</span>
-                      {m.tipo === 'medley' ? ` ${(m.faixas || []).length} músicas · ` : m.instrumental ? ' Instrumental · ' : ' '}
+                      {m.tipo === 'medley' ? ` ${(m.faixas || []).length} músicas · ${m.instrumental ? 'Instrumental · ' : ''}` : m.instrumental ? ' Instrumental · ' : ' '}
                       {fmtTempo(m.duracaoSeg)} · {new Date(m.criadoEm).toLocaleDateString('pt-BR')}
                       {filtro === 'streaming' && (() => {
                         const av = avaliacao(m);
