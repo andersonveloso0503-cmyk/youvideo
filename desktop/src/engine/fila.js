@@ -624,6 +624,7 @@ class Fila extends EventEmitter {
       receita,
       pastaSaida,
       pedidoId: extra.pedidoId || null, // veio do site: devolve o vídeo pronto para lá
+      origemPedido: extra.origem || '', // de qual ferramenta do site veio ('fila' = Fábrica / fila automática)
     };
     this.jobs.push(job);
     this.salvar();

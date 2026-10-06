@@ -137,6 +137,7 @@ export default async function handler(req, res) {
           serie: x.serie || null,
           marca: x.marca || '',
           oracao: x.oracao || null,
+          renderId: x.renderId || null, // pedido de montagem no PC: liga o cartão da Fila do Compilador a este vídeo
           corte: x.corte ? { tipo: x.corte.tipo === 'comico' ? 'comico' : 'filme' } : null,
         };
       });

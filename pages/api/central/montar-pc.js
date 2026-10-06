@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         try {
           receita = d.receita ? JSON.parse(d.receita) : d.receitaUrl ? await (await fetch(d.receitaUrl)).json() : null;
         } catch {}
-        if (receita) pedidos.push({ id: doc.id, titulo: d.titulo || receita.titulo || '', criadoEm: d.criadoEm, receita });
+        if (receita) pedidos.push({ id: doc.id, titulo: d.titulo || receita.titulo || '', criadoEm: d.criadoEm, origem: d.origem || '', receita });
       }
       pedidos.sort((a, b) => (a.criadoEm || 0) - (b.criadoEm || 0));
       return res.status(200).json({ pedidos });

@@ -387,10 +387,66 @@ app.whenReady().then(() => {
   fila.proximo(); // retoma o que ficou aguardando na última vez
   // A tela recebe a fila "enxuta" (sem roteiro, palavras da legenda etc.) e no máximo
   // ~3 vezes por segundo — antes ia tudo a cada % de progresso e a tela travava (ficava preta)
-  const paraTela = (j) => {
+  // ---------- Tarja da Fila: este vídeo sobe sozinho no YouTube ou sou eu que preciso subir? ----------
+  // O que a Fábrica do site sabe de cada vídeo (pelo pedido de montagem). Atualizado de 3 em 3 minutos.
+  let daFabrica = new Map();
+  async function atualizarDaFabrica() {
+    const cfg = store.ler();
+    if (!cfg.centralToken) return;
+    try {
+      const { itens = [] } = await Central.chamar(cfg, '/api/central/fabrica');
+      daFabrica = new Map(itens.filter((i) => i.renderId).map((i) => [i.renderId, i]));
+      fila.emit('mudou');
+    } catch {
+      // sem internet: fica com o que já sabia
+    }
+  }
+  setTimeout(atualizarDaFabrica, 6000);
+  setInterval(atualizarDaFabrica, 3 * 60e3);
+
+  const quandoTxt = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
+  /** { estado: 'ok'|'auto'|'espera'|'subir'|'fora'|'erro', texto, dica } ou null (envios e posts não levam tarja). */
+  function tarjaYoutube(j, todos) {
+    if (j.tipo === 'envio' || j.tipo === 'nuvem') return null;
+    if (['cancelado'].includes(j.status)) return null;
+    // Já existe um envio deste vídeo na fila deste PC?
+    const envio = todos
+      .filter((x) => x.tipo === 'envio' && x.envio && (x.envio.chaveArquivo === `comp-${j.id}` || x.envio.chaveArquivo === `pc_${j.id}` || (j.arquivoFinal && x.envio.arquivo === j.arquivoFinal) || (j.videoUrlSite && x.envio.baixarDe === j.videoUrlSite)))
+      .sort((a, b) => (b.status === 'concluido') - (a.status === 'concluido'))[0];
+    const yt = j.youtube || (envio?.status === 'concluido' ? envio.youtube : null);
+    if (yt) {
+      const futuro = yt.agendadoPara && new Date(yt.agendadoPara).getTime() > Date.now();
+      return { estado: 'ok', texto: futuro ? `✅ AGENDADO NO YOUTUBE · ${quandoTxt(yt.agendadoPara)}` : '✅ JÁ ESTÁ NO YOUTUBE', dica: `Já subiu${yt.canal ? ` no canal ${yt.canal}` : ''}. Não precisa fazer nada.` };
+    }
+    if (envio && ['aguardando', 'publicando'].includes(envio.status)) return { estado: 'espera', texto: '⏳ NA FILA PARA SUBIR', dica: `${envio.etapa || 'Está na fila para subir.'} Deixe o Compilador aberto.` };
+    if (envio?.status === 'erro') return { estado: 'erro', texto: '⚠ ERRO AO SUBIR', dica: `${envio.erro || 'Deu erro ao subir.'} Clique em ↻ no cartão do envio.` };
+
+    if (j.tipo === 'montagem') {
+      const f = j.pedidoId ? daFabrica.get(j.pedidoId) : null;
+      if (f) {
+        if (f.marca) return { estado: 'fora', texto: '➖ NÃO VAI PARA O YOUTUBE', dica: 'Vídeo da empresa: vai só para Facebook e Instagram.' };
+        if (f.youtube?.status === 'ok') return { estado: 'ok', texto: '✅ JÁ ESTÁ NO YOUTUBE', dica: 'A Fábrica já subiu este vídeo. Não precisa fazer nada.' };
+        if (!f.redes?.youtube) return { estado: 'fora', texto: '➖ NÃO VAI PARA O YOUTUBE', dica: 'A Fábrica manda 1 vídeo por dia ao YouTube; este vai só para as outras redes.' };
+        if (f.youtube?.status === 'erro') return { estado: 'erro', texto: '⚠ ERRO AO SUBIR', dica: `${f.youtube.erro || 'Deu erro ao subir.'} Veja na Fábrica.` };
+        return { estado: 'auto', texto: `🤖 SOBE SOZINHO${f.quandoYoutube ? ` · ${quandoTxt(f.quandoYoutube)}` : ''}`, dica: 'Vídeo da Fábrica: o Compilador sobe sozinho. Não precisa fazer nada.' };
+      }
+      // Pedido da fila automática do site (não é da Fábrica): o próprio site publica
+      if (j.origemPedido === 'fila') return { estado: 'auto', texto: '🤖 SOBE SOZINHO', dica: 'Vídeo da fila automática: sobe sozinho. Não precisa fazer nada.' };
+      return { estado: 'subir', texto: '⬆ VOCÊ PRECISA SUBIR', dica: j.status === 'concluido' ? 'Este vídeo não sobe sozinho: abra a Biblioteca, marque ele e clique em Agendar.' : 'Este vídeo não sobe sozinho: depois de pronto, abra a Biblioteca, marque ele e clique em Agendar.' };
+    }
+    // Compilação feita aqui no PC
+    if (j.projeto?.publicar?.ativo && j.projeto.publicar.canalId) {
+      if (j.status === 'erro') return { estado: 'erro', texto: '⚠ NÃO SUBIU', dica: 'Deu erro. Clique em ↻ para tentar de novo.' };
+      return { estado: 'auto', texto: '🤖 SOBE SOZINHO', dica: 'Quando terminar de gerar, o Compilador sobe sozinho. Não precisa fazer nada.' };
+    }
+    return { estado: 'subir', texto: '⬆ VOCÊ PRECISA SUBIR', dica: j.status === 'concluido' ? 'Este vídeo não sobe sozinho: clique em "Subir p/ YouTube" neste cartão.' : 'Este vídeo não sobe sozinho: depois de pronto, clique em "Subir p/ YouTube" no cartão.' };
+  }
+
+  const paraTela = (j, _i, todos) => {
     const { receita, projeto, envio, nuvem, ...resto } = j;
     return {
       ...resto,
+      yt: tarjaYoutube(j, Array.isArray(todos) ? todos : fila.lista()),
       ...(projeto ? { projeto: { formato: projeto.formato, musicas: { length: projeto.musicas?.length || 0 }, fundos: { length: projeto.fundos?.length || 0 } } } : {}),
       ...(receita ? { receita: { duracao: receita.duracao, categoria: receita.categoria, titulo: receita.titulo } } : {}),
       ...(envio ? { envio: { canalId: envio.canalId, agendarPara: envio.agendarPara, fabricaId: envio.fabricaId } } : {}),
@@ -430,7 +486,7 @@ app.whenReady().then(() => {
           const receita = p.receita;
           if (receita?.tipo !== 'youvideo-montagem' || !receita.clipes?.length) throw new Error('Receita inválida.');
           if (!receita.titulo) receita.titulo = p.titulo || 'Vídeo do Youvideo';
-          fila.adicionarMontagem(receita, pasta, { pedidoId: p.id });
+          fila.adicionarMontagem(receita, pasta, { pedidoId: p.id, origem: p.origem || '' });
         } catch (e) {
           Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: p.id, acao: 'erro', erro: e.message } }).catch(() => {});
         }

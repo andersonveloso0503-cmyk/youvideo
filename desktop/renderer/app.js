@@ -961,7 +961,15 @@ function renderFila() {
       <span class="detalhe"></span>
       <span class="barra"><i style="width:${Math.round((j.progresso || 0) * 100)}%"></i></span>
       <span class="links"></span>
-      <span class="acoes-job"></span>`;
+      <span class="acoes-job"></span>
+      ${j.yt ? '<span class="tarja-yt"></span>' : ''}`;
+    if (j.yt) {
+      // Tarja: já está no YouTube, sobe sozinho ou é você quem precisa subir
+      const t = d.querySelector('.tarja-yt');
+      t.classList.add(j.yt.estado);
+      t.textContent = j.yt.texto;
+      t.title = j.yt.dica || '';
+    }
     d.querySelector('.nome-job').textContent = j.nome;
     d.querySelector('.nome-job').title = j.nome;
     d.querySelector('.detalhe').textContent = detalhe || '';
