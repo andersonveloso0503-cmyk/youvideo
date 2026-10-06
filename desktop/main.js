@@ -1029,7 +1029,38 @@ app.whenReady().then(() => {
           publicado: {},
         }));
     } catch {}
-    return { ...d, categorias: { compilacoes: 'Feitos no PC', ...d.categorias }, itens: [...locais, ...deOutros, ...d.itens] };
+    // Situação de cada vídeo no YouTube (vira a tarja do cartão). O que a fila deste PC sabe vale mais:
+    // envio concluído = já está no YouTube; envio esperando = na fila para subir.
+    const chaveDe = (c) => String(c).replace(/[^\w-]/g, '_');
+    const envios = new Map();
+    for (const j of fila.lista()) {
+      if (j.tipo !== 'envio' || !j.envio) continue;
+      const k = j.envio.chaveArquivo || '';
+      const atual = envios.get(k);
+      // Fica com o envio mais adiantado (um concluído vale mais que um erro antigo)
+      const peso = (x) => (x.status === 'concluido' && x.youtube ? 3 : ['aguardando', 'publicando'].includes(x.status) ? 2 : x.status === 'erro' ? 1 : 0);
+      if (!atual || peso(j) > peso(atual)) envios.set(k, j);
+    }
+    const doEnvio = (j) => {
+      if (!j) return null;
+      if (j.status === 'concluido' && j.youtube) return { estado: 'publicado', url: j.youtube.url || null, quando: j.youtube.agendadoPara || null, canal: j.youtube.canal || '' };
+      if (['aguardando', 'publicando'].includes(j.status)) return { estado: 'nafila', motivo: j.etapa || 'Na fila para subir', quando: j.naoAntesDe || null };
+      if (j.status === 'erro') return { estado: 'erro', erro: j.erro || '' };
+      return null;
+    };
+    const todos = [...locais, ...deOutros, ...d.itens].map((i) => {
+      let youtube = i.youtube || null;
+      const local = doEnvio(envios.get(chaveDe(i.chave))) || (i.origem === 'pc' ? doEnvio(envios.get(`comp-${i.id}`)) : null);
+      if (i.origem === 'pc') {
+        const j = fila.lista().find((x) => x.id === i.id);
+        youtube = j?.youtube ? { estado: 'publicado', url: j.youtube.url || null, quando: j.youtube.agendadoPara || null, canal: j.youtube.canal || '' } : { estado: 'manual' };
+      }
+      // O site já sabe que está publicado? Mantém. Senão, vale o que a fila deste PC diz.
+      if (local && youtube?.estado !== 'publicado') youtube = local;
+      if (!youtube) youtube = i.categoria === 'cover' ? null : { estado: 'manual' };
+      return { ...i, youtube, publicado: { ...(i.publicado || {}), youtube: youtube?.estado === 'publicado' } };
+    });
+    return { ...d, categorias: { compilacoes: 'Feitos no PC', ...d.categorias }, itens: todos };
   });
   ipcMain.handle('central:categoria', (_e, dados) => Central.chamar(store.ler(), '/api/central/categoria', { metodo: 'POST', corpo: dados }));
   ipcMain.handle('central:agenda', () => Central.chamar(store.ler(), '/api/central/agenda'));
@@ -1083,6 +1114,7 @@ app.whenReady().then(() => {
           agendarPara: it.quando,
           curto: !!v.curto,
           tipo: v.categoria || null, // histórias, séries, músicas...: decide a categoria no YouTube
+          chaveBiblioteca: v.chave, // para anotar na Biblioteca que este vídeo já subiu
         });
       }
       if (redesNuvem.length) {

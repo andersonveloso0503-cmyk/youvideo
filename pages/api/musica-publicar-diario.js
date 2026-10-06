@@ -30,13 +30,14 @@ export default async function handler(req, res) {
         .collection('youvideo_musica_fila')
         .where('status', '==', 'renderizado')
         .orderBy('criadoEm', 'asc')
-        .limit(1)
+        .limit(20)
         .get();
 
-      if (snapshot.empty) {
+      // Pula as que o Compilador já subiu no YouTube pela Biblioteca (para não publicar duas vezes)
+      doc = snapshot.docs.find((d) => !d.data().youtubeVideoId);
+      if (!doc) {
         return res.status(200).json({ mensagem: 'Nenhuma música pronta pra publicar hoje.' });
       }
-      doc = snapshot.docs[0];
     }
 
     const item = doc.data();

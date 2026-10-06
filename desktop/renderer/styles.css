@@ -728,3 +728,15 @@ body { grid-template-columns: minmax(0, 1fr); }
 .arr-item.feito { border-color: rgba(120, 180, 120, 0.5); }
 .arr-item.falhou { border-color: #e89a88; }
 #modalArrumar .interruptor { margin: 6px 0 2px; }
+
+/* Biblioteca: tarja que diz a situação do vídeo no YouTube */
+.bib-tarja { font-size: 10.5px; font-weight: 800; letter-spacing: .03em; padding: 4px 8px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bib-tarja.ok { background: #1f4a30; color: #b7f0c7; }
+.bib-tarja.auto { background: #1d3b55; color: #bfe0ff; }
+.bib-tarja.espera { background: #5a4613; color: #ffe6a3; }
+.bib-tarja.subir { background: var(--terracota-forte); color: #fff; }
+.bib-tarja.erro { background: #6b1d14; color: #ffd0c8; }
+.bib-tarja.fora { background: var(--bg-4); color: var(--mudo); }
+.bib-legenda { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 16px 0; font-size: 11.5px; color: var(--texto-2); }
+.bib-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.bib-legenda i.bib-tarja { font-style: normal; border-radius: 5px; padding: 2px 6px; }

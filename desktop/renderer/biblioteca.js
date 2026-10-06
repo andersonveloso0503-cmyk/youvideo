@@ -57,7 +57,8 @@ const Biblioteca = (() => {
       if (termo && !String(i.titulo).toLowerCase().includes(termo)) return false;
       if (B.formato === 'curto' && !i.curto) return false;
       if (B.formato === 'longo' && i.curto) return false;
-      if (B.naoPublicados && i.publicado?.youtube) return false;
+      // "Só os que eu preciso subir": esconde o que já está no YouTube, o que sobe sozinho e o que não vai para lá
+      if (B.naoPublicados && i.youtube?.estado !== 'manual' && i.youtube?.estado !== 'erro') return false;
       return true;
     }).sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''))); // mais novos primeiro
   }
@@ -80,6 +81,23 @@ const Biblioteca = (() => {
       };
       nav.appendChild(b);
     }
+  }
+
+  // Tarja do cartão: diz se o vídeo já está no YouTube, se sobe sozinho ou se é você quem precisa subir
+  const dataCurta = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
+  function tarjaYoutube(i) {
+    const y = i.youtube;
+    if (!y) return '';
+    const futuro = y.quando && new Date(y.quando).getTime() > Date.now();
+    const t = {
+      publicado: ['ok', futuro ? `✅ AGENDADO NO YOUTUBE · ${dataCurta(y.quando)}` : '✅ JÁ ESTÁ NO YOUTUBE', `Este vídeo já subiu${y.canal ? ` no canal ${y.canal}` : ''}. Não precisa fazer nada.`],
+      automatico: ['auto', `🤖 SOBE SOZINHO${y.quando ? ` · ${dataCurta(y.quando)}` : ''}`, `${y.motivo || 'Sobe sozinho.'} Não precisa fazer nada.`],
+      nafila: ['espera', '⏳ NA FILA PARA SUBIR', `${y.motivo || 'Está na fila deste PC.'} Deixe o Compilador aberto.`],
+      erro: ['erro', '⚠ ERRO AO SUBIR', `Deu erro ao subir${y.erro ? `: ${y.erro}` : ''}. Veja na Fila ou na Fábrica e clique para tentar de novo.`],
+      fora: ['fora', '➖ NÃO VAI PARA O YOUTUBE', y.motivo || 'Este vídeo não vai para o YouTube.'],
+      manual: ['subir', '⬆ SUBIR PARA O YOUTUBE', 'Este vídeo não sobe sozinho: marque ele e clique em Agendar.'],
+    }[y.estado];
+    return t ? `<div class="bib-tarja ${t[0]}" title="${esc(t[2])}">${esc(t[1])}</div>` : '';
   }
 
   function capaHtml(i) {
@@ -126,6 +144,7 @@ const Biblioteca = (() => {
       const data = i.criadoEm ? new Date(i.criadoEm).toLocaleDateString('pt-BR') : '';
       card.innerHTML = `
         ${capaHtml(i)}
+        ${tarjaYoutube(i)}
         ${i.categoria !== 'cover' ? `<label class="bib-check" title="Selecionar para agendar"><input type="checkbox" ${marcado ? 'checked' : ''} /><span>${marcado ? B.sel.indexOf(i.chave) + 1 : ''}</span></label>` : ''}
         <span class="bib-formato">${i.categoria === 'cover' ? 'ÁUDIO' : i.curto ? 'SHORT' : 'LONGO'}</span>
         <div class="bib-info">

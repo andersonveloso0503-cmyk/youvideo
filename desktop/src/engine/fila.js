@@ -389,6 +389,13 @@ class Fila extends EventEmitter {
         aviso: r.miniaturaErro || null,
         concluidoEm: new Date().toISOString(),
       });
+      // Vídeo da Biblioteca: anota no site que já subiu (a Biblioteca passa a mostrar "Já está no YouTube" em qualquer PC)
+      if (e.chaveBiblioteca && r.id) {
+        Central.chamar(cfg, '/api/central/biblioteca', {
+          metodo: 'POST',
+          corpo: { acao: 'youtube', chave: e.chaveBiblioteca, videoId: r.id, url: r.url || '', canal: canal.titulo || '', quando: e.agendarPara || null },
+        }).catch(() => {});
+      }
       // Vídeo da Fábrica: avisa o site que já está agendado no YouTube
       if (e.fabricaId) {
         Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: e.fabricaId, acao: 'youtube-feito', url: r.url || '' } }).catch(() => {});
