@@ -28,6 +28,25 @@ function proximaMeiaNoitePacifico() {
   return new Date(agora + 6 * 3600e3);
 }
 
+/**
+ * O YouTube recusou por limite? Vale tanto o limite de envios do CANAL ("The user has exceeded the number of
+ * videos they may upload", comum em canal novo) quanto a cota diária do aplicativo. Olha a mensagem e o motivo técnico.
+ */
+function ehLimiteYoutube(err) {
+  const txt = `${err?.message || ''} ${err?.errors?.[0]?.reason || ''} ${err?.response?.data?.error?.errors?.[0]?.reason || ''}`;
+  return /quota|uploadLimitExceeded|rateLimitExceeded|dailyLimit|exceeded the number of videos/i.test(txt);
+}
+/** Limite de envios do CANAL (vale por 24 h corridas, não vira à meia-noite). */
+function ehLimiteDoCanal(err) {
+  const txt = `${err?.message || ''} ${err?.errors?.[0]?.reason || ''} ${err?.response?.data?.error?.errors?.[0]?.reason || ''}`;
+  return /uploadLimitExceeded|exceeded the number of videos/i.test(txt);
+}
+/** Quando tentar de novo depois de um limite: canal = daqui a 8 h; cota do aplicativo = quando ela renova. */
+function quandoTentarDeNovo(err) {
+  return ehLimiteDoCanal(err) ? new Date(Date.now() + 8 * 3600e3) : proximaMeiaNoitePacifico();
+}
+const ehFalhaPassageira = (msg) => /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|network|fetch failed|backendError|\b50[0234]\b|timeout/i.test(String(msg || ''));
+
 const EM_ANDAMENTO = ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'];
 
 function nomeSeguro(n) {
@@ -257,7 +276,7 @@ class Fila extends EventEmitter {
   }
 
   /** Vídeos prontos para subir no YouTube (tela "Subir p/ YouTube"). */
-  adicionarEnvios(lista) {
+  adicionarEnvios(lista, espera = null) {
     const lote = crypto.randomBytes(4).toString('hex');
     const criados = lista.map((e, i) => {
       const job = {
@@ -269,9 +288,11 @@ class Fila extends EventEmitter {
         criadoEm: new Date().toISOString(),
         nome: e.titulo || path.basename(e.arquivo),
         status: 'aguardando',
-        etapa: 'Aguardando para enviar',
+        etapa: espera?.etapa || 'Aguardando para enviar',
         progresso: 0,
         envio: e,
+        // espera = { naoAntesDe, etapa }: só tenta enviar depois desse horário (limite do YouTube)
+        ...(espera?.naoAntesDe ? { naoAntesDe: espera.naoAntesDe } : {}),
       };
       this.jobs.push(job);
       return job;
@@ -394,25 +415,32 @@ class Fila extends EventEmitter {
       const cancelado = err.message === 'CANCELADO' || job.cancelado;
       let msg = err.message;
       // Limite diário do YouTube ou falha de internet: não vira erro — o app tenta de novo sozinho
-      const limiteDia = /quota|uploadLimitExceeded|rateLimitExceeded|dailyLimit/i.test(msg);
-      const passageiro = /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|network|fetch failed|backendError|\b50[0234]\b|timeout/i.test(msg);
+      const limiteDia = ehLimiteYoutube(err);
+      const passageiro = ehFalhaPassageira(msg);
       job.tentativasEnvio = (job.tentativasEnvio || 0) + 1;
       if (!cancelado && (limiteDia || passageiro) && job.tentativasEnvio <= 6) {
-        const quando = limiteDia ? proximaMeiaNoitePacifico() : new Date(Date.now() + 10 * 60e3);
+        const quando = limiteDia ? quandoTentarDeNovo(err) : new Date(Date.now() + 10 * 60e3);
         const hora = quando.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-        this.atualizar(job, {
-          status: 'aguardando',
-          naoAntesDe: quando.toISOString(),
-          progresso: 0,
-          erro: null,
-          etapa: limiteDia ? `Limite de envios do YouTube atingido hoje — tenta de novo sozinho em ${hora}` : `Sem conexão com o YouTube — tenta de novo às ${hora}`,
-        });
+        const etapa = limiteDia ? `Limite de envios do YouTube atingido hoje — tenta de novo sozinho em ${hora}` : `Sem conexão com o YouTube — tenta de novo às ${hora}`;
+        this.atualizar(job, { status: 'aguardando', naoAntesDe: quando.toISOString(), progresso: 0, erro: null, etapa });
+        // Bateu no limite: os outros envios que estão esperando não tentam à toa (cada tentativa recusada gasta cota).
+        // Limite do canal segura só os desse canal; cota do aplicativo segura todos.
+        if (limiteDia) {
+          const soDoCanal = ehLimiteDoCanal(err);
+          for (const o of this.jobs) {
+            if (o === job || o.tipo !== 'envio' || o.status !== 'aguardando' || this.rodando.has(o.id)) continue;
+            if (soDoCanal && o.envio?.canalId !== e.canalId) continue;
+            if (o.naoAntesDe && o.naoAntesDe >= quando.toISOString()) continue;
+            this.atualizar(o, { naoAntesDe: quando.toISOString(), etapa }, false);
+          }
+          this.salvar();
+        }
         return;
       }
       if (e.fabricaId) {
         Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: e.fabricaId, acao: 'youtube-erro', erro: cancelado ? 'Cancelado no PC' : msg } }).catch(() => {});
       }
-      if (/quota|uploadLimitExceeded/i.test(msg)) msg = 'O YouTube recusou: limite de envios do dia atingido. Tente de novo amanhã.';
+      if (limiteDia) msg = 'O YouTube recusou: limite de envios do dia atingido. Tente de novo amanhã.';
       if (/invalid_grant/i.test(msg)) msg = 'A autorização desse canal expirou. Em Contas YouTube, desconecte e conecte o canal de novo.';
       this.atualizar(job, { status: cancelado ? 'cancelado' : 'erro', etapa: cancelado ? 'Cancelado' : 'Erro', erro: cancelado ? null : msg });
       throw err;
@@ -468,9 +496,47 @@ class Fila extends EventEmitter {
     }
   }
 
+  /**
+   * Dados para subir ao YouTube um vídeo de compilação que JÁ ESTÁ PRONTO na pasta (sem montar de novo).
+   * Usa o que foi guardado na hora do envio; em vídeo antigo, remonta a partir do projeto.
+   */
+  envioDaCompilacao(j) {
+    if (j.envioPronto?.arquivo) return j.envioPronto;
+    const p = j.projeto;
+    if (!p?.publicar?.ativo || !p.publicar.canalId || !j.arquivoFinal) return null;
+    const curto = p.formato?.tipo === 'curto';
+    let agendarPara = null;
+    if (p.publicar.agendar?.ativo && p.publicar.agendar.inicio) {
+      agendarPara = new Date(new Date(p.publicar.agendar.inicio).getTime() + ((j.parte || 1) - 1) * (Number(p.publicar.agendar.intervaloHoras) || 24) * 3600e3).toISOString();
+    }
+    return {
+      arquivo: j.arquivoFinal,
+      chaveArquivo: `comp-${j.id}`,
+      capa: j.capa || null,
+      capaManual: !!j.capa,
+      titulo: j.tituloIa || (p.publicar.titulo || p.nome || 'Compilação') + ((j.partes || 1) > 1 ? j.sufixo || '' : ''),
+      descricao: YT.montarDescricao({ descricao: p.publicar.descricao, timeline: j.timeline || [], incluirTracklist: p.publicar.incluirTracklist !== false, curto, tags: p.publicar.tags }),
+      tags: p.publicar.tags,
+      canalId: p.publicar.canalId,
+      privacidade: p.publicar.privacidade,
+      agendarPara,
+      curto,
+      tipo: 'compilacoes',
+    };
+  }
+
   retentar(id) {
     const j = this.jobs.find((x) => x.id === id);
     if (!j || EM_ANDAMENTO.includes(j.status)) return;
+    // Compilação que deu erro só na hora de SUBIR: o vídeo já está na pasta — reenvia sem montar tudo de novo
+    if (j.status === 'erro' && j.projeto && j.arquivoFinal && !j.youtube?.id && fs.existsSync(j.arquivoFinal)) {
+      const envio = this.envioDaCompilacao(j);
+      if (envio) {
+        this.atualizar(j, { status: 'concluido', etapa: 'Pronto — envio ao YouTube na fila', progresso: 1, erro: null });
+        this.adicionarEnvios([envio]);
+        return;
+      }
+    }
     this.atualizar(j, { status: 'aguardando', etapa: 'Aguardando na fila', progresso: 0, erro: null });
     this.proximo();
   }
@@ -882,6 +948,7 @@ class Fila extends EventEmitter {
       this.atualizar(job, { arquivoFinal: saida, capa: miniatura, clima: resumoClima(p.musicas), timeline: audio.timeline.map((t) => ({ titulo: t.titulo, inicio: t.inicio })), duracao: audio.total });
 
       // 7) Publicar
+      let envioAdiado = null; // texto do cartão quando o YouTube recusou por limite e o envio ficou para depois
       if (publica) {
         checar();
         const progP = etapa('publicando', 'Enviando para o YouTube');
@@ -936,34 +1003,58 @@ class Fila extends EventEmitter {
           this.atualizar(job, { capa: chamativa });
         }
         this.atualizar(job, { etapa: 'Enviando para o YouTube' });
-        const r = await YT.publicar({
-          credenciais: cfg.google,
-          redirectOriginal: canal.redirect,
-          refreshToken: canal.refreshToken,
-          arquivo: saida,
-          conteudoIa: cfg.conteudoIa !== false,
-          titulo,
-          descricao: YT.montarDescricao({
-            descricao: descricaoBase,
-            timeline: audio.timeline,
-            incluirTracklist: p.publicar.incluirTracklist !== false,
-            curto: p.formato.tipo === 'curto',
-            tags,
-          }),
+        const descricaoFinal = YT.montarDescricao({
+          descricao: descricaoBase,
+          timeline: audio.timeline,
+          incluirTracklist: p.publicar.incluirTracklist !== false,
+          curto: p.formato.tipo === 'curto',
           tags,
-          privacidade: p.publicar.privacidade,
-          agendarPara,
-          miniatura: p.formato.tipo === 'curto' && !chamativa ? null : miniatura,
-          onProgresso: (x) => {
-            progP(x);
-            this.atualizar(job, { etapa: `Enviando para o YouTube ${Math.round(x * 100)}%` }, false);
+        });
+        const capaEnvio = p.formato.tipo === 'curto' && !chamativa ? null : miniatura;
+        // Guarda tudo o que o envio precisa: se o YouTube recusar agora, dá para subir depois sem montar o vídeo de novo
+        this.atualizar(job, {
+          envioPronto: {
+            arquivo: saida, chaveArquivo: `comp-${job.id}`, capa: capaEnvio, capaManual: !!capaEnvio,
+            titulo, descricao: descricaoFinal, tags, canalId: p.publicar.canalId, privacidade: p.publicar.privacidade,
+            agendarPara: agendarPara ? agendarPara.toISOString() : null, curto: p.formato.tipo === 'curto',
+            tipo: 'compilacoes', conteudoIa: cfg.conteudoIa !== false,
           },
         });
-        this.registrarEnvio();
-        this.atualizar(job, { youtube: { ...r, canal: canal.titulo, agendadoPara: agendarPara ? agendarPara.toISOString() : null } });
+        try {
+          const r = await YT.publicar({
+            credenciais: cfg.google,
+            redirectOriginal: canal.redirect,
+            refreshToken: canal.refreshToken,
+            arquivo: saida,
+            conteudoIa: cfg.conteudoIa !== false,
+            titulo,
+            descricao: descricaoFinal,
+            tags,
+            privacidade: p.publicar.privacidade,
+            agendarPara,
+            miniatura: capaEnvio,
+            onProgresso: (x) => {
+              progP(x);
+              this.atualizar(job, { etapa: `Enviando para o YouTube ${Math.round(x * 100)}%` }, false);
+            },
+          });
+          this.registrarEnvio();
+          this.atualizar(job, { youtube: { ...r, canal: canal.titulo, agendadoPara: agendarPara ? agendarPara.toISOString() : null } });
+        } catch (errPub) {
+          const limite = ehLimiteYoutube(errPub);
+          if (job.cancelado || errPub.message === 'CANCELADO' || !(limite || ehFalhaPassageira(errPub.message))) throw errPub;
+          // Limite de envios do YouTube (ou internet caiu): o vídeo fica pronto e o envio volta sozinho mais tarde
+          const quando = limite ? quandoTentarDeNovo(errPub) : new Date(Date.now() + 10 * 60e3);
+          const hora = quando.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+          this.adicionarEnvios([job.envioPronto], {
+            naoAntesDe: quando.toISOString(),
+            etapa: limite ? `Limite de envios do YouTube atingido hoje — tenta de novo sozinho em ${hora}` : `Sem conexão com o YouTube — tenta de novo às ${hora}`,
+          });
+          envioAdiado = limite ? `Pronto — o YouTube atingiu o limite de hoje; o envio foi para ${hora}` : `Pronto — envio ao YouTube volta às ${hora}`;
+        }
       }
 
-      this.atualizar(job, { status: 'concluido', etapa: publica ? 'Publicado' : 'Pronto', progresso: 1, restanteSeg: null, concluidoEm: new Date().toISOString() });
+      this.atualizar(job, { status: 'concluido', etapa: envioAdiado || (publica ? 'Publicado' : 'Pronto'), progresso: 1, restanteSeg: null, concluidoEm: new Date().toISOString() });
       this.espelhar(job);
       fs.rmSync(dir, { recursive: true, force: true });
     } catch (e) {
@@ -971,7 +1062,7 @@ class Fila extends EventEmitter {
       this.atualizar(job, {
         status: cancelado ? 'cancelado' : 'erro',
         etapa: cancelado ? 'Cancelado' : 'Erro',
-        erro: cancelado ? null : e.message,
+        erro: cancelado ? null : ehLimiteYoutube(e) ? 'O YouTube atingiu o limite de envios de hoje. O vídeo já está pronto na pasta: clique em ↻ para reenviar (sem montar de novo).' : e.message,
         restanteSeg: null,
       });
       if (cancelado) fs.rmSync(dir, { recursive: true, force: true });

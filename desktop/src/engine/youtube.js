@@ -172,7 +172,9 @@ async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, 
   const status = { privacyStatus: privacidade || 'private', selfDeclaredMadeForKids: false, ...(conteudoIa ? { containsSyntheticMedia: true } : {}) };
   if (agendarPara) {
     status.privacyStatus = 'private';
-    status.publishAt = new Date(agendarPara).toISOString();
+    // Horário que já passou (envio atrasado por limite do YouTube, por exemplo): publica daqui a 20 min
+    const marcado = new Date(agendarPara).getTime();
+    status.publishAt = new Date(marcado > Date.now() + 10 * 60e3 ? marcado : Date.now() + 20 * 60e3).toISOString();
   }
 
   const inserir = (comIdioma) =>
