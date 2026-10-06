@@ -358,45 +358,25 @@ export default async function handler(req, res) {
   const soFabrica = req.query.fabrica === '1';
   const inicio = Date.now();
 
-  // Conserto (out/2026): os primeiros vídeos da empresa tiveram as imagens geradas com o visual bíblico.
-  // Os que ainda não foram publicados voltam para a etapa das imagens e são refeitos com o visual certo.
-  try {
-    const daEmpresa = await db.collection('youvideo_fila').where('marca', '==', 'lcs').get();
-    for (const d of daEmpresa.docs) {
-      const x = d.data();
-      if (x.visual === 'empresa' || !Array.isArray(x.arquivos) || !x.arquivos.length || !x.roteiro || !x.narracao) continue;
-      const agendaId = x.fabrica?.agendaId;
-      if (agendaId) {
-        const ag = await db.collection('youvideo_agenda').doc(agendaId).get();
-        const publicado = Object.values(ag.data()?.redes || {}).some((r) => r?.status === 'ok');
-        if (publicado) { await d.ref.update({ visual: 'empresa-antigo' }); continue; } // já foi ao ar: não mexe
-        await ag.ref.delete().catch(() => {});
-      }
-      if (x.videoUrl) {
-        const proj = await db.collection('youvideo_projects').where('videoUrl', '==', x.videoUrl).get();
-        await Promise.all(proj.docs.map((p) => p.ref.delete().catch(() => {})));
-      }
-      await d.ref.update({
-        status: 'voz_ok', arquivos: [], renderId: null, videoUrl: null, thumbnailUrl: null, erro: null, ultimoErro: null, tentativas: 0,
-        'fabrica.agendaId': null, 'fabrica.ativo': true, visual: 'empresa',
-      });
-    }
-  } catch { /* se falhar, tenta de novo na próxima volta */ }
-
   const feitos = [];
   const vistos = new Set();
   try {
-    const snapshot = await db
-      .collection('youvideo_fila')
-      .where('status', 'not-in', ['concluido', 'erro'])
-      .limit(200)
-      .get();
+    // Fábrica (cron de 5 em 5 min): lê só os vídeos que vão ao ar entre 4 dias atrás e 3 dias à frente —
+    // antes lia a fila inteira a cada volta e estourava o limite diário de leituras do banco.
+    const snapshot = soFabrica
+      ? await db
+          .collection('youvideo_fila')
+          .where('fabrica.quando', '>=', new Date(Date.now() - 4 * 24 * 3600e3).toISOString())
+          .where('fabrica.quando', '<=', new Date(Date.now() + 3 * 24 * 3600e3).toISOString())
+          .get()
+      : await db.collection('youvideo_fila').where('status', 'not-in', ['concluido', 'erro']).limit(200).get();
     // Na ordem em que vão ser publicados (fábrica) ou de criação: termina um vídeo antes de começar o próximo
     const prioridade = (d) => d.data().fabrica?.quando || d.data().criadoEm || '';
     // Fábrica: só produz o que vai ao ar nos próximos 3 dias (o crédito é gasto aos poucos,
     // dá para cancelar o resto, e o PC não recebe 60 montagens de uma vez)
     const limite = new Date(Date.now() + 3 * 24 * 3600e3).toISOString();
     let docs = snapshot.docs
+      .filter((d) => !['concluido', 'erro'].includes(d.data().status))
       .filter((d) => (!soFabrica || d.data().fabrica) && (!d.data().fabrica || d.data().status !== 'pendente' || prioridade(d) <= limite))
       .sort((x, y) => prioridade(x).localeCompare(prioridade(y)));
     if (!docs.length) return res.status(200).json({ mensagem: 'Fila vazia, nada a processar.' });

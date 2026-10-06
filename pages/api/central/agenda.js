@@ -19,6 +19,13 @@ export default async function handler(req, res) {
   const db = getDb();
   try {
     if (req.method === 'GET') {
+      // ?lembrete=1 -> só o que chegou na hora nas últimas 6 h (o PC usa para avisar "hora de postar"); gasta poucas leituras
+      if (req.query.lembrete === '1') {
+        const agora = new Date().toISOString();
+        const de = new Date(Date.now() - 6 * 3600e3).toISOString();
+        const s = await db.collection(COL).where('quando', '>=', de).where('quando', '<=', agora).get();
+        return res.status(200).json({ itens: s.docs.map((d) => ({ id: d.id, ...d.data() })) });
+      }
       const desde = new Date(Date.now() - 14 * 86400e3).toISOString();
       const snap = await db.collection(COL).where('quando', '>=', desde).orderBy('quando', 'asc').limit(500).get();
       return res.status(200).json({ itens: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });

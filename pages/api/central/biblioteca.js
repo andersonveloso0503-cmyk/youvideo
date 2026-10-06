@@ -34,7 +34,8 @@ function youtubeDoProjeto(p, categoria, fab) {
 async function projetos(db) {
   const [snap, fabSnap] = await Promise.all([
     db.collection('youvideo_projects').orderBy('criadoEm', 'desc').limit(400).get(),
-    db.collection('youvideo_fila').where('origem', '==', 'fabrica').get().catch(() => ({ docs: [] })),
+    // só a Fábrica dos últimos 30 dias (economia de leituras do banco)
+    db.collection('youvideo_fila').where('fabrica.quando', '>=', new Date(Date.now() - 30 * 24 * 3600e3).toISOString()).get().catch(() => ({ docs: [] })),
   ]);
   // Vídeos que vieram da Fábrica: acha pelo endereço do vídeo
   const daFabrica = new Map();

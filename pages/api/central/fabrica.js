@@ -113,8 +113,13 @@ export default async function handler(req, res) {
       return res.status(200).json(await testarConta(String(req.query.conexao)));
     }
     if (req.method === 'GET') {
-      const snap = await col.where('fabrica.ativo', '==', true).get();
-      let itens = snap.docs.map((d) => {
+      // Economia de leituras do banco (o plano grátis tem limite por dia):
+      //  - ?youtube=1 (o PC pergunta a cada 2 min): lê só os vídeos que estão esperando para subir no YouTube
+      //  - lista da Fábrica: lê só de 3 dias atrás em diante (o que já passou não aparece mais na tela)
+      const snap = req.query.youtube === '1'
+        ? await col.where('fabrica.youtube.status', 'in', ['pendente', 'enviando', 'erro']).get()
+        : await col.where('fabrica.quando', '>=', new Date(Date.now() - 3 * 24 * 3600e3).toISOString()).get();
+      let itens = snap.docs.filter((d) => d.data().fabrica?.ativo === true).map((d) => {
         const x = d.data();
         return {
           id: d.id,

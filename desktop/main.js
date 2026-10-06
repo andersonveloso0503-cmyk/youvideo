@@ -401,8 +401,9 @@ app.whenReady().then(() => {
       // sem internet: fica com o que já sabia
     }
   }
+  // De 30 em 30 min (e sempre que a tela da Fábrica abre): cada consulta lê o banco, que tem limite por dia
   setTimeout(atualizarDaFabrica, 6000);
-  setInterval(atualizarDaFabrica, 3 * 60e3);
+  setInterval(atualizarDaFabrica, 30 * 60e3);
 
   const quandoTxt = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
   /** { estado: 'ok'|'auto'|'espera'|'subir'|'fora'|'erro', texto, dica } ou null (envios e posts não levam tarja). */
@@ -671,7 +672,7 @@ app.whenReady().then(() => {
     const cfg = store.ler();
     if (!cfg.centralToken) return;
     try {
-      const { itens = [] } = await Central.chamar(cfg, '/api/central/agenda');
+      const { itens = [] } = await Central.chamar(cfg, '/api/central/agenda', { query: { lembrete: '1' } }); // consulta leve
       const agora = Date.now();
       const faltam = (a) => ['tiktok', 'kwai'].filter((r) => a.redes?.[r]?.status === 'manual');
       // Chegou a hora (até 6 h de atraso) e ainda não foi postado
@@ -691,7 +692,7 @@ app.whenReady().then(() => {
     } catch {}
   }
   setTimeout(lembrarPostsCelular, 30000);
-  setInterval(lembrarPostsCelular, 5 * 60e3);
+  setInterval(lembrarPostsCelular, 10 * 60e3);
 
   setTimeout(checarCreditos, 20000);
   setInterval(checarCreditos, 30 * 60e3);
@@ -702,7 +703,12 @@ app.whenReady().then(() => {
 
   setTimeout(fabricaParaYoutube, 15000);
   setInterval(fabricaParaYoutube, 120000);
-  ipcMain.handle('fabrica:listar', () => Central.chamar(store.ler(), '/api/central/fabrica'));
+  ipcMain.handle('fabrica:listar', async () => {
+    const r = await Central.chamar(store.ler(), '/api/central/fabrica');
+    // Aproveita a mesma resposta para as tarjas da Fila (sem consultar o banco de novo)
+    daFabrica = new Map((r.itens || []).filter((i) => i.renderId).map((i) => [i.renderId, i]));
+    return r;
+  });
   ipcMain.handle('fabrica:criar', (_e, dados) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { ...dados, acao: 'criar' } }));
   ipcMain.handle('fabrica:acao', (_e, { id, acao }) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao } }));
 
