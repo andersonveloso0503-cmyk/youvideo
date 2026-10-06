@@ -7,6 +7,10 @@
     {
       "path": "/api/fila-processar?fabrica=1",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/central/limpeza",
+      "schedule": "30 8 * * *"
     }
   ]
 }
