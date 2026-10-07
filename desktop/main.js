@@ -1291,6 +1291,46 @@ app.whenReady().then(() => {
       return null;
     }
   });
+  // ---------- Short do cantor ----------
+  // O vídeo do cantor é feito num site de fora; aqui é o antes (cortar o melhor trecho) e o depois (reconhecer e virar Short)
+  const Cantor = require('./src/engine/cantor');
+  const dadosCantor = () => app.getPath('userData');
+  ipcMain.handle('cantor:cortar', async (_e, { musicas, duracao, inicio }) => {
+    if (!Array.isArray(musicas) || !musicas.length) throw new Error('Marque pelo menos uma música.');
+    const pasta = path.join(store.ler().pastaSaida || path.join(os.homedir(), 'Videos'), 'Trechos para o cantor');
+    const itens = [];
+    for (const [i, m] of musicas.entries()) {
+      try {
+        itens.push(await Cantor.cortarTrecho({ arquivo: m.arquivo, titulo: m.titulo, inicio: musicas.length === 1 ? inicio : null, duracao, pasta, dirDados: dadosCantor() }));
+      } catch (e) {
+        itens.push({ titulo: m.titulo, original: m.arquivo, erro: String(e?.message || e).slice(0, 200) });
+      }
+      enviar('cantor:progresso', (i + 1) / musicas.length);
+    }
+    return { pasta, itens };
+  });
+  ipcMain.handle('cantor:trechos', () => Cantor.lerRegistro(dadosCantor()).map(Cantor.semAssinatura).reverse().slice(0, 100));
+  ipcMain.handle('cantor:reconhecer', async (_e, caminhos) => {
+    const lista = (caminhos || []).filter((c) => EXT_VIDEO_ENVIO.includes(path.extname(c).slice(1).toLowerCase()));
+    const info = await infoVideos(lista);
+    const r = await Cantor.reconhecer(info.map((v) => v.arquivo), dadosCantor());
+    const jobs = fila.lista();
+    return info.map((v, i) => ({ ...v, trecho: r[i].trecho, certeza: r[i].certeza, completo: Cantor.videoCompleto(jobs, r[i].trecho), deitado: v.largura > v.altura * 1.05 }));
+  });
+  ipcMain.handle('cantor:completo', (_e, id) => {
+    const reg = Cantor.lerRegistro(dadosCantor()).find((x) => x.id === id);
+    return Cantor.videoCompleto(fila.lista(), reg);
+  });
+  // Vídeo deitado não entra como Short: deixa em pé. Devolve os dados do arquivo que vai subir.
+  ipcMain.handle('cantor:emPe', async (_e, arquivos) => {
+    const saida = [];
+    for (const [i, a] of (arquivos || []).entries()) {
+      const pronto = await Cantor.deixarEmPe(a, { onProgresso: (x) => enviar('cantor:progresso', (i + x) / arquivos.length) });
+      saida.push((await infoVideos([pronto]))[0] || null);
+    }
+    return saida;
+  });
+
   ipcMain.handle('envio:contador', () => ({ hoje: enviosHoje(), limite: 100, renova: horaRenovacao() }));
   ipcMain.handle('envio:adicionar', (_e, lista) => {
     if (!Array.isArray(lista) || !lista.length) throw new Error('Nenhum vídeo para subir.');

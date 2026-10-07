@@ -40,6 +40,8 @@ const Subir = (() => {
   // Descrição final = texto + lista de músicas (capítulos) + hashtags do modelo
   function descricaoFinal(v) {
     let d = (v.descricao || '').trim();
+    // Short de trecho: aponta para o vídeo completo da música (o texto vale mesmo se a IA reescrever a descrição)
+    if (v.linkCompleto && !d.includes(v.linkCompleto)) d = `🎧 Música completa: ${v.linkCompleto}` + (d ? `\n\n${d}` : '');
     if (S.capitulos && v.musicas && v.musicas.length > 1) {
       const linhas = v.musicas.map((m, i) => `${fmtMin(i === 0 ? 0 : m.inicio)} ${m.titulo}`);
       const lista = '🎵 Músicas:\n' + linhas.join('\n');
@@ -121,7 +123,7 @@ const Subir = (() => {
         <span class="num">${i + 1}</span>
         <div class="capa${v.curto ? ' em-pe' : ''}" title="Clique para trocar a capa">${v.previa ? `<img src="${urlArquivo(v.previa)}" />` : ''}<span>Trocar capa</span></div>
         <div class="campos">
-          <div class="info"><span class="arq"></span><span>${tempo(v.duracao)}</span>${v.curto ? '<span>Shorts</span>' : ''}${v.musicas?.length ? `<span>${v.musicas.length} músicas</span>` : ''}<b>${quando}</b></div>
+          <div class="info"><span class="arq"></span><span>${tempo(v.duracao)}</span>${v.curto ? '<span>Shorts</span>' : ''}${v.musicas?.length > 1 ? `<span>${v.musicas.length} músicas</span>` : ''}${v.linkCompleto ? '<span title="A descrição leva o link do vídeo completo desta música">🔗 com link do vídeo completo</span>' : ''}<b>${quando}</b></div>
           <div class="titulo-linha"><input class="t" maxlength="100" list="opcoes-envio-${i}" placeholder="Título do vídeo no YouTube" /><span class="conta"></span></div>
           <datalist id="opcoes-envio-${i}">${(v.opcoes || []).map((o) => `<option value="${String(o).replace(/"/g, '&quot;')}"></option>`).join('')}</datalist>
           ${v.opcoes?.length > 1 ? `<span class="dica-opcoes">💡 ${v.opcoes.length} opções de título — apague o texto do título para ver as outras${v.palavra ? ` · palavra-chave: <b>${String(v.palavra).replace(/</g, '')}</b>` : ''}</span>` : ''}
@@ -208,7 +210,8 @@ const Subir = (() => {
       else avisar('Nenhum vídeo encontrado');
       return;
     }
-    const adicionados = novos.map((v) => ({ ...v, previa: null, fonte: null }));
+    // Vídeo que já chega com título pronto (ex.: Short do cantor) mantém o texto; os outros seguem o modelo
+    const adicionados = novos.map((v) => ({ ...v, previa: null, fonte: v.fonte || null }));
     S.videos.push(...adicionados);
     renderLista();
     // Prévia das capas (a imagem com o mesmo nome do vídeo, ou um quadro dele)
@@ -377,7 +380,7 @@ const Subir = (() => {
     q('.grade-agenda').style.pointerEvents = agenda ? '' : 'none';
   }
 
-  async function abrir(arquivos) {
+  async function abrir(arquivos, prontos) {
     ligar();
     const prefs = config.envioPrefs || {};
     Object.assign(S, {
@@ -416,6 +419,7 @@ const Subir = (() => {
     conferirAgenda();
     q('#modalSubir').showModal();
     if (arquivos?.length) await adicionarVideos(await window.api.envio.infoVideos(arquivos));
+    if (prontos?.length) await adicionarVideos(prontos);
   }
 
   return { abrir, renderCanais: () => ligado && renderCanais() };

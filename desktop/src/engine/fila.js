@@ -884,10 +884,14 @@ class Fila extends EventEmitter {
             onStatus: (s) => this.atualizar(job, { etapa: `${s} — ${i + 1}/${musicas.length}` }, false),
           });
           const durMusica = t.fim - t.inicio;
+          const pulo = t.inicioNaMusica || 0; // Short que começa no refrão: a letra anda junto
           for (const l of linhas) {
-            if (limite && l.inicio >= limite) continue;
-            if (l.inicio >= durMusica) continue;
-            legendas.push({ inicio: t.inicio + l.inicio, fim: t.inicio + Math.min(l.fim, durMusica), texto: l.texto });
+            const li = l.inicio - pulo;
+            const lf = l.fim - pulo;
+            if (lf <= 0.2) continue;
+            if (limite && li >= limite) continue;
+            if (li >= durMusica) continue;
+            legendas.push({ inicio: t.inicio + Math.max(0, li), fim: t.inicio + Math.min(lf, durMusica), texto: l.texto });
           }
           prog((i + 1) / musicas.length);
         }

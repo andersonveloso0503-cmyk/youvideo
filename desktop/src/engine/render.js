@@ -129,19 +129,35 @@ async function prepararAudio({ musicas, audio, formato, dir, modo, onProgresso, 
   const cf = Math.max(0, Math.min(10, Number(audio?.crossfade) || 0));
   const normalizar = !!audio?.normalizar;
 
-  // Duração real de cada faixa depois do corte
-  const faixas = musicas.map((m) => ({ ...m, dur: limite ? Math.min(m.duracao, limite) : m.duracao }));
+  const maxMin = Number(formato?.duracaoMaxMin) || (formato?.tipo === 'curto' ? 1 : 0);
+  const maxTotal = maxMin ? maxMin * 60 : Infinity;
+
+  // Duração real de cada faixa depois do corte (ini = de onde a música começa a tocar)
+  const faixas = musicas.map((m) => ({ ...m, dur: limite ? Math.min(m.duracao, limite) : m.duracao, ini: 0 }));
+
+  // Shorts: em vez de pegar o começo da música, pega a parte mais forte (o refrão, quase sempre).
+  // Vale para a música que não cabe inteira no Short.
+  if (formato?.tipo === 'curto' && formato?.refrao !== false) {
+    if (faixas.length === 1 && faixas[0].dur > maxTotal) faixas[0].dur = maxTotal;
+    const { inicioDoRefrao } = require('./cantor');
+    for (const f of faixas) {
+      if (f.duracao <= f.dur + 3) continue;
+      try {
+        f.ini = Math.max(0, Math.min(await inicioDoRefrao(f.arquivoOriginal || f.arquivo, f.dur), f.duracao - f.dur));
+      } catch {
+        f.ini = 0; // não conseguiu escutar a música: começa do início, como antes
+      }
+    }
+  }
+
   const timeline = [];
   let t = 0;
   faixas.forEach((f, i) => {
     const inicio = i === 0 ? 0 : t - cf;
-    timeline.push({ titulo: f.titulo, inicio, fim: inicio + f.dur, arquivoOriginal: f.arquivoOriginal || f.arquivo });
+    timeline.push({ titulo: f.titulo, inicio, fim: inicio + f.dur, arquivoOriginal: f.arquivoOriginal || f.arquivo, inicioNaMusica: f.ini });
     t = inicio + f.dur;
   });
   let total = t;
-
-  const maxMin = Number(formato?.duracaoMaxMin) || (formato?.tipo === 'curto' ? 1 : 0);
-  const maxTotal = maxMin ? maxMin * 60 : Infinity;
   if (total > maxTotal) total = maxTotal;
 
   // Processa em lotes pra não estourar o limite de linha de comando do Windows
@@ -160,9 +176,11 @@ async function prepararAudio({ musicas, audio, formato, dir, modo, onProgresso, 
     const partes = [];
     lote.forEach((f, i) => {
       const fadeOut = Math.max(0, f.dur - 1.5);
-      let cadeia = `[${i}:a]atrim=0:${f.dur.toFixed(3)},asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo`;
+      let cadeia = `[${i}:a]atrim=${f.ini.toFixed(3)}:${(f.ini + f.dur).toFixed(3)},asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo`;
       if (normalizar) cadeia += ',loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000';
-      if (cf === 0 && limite && f.duracao > limite) cadeia += `,afade=t=out:st=${fadeOut.toFixed(3)}:d=1.5`;
+      if (f.ini > 0.05) cadeia += ',afade=t=in:d=0.2';
+      // Música cortada antes do fim: termina com o som baixando, não de repente
+      if (cf === 0 && ((limite && f.duracao > limite) || f.ini + f.dur < f.duracao - 0.5)) cadeia += `,afade=t=out:st=${fadeOut.toFixed(3)}:d=1.5`;
       partes.push(`${cadeia}[a${i}]`);
     });
     let ultimo = 'a0';

@@ -868,8 +868,20 @@ function ligarTudo() {
       }
       if (P.formato.tipo === 'longo' && max && max <= 3) P.formato.duracaoMaxMin = '';
       $('#inDuracaoMax').value = P.formato.duracaoMaxMin;
+      $('#campoRefrao').hidden = P.formato.tipo !== 'curto';
       dimensionarPrevia(); atualizarResumo();
     }),
+    // Shorts começam no refrão (ligado por padrão, inclusive em projeto salvo antes de a opção existir)
+    (() => {
+      const el = $('#cRefrao');
+      const pintar = () => {
+        el.checked = P.formato.refrao !== false;
+        $('#campoRefrao').hidden = P.formato.tipo !== 'curto';
+      };
+      el.onchange = () => { P.formato.refrao = el.checked; salvarDepois(); };
+      pintar();
+      return pintar;
+    })(),
     ligarCampo('#selResolucao', fm, 'resolucao', 'change'),
     ligarCampo('#inDuracaoMax', fm, 'duracaoMaxMin'),
     ligarCampo('#inLimiteMusica', fm, 'limiteMusicaSeg'),
@@ -1330,6 +1342,7 @@ async function iniciar() {
   };
   $('#btnConfig').onclick = () => abrirConfig();
   $('#btnSubir').onclick = () => Subir.abrir();
+  $('#btnCantor').onclick = () => Cantor.abrir();
   const puxarConfig = async () => {
     const res = $('#resSync');
     res.textContent = 'Buscando as configurações do outro PC...';

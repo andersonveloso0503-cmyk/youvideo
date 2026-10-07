@@ -36,6 +36,10 @@
         <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M12 15V9M9 11.5 12 9l3 2.5"/></svg>
         Subir p/ YouTube
       </button>
+      <button class="btn-topo" id="btnCantor" title="Corta o melhor trecho da música para o vídeo do cantor e transforma o vídeo pronto em Short">
+        <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        Short do cantor
+      </button>
       <button class="btn-topo" id="btnConfig">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         Configurações
@@ -305,6 +309,10 @@
         <label title="Corta cada música nesse tempo (com fade)">Limitar cada música</label>
         <div class="linha-unidade"><input type="number" min="0" id="inLimiteMusica" placeholder="toda" /><span>seg</span></div>
       </div>
+      <div class="campo" id="campoRefrao" hidden>
+        <label title="O Compilador escuta a música e começa o Short na parte mais forte (quase sempre o refrão), em vez de começar do início da música">Trecho do Short</label>
+        <label class="interruptor"><input type="checkbox" id="cRefrao" checked /><span></span> Começar no refrão</label>
+      </div>
     </fieldset>
     <div class="gerar">
       <div class="gerar-resumo">
@@ -391,6 +399,54 @@
       <button class="btn-primario" id="btnArrAplicar" hidden>✅ Aplicar no YouTube</button>
       <span class="nota" id="arrNota"></span>
     </div>
+  </dialog>
+
+  <!-- Modal: Short do cantor -->
+  <dialog class="modal largo" id="modalCantor">
+    <div class="modal-topo"><h2>🎤 Short do cantor</h2><button class="fechar" data-fechar>×</button></div>
+    <p class="modal-texto">O vídeo do cantor você gera no ilovesong. O Compilador cuida do antes (cortar o melhor trecho) e do depois (transformar em Short e programar no canal).</p>
+
+    <div class="cartao">
+      <h3>1. Cortar o melhor trecho de cada música</h3>
+      <p class="nota">O Compilador escuta a música e pega a parte mais forte, que quase sempre é o refrão. Depois de cortar dá para ouvir e mudar o começo.</p>
+      <div class="can-linha">
+        <label>Tamanho do trecho
+          <select id="canDur">
+            <option value="30">30 segundos</option>
+            <option value="45">45 segundos</option>
+            <option value="60">60 segundos</option>
+          </select>
+        </label>
+        <button class="btn-mini" id="canEscolher">+ Escolher outras músicas</button>
+      </div>
+      <div id="canMusicas" class="arr-lista"></div>
+      <div class="can-linha">
+        <button class="btn-primario" id="canCortar">✂ Cortar os trechos</button>
+        <button class="btn-mini" id="canPasta" hidden>📂 Abrir a pasta dos trechos</button>
+        <span class="nota" id="canNota1"></span>
+      </div>
+    </div>
+
+    <div class="cartao">
+      <h3>2. Gerar o vídeo no ilovesong</h3>
+      <p class="nota">No site, mande a foto do cantor e o trecho cortado, gere o vídeo e baixe. Se o site deixar escolher, prefira o formato em pé (9:16). Não precisa mudar o nome do arquivo baixado.</p>
+      <div class="can-linha"><button class="btn-mini" id="canSite">🌐 Abrir o ilovesong</button></div>
+    </div>
+
+    <div class="cartao">
+      <h3>3. Trazer os vídeos baixados</h3>
+      <div class="zona-envio" id="canZona">
+        <strong>⬇ Arraste aqui os vídeos que você baixou</strong>
+        <span>ou <a id="canEscolherVideos">escolha os vídeos</a>. O Compilador reconhece pelo som de qual música é cada um.</span>
+      </div>
+      <div id="canVideos" class="arr-lista"></div>
+      <p class="nota" id="canAvisoLink" hidden>No Short, o link escrito na descrição aparece mas não dá para clicar (regra do YouTube). Para o Short ganhar o botão que leva ao vídeo longo, depois de subir abra o Short no YouTube Studio e escolha o vídeo em <b>"Vídeo relacionado"</b>.</p>
+      <div class="can-linha">
+        <button class="btn-primario" id="canSubir" hidden>▶ Continuar para subir no YouTube</button>
+        <span class="nota" id="canNota3"></span>
+      </div>
+    </div>
+    <p class="modal-erro" id="canErro"></p>
   </dialog>
 
   <!-- Modal: atualizar o app -->
@@ -698,6 +754,7 @@
   <script src="biblioteca.js"></script>
   <script src="fabrica.js"></script>
   <script src="arrumar.js"></script>
+  <script src="cantor.js"></script>
   <script src="criar.js"></script>
   <script src="app.js"></script>
 </body>

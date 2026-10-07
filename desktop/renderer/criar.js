@@ -25,7 +25,8 @@ const Criar = (() => {
         ['/musica', '🎵', 'Música', 'Uma música, do áudio até o vídeo pronto'],
         ['/musica-fila', '📋', 'Fila de músicas', 'Suba várias e deixe gerar sozinho'],
         ['/medley', '🎶', 'Medley', 'Junte músicas de estilos diferentes numa faixa só'],
-        ['/musica-cantada', '🧑‍🎤', 'Cantor virtual', 'Vídeo do personagem cantando'],
+        // "acao:" abre uma janela do próprio Compilador em vez de uma página do Youvideo
+        ['acao:cantor', '🧑‍🎤', 'Short do cantor', 'Corta o melhor trecho para o ilovesong e transforma o vídeo pronto em Short'],
         ['/cover', '🎤', 'Cover IA', 'Separa voz e instrumental e canta com voz de IA'],
         ['/transcrever', '📝', 'Transcrever áudio', 'Recupera a letra cantada de uma música'],
       ],
@@ -104,6 +105,7 @@ const Criar = (() => {
   }
 
   async function abrirFerramenta(rota, nome) {
+    if (rota === 'acao:cantor') return Cantor.abrir();
     navegando = true;
     q('#criarHub').hidden = true;
     q('#criarNavegador').hidden = false;
