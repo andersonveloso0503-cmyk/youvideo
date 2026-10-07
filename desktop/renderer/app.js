@@ -321,6 +321,7 @@ function atualizarResumo() {
   if (P.audio.somenteInstrumental && !config.temFal) dica = '⚠ Falta a chave da fal.ai (Configurações)';
   if (P.legenda.ativo && !config.temGroq) dica = '⚠ Falta a chave da Groq (Configurações)';
   if (P.publicar.ativo && !P.publicar.canalId) dica = '⚠ Escolha o canal na aba Publicar';
+  if (P.formato.tipo !== 'curto' && Number(P.formato.versoes) > 2 && sel.length) dica = `⚠ ${Number(P.formato.versoes)} versões das mesmas músicas: o YouTube pode ver como repetido. Recomendado: até 2`;
   $('#dicaGerar').textContent = dica;
   btn.innerHTML = btn.innerHTML.replace(/GERAR (VÍDEOS?|\d+ VÍDEOS)/, grupos.length > 1 ? `GERAR ${grupos.length} VÍDEOS` : 'GERAR VÍDEO');
 }
@@ -1067,6 +1068,18 @@ async function gerar() {
   if (P.audio.somenteInstrumental && !config.temFal) return abrirConfig('Cadastre a chave da fal.ai para separar a voz.');
   if (P.legenda.ativo && !config.temGroq) return abrirConfig('Cadastre a chave da Groq para gerar a legenda.');
   if (P.publicar.ativo && !P.publicar.canalId) { trocarAba('publicar'); return avisar('Escolha o canal do YouTube', true); }
+  // Mais de 2 versões das mesmas músicas: o YouTube pode tratar o canal como conteúdo repetitivo
+  const versoes = P.formato.tipo === 'curto' ? 0 : Number(P.formato.versoes) || 0;
+  if (versoes > 2) {
+    const canal = P.publicar.ativo ? canais.find((c) => c.id === P.publicar.canalId)?.titulo : '';
+    const ok = confirm(
+      `Atenção: são ${versoes} vídeos com AS MESMAS músicas, só em outra ordem${canal ? `, todos para o canal "${canal}"` : ''}.\n\n` +
+        'O YouTube pode considerar isso conteúdo repetitivo (e quem assiste ouve as mesmas músicas de novo). ' +
+        'O recomendado é no máximo 2 versões por conjunto de músicas, com alguns dias entre uma e outra. Para ter mais vídeos, use músicas novas.\n\n' +
+        `Gerar os ${versoes} mesmo assim?`
+    );
+    if (!ok) return;
+  }
   const nomeBase = (P.saida.nome || P.publicar.titulo || sel[0].titulo || 'compilacao').trim();
   const projeto = {
     nome: nomeBase,
