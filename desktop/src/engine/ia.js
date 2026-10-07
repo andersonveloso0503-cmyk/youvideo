@@ -157,6 +157,44 @@ function lerJson(texto) {
   }
 }
 
+// ---------- Buscas e etiquetas que NÃO podem entrar no vídeo ----------
+// O autocompletar do YouTube mistura nome de pregador, padre, cantor, outras religiões e até outro idioma
+// ("parábola dos talentos frei gilson", "historia biblica moises cruza el mar rojo"). Usar isso em título,
+// descrição ou etiqueta é "informação enganosa" para o YouTube e leva o vídeo ao público errado.
+// (ficam de fora palavras que também são comuns em louvores: "dom", "pra", "irmã", "ministério")
+const TITULOS_DE_PESSOA = ['padre', 'frei', 'bispo', 'bispa', 'pastor', 'pastora', 'pr', 'missionario', 'missionaria', 'cardeal', 'monsenhor', 'reverendo', 'papa'];
+const OUTRAS_CRENCAS = ['espiritismo', 'espirita', 'espiritas', 'kardec', 'kardecista', 'umbanda', 'candomble', 'chico xavier', 'mormon', 'mormons', 'testemunhas de jeova', 'testemunha de jeova', 'budismo', 'budista', 'islamismo', 'alcorao', 'tarot', 'horoscopo', 'signo', 'signos'];
+// Nomes muito comuns no autocompletar de assuntos cristãos (a regra dos títulos acima não pega quem aparece só pelo nome)
+const NOMES_CONHECIDOS = ['gilson', 'manzotti', 'reginaldo', 'bruno leonardo', 'deive leonardo', 'claudio duarte', 'hernandes', 'haroldo dutra', 'rodrigo silva', 'nicodemus', 'malafaia', 'valadao', 'macedo', 'feliciano', 'caio fabio', 'tiago brunet', 'marcelo rossi', 'fabio de melo', 'kezya nunes', 'mara lima', 'aline barros', 'fernandinho', 'gabriela rocha', 'isadora pompeo', 'eyshila', 'cassiane', 'damares', 'bruna karla', 'anderson freire', 'midian lima', 'paulo junior', 'augustus', 'lamartine', 'yago martins', 'antonio junior', 'elizeu rodrigues', 'junior trovao', 'talitha pereira', 'viviane martinello', 'helena tannure', 'luciano subira'];
+const OUTRO_IDIOMA = {
+  // palavras que denunciam espanhol / inglês numa busca que deveria ser em português
+  pt: ['los', 'las', 'del', 'nino', 'ninos', 'nina', 'ninas', 'rojo', 'dios', 'cuento', 'cuentos', 'pelicula', 'cristianos', 'hijo', 'hijos', 'iglesia', 'senor', 'palabra', 'cancion', 'canciones', 'oracion', 'oraciones', 'manana', 'noche', 'cruza', 'biblicas para', 'the', 'for kids', 'story', 'stories', 'bible', 'prayer', 'worship songs'],
+};
+const DE_CRIANCA = ['infantil', 'infantis', 'crianca', 'criancas', 'kids', 'bebe', 'bebes', 'para criancas', 'escola dominical', 'ebd'];
+// Palavras gerais que podem acompanhar qualquer história ou oração
+const VOCABULARIO_GERAL = new Set(('biblia biblica biblicas biblico biblicos historia historias desenho animado animada animacao explicacao explicada resumo resumida completa completo estudo mensagem reflexao significado versiculo versiculos curta curtas curto short shorts video videos oracao oracoes poderosa poderoso forte manha noite dia hoje dormir deus jesus cristo senhor espirito santo fe milagre milagres parabola parabolas evangelho cristao crista cristaos gospel palavra antigo novo testamento licao licoes ensinamento ensinamentos personagem personagens apostolo apostolos discipulo discipulos profeta profetas vida verdadeira real passagem livro capitulo salmo salmos amor esperanca coragem paz gratidao perdao bencao sobre para com sem que como quem foi era uma uns umas dos das nos nas pelo pela aos mais muito').split(' '));
+
+/**
+ * Esta busca/etiqueta pode ir num vídeo em português? Devolve false para nome de outra pessoa,
+ * outra crença, outro idioma e (em história bíblica) rótulo de conteúdo infantil.
+ * contexto: o texto do próprio vídeo. Em história bíblica (rigor = true) a busca só passa se as palavras
+ * dela estiverem no vídeo ou forem gerais — no máximo 1 palavra de fora (2 ou mais quase sempre é nome de alguém).
+ */
+function buscaSegura(texto, { contexto = '', idioma = 'pt', rigor = false } = {}) {
+  const t = String(texto || '');
+  const tem = (lista) => lista.some((w) => temPalavra(t, w));
+  if (tem(TITULOS_DE_PESSOA) || tem(OUTRAS_CRENCAS) || tem(NOMES_CONHECIDOS)) return false;
+  if (OUTRO_IDIOMA[idioma] && tem(OUTRO_IDIOMA[idioma])) return false;
+  if (!rigor) return true;
+  if (tem(DE_CRIANCA)) return false; // rotular de "infantil" pode fazer o YouTube tratar o canal como conteúdo para crianças
+  const doVideo = palavras(contexto);
+  const raiz = (w) => w.replace(/(oes|aes|es|s)$/, '');
+  const conhecidas = new Set([...doVideo, ...VOCABULARIO_GERAL].flatMap((w) => [w, raiz(w)]));
+  let deFora = 0;
+  for (const w of palavras(t)) if (!conhecidas.has(w) && !conhecidas.has(raiz(w)) && !/^\d+$/.test(w)) deFora++;
+  return deFora <= 1;
+}
+
 /** Sugestões reais da busca do YouTube (o que aparece enquanto a pessoa digita). */
 async function sugestoesYoutube(termo, idioma = 'pt') {
   const gl = idioma === 'pt' ? 'BR' : idioma === 'es' ? 'MX' : 'US';
@@ -197,7 +235,10 @@ async function palavrasPesquisadas(groqKey, info, idiomaCodigo) {
     sementes = (r.sementes || []).map((s) => String(s).toLowerCase().trim()).filter(Boolean).slice(0, 6);
   } catch {}
   const proibidos = generosProibidos(info.pedido);
-  sementes = sementes.filter((x) => !violaPedido(x, proibidos));
+  // Nada de nome de outra pessoa, outra crença ou outro idioma (em história bíblica o filtro é mais rígido)
+  const filtro = { contexto: `${info.nome || ''} ${info.pedido || ''} ${info.contexto || ''}`, idioma: idiomaCodigo, rigor: info.tipo === 'historia' };
+  const segura = (x) => buscaSegura(x, filtro);
+  sementes = sementes.filter((x) => !violaPedido(x, proibidos) && segura(x));
   // O próprio pedido também vira busca (é o que o dono quer aparecer)
   const doPedido = String(info.pedido || '').toLowerCase().replace(/[^\p{L}\p{N} ]+/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 4).join(' ');
   if (doPedido && !sementes.includes(doPedido)) sementes.unshift(doPedido);
@@ -210,7 +251,7 @@ async function palavrasPesquisadas(groqKey, info, idiomaCodigo) {
   for (let i = 0; i < 10; i++) {
     for (const r of resultados) {
       const s = r[i];
-      if (s && !vistos.has(s.toLowerCase()) && !violaPedido(s, proibidos)) {
+      if (s && !vistos.has(s.toLowerCase()) && !violaPedido(s, proibidos) && segura(s)) {
         vistos.add(s.toLowerCase());
         lista.push(s);
       }
@@ -248,7 +289,9 @@ const REGRAS_TITULO_HISTORIA = `ESTE VÍDEO É UMA HISTÓRIA BÍBLICA NARRADA (n
 5. As 3 opções: (a) nome + "a História Bíblica de [tema]", (b) nome + a lição, (c) nome + o detalhe curioso.
 6. Sem emoji no meio. Sem aspas. Sem hashtag (o app coloca).
 Exemplos só da FORMA: "Davi e Golias: a Pedra que Derrubou o Gigante", "Rute e Noemi — a Lealdade que Mudou uma Família", "Elias no Monte Carmelo: a História Bíblica do Fogo do Céu".
-A palavra_principal continua sendo a busca da lista que melhor descreve a história.`;
+A palavra_principal continua sendo a busca da lista que melhor descreve a história.
+7. A busca da lista serve para escolher as PALAVRAS, não para ser copiada torta. No título e na descrição escreva a frase em português correto, com artigos e preposições: busca "milagre da pesca jesus" → "O Milagre da Pesca de Jesus"; busca "parábola dos talentos" → "A Parábola dos Talentos".
+8. PROIBIDO no título, na descrição e nas tags: nome de pregador, padre, pastor, cantor, canal ou de outra religião; palavra em espanhol ou inglês; e as palavras "infantil" e "para crianças".`;
 
 /**
  * Títulos novos para vídeos de história bíblica que já estão no canal com título fraco.
@@ -415,6 +458,8 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   const limparTitulo = (t) => String(t || '').replace(/^["'“]|["'”]$/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
   const bom = (t) =>
     !violaPedido(t, proibidos) &&
+    buscaSegura(t, { idioma: idiomaCodigo }) &&
+    !(historia && DE_CRIANCA.some((w) => temPalavra(t, w))) &&
     !(historia && COMECO_FRACO.test(t)) &&
     !evitar.some((e) => parecido(t, e) >= 0.7 || (!historia && mesmaAbertura(t, e)));
 
@@ -445,7 +490,8 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   let tags = (Array.isArray(j.tags) ? j.tags : String(j.tags || '').split(','))
     .map((t) => String(t).replace(/^#/, '').trim())
     .filter(Boolean)
-    .filter((t) => !violaPedido(t, proibidos));
+    .filter((t) => !violaPedido(t, proibidos))
+    .filter((t) => buscaSegura(t, { contexto: `${info.nome || ''} ${info.pedido || ''} ${info.contexto || ''} ${opcoes.join(' ')} ${j?.descricao || ''}`, idioma: idiomaCodigo, rigor: historia }));
   // O YouTube aceita até 500 caracteres de tags no total
   const cabem = [];
   let total = 0;
@@ -474,4 +520,4 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   };
 }
 
-module.exports = { gerarTextosVideo, limparNome, sugestoesYoutube, comHashtags, titulosHistoria, GENEROS, temPalavra, gruposDe };
+module.exports = { buscaSegura, gerarTextosVideo, limparNome, sugestoesYoutube, comHashtags, titulosHistoria, GENEROS, temPalavra, gruposDe };

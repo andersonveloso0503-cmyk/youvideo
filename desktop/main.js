@@ -516,11 +516,17 @@ app.whenReady().then(() => {
     if (buscandoFabrica || !cfg.centralToken) return;
     buscandoFabrica = true;
     try {
+      await fila.reavisarFabrica(); // avisos de "já subiu" que não chegaram ao site (site fora do ar, limite do banco)
       const { itens = [] } = await Central.chamar(cfg, '/api/central/fabrica', { query: { youtube: '1' } });
       for (const it of itens) {
         const canalId = it.canalYoutube?.id;
         if (!canalId || !store.canal(canalId)) continue; // esse canal está conectado em outro PC
         if (fila.lista().some((j) => j.envio?.fabricaId === it.id && !['erro', 'cancelado'].includes(j.status))) continue;
+        // Este PC já subiu este vídeo: nunca sobe de novo — só repete o aviso ao site
+        if (fila.fabricaJaEnviado(it.id)) {
+          await fila.avisarFabricaEnviado(it.id);
+          continue;
+        }
         const { ok } = await Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: it.id, acao: 'youtube-pegar', pc: os.hostname() } });
         if (!ok) continue;
         let quando = it.quandoYoutube ? new Date(it.quandoYoutube) : null;

@@ -122,6 +122,61 @@ class Fila extends EventEmitter {
     this.carregar();
   }
 
+  // ---------- Vídeos da Fábrica que este PC já subiu no YouTube ----------
+  // Sem isto, se o aviso ao site falhasse (site fora do ar, limite do banco) e a Fila fosse limpa,
+  // o mesmo vídeo subia de novo horas depois — e o canal ficava com vídeo repetido.
+  fabricaEnviados() {
+    try {
+      const l = JSON.parse(fs.readFileSync(path.join(this.dirDados, 'fabrica-enviados.json'), 'utf8'));
+      return l && typeof l === 'object' ? l : {};
+    } catch {
+      return {};
+    }
+  }
+  gravarFabricaEnviados(mapa) {
+    // guarda os 500 mais recentes
+    const recentes = Object.entries(mapa).sort((a, b) => (b[1].em || 0) - (a[1].em || 0)).slice(0, 500);
+    try {
+      fs.writeFileSync(path.join(this.dirDados, 'fabrica-enviados.json'), JSON.stringify(Object.fromEntries(recentes)));
+    } catch {}
+  }
+  anotarFabricaEnviado(id, url) {
+    const m = this.fabricaEnviados();
+    m[id] = { url: url || '', em: Date.now(), avisado: false };
+    this.gravarFabricaEnviados(m);
+  }
+  /** Já subiu por este PC? Devolve { url, em, avisado } ou null. */
+  fabricaJaEnviado(id) {
+    return this.fabricaEnviados()[id] || null;
+  }
+  /** Avisa o site que o vídeo já está no YouTube; se não der, fica marcado para tentar de novo depois. */
+  async avisarFabricaEnviado(id) {
+    const reg = this.fabricaJaEnviado(id);
+    if (!reg) return false;
+    try {
+      await Central.chamar(this.obterConfig(), '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao: 'youtube-feito', url: reg.url || '' } });
+      const m = this.fabricaEnviados();
+      if (m[id]) {
+        m[id].avisado = true;
+        this.gravarFabricaEnviados(m);
+      }
+      return true;
+    } catch {
+      // conta as tentativas para não insistir para sempre (ex.: o vídeo foi apagado da Fábrica)
+      const m = this.fabricaEnviados();
+      if (m[id]) {
+        m[id].tentativas = (m[id].tentativas || 0) + 1;
+        this.gravarFabricaEnviados(m);
+      }
+      return false;
+    }
+  }
+  /** Tenta de novo os avisos que não chegaram ao site. */
+  async reavisarFabrica() {
+    const pendentes = Object.entries(this.fabricaEnviados()).filter(([, r]) => !r.avisado && (r.tentativas || 0) < 40 && Date.now() - (r.em || 0) < 30 * 24 * 3600e3).map(([id]) => id);
+    for (const id of pendentes.slice(0, 10)) await this.avisarFabricaEnviado(id);
+  }
+
   /**
    * Vídeo pronto aqui: sobe para a nuvem (em segundo plano, um de cada vez) e registra,
    * para aparecer na Biblioteca de todos os PCs.
@@ -396,9 +451,10 @@ class Fila extends EventEmitter {
           corpo: { acao: 'youtube', chave: e.chaveBiblioteca, videoId: r.id, url: r.url || '', canal: canal.titulo || '', quando: e.agendarPara || null },
         }).catch(() => {});
       }
-      // Vídeo da Fábrica: avisa o site que já está agendado no YouTube
+      // Vídeo da Fábrica: anota aqui no PC que já subiu (vale mesmo se a Fila for limpa) e avisa o site
       if (e.fabricaId) {
-        Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: e.fabricaId, acao: 'youtube-feito', url: r.url || '' } }).catch(() => {});
+        this.anotarFabricaEnviado(e.fabricaId, r.url || '');
+        this.avisarFabricaEnviado(e.fabricaId);
       }
       // Playlist (ex.: "Oração da Manhã" / "Oração da Noite"): o vídeo já subiu — se a playlist falhar, só avisa
       if (e.playlist?.titulo && r.id) {

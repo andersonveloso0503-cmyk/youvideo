@@ -2,7 +2,7 @@
 const fs = require('fs');
 const http = require('http');
 const { google } = require('googleapis');
-const { GENEROS, temPalavra, gruposDe } = require('./ia');
+const { GENEROS, temPalavra, gruposDe, buscaSegura } = require('./ia');
 
 const PORTA_CALLBACK = 53682;
 const REDIRECT = `http://127.0.0.1:${PORTA_CALLBACK}/callback`;
@@ -135,6 +135,22 @@ function etiquetasErradas({ titulo, descricao, tags, comClima = true }) {
   });
 }
 
+const DE_CRIANCA = /\b(infantil|infantis|crian[cç]as?|kids|ni[nñ]os?)\b/i;
+/**
+ * Etiquetas que não são do vídeo em nenhum canal: nome de outra pessoa (pregador, padre, cantor), outra crença
+ * e, em canal falado em português, outro idioma e rótulo de conteúdo infantil.
+ */
+function etiquetasAlheias(tags, { falado = false } = {}) {
+  const lista = (Array.isArray(tags) ? tags : String(tags || '').split(',')).map((t) => String(t || '').trim()).filter(Boolean);
+  return lista.filter((t) => !buscaSegura(t, { idioma: falado ? 'pt' : '' }) || (falado && DE_CRIANCA.test(t)));
+}
+
+/** Tudo que deve sair das etiquetas de um vídeo. musica = vídeo na categoria Música (confere também o estilo). */
+function etiquetasParaTirar({ titulo, descricao, tags, musica, comClima = true }) {
+  const estilo = musica ? etiquetasErradas({ titulo, descricao, tags, comClima }) : [];
+  return [...new Set([...estilo, ...etiquetasAlheias(tags, { falado: !musica })])];
+}
+
 /** Tira do texto as hashtags das etiquetas erradas (#lofi, #rock...), sem mexer no resto. */
 function semHashtagsDe(texto, erradas) {
   let t = String(texto || '');
@@ -227,10 +243,10 @@ async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, 
     status.publishAt = new Date(marcado > Date.now() + 10 * 60e3 ? marcado : Date.now() + 20 * 60e3).toISOString();
   }
 
-  // Vídeo de música: etiqueta de outro estilo (e a hashtag dela) não sobe junto
-  if ((categoria || CATEGORIA_MUSICA) === CATEGORIA_MUSICA) {
+  // Não sobe junto: etiqueta de outro estilo de música, nome de outra pessoa, outra crença ou outro idioma (nem a hashtag dela)
+  {
     const lista = limparTags(tags);
-    const erradas = etiquetasErradas({ titulo, descricao, tags: lista, comClima: false });
+    const erradas = etiquetasParaTirar({ titulo, descricao, tags: lista, musica: (categoria || CATEGORIA_MUSICA) === CATEGORIA_MUSICA, comClima: false });
     if (erradas.length) {
       tags = lista.filter((t) => !erradas.includes(t));
       descricao = semHashtagsDe(descricao, erradas);
@@ -313,6 +329,8 @@ function tituloFraco(titulo) {
   if (/^(descubra|veja|conhe[cç]a|saiba|entenda)\s+(como|o que|por ?que|quem|a história)/i.test(t)) return 'Uma frase inteira no lugar do título';
   if (t.length > 78 && /[.?!]$/.test(t) && !/[|—–:]/.test(t)) return 'Uma frase inteira no lugar do título';
   if (/^por ?que\b/i.test(t)) return 'Começa com "Por Que", igual a vários outros vídeos';
+  if (!buscaSegura(t, { idioma: 'pt' })) return 'Tem palavra em outro idioma ou nome de outra pessoa';
+  if (DE_CRIANCA.test(t)) return 'Chama o vídeo de "infantil" (o YouTube pode tratar como conteúdo para crianças)';
   return '';
 }
 
@@ -413,8 +431,8 @@ async function conferirCanal({ credenciais, refreshToken, redirectOriginal, maxi
       const sn = x.snippet || {};
       const categoriaErrada = String(sn.categoryId || '') !== categoriaCerta;
       const semIdioma = !!idiomaCerto && (!sn.defaultLanguage || !sn.defaultAudioLanguage);
-      // Só canal de música: etiquetas de outro estilo (em canal falado as etiquetas não são de estilo musical)
-      const tagsErradas = falado ? [] : etiquetasErradas({ titulo: sn.title, descricao: sn.description, tags: sn.tags || [] });
+      // Canal de música: etiquetas de outro estilo. Qualquer canal: nome de outra pessoa, outra crença, outro idioma.
+      const tagsErradas = etiquetasParaTirar({ titulo: sn.title, descricao: sn.description, tags: sn.tags || [], musica: !falado });
       videos.push({
         tagsErradas,
         tagsTotal: (sn.tags || []).length,
@@ -467,12 +485,20 @@ async function corrigirVideos({ credenciais, refreshToken, redirectOriginal, ite
       let tagsNovas = sn.tags || [];
       let descricaoNova = sn.description || '';
       if (it.etiquetas) {
-        const erradas = etiquetasErradas({ titulo: novoTitulo || sn.title, descricao: sn.description, tags: tagsNovas });
+        const musica = String(categoria || sn.categoryId || '') === CATEGORIA_MUSICA;
+        const erradas = etiquetasParaTirar({ titulo: novoTitulo || sn.title, descricao: sn.description, tags: tagsNovas, musica });
         if (erradas.length) {
           tagsNovas = tagsNovas.filter((t) => !erradas.includes(String(t).trim()));
-          if (tagsNovas.length < 5) tagsNovas = [...tagsNovas, ...etiquetasDoTitulo(novoTitulo || sn.title)];
+          const tituloFinal = novoTitulo || sn.title;
+          if (tagsNovas.length < 5) tagsNovas = [...tagsNovas, ...etiquetasDoTitulo(tituloFinal).filter((t) => !etiquetasAlheias([t], { falado: !musica }).length)];
           tagsNovas = limparTags(tagsNovas);
           descricaoNova = semHashtagsDe(descricaoNova, erradas);
+          // A busca errada às vezes foi copiada para dentro da descrição ("Historia biblica ... mostra..."): troca pelo nome da história
+          const nome = semHashtags(tituloFinal).split(/\s[—–|]\s|:\s/)[0].replace(/\s+/g, ' ').trim();
+          for (const e of erradas) {
+            if (e.split(/\s+/).length < 3 || !nome || etiquetasAlheias([nome], { falado: !musica }).length) continue;
+            descricaoNova = descricaoNova.replace(new RegExp(e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), nome);
+          }
           if (!novoTitulo) {
             const t = semHashtagsDe(sn.title, erradas).replace(/\s+/g, ' ').trim();
             if (t && t !== sn.title) novoTitulo = t;
@@ -569,5 +595,5 @@ async function desprogramarVideos({ credenciais, refreshToken, redirectOriginal,
 module.exports = {
   desprogramarVideos,
   limparTags, autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT,
-  etiquetasErradas, semHashtagsDe, etiquetasDoTitulo,
+  etiquetasErradas, etiquetasAlheias, etiquetasParaTirar, semHashtagsDe, etiquetasDoTitulo,
   categoriaDoVideo, tituloFraco, conferirCanal, corrigirVideos, adicionarNaPlaylist, CATEGORIA_MUSICA, CATEGORIA_FALADO };

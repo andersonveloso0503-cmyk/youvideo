@@ -167,7 +167,7 @@ const Arrumar = (() => {
     const achados = [
       ficha.length && `${ficha.length} com categoria ou idioma para arrumar`,
       fracos.length && `${fracos.length} com título fraco`,
-      etiquetas && `${etiquetas} com etiquetas de outro estilo`,
+      etiquetas && `${etiquetas} com etiquetas que não são do vídeo`,
       repetidos && `${repetidos} repetidos na programação`,
     ].filter(Boolean);
     q('#arrResumo').textContent = `${v.length} vídeos conferidos: ${achados.join(', ')}. Nada muda no YouTube antes de você clicar.`;
@@ -224,7 +224,7 @@ const Arrumar = (() => {
     if (comFicha) dados.videos.filter((x) => x.arrumarFicha).forEach((x) => ids.add(x.id));
     if (!ids.size) return (q('#arrErro').textContent = 'Marque pelo menos uma coisa para arrumar.');
     const nTit = Object.keys(titulos).length;
-    if (!confirm(`Arrumar ${ids.size} vídeo(s) no YouTube${nTit ? `, trocando ${nTit} título(s)` : ''}${comEtiqueta.size ? `, tirando as etiquetas de outro estilo de ${comEtiqueta.size}` : ''}?`)) return;
+    if (!confirm(`Arrumar ${ids.size} vídeo(s) no YouTube${nTit ? `, trocando ${nTit} título(s)` : ''}${comEtiqueta.size ? `, tirando as etiquetas que não são do vídeo de ${comEtiqueta.size}` : ''}?`)) return;
     const b = q('#btnArrAplicar');
     b.disabled = true;
     q('#arrErro').textContent = '';
@@ -246,7 +246,7 @@ const Arrumar = (() => {
         if (r.feitos.includes(l.dataset.id)) {
           l.classList.add('feito');
           l.querySelector('input').disabled = true;
-          l.querySelector('.saem').textContent = '✓ Etiquetas de outro estilo retiradas';
+          l.querySelector('.saem').textContent = '✓ Etiquetas retiradas';
         }
         if (falhou.has(l.dataset.id)) l.classList.add('falhou');
       });
