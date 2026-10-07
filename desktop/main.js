@@ -390,12 +390,14 @@ app.whenReady().then(() => {
   // ---------- Tarja da Fila: este vídeo sobe sozinho no YouTube ou sou eu que preciso subir? ----------
   // O que a Fábrica do site sabe de cada vídeo (pelo pedido de montagem). Atualizado de 3 em 3 minutos.
   let daFabrica = new Map();
+  // O site guarda o pedido como "pc:<código>"; a Fila do Compilador guarda só o <código>
+  const mapaDaFabrica = (itens) => new Map((itens || []).filter((i) => i.renderId).map((i) => [String(i.renderId).replace(/^pc:/, ''), i]));
   async function atualizarDaFabrica() {
     const cfg = store.ler();
     if (!cfg.centralToken) return;
     try {
       const { itens = [] } = await Central.chamar(cfg, '/api/central/fabrica');
-      daFabrica = new Map(itens.filter((i) => i.renderId).map((i) => [i.renderId, i]));
+      daFabrica = mapaDaFabrica(itens);
       fila.emit('mudou');
     } catch {
       // sem internet: fica com o que já sabia
@@ -706,7 +708,8 @@ app.whenReady().then(() => {
   ipcMain.handle('fabrica:listar', async () => {
     const r = await Central.chamar(store.ler(), '/api/central/fabrica');
     // Aproveita a mesma resposta para as tarjas da Fila (sem consultar o banco de novo)
-    daFabrica = new Map((r.itens || []).filter((i) => i.renderId).map((i) => [i.renderId, i]));
+    daFabrica = mapaDaFabrica(r.itens);
+    fila.emit('mudou'); // repinta as tarjas da Fila com o que acabou de chegar
     return r;
   });
   ipcMain.handle('fabrica:criar', (_e, dados) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { ...dados, acao: 'criar' } }));
