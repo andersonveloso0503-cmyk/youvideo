@@ -19,6 +19,8 @@ import {
 // plano Pro do Vercel pra valer mais que ~60s.
 export const maxDuration = 300;
 
+const CENAS_ANIMADAS_ECONOMICO = 3;
+
 export default async function handler(req, res) {
   const db = getDb();
   const baseUrl = `https://${req.headers.host}`;
@@ -205,9 +207,13 @@ export default async function handler(req, res) {
         const LOTE = 5;
         const arquivosAnimados = [...item.arquivos];
         let enviadosNesseLote = 0;
+        // Fábrica em modo econômico (padrão): anima só as 3 primeiras cenas — o começo é o que segura quem assiste —
+        // e o resto entra como imagem com zoom. Cada cena animada custa cerca de US$ 0,10 na fal.ai.
+        const limiteAnimadas = item.fabrica && item.animacaoCompleta !== true ? CENAS_ANIMADAS_ECONOMICO : Infinity;
 
         for (let i = 0; i < arquivosAnimados.length && enviadosNesseLote < LOTE; i++) {
           const arquivo = arquivosAnimados[i];
+          if (i >= limiteAnimadas) break;
           if (!arquivo.imageUrl || arquivo.klingTaskId || arquivo.avisoVideo) continue;
           try {
             const { requestId, statusUrl, responseUrl } = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo, emLoop);
@@ -218,7 +224,7 @@ export default async function handler(req, res) {
           enviadosNesseLote++;
         }
 
-        const faltamEnviar = arquivosAnimados.some((a) => a.imageUrl && !a.klingTaskId && !a.avisoVideo);
+        const faltamEnviar = arquivosAnimados.some((a, i) => i < limiteAnimadas && a.imageUrl && !a.klingTaskId && !a.avisoVideo);
         await ref.update({
           arquivos: arquivosAnimados,
           duracaoAlvo,

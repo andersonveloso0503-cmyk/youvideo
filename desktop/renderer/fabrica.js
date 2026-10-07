@@ -39,7 +39,9 @@ const Fabrica = (() => {
     erro: 'Erro',
   };
   // Custo aproximado por Short de 1 min (imagens + voz + animação)
-  const CUSTO = { animado: 1.3, parado: 0.45 };
+  // animado = todas as cenas animadas; economico = só as 3 primeiras (o resto com zoom)
+  const CUSTO = { animado: 1.3, economico: 0.75, parado: 0.45 };
+  const custoAnimado = () => (q('#fabCenas')?.value === 'todas' ? CUSTO.animado : CUSTO.economico);
   // Corte tem mais cenas (uma imagem por fala) e várias vozes: sai um pouco mais caro que um Short narrado
   const CUSTO_CORTE = { animado: 1.6, parado: 0.55 };
 
@@ -82,7 +84,7 @@ const Fabrica = (() => {
     const n = Number(q('#fabDias').value) * Number(q('#fabPorDia').value);
     const anim = q('#fabAnimacao').value;
     const animados = anim === 'tudo' ? n : anim === 'nada' ? 0 : Math.ceil(n / 2);
-    const total = animados * CUSTO.animado + (n - animados) * CUSTO.parado;
+    const total = animados * custoAnimado() + (n - animados) * CUSTO.parado;
     q('#fabCusto').textContent = `${n} Shorts · custo aproximado US$ ${total.toFixed(0)} (imagens, voz e animação)`;
   }
 
@@ -111,7 +113,7 @@ const Fabrica = (() => {
     for (const [r, id] of [['youtube', '#fabYoutube'], ['facebook', '#fabFacebook'], ['instagram', '#fabInstagram'], ['tiktok', '#fabTiktok'], ['kwai', '#fabKwai']]) {
       if (p.redes && r in p.redes) q(id).checked = !!p.redes[r];
     }
-    ['#fabDias', '#fabPorDia', '#fabHora1', '#fabHora2', '#fabAnimacao', '#fabFormato', '#fabCanal', '#fabYoutube', '#fabFacebook', '#fabInstagram', '#fabTiktok', '#fabKwai'].forEach((id) =>
+    ['#fabDias', '#fabPorDia', '#fabHora1', '#fabHora2', '#fabAnimacao', '#fabCenas', '#fabFormato', '#fabCanal', '#fabYoutube', '#fabFacebook', '#fabInstagram', '#fabTiktok', '#fabKwai'].forEach((id) =>
       q(id).addEventListener('change', () => {
         salvarPrefs();
         custo();
@@ -165,6 +167,7 @@ const Fabrica = (() => {
         porDia: Number(q('#fabPorDia').value),
         horarios: [q('#fabHora1').value, q('#fabHora2').value],
         animacao: q('#fabAnimacao').value,
+        animacaoCompleta: q('#fabCenas').value === 'todas',
         series: q('#fabFormato').value !== '0',
         partes: Number(q('#fabFormato').value) || 3,
         redes,
@@ -202,6 +205,7 @@ const Fabrica = (() => {
         tipo: 'cortes', estiloCorte: tipo, dias, porDia,
         horarios: [q('#fabCtHora1').value, q('#fabCtHora2').value],
         animacao: q('#fabCtAnimacao').value,
+        animacaoCompleta: q('#fabCenas').value === 'todas',
         redes,
         canalYoutube: redes.youtube && canal ? { id: canal.id, titulo: canal.titulo } : null,
       });

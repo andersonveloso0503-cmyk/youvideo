@@ -327,6 +327,7 @@ export default async function handler(req, res) {
             formato: 'short',
             duracaoDesejada: tipo === 'comico' ? '60' : '45',
             animar: animarCt,
+            animacaoCompleta: b.animacaoCompleta === true,
             status: 'pendente',
             origem: 'fabrica',
             criadoEm: new Date().toISOString(),
@@ -424,6 +425,7 @@ export default async function handler(req, res) {
           formato: 'short',
           duracaoDesejada: '60',
           animar,
+          animacaoCompleta: b.animacaoCompleta === true, // false = econômica: só as 3 primeiras cenas animadas
           status: 'pendente',
           origem: 'fabrica',
           criadoEm: new Date().toISOString(),
