@@ -758,3 +758,9 @@ body { grid-template-columns: minmax(0, 1fr); }
 .arr-rep.feito .quando { color: #b7f0c7; }
 .arr-rep.falhou .quando { color: #e89a88; }
 #arrRepBox .modal-acoes { margin-top: 10px; }
+
+/* Arrumar vídeos: etiquetas de outro estilo */
+.arr-tag { cursor: pointer; }
+.arr-tag .titulo { font-size: 13px; overflow-wrap: anywhere; }
+.arr-tag .saem { font-size: 11.5px; color: #e89a88; overflow-wrap: anywhere; }
+.arr-tag.feito .saem { color: #b7f0c7; }

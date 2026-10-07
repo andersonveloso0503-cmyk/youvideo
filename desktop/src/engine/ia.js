@@ -26,6 +26,7 @@ const GENEROS = [
   ['blues'],
   ['jazz'],
   ['reggae'],
+  ['soul', 'r&b', 'rnb'],
   ['mpb'],
   ['pop'],
   ['country'],
@@ -473,4 +474,4 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   };
 }
 
-module.exports = { gerarTextosVideo, limparNome, sugestoesYoutube, comHashtags, titulosHistoria };
+module.exports = { gerarTextosVideo, limparNome, sugestoesYoutube, comHashtags, titulosHistoria, GENEROS, temPalavra, gruposDe };

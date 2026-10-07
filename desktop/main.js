@@ -918,7 +918,7 @@ app.whenReady().then(() => {
     const cfg = store.ler();
     return YT.corrigirVideos({
       credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect,
-      itens: itens.map((i) => ({ id: String(i.id), titulo: i.titulo ? String(i.titulo) : '' })),
+      itens: itens.map((i) => ({ id: String(i.id), titulo: i.titulo ? String(i.titulo) : '', etiquetas: !!i.etiquetas })),
       categoria: categoria || undefined, idioma: idioma || undefined,
       onProgresso: (x) => enviar('canais:progresso', x),
     });

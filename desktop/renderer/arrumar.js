@@ -1,4 +1,4 @@
-/* Arrumar os vídeos que já estão no canal: categoria certa, idioma e títulos fracos.
+/* Arrumar os vídeos que já estão no canal: categoria certa, idioma, títulos fracos e etiquetas de outro estilo.
    Primeiro só confere e mostra; nada muda no YouTube antes de clicar em "Aplicar". */
 const Arrumar = (() => {
   const q = (s) => document.querySelector(s);
@@ -27,6 +27,27 @@ const Arrumar = (() => {
     q('#arrRepBox').hidden = true;
     q('#arrRepLista').innerHTML = '';
     q('#arrRepNota').textContent = '';
+    q('#arrTagsBox').hidden = true;
+    q('#arrTagsLista').innerHTML = '';
+  }
+
+  // Vídeos com etiquetas de outro estilo de música: mostra quais saem de cada um
+  function mostrarEtiquetas() {
+    const com = dados.videos.filter((x) => x.tagsErradas && x.tagsErradas.length);
+    if (!com.length) return 0;
+    const lista = q('#arrTagsLista');
+    for (const x of com) {
+      const l = document.createElement('label');
+      l.className = 'arr-item arr-tag';
+      l.dataset.id = x.id;
+      l.innerHTML = '<input type="checkbox" checked /><div><div class="titulo"></div><div class="saem"></div></div>';
+      l.querySelector('.titulo').textContent = x.titulo;
+      l.querySelector('.saem').textContent = `Saem: ${x.tagsErradas.join(', ')}`;
+      lista.appendChild(l);
+    }
+    q('#arrTagsQtd').textContent = `(${com.length})`;
+    q('#arrTagsBox').hidden = false;
+    return com.length;
   }
 
   // Vídeos longos ainda programados com a mesma duração = mesmas músicas em outra ordem.
@@ -136,13 +157,20 @@ const Arrumar = (() => {
     const ficha = v.filter((x) => x.arrumarFicha);
     const fracos = v.filter((x) => x.motivoTitulo);
     const repetidos = mostrarRepetidos();
-    if (!ficha.length && !fracos.length) {
+    const etiquetas = mostrarEtiquetas();
+    if (!ficha.length && !fracos.length && !etiquetas) {
       q('#arrResumo').textContent = repetidos
-        ? `${v.length} vídeos conferidos. Categoria, idioma e títulos estão certos. Achei ${repetidos} vídeos repetidos na programação (veja abaixo).`
-        : `${v.length} vídeos conferidos. Está tudo certo: categoria, idioma, títulos e programação. Nada para arrumar.`;
+        ? `${v.length} vídeos conferidos. Categoria, idioma, títulos e etiquetas estão certos. Achei ${repetidos} vídeos repetidos na programação (veja abaixo).`
+        : `${v.length} vídeos conferidos. Está tudo certo: categoria, idioma, títulos, etiquetas e programação. Nada para arrumar.`;
       return;
     }
-    q('#arrResumo').textContent = `${v.length} vídeos conferidos: ${ficha.length} com categoria ou idioma para arrumar, ${fracos.length} com título fraco${repetidos ? ` e ${repetidos} repetidos na programação` : ''}. Nada muda no YouTube antes de você clicar.`;
+    const achados = [
+      ficha.length && `${ficha.length} com categoria ou idioma para arrumar`,
+      fracos.length && `${fracos.length} com título fraco`,
+      etiquetas && `${etiquetas} com etiquetas de outro estilo`,
+      repetidos && `${repetidos} repetidos na programação`,
+    ].filter(Boolean);
+    q('#arrResumo').textContent = `${v.length} vídeos conferidos: ${achados.join(', ')}. Nada muda no YouTube antes de você clicar.`;
 
     if (ficha.length) {
       const erradas = ficha.filter((x) => x.categoriaErrada);
@@ -189,10 +217,14 @@ const Arrumar = (() => {
       if (l.querySelector('input[type="checkbox"]').checked && novo.length >= 5) titulos[l.dataset.id] = novo;
     });
     const ids = new Set(Object.keys(titulos));
+    const comEtiqueta = new Set(
+      [...document.querySelectorAll('#arrTagsLista .arr-tag')].filter((l) => l.querySelector('input').checked && !l.classList.contains('feito')).map((l) => l.dataset.id)
+    );
+    comEtiqueta.forEach((id) => ids.add(id));
     if (comFicha) dados.videos.filter((x) => x.arrumarFicha).forEach((x) => ids.add(x.id));
     if (!ids.size) return (q('#arrErro').textContent = 'Marque pelo menos uma coisa para arrumar.');
     const nTit = Object.keys(titulos).length;
-    if (!confirm(`Arrumar ${ids.size} vídeo(s) no YouTube${nTit ? `, trocando ${nTit} título(s)` : ''}?`)) return;
+    if (!confirm(`Arrumar ${ids.size} vídeo(s) no YouTube${nTit ? `, trocando ${nTit} título(s)` : ''}${comEtiqueta.size ? `, tirando as etiquetas de outro estilo de ${comEtiqueta.size}` : ''}?`)) return;
     const b = q('#btnArrAplicar');
     b.disabled = true;
     q('#arrErro').textContent = '';
@@ -200,13 +232,22 @@ const Arrumar = (() => {
     try {
       const r = await window.api.canais.corrigir({
         id: canal.id,
-        itens: [...ids].map((id) => ({ id, titulo: titulos[id] || '' })),
+        itens: [...ids].map((id) => ({ id, titulo: titulos[id] || '', etiquetas: comEtiqueta.has(id) })),
         categoria: comFicha ? dados.categoriaCerta : '',
         idioma: comFicha ? dados.idiomaCerto : '',
       });
       const falhou = new Set(r.falhas.map((f) => f.id));
       document.querySelectorAll('#arrLista .arr-item').forEach((l) => {
         if (r.feitos.includes(l.dataset.id)) l.classList.add('feito');
+        if (falhou.has(l.dataset.id)) l.classList.add('falhou');
+      });
+      document.querySelectorAll('#arrTagsLista .arr-tag').forEach((l) => {
+        if (!comEtiqueta.has(l.dataset.id)) return;
+        if (r.feitos.includes(l.dataset.id)) {
+          l.classList.add('feito');
+          l.querySelector('input').disabled = true;
+          l.querySelector('.saem').textContent = '✓ Etiquetas de outro estilo retiradas';
+        }
         if (falhou.has(l.dataset.id)) l.classList.add('falhou');
       });
       q('#arrNota').textContent = `${r.feitos.length} vídeo(s) arrumado(s).${r.falhas.length ? ` ${r.falhas.length} não deram certo.` : ''}`;

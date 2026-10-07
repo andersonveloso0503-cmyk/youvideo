@@ -2,6 +2,7 @@
 const fs = require('fs');
 const http = require('http');
 const { google } = require('googleapis');
+const { GENEROS, temPalavra, gruposDe } = require('./ia');
 
 const PORTA_CALLBACK = 53682;
 const REDIRECT = `http://127.0.0.1:${PORTA_CALLBACK}/callback`;
@@ -107,6 +108,55 @@ function montarDescricao({ descricao, timeline, incluirTracklist, curto, tags })
   return final;
 }
 
+// Etiquetas de "clima": só valem se a palavra aparece no título ou na descrição do vídeo
+const SO_SE_ESTIVER_NO_VIDEO = ['instrumental', 'relax', 'relaxing', 'relaxante', 'chill', 'chillout'];
+const semHashtags = (t) => String(t || '').replace(/#[\p{L}\p{N}_]+/gu, ' ');
+const comoHashtag = (t) => String(t || '').replace(/[^\p{L}\p{N}]/gu, '');
+
+/**
+ * Etiquetas que não combinam com o vídeo: de OUTRO estilo de música (ex.: "rock" e "lofi" num vídeo de sertanejo gospel).
+ * O estilo do vídeo vem do título (ou da descrição, se o título não diz). Sem estilo reconhecido, não acusa nada.
+ * Etiqueta que cita o estilo certo fica (ex.: "pop rock" num vídeo de rock).
+ * comClima: também acusa "instrumental", "relax" e parecidas quando o vídeo não fala disso.
+ */
+function etiquetasErradas({ titulo, descricao, tags, comClima = true }) {
+  const lista = (Array.isArray(tags) ? tags : String(tags || '').split(',')).map((t) => String(t || '').trim()).filter(Boolean);
+  if (!lista.length) return [];
+  let grupos = gruposDe(semHashtags(titulo));
+  if (!grupos.length) grupos = gruposDe(semHashtags(descricao));
+  if (!grupos.length) return [];
+  const certas = grupos.flatMap((i) => GENEROS[i]);
+  const outras = GENEROS.filter((_, i) => !grupos.includes(i)).flat();
+  const texto = `${semHashtags(titulo)} ${semHashtags(descricao)}`;
+  return lista.filter((tag) => {
+    if (certas.some((w) => temPalavra(tag, w))) return false;
+    if (outras.some((w) => temPalavra(tag, w))) return true;
+    return comClima && SO_SE_ESTIVER_NO_VIDEO.some((w) => temPalavra(tag, w) && !temPalavra(texto, w));
+  });
+}
+
+/** Tira do texto as hashtags das etiquetas erradas (#lofi, #rock...), sem mexer no resto. */
+function semHashtagsDe(texto, erradas) {
+  let t = String(texto || '');
+  for (const e of erradas) {
+    const h = comoHashtag(e);
+    if (h.length < 2) continue;
+    t = t.replace(new RegExp(`(^|[ \\t])#${h}(?![\\p{L}\\p{N}_])`, 'gimu'), '$1');
+  }
+  return t.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+$/gm, '').replace(/^[ \t]+(?=#)/gm, '');
+}
+
+/** Etiquetas tiradas do próprio título, para o vídeo não ficar quase sem nenhuma depois da limpeza. */
+function etiquetasDoTitulo(titulo) {
+  const limpo = semHashtags(titulo).toLowerCase();
+  const pedacos = limpo
+    .split(/[-–—|:•·,()\[\]]|[^\p{L}\p{N}\s&'’]/u)
+    .map((p) => p.replace(/\s+/g, ' ').trim())
+    .filter((p) => p.length >= 3 && p.length <= 40);
+  const estilos = gruposDe(limpo).flatMap((i) => GENEROS[i].filter((w) => temPalavra(limpo, w)));
+  return [...new Set([...pedacos, ...estilos])];
+}
+
 /** Envia o vídeo para o canal. Devolve { id, url }. */
 /**
  * Tags no limite do YouTube: 500 caracteres no total, contando a vírgula entre elas e as
@@ -175,6 +225,17 @@ async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, 
     // Horário que já passou (envio atrasado por limite do YouTube, por exemplo): publica daqui a 20 min
     const marcado = new Date(agendarPara).getTime();
     status.publishAt = new Date(marcado > Date.now() + 10 * 60e3 ? marcado : Date.now() + 20 * 60e3).toISOString();
+  }
+
+  // Vídeo de música: etiqueta de outro estilo (e a hashtag dela) não sobe junto
+  if ((categoria || CATEGORIA_MUSICA) === CATEGORIA_MUSICA) {
+    const lista = limparTags(tags);
+    const erradas = etiquetasErradas({ titulo, descricao, tags: lista, comClima: false });
+    if (erradas.length) {
+      tags = lista.filter((t) => !erradas.includes(t));
+      descricao = semHashtagsDe(descricao, erradas);
+      titulo = semHashtagsDe(titulo, erradas);
+    }
   }
 
   const inserir = (comIdioma) =>
@@ -352,7 +413,11 @@ async function conferirCanal({ credenciais, refreshToken, redirectOriginal, maxi
       const sn = x.snippet || {};
       const categoriaErrada = String(sn.categoryId || '') !== categoriaCerta;
       const semIdioma = !!idiomaCerto && (!sn.defaultLanguage || !sn.defaultAudioLanguage);
+      // Só canal de música: etiquetas de outro estilo (em canal falado as etiquetas não são de estilo musical)
+      const tagsErradas = falado ? [] : etiquetasErradas({ titulo: sn.title, descricao: sn.description, tags: sn.tags || [] });
       videos.push({
+        tagsErradas,
+        tagsTotal: (sn.tags || []).length,
         id: x.id,
         titulo: sn.title || '',
         descricao: String(sn.description || '').slice(0, 600),
@@ -397,7 +462,23 @@ async function corrigirVideos({ credenciais, refreshToken, redirectOriginal, ite
       continue;
     }
     try {
-      const novoTitulo = semSinais(it.titulo || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+      let novoTitulo = semSinais(it.titulo || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+      // Etiquetas: confere de novo no vídeo como ele está agora e tira só as de outro estilo
+      let tagsNovas = sn.tags || [];
+      let descricaoNova = sn.description || '';
+      if (it.etiquetas) {
+        const erradas = etiquetasErradas({ titulo: novoTitulo || sn.title, descricao: sn.description, tags: tagsNovas });
+        if (erradas.length) {
+          tagsNovas = tagsNovas.filter((t) => !erradas.includes(String(t).trim()));
+          if (tagsNovas.length < 5) tagsNovas = [...tagsNovas, ...etiquetasDoTitulo(novoTitulo || sn.title)];
+          tagsNovas = limparTags(tagsNovas);
+          descricaoNova = semHashtagsDe(descricaoNova, erradas);
+          if (!novoTitulo) {
+            const t = semHashtagsDe(sn.title, erradas).replace(/\s+/g, ' ').trim();
+            if (t && t !== sn.title) novoTitulo = t;
+          }
+        }
+      }
       const lingua = idioma || sn.defaultLanguage || '';
       const linguaAudio = idioma || sn.defaultAudioLanguage || '';
       const gravar = (comIdiomaNovo) =>
@@ -407,8 +488,8 @@ async function corrigirVideos({ credenciais, refreshToken, redirectOriginal, ite
             id: it.id,
             snippet: {
               title: novoTitulo || sn.title,
-              description: sn.description || '',
-              tags: sn.tags || [],
+              description: descricaoNova,
+              tags: tagsNovas,
               categoryId: categoria || sn.categoryId,
               ...((comIdiomaNovo ? lingua : sn.defaultLanguage) ? { defaultLanguage: comIdiomaNovo ? lingua : sn.defaultLanguage } : {}),
               ...((comIdiomaNovo ? linguaAudio : sn.defaultAudioLanguage) ? { defaultAudioLanguage: comIdiomaNovo ? linguaAudio : sn.defaultAudioLanguage } : {}),
@@ -488,4 +569,5 @@ async function desprogramarVideos({ credenciais, refreshToken, redirectOriginal,
 module.exports = {
   desprogramarVideos,
   limparTags, autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT,
+  etiquetasErradas, semHashtagsDe, etiquetasDoTitulo,
   categoriaDoVideo, tituloFraco, conferirCanal, corrigirVideos, adicionarNaPlaylist, CATEGORIA_MUSICA, CATEGORIA_FALADO };
