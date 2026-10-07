@@ -749,3 +749,12 @@ body { grid-template-columns: minmax(0, 1fr); }
 .job .tarja-yt.subir { background: var(--terracota-forte); color: #fff; }
 .job .tarja-yt.erro { background: #6b1d14; color: #ffd0c8; }
 .job .tarja-yt.fora { background: var(--bg-4); color: var(--mudo); }
+
+/* Arrumar vídeos: repetidos na programação */
+.arr-grupo { margin: 10px 0 2px; font-size: 12.5px; font-weight: 700; color: var(--ouro); }
+.arr-rep { cursor: pointer; }
+.arr-rep .titulo { font-size: 13px; overflow-wrap: anywhere; }
+.arr-rep .quando { font-size: 11.5px; color: var(--mudo); }
+.arr-rep.feito .quando { color: #b7f0c7; }
+.arr-rep.falhou .quando { color: #e89a88; }
+#arrRepBox .modal-acoes { margin-top: 10px; }

@@ -372,6 +372,15 @@
       <p class="nota">A IA sugeriu um título novo para cada um. Leia, mude o que quiser e desmarque os que não quer trocar.</p>
       <div id="arrLista" class="arr-lista"></div>
     </div>
+    <div id="arrRepBox" hidden>
+      <h3 class="arr-sub">Vídeos repetidos na programação <small id="arrRepQtd"></small></h3>
+      <p class="nota">Vídeos programados com a <b>mesma duração</b> — quase certamente as mesmas músicas em outra ordem. O recomendado é ficar com até 2 de cada conjunto. Os marcados <b>saem da programação</b>: continuam no canal como privados, sem data, e não vão ao ar. Nada é apagado.</p>
+      <div id="arrRepLista" class="arr-lista"></div>
+      <div class="modal-acoes">
+        <button class="btn-primario" id="btnArrRep">📅 Tirar os marcados da programação</button>
+        <span class="nota" id="arrRepNota"></span>
+      </div>
+    </div>
     <p class="modal-erro" id="arrErro"></p>
     <div class="modal-acoes">
       <button class="btn-primario" id="btnArrAplicar" hidden>✅ Aplicar no YouTube</button>

@@ -436,6 +436,56 @@ async function corrigirVideos({ credenciais, refreshToken, redirectOriginal, ite
   return { feitos, falhas, parou };
 }
 
+/**
+ * Tira vídeos da programação: continuam no canal como PRIVADOS, sem data para ir ao ar.
+ * Não apaga nada — dá para programar de novo depois, pelo YouTube Studio. Vídeo que já está público não é tocado.
+ * Devolve { feitos: [id], falhas: [{ id, erro }], parou }.
+ */
+async function desprogramarVideos({ credenciais, refreshToken, redirectOriginal, ids, onProgresso }) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const atuais = {};
+  for (let i = 0; i < ids.length; i += 50) {
+    const v = await yt.videos.list({ part: ['status'], id: ids.slice(i, i + 50) });
+    for (const x of v.data.items || []) atuais[x.id] = x.status;
+  }
+  const feitos = [];
+  const falhas = [];
+  let parou = null;
+  for (const [n, id] of ids.entries()) {
+    const st = atuais[id];
+    try {
+      if (!st) throw new Error('Vídeo não encontrado no canal');
+      if (st.privacyStatus !== 'private') throw new Error('Este vídeo já está no ar; não mexi nele');
+      // Regrava o estado SEM a data de publicação (é assim que o YouTube tira da programação); o resto fica igual
+      await yt.videos.update({
+        part: ['status'],
+        requestBody: {
+          id,
+          status: {
+            privacyStatus: 'private',
+            selfDeclaredMadeForKids: st.selfDeclaredMadeForKids ?? st.madeForKids ?? false,
+            ...(st.embeddable != null ? { embeddable: st.embeddable } : {}),
+            ...(st.license ? { license: st.license } : {}),
+            ...(st.publicStatsViewable != null ? { publicStatsViewable: st.publicStatsViewable } : {}),
+            ...(st.containsSyntheticMedia != null ? { containsSyntheticMedia: st.containsSyntheticMedia } : {}),
+          },
+        },
+      });
+      feitos.push(id);
+    } catch (e) {
+      const msg = String(e?.errors?.[0]?.reason || e?.message || e);
+      if (/quota|rateLimit|dailyLimit/i.test(msg)) {
+        parou = 'O YouTube atingiu o limite de alterações de hoje. Clique em "Arrumar vídeos" de novo amanhã para terminar.';
+        break;
+      }
+      falhas.push({ id, erro: msg.slice(0, 160) });
+    }
+    if (onProgresso) onProgresso((n + 1) / ids.length);
+  }
+  return { feitos, falhas, parou };
+}
+
 module.exports = {
+  desprogramarVideos,
   limparTags, autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT,
   categoriaDoVideo, tituloFraco, conferirCanal, corrigirVideos, adicionarNaPlaylist, CATEGORIA_MUSICA, CATEGORIA_FALADO };

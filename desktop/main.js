@@ -923,6 +923,17 @@ app.whenReady().then(() => {
       onProgresso: (x) => enviar('canais:progresso', x),
     });
   });
+  ipcMain.handle('canais:desprogramar', async (_e, { id, ids }) => {
+    const canal = store.canal(id);
+    if (!canal) throw new Error('Canal não encontrado. Conecte de novo em Contas YouTube.');
+    if (!Array.isArray(ids) || !ids.length) throw new Error('Nenhum vídeo marcado.');
+    const cfg = store.ler();
+    return YT.desprogramarVideos({
+      credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect,
+      ids: ids.map(String).slice(0, 200),
+      onProgresso: (x) => enviar('canais:progresso', x),
+    });
+  });
   ipcMain.handle('canais:remover', (_e, id) => {
     store.removerCanal(id);
     sincronizarDepois();
