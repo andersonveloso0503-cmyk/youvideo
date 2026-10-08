@@ -37,6 +37,8 @@ const VOZES = {
 // (que puxa para o sertanejo). A voz escolhida na tela define homem/mulher e o timbre;
 // aqui entra o jeito de cantar do gênero.
 const CANTORES = [
+  // Sertanejo gospel antes de todos: tem as duas palavras e não pode cair no sertanejo romântico nem no louvor sem viola
+  { id: 'sertanejo-gospel', teste: /sertanej[\s\S]*gospel|gospel[\s\S]*sertanej|louvor sertanejo/i, cantor: 'Brazilian sertanejo gospel singer, warm heartfelt worship delivery with a gentle sertanejo twang, reverent and emotional, sung as praise to God (not a romantic love song, not party sertanejo)' },
   { id: 'forro', teste: /forr[oó]|piseiro|xote|bai[aã]o|zabumba/i, cantor: 'Northeastern Brazilian forró / piseiro singer with a nordestino accent, bright and slightly nasal tone, rhythmic syncopated phrasing typical of forró and piseiro, festive and danceable delivery' },
   { id: 'reggae', teste: /reggae|ska\b|dub\b/i, cantor: 'Brazilian reggae singer, relaxed warm and smooth tone, laid-back sunny phrasing on the offbeat, positive vibe' },
   { id: 'metal', teste: /heavy metal|\bmetal\b|thrash|power metal/i, cantor: 'heavy metal singer, powerful high operatic tenor, soaring sustained notes and wails, dramatic and epic delivery' },
@@ -93,6 +95,7 @@ const GENEROS = {
   infantil: { pos: ["children's music", 'playful', 'cheerful clear vocals'], neg: [...SEM_SERTANEJO, 'rock'] },
   gaucha: { pos: ['gaucho music', 'milonga', 'nativist', 'nylon guitar', 'accordion', 'deep baritone vocals'], neg: ['rock', 'pop'] },
   sertanejo: { pos: ['sertanejo'], neg: [] },
+  'sertanejo-gospel': { pos: ['sertanejo gospel', 'brazilian worship', 'acoustic guitar', 'viola caipira', 'soft accordion', 'heartfelt worship vocals'], neg: ['arrocha', 'party', 'funk', 'electronic', 'drinking'] },
 };
 
 // Música em inglês: o cantor é do gênero, mas sem o "brasileiro" (senão a IA puxa o sotaque e o português)

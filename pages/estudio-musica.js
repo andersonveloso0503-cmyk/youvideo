@@ -6,7 +6,7 @@ import { capaComTitulo } from '../lib/capaTitulo';
 // Nome do gênero como aparece na lista das distribuidoras
 const GENERO_STREAMING = [
   [/reggae/i, 'Reggae'], [/heavy metal|\bmetal\b/i, 'Metal'], [/\brock\b/i, 'Rock'], [/forr[oó]|piseiro|xote|bai[aã]o/i, 'Forró (Brazilian)'],
-  [/sertanej/i, 'Sertanejo (Brazilian)'], [/ga[uú]ch|milonga|nativis/i, 'Brazilian / Regional'], [/pagode|samba/i, 'Samba / Pagode (Brazilian)'],
+  [/sertanej[\s\S]*gospel|gospel[\s\S]*sertanej/i, 'Christian & Gospel'], [/sertanej/i, 'Sertanejo (Brazilian)'], [/ga[uú]ch|milonga|nativis/i, 'Brazilian / Regional'], [/pagode|samba/i, 'Samba / Pagode (Brazilian)'],
   [/\bfunk\b/i, 'Funk Carioca (Brazilian)'], [/\bmpb\b|bossa/i, 'MPB (Brazilian)'],
   [/r&b|\brnb\b|\bsoul\b/i, 'R&B / Soul'], [/\bjazz\b/i, 'Jazz'], [/\btrap\b|\brap\b|hip.?hop/i, 'Hip Hop / Rap'],
   [/electronic dance|\bedm\b|eletronica/i, 'Electronic / Dance'], [/\bax[eé](?![a-zà-ú])/i, 'Axé (Brazilian)'], [/\bcountry\b/i, 'Country'],
@@ -20,6 +20,7 @@ const generoStreaming = (m) => (GENERO_STREAMING.find(([re]) => re.test(`${m.gen
 const ESTILOS = [
   { id: 'gospel', nome: 'Gospel / Louvor', base: 'Brazilian gospel worship, modern, emotional, piano and pads, uplifting build' },
   { id: 'gospel-animado', nome: 'Gospel Animado', base: 'upbeat Brazilian gospel, festive, drums, bass, joyful, danceable' },
+  { id: 'sertanejo-gospel', nome: 'Sertanejo Gospel', base: 'Brazilian sertanejo gospel (louvor sertanejo), acoustic guitar and viola caipira, soft accordion, heartfelt worship, calm and emotional' },
   { id: 'sertanejo', nome: 'Sertanejo', base: 'Brazilian sertanejo, romantic, acoustic guitar, accordion touch' },
   { id: 'sertanejo-potente', nome: 'Sertanejo Arena', base: 'Brazilian sertanejo, modern arena sertanejo production, acoustic guitar and viola caipira, full band, big anthemic chorus' },
   { id: 'gaucha', nome: 'Gaúcha / Nativista', base: 'Southern Brazilian gaucho music, milonga, nylon guitar, accordion' },
@@ -323,7 +324,7 @@ function ideiasEmTexto(ids) {
 
 const ABA_DO_ESTILO = {
   reggae: 'Reggae e ska', gaucha: 'Gaúcho e nativista', forro: 'Nordeste', rock: 'Rock e metal', metal: 'Rock e metal',
-  pagode: 'Samba e pagode', funk: 'Eletrônico', pop: 'Eletrônico', sertanejo: 'Guitarra', 'sertanejo-potente': 'Guitarra',
+  pagode: 'Samba e pagode', funk: 'Eletrônico', pop: 'Eletrônico', sertanejo: 'Guitarra', 'sertanejo-potente': 'Guitarra', 'sertanejo-gospel': 'Guitarra',
   soul: 'Metais e sopros', rnb: 'Teclados', jazz: 'Metais e sopros', 'blues-raiz': 'Guitarra', bossa: 'Guitarra', balada: 'Cordas e orquestra',
   rap: 'Eletrônico', trap: 'Eletrônico', eletronica: 'Eletrônico', axe: 'Ritmo e percussão', country: 'Guitarra',
 };
