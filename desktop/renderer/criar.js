@@ -202,6 +202,9 @@ const Criar = (() => {
         el.textContent = `🎬 "${d.nome}" foi para a fila`;
         el.onclick = null;
         avisar(`"${d.nome}" entrou na fila para montar aqui no PC — acompanhe em 🎬 Compilar › Fila`);
+      } else if (d.estado === 'musicas') {
+        el.textContent = `🎵 ${d.n} músicas de "${d.nome}" na lista`;
+        el.onclick = null;
       } else if (d.estado === 'erro') {
         el.textContent = `Não consegui montar: ${d.erro || d.nome}`;
         avisar(d.erro || 'Não consegui ler a receita do vídeo', true);

@@ -192,7 +192,20 @@ function atualizarQtdVideos(nMusicas) {
 }
 
 // ---------- Músicas ----------
-function adicionarMusicas(lista) {
+// Músicas que chegaram do Estúdio de Música: entram na lista e ficam marcadas SÓ elas (é o vídeo do álbum)
+function receberDoEstudio({ nome, musicas, faltaram }) {
+  if (!musicas?.length) return;
+  const novas = new Set(musicas.map((m) => m.arquivo));
+  P.musicas.forEach((m) => (m.selecionada = novas.has(m.arquivo)));
+  adicionarMusicas(musicas, true);
+  P.musicas.forEach((m) => (m.selecionada = novas.has(m.arquivo)));
+  renderMusicas();
+  salvarDepois();
+  if (typeof Criar !== 'undefined') Criar.trocarModo('compilar');
+  avisar(`🎵 ${musicas.length} música${musicas.length > 1 ? 's' : ''} de "${nome}" na lista, já marcadas${faltaram ? ` (${faltaram} não baixaram)` : ''}. Agora é escolher as imagens e gerar o vídeo.`, !!faltaram);
+}
+
+function adicionarMusicas(lista, quieto = false) {
   const existentes = new Set(P.musicas.map((m) => m.arquivo));
   let n = 0;
   for (const m of lista) {
@@ -204,6 +217,7 @@ function adicionarMusicas(lista) {
   renderMusicas();
   salvarDepois();
   analisarPendentes();
+  if (quieto) return;
   if (n) avisar(`${n} música${n > 1 ? 's' : ''} adicionada${n > 1 ? 's' : ''}`);
   else if (lista.length) avisar('Essas músicas já estavam na lista');
 }
@@ -1343,6 +1357,7 @@ async function iniciar() {
   $('#btnConfig').onclick = () => abrirConfig();
   $('#btnSubir').onclick = () => Subir.abrir();
   $('#btnCantor').onclick = () => Cantor.abrir();
+  window.api.ao('estudio:musicas', receberDoEstudio);
   const puxarConfig = async () => {
     const res = $('#resSync');
     res.textContent = 'Buscando as configurações do outro PC...';

@@ -72,6 +72,34 @@ Responda SÓ com JSON neste formato:
       return res.status(500).json({ erro: 'Não consegui entender esse estilo agora. Tente de novo.' });
     }
 
+    // Álbum: N músicas do mesmo estilo, cada uma com título e assunto próprios
+    if (acao === 'planoAlbum') {
+      const n = Math.max(2, Math.min(30, parseInt(req.body.quantidade, 10) || 10));
+      const estiloAlb = String(req.body.estilo || 'gospel').slice(0, 80);
+      const temaAlb = String(tema || '').trim().slice(0, 400) || 'fé, gratidão, confiança e adoração a Deus';
+      const jaExistem = (Array.isArray(req.body.evitar) ? req.body.evitar : []).map((t) => String(t).slice(0, 60)).filter(Boolean).slice(0, 80);
+      const pedidoAlbum = `Vou gravar um álbum com ${n} músicas ORIGINAIS no estilo ${estiloAlb}.
+Tema geral do álbum: ${temaAlb}
+
+Para CADA música invente um título curto (2 a 5 palavras) e um assunto próprio dentro do tema: uma situação, um sentimento, uma promessa ou uma passagem bíblica diferente.
+Nenhuma pode repetir o assunto, as imagens ou as palavras principais do título de outra. Títulos em português correto e natural, sem números e sem aspas.${jaExistem.length ? `\nNão use nem imite estes títulos, que já existem: ${jaExistem.join('; ')}.` : ''}
+
+Responda SÓ com as linhas, uma por música, neste formato:
+1 | Título | assunto em uma frase`;
+      for (let t = 1; t <= 3; t++) {
+        const txt = await groq(pedidoAlbum, 6000);
+        const ideias = [];
+        txt.split('\n').forEach((l) => {
+          const m = l.replace(/[*_`]/g, '').match(/^\s*(\d+)\s*[|.)-]\s*([^|]+)\|\s*(.+)$/);
+          if (m && +m[1] >= 1 && +m[1] <= n) ideias[+m[1] - 1] = { titulo: m[2].replace(/[*"]/g, '').trim(), angulo: m[3].replace(/[*"]/g, '').trim() };
+        });
+        const vistos = new Set();
+        const ok = Array.from({ length: n }, (_, i) => ideias[i]).every((x) => x && x.angulo && !vistos.has(x.titulo.toLowerCase()) && vistos.add(x.titulo.toLowerCase()));
+        if (ok) return res.status(200).json({ ideias: ideias.slice(0, n) });
+      }
+      return res.status(500).json({ erro: 'Não consegui planejar as músicas do álbum. Tente de novo.' });
+    }
+
     // Medley: planeja N músicas DIFERENTES entre si a partir do tema geral
     if (acao === 'planoMedley') {
       const faixas = Array.isArray(req.body.faixas) ? req.body.faixas.slice(0, 15) : [];

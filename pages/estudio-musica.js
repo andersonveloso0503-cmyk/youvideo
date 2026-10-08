@@ -468,6 +468,8 @@ function EstilosDoMedley({ medley, biblioteca }) {
         .med-est-rit { font-size: 11px; font-weight: 600; color: var(--text); background: var(--teal-soft); border-radius: 999px; padding: 2px 8px; }
         .med-est-tit { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .med-est-ideias { display: flex; flex-wrap: wrap; gap: 5px; }
+        .est-alb-cont { margin-left: auto; font-size: 12px; opacity: 0.75; }
+        .est-alb-marca { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
         .med-est-ideias span { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
       `}</style>
     </div>
@@ -523,6 +525,15 @@ const MEDLEY_PADRAO = [
   { estiloId: 'forro', tema: '', ritmo: 'animada' },
   { estiloId: 'pagode', tema: '', ritmo: 'animada' },
 ];
+
+// Álbum: estilos com instrumentos, ritmo e tema já programados (o dono só escolhe quantas músicas)
+const ALBUM_PRESETS = [
+  { id: 'louvor', nome: 'Louvor / Adoração', estiloId: 'gospel', ideias: ['piano', 'pads', 'violao-nylon'], ritmo: 'lenta', tema: 'adoração, gratidão e confiança em Deus' },
+  { id: 'sertanejo-gospel', nome: 'Sertanejo Gospel', estiloId: 'sertanejo-gospel', ideias: ['viola', 'dedilhado', 'acordeon'], ritmo: 'media', tema: 'fé, oração e gratidão a Deus no dia a dia' },
+  { id: 'gospel-animado', nome: 'Gospel Animado', estiloId: 'gospel-animado', ideias: [], ritmo: 'animada', tema: 'alegria, vitória e celebração em Deus' },
+  { id: 'pagode-gospel', nome: 'Pagode Gospel', estiloId: 'pagode', ideias: ['cavaco'], ritmo: 'media', tema: 'louvor e gratidão a Deus com alegria', extra: 'gospel praise lyrics about God' },
+];
+const ALBUM_QTDS = [5, 10, 15, 20, 25, 30];
 
 // Roda tarefas com no máximo N ao mesmo tempo
 async function emLotes(itens, n, fn) {
@@ -588,6 +599,15 @@ export default function EstudioMusica() {
     pergunta.resolver(r);
     setPergunta(null);
   }
+
+  // Álbum (várias músicas do mesmo estilo, de uma vez)
+  const [albPreset, setAlbPreset] = useState('louvor');
+  const [albQtd, setAlbQtd] = useState(20);
+  const [albNome, setAlbNome] = useState('');
+  const [albTema, setAlbTema] = useState('');
+  const [albProg, setAlbProg] = useState(null); // { nome, plano, fase: planejando|musicas|pronto|erro, erro, itens: [{ titulo, status, musica, marcada, falhou }] }
+  const [noCompilador, setNoCompilador] = useState(false); // a página está aberta dentro do Youvideo Compilador?
+  useEffect(() => { setNoCompilador(/Electron/i.test(navigator.userAgent)); }, []);
 
   // Medley
   const [medTitulo, setMedTitulo] = useState('');
@@ -1068,6 +1088,124 @@ export default function EstudioMusica() {
     setIdeias(achadas.map((x) => x.id));
     setEstiloExtra(resto.split(',').map((t) => t.trim()).filter(Boolean).join(', '));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Álbum: N músicas do mesmo estilo, cada uma com título e assunto próprios ──
+  async function criarAlbum() {
+    setAviso('');
+    const pr = ALBUM_PRESETS.find((p) => p.id === albPreset) || ALBUM_PRESETS[0];
+    const est = ESTILOS.find((e) => e.id === pr.estiloId) || ESTILOS[0];
+    const motorAlb = motor === 'comparar' ? 'elevenlabs' : motor;
+    const n = albQtd;
+    const preco = motorAlb === 'lyria' ? [0.5, 1] : [3, 5];
+    const ok = await perguntar(`Criar ${n} músicas de ${pr.nome}?`, [], {
+      nota: `Custo aproximado: R$ ${Math.round(n * preco[0])} a R$ ${Math.round(n * preco[1])} (${motorAlb === 'lyria' ? 'Google Lyria' : 'ElevenLabs'}). Leva uns ${Math.ceil(n * 0.7)} a ${Math.ceil(n * 1.5)} minutos — deixe esta tela aberta até terminar.`,
+      botao: 'Criar álbum',
+    });
+    if (!ok) return;
+    const nome = albNome.trim() || `${pr.nome} ${new Date().toLocaleDateString('pt-BR')}`;
+    const plano = {
+      nome, preset: pr, est, motor: motorAlb, grupoId: `a${Date.now()}`, tema: albTema.trim() || pr.tema,
+      voz: instrumental ? '' : voz, instrumental, duracao, ideias: null, prontas: Array(n).fill(null),
+    };
+    setAlbProg({ nome, plano, fase: 'planejando', erro: '', itens: Array.from({ length: n }, (_, i) => ({ titulo: `Música ${i + 1}`, status: 'planejando…', marcada: true })) });
+    try {
+      const pl = await api('/api/estudio/letra', {
+        method: 'POST',
+        body: JSON.stringify({ acao: 'planoAlbum', quantidade: n, estilo: pr.nome, tema: plano.tema, evitar: musicas.map((m) => m.titulo).slice(0, 80) }),
+      });
+      plano.ideias = pl.ideias;
+    } catch (e) {
+      setAlbProg((p) => p && { ...p, fase: 'erro', erro: e.message });
+      return;
+    }
+    setAlbProg((p) => p && { ...p, itens: p.itens.map((it, i) => ({ ...it, titulo: plano.ideias[i].titulo, status: 'esperando' })) });
+    await rodarAlbum(plano, plano.ideias.map((_, i) => i));
+  }
+
+  async function rodarAlbum(plano, indices) {
+    const marcar = (k, campos) => setAlbProg((p) => p && { ...p, itens: p.itens.map((it, i) => (i === k ? { ...it, ...campos } : it)) });
+    const estilo = [plano.est.base, ritmoEn(plano.preset.ritmo), ideiasEmTexto(plano.preset.ideias), plano.preset.extra || ''].filter(Boolean).join(', ');
+    const instrumentos = plano.preset.ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean).join(', ');
+    setAlbProg((p) => p && { ...p, fase: 'musicas', erro: '' });
+    await emLotes(indices, 2, async (k) => {
+      const ideia = plano.ideias[k];
+      let erro = '';
+      for (let t = 1; t <= 2; t++) {
+        try {
+          let letraTxt = '';
+          if (!plano.instrumental) {
+            marcar(k, { status: t > 1 ? 'tentando de novo: letra…' : 'escrevendo a letra…' });
+            const l = await api('/api/estudio/letra', {
+              method: 'POST',
+              body: JSON.stringify({
+                acao: 'letra',
+                tema: `${ideia.angulo} (título: "${ideia.titulo}"; tema do álbum: ${plano.tema})`,
+                evitar: plano.ideias.filter((_, i) => i !== k).map((x) => `"${x.titulo}"`).slice(0, 29),
+                estilo: plano.preset.nome,
+                voz: VOZES.find((v) => v.id === plano.voz)?.nome,
+                detalhes: instrumentos,
+              }),
+            });
+            letraTxt = l.letra;
+          }
+          marcar(k, { status: t > 1 ? 'tentando de novo: música…' : 'criando a música…' });
+          const d = await api('/api/estudio/gerar', {
+            method: 'POST',
+            body: JSON.stringify({
+              motor: plano.motor,
+              modo: 'personalizado',
+              titulo: ideia.titulo,
+              descricao: plano.instrumental ? ideia.angulo.slice(0, 1000) : '',
+              letra: letraTxt,
+              estilo,
+              voz: plano.voz,
+              instrumental: plano.instrumental,
+              duracaoSeg: plano.duracao,
+              grupoId: plano.grupoId,
+              versao: k + 1,
+            }),
+          });
+          plano.prontas[k] = d.musica;
+          setMusicas((ms) => [d.musica, ...ms]);
+          marcar(k, { status: 'pronta ✓', musica: d.musica, falhou: false });
+          return;
+        } catch (e) {
+          erro = e.message;
+        }
+      }
+      marcar(k, { status: `falhou ✕ (${erro.slice(0, 80)})`, falhou: true });
+    });
+    const falhas = plano.prontas.filter((x) => !x).length;
+    setAlbProg((p) => p && { ...p, fase: 'pronto', erro: falhas ? `${falhas} música(s) não deram certo. Dá para tentar de novo só elas.` : '' });
+  }
+
+  function tentarFalhasAlbum() {
+    const pl = albProg?.plano;
+    if (!pl?.ideias) return;
+    const idx = pl.prontas.map((x, i) => (x ? -1 : i)).filter((i) => i >= 0);
+    if (!idx.length) return;
+    setAlbProg((p) => ({ ...p, itens: p.itens.map((it, i) => (idx.includes(i) ? { ...it, falhou: false, status: 'esperando' } : it)) }));
+    rodarAlbum(pl, idx);
+  }
+
+  // Manda as músicas para a lista do Youvideo Compilador: a página baixa um arquivo pequeno com os links,
+  // o Compilador reconhece, baixa os áudios para o PC e coloca na lista de músicas (já marcadas).
+  function mandarParaCompilador(lista, nome) {
+    const comAudio = lista.filter((m) => m && m.audioUrl);
+    if (!comAudio.length) { setAviso('Nenhuma música com áudio para mandar.'); return; }
+    if (!noCompilador) {
+      setAviso('Para mandar direto para o Compilador, abra o Estúdio de Música por dentro do Compilador (✨ Criar → Estúdio de Música). Aqui no navegador, use ⬇ Baixar.');
+      return;
+    }
+    const dados = { tipo: 'youvideo-musicas', nome: nome || 'Estúdio de Música', musicas: comAudio.map((m) => ({ titulo: m.titulo, url: m.audioUrl })) };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(dados)], { type: 'application/json' }));
+    a.download = arquivoNome(nome || 'musicas', 'youvideo-musicas.json');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setAviso(`🎬 ${comAudio.length} música${comAudio.length > 1 ? 's' : ''} indo para o Compilador. Elas aparecem na lista de músicas da tela Compilar, já marcadas. (Se nada acontecer, atualize o Compilador.)`);
   }
 
   // ── Medley: gera N músicas e junta ──
@@ -1571,9 +1709,75 @@ export default function EstudioMusica() {
               <button className={modo === 'simples' ? 'on' : ''} onClick={() => setModo('simples')}>Simples</button>
               <button className={modo === 'personalizado' ? 'on' : ''} onClick={() => setModo('personalizado')}>Personalizado</button>
               <button className={modo === 'medley' ? 'on' : ''} onClick={() => setModo('medley')}>Medley</button>
+              <button className={modo === 'album' ? 'on' : ''} onClick={() => setModo('album')}>📀 Álbum</button>
             </div>
 
-            {modo === 'medley' ? (
+            {modo === 'album' && (() => {
+              const pr = ALBUM_PRESETS.find((p) => p.id === albPreset) || ALBUM_PRESETS[0];
+              const ocupado = !!albProg && !['pronto', 'erro'].includes(albProg.fase);
+              return (
+                <>
+                  <label className="est-rot">Estilo (instrumentos já programados)</label>
+                  <div className="est-chips">
+                    {ALBUM_PRESETS.map((p) => (
+                      <button key={p.id} className={albPreset === p.id ? 'on' : ''} onClick={() => setAlbPreset(p.id)}>{p.nome}</button>
+                    ))}
+                  </div>
+                  <small className="est-nota">
+                    {pr.ideias.length ? `Instrumentos: ${pr.ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean).join(', ')} · ` : ''}
+                    ritmo {nomeRitmo(pr.ritmo).toLowerCase()}
+                  </small>
+
+                  <label className="est-rot">Quantas músicas</label>
+                  <div className="est-chips">
+                    {ALBUM_QTDS.map((q) => (
+                      <button key={q} className={albQtd === q ? 'on' : ''} onClick={() => setAlbQtd(q)}>{q}</button>
+                    ))}
+                  </div>
+
+                  <label className="est-rot">Nome do álbum (opcional)</label>
+                  <input value={albNome} onChange={(e) => setAlbNome(e.target.value)} placeholder="Ex: Louvores de Adoração 2027" />
+
+                  <label className="est-rot">Tema geral (opcional)</label>
+                  <textarea rows={2} value={albTema} onChange={(e) => setAlbTema(e.target.value)} placeholder={pr.tema} />
+
+                  <label className="est-toggle">
+                    <input type="checkbox" checked={instrumental} onChange={(e) => setInstrumental(e.target.checked)} />
+                    <span>Instrumental (sem voz)</span>
+                  </label>
+                  {!instrumental && (
+                    <>
+                      <label className="est-rot">Voz</label>
+                      <div className="est-chips">
+                        {VOZES.map((v) => (
+                          <button key={v.id} className={voz === v.id ? 'on' : ''} onClick={() => setVoz(v.id)}>{v.nome}</button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  <label className="est-rot">Duração de cada música: {fmtTempo(duracao)}</label>
+                  <input type="range" min={60} max={300} step={15} value={duracao} onChange={(e) => setDuracao(+e.target.value)} />
+
+                  <label className="est-rot">Motor de IA</label>
+                  <div className="est-motores">
+                    {MOTORES.filter((m) => m.id !== 'comparar').map((m) => (
+                      <button key={m.id} className={motor === m.id ? 'on' : ''} onClick={() => setMotor(m.id)}>
+                        <strong>{m.nome}</strong>
+                        <small>{m.id === 'lyria' ? '~R$0,50-1 por música' : '~R$3-5 por música'}</small>
+                      </button>
+                    ))}
+                  </div>
+
+                  <button className="est-criar-btn" disabled={ocupado} onClick={criarAlbum}>
+                    📀 Criar {albQtd} músicas ({Math.round((albQtd * duracao) / 60)} min no total)
+                  </button>
+                  <small className="est-nota">A IA dá um título e um assunto diferente para cada música, escreve as letras e cria as músicas, 2 de cada vez. Deixe esta tela aberta. No fim, marque as que quer e mande direto para o Compilador montar o vídeo.</small>
+                </>
+              );
+            })()}
+
+            {modo === 'album' ? null : modo === 'medley' ? (
               <>
                 <label className="est-rot">Título do medley</label>
                 <input value={medTitulo} onChange={(e) => setMedTitulo(e.target.value)} placeholder="Ex: 1 HORA DE LOUVOR — Sertanejo, Forró e Pagode Pra Deus" />
@@ -1826,6 +2030,7 @@ export default function EstudioMusica() {
                     <button className="est-btn-sec" onClick={novaVersaoMarcadas}>🔁 Nova versão</button>
                     <button className="est-btn-sec" disabled={!!loteRodando} onClick={inglesMarcadas} title="Faz a versão em inglês de cada música marcada: letra e nome em inglês, mesma voz e estilo">🌎 Em inglês{marcadas.length > 1 ? ` (${marcadas.length})` : ''}</button>
                     <button className="est-btn-sec" disabled={!!loteRodando} onClick={() => prepararStreaming(musicas.filter((x) => marcadas.includes(x.id) && x.tipo !== 'medley'))} title="Um pacote só, com uma pasta por música: áudio, capa com o título, letra e ficha">📦 Preparar para streaming{marcadas.length > 1 ? ` (${marcadas.length})` : ''}</button>
+                    <button className="est-btn-sec" disabled={!!loteRodando} onClick={() => mandarParaCompilador(marcadas.map((id) => musicas.find((x) => x.id === id)), 'Músicas do Estúdio')} title="Coloca as músicas marcadas na lista do Youvideo Compilador, prontas para montar o vídeo">🎬 Para o Compilador{marcadas.length > 1 ? ` (${marcadas.length})` : ''}</button>
                     <button className="est-btn-sec" disabled={!!loteRodando} onClick={baixarMarcadas}>⬇ Baixar {marcadas.length > 1 ? `(${marcadas.length})` : ''}</button>
                     <button className="est-btn-sec perigo" disabled={!!loteRodando} onClick={excluirMarcadas}>🗑 Excluir</button>
                     <button className="est-btn-link" onClick={() => setMarcadas([])}>Desmarcar</button>
@@ -1845,6 +2050,49 @@ export default function EstudioMusica() {
                 <button className="est-btn-sec" disabled={selecao.length < 2 || !!medProgresso} onClick={juntarSelecionadas}>Juntar em medley</button>
               </div>
             )}
+
+            {albProg && (() => {
+              const prontas = albProg.itens.filter((x) => x.musica);
+              const escolhidas = prontas.filter((x) => x.marcada);
+              const falhas = albProg.itens.filter((x) => x.falhou).length;
+              const acabou = ['pronto', 'erro'].includes(albProg.fase);
+              return (
+                <div className={`est-card est-medprog ${albProg.fase === 'erro' ? 'erro' : ''}`}>
+                  <div className="est-medprog-top">
+                    {acabou ? '📀' : <span className="est-spin" />}
+                    <strong>{albProg.nome}</strong>
+                    <span className="est-alb-cont">{prontas.length} de {albProg.itens.length} prontas</span>
+                  </div>
+                  <div className="est-medprog-lista">
+                    {albProg.itens.map((it, i) => (
+                      <div key={i}>
+                        <span>
+                          {it.musica ? (
+                            <label className="est-alb-marca">
+                              <input type="checkbox" checked={!!it.marcada} onChange={(e) => setAlbProg((p) => ({ ...p, itens: p.itens.map((x, k) => (k === i ? { ...x, marcada: e.target.checked } : x)) }))} />
+                              {i + 1}. {it.titulo}
+                            </label>
+                          ) : `${i + 1}. ${it.titulo}`}
+                        </span>
+                        <span>{it.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {albProg.erro && <div className="est-erro-txt">{albProg.erro}</div>}
+                  <div className="est-medprog-btns">
+                    {escolhidas.length > 0 && (
+                      <button className="est-criar-btn" onClick={() => mandarParaCompilador(escolhidas.map((x) => x.musica), albProg.nome)}>
+                        🎬 Mandar {escolhidas.length} para o Compilador
+                      </button>
+                    )}
+                    {acabou && falhas > 0 && albProg.plano?.ideias && (
+                      <button className="est-btn-sec" onClick={tentarFalhasAlbum}>🔁 Tentar de novo as que falharam</button>
+                    )}
+                    {acabou && <button className="est-link" onClick={() => setAlbProg(null)}>fechar</button>}
+                  </div>
+                </div>
+              );
+            })()}
 
             {medProgresso && (
               <div className={`est-card est-medprog ${medProgresso.erro ? 'erro' : ''}`}>

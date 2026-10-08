@@ -71,6 +71,16 @@ function criarVista() {
       if (t) enviar('criar:download', { estado: 'baixando', nome: item.getFilename(), x: item.getReceivedBytes() / t });
     });
     item.once('done', (_ev, estado) => {
+      // Músicas do Estúdio de Música ("Para o Compilador"): baixa os áudios e coloca na lista de músicas
+      if (estado === 'completed' && /\.youvideo-musicas\.json$/i.test(destino)) {
+        let dados = null;
+        try {
+          dados = JSON.parse(fs.readFileSync(destino, 'utf8'));
+        } catch {}
+        fs.rmSync(destino, { force: true });
+        receberMusicasDoEstudio(dados).catch((e) => enviar('criar:download', { estado: 'erro', nome: 'músicas do Estúdio', erro: e.message }));
+        return;
+      }
       // Receita de vídeo do site ("Montar no PC"): vira um vídeo na fila, montado aqui
       if (estado === 'completed' && /\.youvideo\.json$/i.test(destino)) {
         try {
@@ -117,6 +127,40 @@ function criarVista() {
     if (atual() && principal && codigo !== -3) enviar('criar:erro', `Não consegui abrir o Youvideo (${desc}). Confira a internet.`);
   });
   return vistaCriar;
+}
+
+/**
+ * Músicas mandadas pelo Estúdio de Música: baixa cada áudio para "Música/Youvideo Estúdio/<álbum>"
+ * (numerado na ordem) e entrega para a tela, que coloca na lista de músicas já marcadas.
+ */
+async function receberMusicasDoEstudio(dados) {
+  if (!dados || dados.tipo !== 'youvideo-musicas' || !Array.isArray(dados.musicas)) throw new Error('Não entendi a lista de músicas que veio do Estúdio.');
+  const lista = dados.musicas.filter((m) => m && /^https:\/\//i.test(String(m.url || ''))).slice(0, 60);
+  if (!lista.length) throw new Error('A lista do Estúdio veio sem músicas.');
+  const limpo = (t) => String(t || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const nome = limpo(dados.nome) || 'Estúdio de Música';
+  const pasta = path.join(app.getPath('music'), 'Youvideo Estúdio', nome);
+  const arquivos = [];
+  const titulos = new Map();
+  for (const [i, m] of lista.entries()) {
+    const titulo = limpo(m.titulo) || `Música ${i + 1}`;
+    const ext = /\.wav(\?|$)/i.test(m.url) ? 'wav' : 'mp3';
+    const destino = path.join(pasta, `${String(i + 1).padStart(2, '0')} - ${titulo}.${ext}`);
+    enviar('criar:download', { estado: 'baixando', nome: `música ${i + 1} de ${lista.length}: ${titulo}` });
+    try {
+      await Central.baixar(m.url, destino, (x) => enviar('criar:download', { estado: 'baixando', nome: `música ${i + 1} de ${lista.length}: ${titulo}`, x }));
+      arquivos.push(destino);
+      titulos.set(destino, titulo);
+    } catch {
+      // uma música que não baixou não impede as outras
+    }
+  }
+  if (!arquivos.length) throw new Error('Não consegui baixar as músicas do Estúdio. Confira a internet.');
+  const info = (await infoMusicas(arquivos)).map((x) => ({ ...x, titulo: titulos.get(x.arquivo) || x.titulo }));
+  // mantém a ordem do álbum (a leitura das durações pode terminar fora de ordem)
+  info.sort((a, b) => arquivos.indexOf(a.arquivo) - arquivos.indexOf(b.arquivo));
+  enviar('estudio:musicas', { nome, pasta, musicas: info, faltaram: lista.length - arquivos.length });
+  enviar('criar:download', { estado: 'musicas', nome, n: info.length });
 }
 
 // ---------- Navegador de ofertas: sites de fora (mercado da Hotmart, Kiwify, páginas de venda) ----------
