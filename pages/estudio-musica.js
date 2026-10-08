@@ -469,6 +469,8 @@ function EstilosDoMedley({ medley, biblioteca }) {
         .med-est-tit { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .med-est-ideias { display: flex; flex-wrap: wrap; gap: 5px; }
         .est-alb-cont { margin-left: auto; font-size: 12px; opacity: 0.75; }
+        .est-alb-mais { margin: 6px 0; }
+        .est-alb-mais summary { cursor: pointer; font-size: 13px; opacity: 0.85; margin-bottom: 6px; }
         .est-alb-grupo { display: block; margin: 6px 0 4px; font-size: 11.5px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.05em; }
         .est-alb-marca { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
         .med-est-ideias span { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
@@ -530,35 +532,35 @@ const MEDLEY_PADRAO = [
 // Álbum: todos os estilos, cada um com instrumentos, ritmo e tema já programados (o dono só escolhe quantas músicas)
 const P_ = (id, nome, estiloId, ideias, ritmo, tema, extra = '', gospel = false) => ({ id, nome, estiloId, ideias, ritmo, tema, extra, gospel, grupo: gospel ? 'Gospel' : 'Outros estilos' });
 const ALBUM_PRESETS = [
-  P_('louvor', 'Louvor / Adoração', 'gospel', ['piano', 'pads', 'violao-nylon'], 'lenta', 'adoração, gratidão e confiança em Deus', '', true),
-  P_('sertanejo-gospel', 'Sertanejo Gospel', 'sertanejo-gospel', ['viola', 'dedilhado', 'acordeon'], 'media', 'fé, oração e gratidão a Deus no dia a dia', '', true),
-  P_('gospel-animado', 'Gospel Animado', 'gospel-animado', ['palmas', 'bat-forte', 'baixo-groove'], 'animada', 'alegria, vitória e celebração em Deus', '', true),
-  P_('pagode-gospel', 'Pagode Gospel', 'pagode', ['cavaco', 'pandeiro', 'banjo'], 'media', 'louvor e gratidão a Deus com alegria', 'gospel praise lyrics about God', true),
-  P_('blues-gospel', 'Blues Gospel', 'blues', ['hammond', 'solo-blues'], 'media', 'fé, esperança e a presença de Deus nas lutas', '', true),
-  P_('sertanejo', 'Sertanejo', 'sertanejo', ['viola', 'acordeon', 'dedilhado'], 'media', 'amor, saudade e histórias da vida no interior'),
-  P_('sertanejo-potente', 'Sertanejo Arena', 'sertanejo-potente', ['viola', 'bat-forte', 'build'], 'animada', 'amor, festa e saudade'),
-  P_('gaucha', 'Gaúcha / Nativista', 'gaucha', ['gaita-gaucha', 'violao-milonga', 'bombo'], 'media', 'a vida no campo, o Rio Grande e as tradições gaúchas'),
-  P_('pagode', 'Pagode / Samba', 'pagode', ['cavaco', 'pandeiro', 'banjo', 'roda'], 'media', 'amor, amizade e os bons momentos com a galera'),
-  P_('forro', 'Forró / Piseiro', 'forro', ['sanfona-forro', 'zabumba', 'triangulo'], 'animada', 'festa, amor e saudade do Nordeste'),
-  P_('mpb', 'MPB / Acústico', 'mpb', ['violao-nylon', 'acustico'], 'lenta', 'amor, saudade e reflexões sobre a vida'),
-  P_('pop', 'Pop', 'pop', ['synth-lead', 'beat'], 'animada', 'amor, liberdade e boas vibrações'),
-  P_('rock', 'Rock', 'rock', ['power-chords', 'riff', 'bat-forte'], 'animada', 'liberdade, estrada e superação'),
-  P_('metal', 'Heavy Metal', 'metal', ['power-chords', 'guitarras-gemeas', 'bumbo-duplo'], 'muito', 'força, coragem e superação'),
-  P_('reggae', 'Reggae', 'reggae', ['skank', 'baixo-reggae', 'one-drop'], 'media', 'paz, amor e boas vibrações'),
-  P_('funk', 'Funk BR', 'funk', ['beat', 'palmas'], 'animada', 'festa, dança e alegria (letra para toda a família)'),
-  P_('blues-raiz', 'Blues', 'blues-raiz', ['solo-blues', 'gaita', 'hammond'], 'lenta', 'a estrada, a saudade e a vida'),
-  P_('soul', 'Soul', 'soul', ['naipe', 'rhodes', 'baixo-groove'], 'media', 'amor, alegria e recomeço'),
-  P_('rnb', 'R&B', 'rnb', ['rhodes', 'backing'], 'lenta', 'amor e romance'),
-  P_('jazz', 'Jazz', 'jazz', ['sax', 'contrabaixo-acust', 'bat-suave'], 'lenta', 'noites na cidade e romance'),
-  P_('bossa', 'Bossa Nova', 'bossa', ['violao-nylon', 'bat-suave', 'flauta'], 'lenta', 'o mar, o amor e a vida tranquila'),
-  P_('balada', 'Balada Romântica', 'balada', ['piano', 'violino', 'build'], 'lenta', 'amor e saudade'),
-  P_('rap', 'Rap / Hip Hop', 'rap', ['beat', 'backing'], 'media', 'superação, sonhos e a vida na cidade'),
-  P_('trap', 'Trap', 'trap', ['trap', 'synth-lead'], 'media', 'conquistas, sonhos e superação'),
-  P_('eletronica', 'Eletrônica / Dance', 'eletronica', ['house', 'edm-drop', 'synth-lead'], 'animada', 'festa, liberdade e noite'),
-  P_('axe', 'Axé', 'axe', ['percussao', 'naipe'], 'animada', 'carnaval, verão e alegria'),
-  P_('country', 'Country', 'country', ['slide', 'gaita', 'violino'], 'media', 'estrada, liberdade e a vida no interior'),
-  P_('lofi', 'Lo-fi / Relax', 'lofi', ['rhodes', 'beat', 'intima'], 'lenta', 'calma, estudo e noites tranquilas'),
-  P_('infantil', 'Infantil', 'infantil', ['alegre', 'palmas'], 'animada', 'brincadeiras, amizade e aprender coisas novas'),
+  P_('louvor', 'Louvor / Adoração', 'gospel', ['piano', 'pads', 'dedilhado', 'violino', 'cello', 'bat-suave', 'coro', 'build'], 'lenta', 'adoração, gratidão e confiança em Deus', '', true),
+  P_('sertanejo-gospel', 'Sertanejo Gospel', 'sertanejo-gospel', ['viola', 'dedilhado', 'acordeon', 'violao-nylon', 'violino', 'bat-suave', 'baixo-groove', 'backing'], 'media', 'fé, oração e gratidão a Deus no dia a dia', '', true),
+  P_('gospel-animado', 'Gospel Animado', 'gospel-animado', ['palmas', 'bat-forte', 'baixo-groove', 'hammond', 'naipe', 'guit-limpa', 'coro', 'backing'], 'animada', 'alegria, vitória e celebração em Deus', '', true),
+  P_('pagode-gospel', 'Pagode Gospel', 'pagode', ['cavaco', 'pandeiro', 'banjo', 'tantan', 'surdo', 'violao7', 'roda', 'backing'], 'media', 'louvor e gratidão a Deus com alegria', 'gospel praise lyrics about God', true),
+  P_('blues-gospel', 'Blues Gospel', 'blues', ['hammond', 'solo-blues', 'piano', 'baixo-groove', 'bat-suave', 'coro'], 'media', 'fé, esperança e a presença de Deus nas lutas', '', true),
+  P_('sertanejo', 'Sertanejo', 'sertanejo', ['viola', 'acordeon', 'dedilhado', 'violao-nylon', 'violino', 'bat-suave', 'baixo-groove'], 'media', 'amor, saudade e histórias da vida no interior'),
+  P_('sertanejo-potente', 'Sertanejo Arena', 'sertanejo-potente', ['viola', 'dedilhado', 'acordeon', 'guit-limpa', 'bat-forte', 'baixo-groove', 'build', 'backing'], 'animada', 'amor, festa e saudade'),
+  P_('gaucha', 'Gaúcha / Nativista', 'gaucha', ['gaita-gaucha', 'gaita-ponto', 'violao-milonga', 'bombo', 'contrabaixo-acust'], 'media', 'a vida no campo, o Rio Grande e as tradições gaúchas'),
+  P_('pagode', 'Pagode / Samba', 'pagode', ['cavaco', 'pandeiro', 'banjo', 'tantan', 'surdo', 'cuica', 'violao7', 'roda'], 'media', 'amor, amizade e os bons momentos com a galera'),
+  P_('forro', 'Forró / Piseiro', 'forro', ['sanfona-forro', 'zabumba', 'triangulo', 'pifano', 'rabeca', 'piseiro-teclado'], 'animada', 'festa, amor e saudade do Nordeste'),
+  P_('mpb', 'MPB / Acústico', 'mpb', ['violao-nylon', 'dedilhado', 'piano', 'flauta', 'contrabaixo-acust', 'bat-suave', 'acustico'], 'lenta', 'amor, saudade e reflexões sobre a vida'),
+  P_('pop', 'Pop', 'pop', ['synth-lead', 'beat', 'piano', 'guit-limpa', 'baixo-groove', 'backing'], 'animada', 'amor, liberdade e boas vibrações'),
+  P_('rock', 'Rock', 'rock', ['power-chords', 'riff', 'solo-rock', 'bat-forte', 'baixo-groove', 'hammond'], 'animada', 'liberdade, estrada e superação'),
+  P_('metal', 'Heavy Metal', 'metal', ['power-chords', 'palm-mute', 'guitarras-gemeas', 'bumbo-duplo', 'baixo-pesado', 'galope'], 'muito', 'força, coragem e superação'),
+  P_('reggae', 'Reggae', 'reggae', ['skank', 'baixo-reggae', 'one-drop', 'orgao-bubble', 'metais-reggae', 'melodica', 'dub'], 'media', 'paz, amor e boas vibrações'),
+  P_('funk', 'Funk BR', 'funk', ['beat', 'palmas', 'synth-lead', 'baixo-groove'], 'animada', 'festa, dança e alegria (letra para toda a família)'),
+  P_('blues-raiz', 'Blues', 'blues-raiz', ['solo-blues', 'slide', 'gaita', 'hammond', 'baixo-groove', 'bat-suave'], 'lenta', 'a estrada, a saudade e a vida'),
+  P_('soul', 'Soul', 'soul', ['naipe', 'rhodes', 'hammond', 'guit-limpa', 'baixo-groove', 'bat-suave', 'backing'], 'media', 'amor, alegria e recomeço'),
+  P_('rnb', 'R&B', 'rnb', ['rhodes', 'pads', 'beat', 'baixo-groove', 'backing', 'falsete'], 'lenta', 'amor e romance'),
+  P_('jazz', 'Jazz', 'jazz', ['sax', 'trompete', 'piano', 'contrabaixo-acust', 'bat-suave', 'guit-limpa'], 'lenta', 'noites na cidade e romance'),
+  P_('bossa', 'Bossa Nova', 'bossa', ['violao-nylon', 'flauta', 'piano', 'contrabaixo-acust', 'bat-suave', 'intima'], 'lenta', 'o mar, o amor e a vida tranquila'),
+  P_('balada', 'Balada Romântica', 'balada', ['piano', 'violino', 'cello', 'orquestra', 'bat-suave', 'build'], 'lenta', 'amor e saudade'),
+  P_('rap', 'Rap / Hip Hop', 'rap', ['beat', 'piano', 'baixo-groove', 'backing', 'adlibs'], 'media', 'superação, sonhos e a vida na cidade'),
+  P_('trap', 'Trap', 'trap', ['trap', 'synth-lead', 'pads', 'adlibs', 'vocoder'], 'media', 'conquistas, sonhos e superação'),
+  P_('eletronica', 'Eletrônica / Dance', 'eletronica', ['house', 'edm-drop', 'synth-lead', 'piano-house', 'pads', 'build'], 'animada', 'festa, liberdade e noite'),
+  P_('axe', 'Axé', 'axe', ['percussao', 'naipe', 'guit-limpa', 'baixo-groove', 'palmas', 'alegre'], 'animada', 'carnaval, verão e alegria'),
+  P_('country', 'Country', 'country', ['slide', 'gaita', 'violino', 'dedilhado', 'bat-suave'], 'media', 'estrada, liberdade e a vida no interior'),
+  P_('lofi', 'Lo-fi / Relax', 'lofi', ['rhodes', 'beat', 'pads', 'guit-limpa', 'intima', 'lofi'], 'lenta', 'calma, estudo e noites tranquilas'),
+  P_('infantil', 'Infantil', 'infantil', ['piano', 'flauta', 'guit-limpa', 'palmas', 'alegre'], 'animada', 'brincadeiras, amizade e aprender coisas novas'),
 ];
 const ALBUM_QTDS = [5, 10, 15, 20, 25, 30];
 
@@ -629,6 +631,7 @@ export default function EstudioMusica() {
 
   // Álbum (várias músicas do mesmo estilo, de uma vez)
   const [albPreset, setAlbPreset] = useState('louvor');
+  const [albIdeias, setAlbIdeias] = useState(() => [...ALBUM_PRESETS[0].ideias]); // instrumentos do álbum (vêm do estilo; dá para tirar e pôr)
   const [albQtd, setAlbQtd] = useState(20);
   const [albNome, setAlbNome] = useState('');
   const [albTema, setAlbTema] = useState('');
@@ -1133,7 +1136,7 @@ export default function EstudioMusica() {
     const nome = albNome.trim() || `${pr.nome} ${new Date().toLocaleDateString('pt-BR')}`;
     const plano = {
       nome, preset: pr, est, motor: motorAlb, grupoId: `a${Date.now()}`, tema: albTema.trim() || pr.tema,
-      voz: instrumental ? '' : voz, instrumental, duracao, ideias: null, prontas: Array(n).fill(null),
+      voz: instrumental ? '' : voz, instrumental, duracao, ideias: null, prontas: Array(n).fill(null), instrumentos: [...albIdeias],
     };
     setAlbProg({ nome, plano, fase: 'planejando', erro: '', itens: Array.from({ length: n }, (_, i) => ({ titulo: `Música ${i + 1}`, status: 'planejando…', marcada: true })) });
     try {
@@ -1152,8 +1155,8 @@ export default function EstudioMusica() {
 
   async function rodarAlbum(plano, indices) {
     const marcar = (k, campos) => setAlbProg((p) => p && { ...p, itens: p.itens.map((it, i) => (i === k ? { ...it, ...campos } : it)) });
-    const estilo = [plano.est.base, ritmoEn(plano.preset.ritmo), ideiasEmTexto(plano.preset.ideias), plano.preset.extra || ''].filter(Boolean).join(', ');
-    const instrumentos = plano.preset.ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean).join(', ');
+    const estilo = [plano.est.base, ritmoEn(plano.preset.ritmo), ideiasEmTexto(plano.instrumentos), plano.preset.extra || ''].filter(Boolean).join(', ');
+    const instrumentos = plano.instrumentos.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean).join(', ');
     setAlbProg((p) => p && { ...p, fase: 'musicas', erro: '' });
     await emLotes(indices, 2, async (k) => {
       const ideia = plano.ideias[k];
@@ -1750,15 +1753,24 @@ export default function EstudioMusica() {
                       <small className="est-alb-grupo">{g}</small>
                       <div className="est-chips">
                         {ALBUM_PRESETS.filter((p) => p.grupo === g).map((p) => (
-                          <button key={p.id} className={albPreset === p.id ? 'on' : ''} onClick={() => setAlbPreset(p.id)}>{p.nome}</button>
+                          <button key={p.id} className={albPreset === p.id ? 'on' : ''} onClick={() => { setAlbPreset(p.id); setAlbIdeias([...p.ideias]); }}>{p.nome}</button>
                         ))}
                       </div>
                     </div>
                   ))}
-                  <small className="est-nota">
-                    {pr.ideias.length ? `Instrumentos: ${pr.ideias.map((id) => TODAS_IDEIAS.find((x) => x.id === id)?.nome).filter(Boolean).join(', ')} · ` : ''}
-                    ritmo {nomeRitmo(pr.ritmo).toLowerCase()}
-                  </small>
+                  <label className="est-rot">Instrumentos e arranjo — toque para tirar ou pôr de volta</label>
+                  <div className="est-chips">
+                    {[...new Set([...pr.ideias, ...albIdeias])].map((id) => (
+                      <button key={id} className={albIdeias.includes(id) ? 'on' : ''} onClick={() => setAlbIdeias((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]))}>
+                        {albIdeias.includes(id) ? '✓ ' : '+ '}{TODAS_IDEIAS.find((x) => x.id === id)?.nome || id}
+                      </button>
+                    ))}
+                  </div>
+                  <details className="est-alb-mais">
+                    <summary>+ Outros instrumentos</summary>
+                    <PainelIdeias selecionadas={albIdeias} setSelecionadas={setAlbIdeias} estiloId={pr.estiloId} />
+                  </details>
+                  <small className="est-nota">Ritmo {nomeRitmo(pr.ritmo).toLowerCase()}{albIdeias.length ? ` · ${albIdeias.length} instrumentos/arranjos ligados` : ' · nenhum instrumento escolhido: a IA decide pelo estilo'}</small>
 
                   <label className="est-rot">Quantas músicas</label>
                   <div className="est-chips">
