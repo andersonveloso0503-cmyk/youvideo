@@ -76,12 +76,13 @@ Responda SÓ com JSON neste formato:
     if (acao === 'planoAlbum') {
       const n = Math.max(2, Math.min(30, parseInt(req.body.quantidade, 10) || 10));
       const estiloAlb = String(req.body.estilo || 'gospel').slice(0, 80);
-      const temaAlb = String(tema || '').trim().slice(0, 400) || 'fé, gratidão, confiança e adoração a Deus';
+      const gospel = req.body.gospel === true;
+      const temaAlb = String(tema || '').trim().slice(0, 400) || (gospel ? 'fé, gratidão, confiança e adoração a Deus' : 'os momentos e sentimentos da vida');
       const jaExistem = (Array.isArray(req.body.evitar) ? req.body.evitar : []).map((t) => String(t).slice(0, 60)).filter(Boolean).slice(0, 80);
       const pedidoAlbum = `Vou gravar um álbum com ${n} músicas ORIGINAIS no estilo ${estiloAlb}.
 Tema geral do álbum: ${temaAlb}
 
-Para CADA música invente um título curto (2 a 5 palavras) e um assunto próprio dentro do tema: uma situação, um sentimento, uma promessa ou uma passagem bíblica diferente.
+Para CADA música invente um título curto (2 a 5 palavras) e um assunto próprio dentro do tema: ${gospel ? 'uma situação, um sentimento, uma promessa ou uma passagem bíblica diferente' : 'uma situação, um sentimento, um lugar ou uma história diferente, com o jeito e o vocabulário típicos do estilo'}.
 Nenhuma pode repetir o assunto, as imagens ou as palavras principais do título de outra. Títulos em português correto e natural, sem números e sem aspas.${jaExistem.length ? `\nNão use nem imite estes títulos, que já existem: ${jaExistem.join('; ')}.` : ''}
 
 Responda SÓ com as linhas, uma por música, neste formato:
