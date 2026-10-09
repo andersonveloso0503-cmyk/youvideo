@@ -265,6 +265,8 @@ const Subir = (() => {
   async function subir() {
     q('#erroSubir').textContent = '';
     if (!S.canalId) return (q('#erroSubir').textContent = 'Escolha o canal.');
+    // Vídeos de música (feitos aqui com músicas) indo para canal bíblico: pergunta antes
+    if (S.videos.some((v) => v.musicas?.length) && !canalCombina(S.canalId, 'musica')) return (q('#erroSubir').textContent = 'Escolha o canal certo lá em cima.');
     const hs = horarios();
     if (S.privacidade === 'agendado' && hs[0].getTime() < Date.now() + 15 * 60e3) {
       return (q('#erroSubir').textContent = 'O primeiro horário agendado já passou (ou é daqui a menos de 15 min). Escolha outra data ou horário.');

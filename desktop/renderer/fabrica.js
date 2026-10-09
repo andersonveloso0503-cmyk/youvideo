@@ -155,6 +155,7 @@ const Fabrica = (() => {
     if (!Object.values(redes).some(Boolean)) return (erro.textContent = 'Marque pelo menos uma rede.');
     const canalId = q('#fabCanal').value;
     if (redes.youtube && !canalId) return (erro.textContent = 'Conecte um canal em Contas YouTube (ou desmarque o YouTube).');
+    if (redes.youtube && !canalCombina(canalId, 'falado')) return (erro.textContent = 'Escolha o canal certo para o YouTube.');
     const n = Number(q('#fabDias').value) * Number(q('#fabPorDia').value);
     if (!confirm(`Criar ${n} Shorts? ${q('#fabCusto').textContent.split('·')[1] || ''}\nA IA escolhe os temas e eles já ficam agendados.`)) return;
     const b = q('#btnFabCriar');
@@ -191,6 +192,7 @@ const Fabrica = (() => {
     if (!Object.values(redes).some(Boolean)) return (erro.textContent = 'Marque pelo menos uma rede.');
     const canalId = q('#fabCtCanal').value;
     if (redes.youtube && !canalId) return (erro.textContent = 'Conecte um canal em Contas YouTube (ou desmarque o YouTube).');
+    if (redes.youtube && !canalCombina(canalId, 'falado')) return (erro.textContent = 'Escolha o canal certo para o YouTube.');
     const dias = Number(q('#fabCtDias').value);
     const porDia = Number(q('#fabCtPorDia').value);
     const tipo = q('#fabCtTipo').value;
@@ -228,6 +230,7 @@ const Fabrica = (() => {
     if (!Object.values(redes).some(Boolean)) return (erro.textContent = 'Marque pelo menos uma rede.');
     const canalId = q('#fabOrCanal').value;
     if (redes.youtube && !canalId) return (erro.textContent = 'Conecte um canal em Contas YouTube (ou desmarque o YouTube).');
+    if (redes.youtube && !canalCombina(canalId, 'falado')) return (erro.textContent = 'Escolha o canal certo para o YouTube.');
     const dias = Number(q('#fabOrDias').value);
     const periodo = q('#fabOrPeriodo').value;
     if (!confirm(`Criar ${dias} orações da ${periodo === 'noite' ? 'noite' : 'manhã'}, uma por dia às ${q('#fabOrHora').value}? ${q('#fabCusto').textContent.split('·')[1] || ''}`)) return;

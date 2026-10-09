@@ -1088,12 +1088,29 @@ async function gerarTituloIa() {
 }
 
 // ---------- Gerar ----------
+// Canal de histórias bíblicas e orações x canal de música (pelo nome, como o Compilador decide a categoria no YouTube).
+// Mandou o conteúdo para o tipo de canal errado? Pergunta antes — vídeo não muda de canal depois de subir.
+const CANAL_FALADO = /jesus|cristo|b[ií]bli|\bdeus\b|ora[cç][aã]o|evangel|hist[oó]rias/i;
+function canalCombina(canalId, conteudo) {
+  const c = canais.find((x) => x.id === canalId);
+  if (!c) return true;
+  const falado = CANAL_FALADO.test(c.titulo || '');
+  if (conteudo === 'musica' && falado) {
+    return confirm(`Você vai mandar MÚSICA para o canal "${c.titulo}", que é de histórias bíblicas e orações.\n\nÉ esse canal mesmo?\n(Cancelar = voltar e trocar o canal)`);
+  }
+  if (conteudo === 'falado' && !falado) {
+    return confirm(`Você vai mandar histórias bíblicas / orações para o canal "${c.titulo}", que é de música.\n\nÉ esse canal mesmo?\n(Cancelar = voltar e trocar o canal)`);
+  }
+  return true;
+}
+
 async function gerar() {
   const sel = selecionadas();
   if (!sel.length) return;
   if (P.audio.somenteInstrumental && !config.temFal) return abrirConfig('Cadastre a chave da fal.ai para separar a voz.');
   if (P.legenda.ativo && !config.temGroq) return abrirConfig('Cadastre a chave da Groq para gerar a legenda.');
   if (P.publicar.ativo && !P.publicar.canalId) { trocarAba('publicar'); return avisar('Escolha o canal do YouTube', true); }
+  if (P.publicar.ativo && !canalCombina(P.publicar.canalId, 'musica')) { trocarAba('publicar'); return avisar('Escolha o canal certo na aba Publicar', true); }
   // Mais de 2 versões das mesmas músicas: o YouTube pode tratar o canal como conteúdo repetitivo
   const versoes = P.formato.tipo === 'curto' ? 0 : Number(P.formato.versoes) || 0;
   if (versoes > 2) {
