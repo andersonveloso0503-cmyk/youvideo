@@ -55,7 +55,7 @@ const Fabrica = (() => {
   function salvarPrefs() {
     const p = {
       dias: q('#fabDias').value, porDia: q('#fabPorDia').value, hora1: q('#fabHora1').value, hora2: q('#fabHora2').value,
-      animacao: q('#fabAnimacao').value, canal: q('#fabCanal').value, formato: q('#fabFormato').value,
+      animacao: q('#fabAnimacao').value, canal: q('#fabCanal').value, formato: q('#fabFormato').value, estilo: q('#fabEstilo').value,
       redes: { youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked, tiktok: q('#fabTiktok').checked, kwai: q('#fabKwai').checked },
       cortes: { tipo: q('#fabCtTipo').value, dias: q('#fabCtDias').value, porDia: q('#fabCtPorDia').value, hora1: q('#fabCtHora1').value, hora2: q('#fabCtHora2').value, animacao: q('#fabCtAnimacao').value },
     };
@@ -83,7 +83,9 @@ const Fabrica = (() => {
     }
     const n = Number(q('#fabDias').value) * Number(q('#fabPorDia').value);
     const anim = q('#fabAnimacao').value;
-    const animados = anim === 'tudo' ? n : anim === 'nada' ? 0 : Math.ceil(n / 2);
+    // "Metade" anima as histórias em desenho: com "só desenho" são todas; com "só realista", nenhuma
+    const est = q('#fabEstilo').value;
+    const animados = anim === 'tudo' ? n : anim === 'nada' ? 0 : est === 'desenho' ? n : est === 'realista' ? 0 : Math.ceil(n / 2);
     const total = animados * custoAnimado() + (n - animados) * CUSTO.parado;
     q('#fabCusto').textContent = `${n} Shorts · custo aproximado US$ ${total.toFixed(0)} (imagens, voz e animação)`;
   }
@@ -110,10 +112,11 @@ const Fabrica = (() => {
     if (p.hora2) q('#fabHora2').value = p.hora2;
     if (p.animacao) q('#fabAnimacao').value = p.animacao;
     if (p.formato != null) q('#fabFormato').value = p.formato;
+    if (p.estilo) q('#fabEstilo').value = p.estilo;
     for (const [r, id] of [['youtube', '#fabYoutube'], ['facebook', '#fabFacebook'], ['instagram', '#fabInstagram'], ['tiktok', '#fabTiktok'], ['kwai', '#fabKwai']]) {
       if (p.redes && r in p.redes) q(id).checked = !!p.redes[r];
     }
-    ['#fabDias', '#fabPorDia', '#fabHora1', '#fabHora2', '#fabAnimacao', '#fabCenas', '#fabFormato', '#fabCanal', '#fabYoutube', '#fabFacebook', '#fabInstagram', '#fabTiktok', '#fabKwai'].forEach((id) =>
+    ['#fabDias', '#fabPorDia', '#fabHora1', '#fabHora2', '#fabAnimacao', '#fabCenas', '#fabFormato', '#fabEstilo', '#fabCanal', '#fabYoutube', '#fabFacebook', '#fabInstagram', '#fabTiktok', '#fabKwai'].forEach((id) =>
       q(id).addEventListener('change', () => {
         salvarPrefs();
         custo();
@@ -157,7 +160,8 @@ const Fabrica = (() => {
     if (redes.youtube && !canalId) return (erro.textContent = 'Conecte um canal em Contas YouTube (ou desmarque o YouTube).');
     if (redes.youtube && !canalCombina(canalId, 'falado')) return (erro.textContent = 'Escolha o canal certo para o YouTube.');
     const n = Number(q('#fabDias').value) * Number(q('#fabPorDia').value);
-    if (!confirm(`Criar ${n} Shorts? ${q('#fabCusto').textContent.split('·')[1] || ''}\nA IA escolhe os temas e eles já ficam agendados.`)) return;
+    const nTemas = q('#fabTemas').value.split('\n').filter((t) => t.trim()).length;
+    if (!confirm(`Criar ${n} Shorts? ${q('#fabCusto').textContent.split('·')[1] || ''}\n${nTemas ? `Os ${nTemas} temas que você escreveu entram primeiro; a IA completa o resto.` : 'A IA escolhe os temas'} e eles já ficam agendados.`)) return;
     const b = q('#btnFabCriar');
     b.disabled = true;
     b.textContent = '🏭 A IA está escolhendo os temas...';
@@ -171,10 +175,13 @@ const Fabrica = (() => {
         animacaoCompleta: q('#fabCenas').value === 'todas',
         series: q('#fabFormato').value !== '0',
         partes: Number(q('#fabFormato').value) || 3,
+        estiloModo: q('#fabEstilo').value,
+        temas: q('#fabTemas').value.split('\n').map((t) => t.trim()).filter(Boolean),
         redes,
         canalYoutube: redes.youtube && canal ? { id: canal.id, titulo: canal.titulo } : null,
       });
       avisar(`${r.criados.length} Shorts na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}`);
+      q('#fabTemas').value = ''; // temas usados: o próximo lote começa limpo
       carregar();
     } catch (e) {
       erro.textContent = msgErro(e);

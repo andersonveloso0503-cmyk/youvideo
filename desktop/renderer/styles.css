@@ -782,3 +782,7 @@ body { grid-template-columns: minmax(0, 1fr); }
 .can-video select { max-width: 100%; }
 .can-video .linha { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
 .can-video .tirar { margin-left: auto; }
+
+/* Fábrica: temas escolhidos pelo dono ocupam a linha inteira */
+.fab-temas { grid-column: 1 / -1; }
+.fab-temas textarea { width: 100%; resize: vertical; }

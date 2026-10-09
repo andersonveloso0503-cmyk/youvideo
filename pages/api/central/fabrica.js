@@ -55,7 +55,7 @@ async function temasDaIa(qtd, evitar) {
 }
 
 // Séries: cada história dividida em partes, cada parte termina num gancho ("siga para ver a parte 2").
-async function seriesDaIa(qtd, partes, evitar) {
+async function seriesDaIa(qtd, partes, evitar, pedidos = []) {
   const pedir = async (modelo) => {
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -76,7 +76,12 @@ async function seriesDaIa(qtd, partes, evitar) {
               `"partes": ["o que acontece na parte 1 e onde ela para", ...${partes} itens]}]}. ` +
               'Varie entre Antigo e Novo Testamento, milagres, heróis da fé e personagens pouco conhecidos. Nada repetido nem parecido com a lista de já usados.',
           },
-          { role: 'user', content: `Quero ${qtd} séries diferentes.\n\nJá usados (não repetir):\n${evitar.slice(0, 250).map((t) => `- ${t}`).join('\n') || '(nenhum)'}` },
+          {
+            role: 'user',
+            content: pedidos.length
+              ? `Quero ${pedidos.length} séries, uma sobre cada assunto abaixo, nesta ordem (o dono do canal escolheu):\n${pedidos.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
+              : `Quero ${qtd} séries diferentes.\n\nJá usados (não repetir):\n${evitar.slice(0, 250).map((t) => `- ${t}`).join('\n') || '(nenhum)'}`,
+          },
         ],
       }),
     });
@@ -374,13 +379,19 @@ export default async function handler(req, res) {
       proj.docs.forEach((d) => usados.push(d.data().tema || d.data().titulo));
       const qtd = dias * porDia;
       const partes = b.series === false ? 0 : [2, 3].includes(Number(b.partes)) ? Number(b.partes) : 3;
+      // Estilo das imagens: alternar (padrão), só desenho animado ou só realista
+      const estiloModo = ['desenho', 'realista'].includes(b.estiloModo) ? b.estiloModo : 'alternar';
+      // Temas que o dono escolheu (um por linha na tela): entram primeiro; a IA completa o resto
+      const temasDono = (Array.isArray(b.temas) ? b.temas : []).map((t) => String(t).trim().slice(0, 160)).filter(Boolean).slice(0, 40);
 
       const lote = Date.now().toString(36);
       // Lista de vídeos: { tema, serie?, grupo } (grupo = índice da série, para manter o mesmo estilo nas partes)
       let videos = [];
       if (partes) {
         const qtdSeries = Math.ceil(qtd / partes);
-        let series = await seriesDaIa(qtdSeries, partes, usados.filter(Boolean));
+        const pedidos = temasDono.slice(0, qtdSeries);
+        let series = pedidos.length ? await seriesDaIa(pedidos.length, partes, usados.filter(Boolean), pedidos) : [];
+        if (series.length < qtdSeries) series = [...series, ...(await seriesDaIa(qtdSeries - series.length, partes, [...usados, ...series.map((s) => s.nome)].filter(Boolean)))];
         if (series.length < qtdSeries) series = [...series, ...(await seriesDaIa(qtdSeries - series.length, partes, [...usados, ...series.map((s) => s.nome)]))];
         series.slice(0, qtdSeries).forEach((s, g) => {
           s.partes.forEach((resumo, p) => {
@@ -392,8 +403,9 @@ export default async function handler(req, res) {
           });
         });
       } else {
-        let temas = await temasDaIa(qtd, usados.filter(Boolean));
-        if (temas.length < qtd) temas = [...temas, ...(await temasDaIa(qtd - temas.length, [...usados, ...temas]))];
+        let temas = temasDono.slice(0, qtd);
+        if (temas.length < qtd) temas = [...temas, ...(await temasDaIa(qtd - temas.length, [...usados, ...temas].filter(Boolean)))];
+        if (temas.length < qtd) temas = [...temas, ...(await temasDaIa(qtd - temas.length, [...usados, ...temas].filter(Boolean)))];
         videos = temas.slice(0, qtd).map((tema, i) => ({ tema, grupo: i }));
       }
       if (!videos.length) return res.status(500).json({ erro: 'A IA não devolveu temas. Tente de novo.' });
@@ -412,7 +424,7 @@ export default async function handler(req, res) {
       videos.forEach((v, i) => {
         const dia = somarDias(primeiroDia, Math.floor(i / porDia));
         const vez = i % porDia; // 0 = 1º horário do dia
-        const estilo = v.grupo % 2 === 0 ? 'desenho' : 'realista'; // alterna história animada e narrado realista
+        const estilo = estiloModo !== 'alternar' ? estiloModo : v.grupo % 2 === 0 ? 'desenho' : 'realista'; // alterna história animada e narrado realista
         const animar = animacao === 'tudo' ? true : animacao === 'nada' ? false : estilo === 'desenho';
         const quando = horarioBrasilia(dia, horarios[vez]);
         const vaiYoutube = redes.youtube && (partes ? true : vez === 0);
