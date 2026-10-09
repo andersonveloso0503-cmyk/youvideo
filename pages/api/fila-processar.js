@@ -6,6 +6,7 @@ import { gerarRoteiroOracaoDia } from '../../lib/oracaoDia';
 import { buscarSaldoFal } from '../../lib/orcamento';
 import {
   gerarRoteiro,
+  garantirChamada,
   gerarNarracao,
   gerarImagens,
   enviarAnimacao,
@@ -80,7 +81,7 @@ export default async function handler(req, res) {
         }
         if (item.oracao) {
           // Oração do dia: texto de oração, com a data no título
-          const roteiroOr = await gerarRoteiroOracaoDia(item.oracao);
+          const roteiroOr = garantirChamada(await gerarRoteiroOracaoDia(item.oracao), 'oracao');
           await ref.update({ roteiro: roteiroOr, status: 'roteiro_ok' });
           break;
         }
@@ -114,13 +115,16 @@ export default async function handler(req, res) {
           await ref.update({ roteiro: roteiroCorte, status: 'roteiro_ok' });
           break;
         }
-        const roteiro = await gerarRoteiro({
+        let roteiro = await gerarRoteiro({
           tema: item.tema,
           estilo: item.estilo,
           formato: item.formato,
           duracaoDesejada: item.duracaoDesejada,
           serie: item.serie || null,
         });
+        // Série no meio termina com "siga para a parte N" (já pede para seguir); nas outras, garante o pedido de comentário
+        const meioDeSerie = item.serie && item.serie.total > 1 && item.serie.parte < item.serie.total;
+        if (!meioDeSerie) roteiro = garantirChamada(roteiro, 'historia');
         await ref.update({ roteiro, status: 'roteiro_ok' });
         break;
       }
