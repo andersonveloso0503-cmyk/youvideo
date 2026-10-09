@@ -10,6 +10,7 @@ const YT = require('./src/engine/youtube');
 const IA = require('./src/engine/ia');
 const Central = require('./src/engine/central');
 const Montagem = require('./src/engine/montagem');
+const { MusicaAuto } = require('./src/engine/musicaAuto');
 const Sync = require('./src/sync');
 const { analisarMusica, resumoClima } = require('./src/engine/analise');
 
@@ -34,6 +35,7 @@ const REPO = 'andersonveloso0503-cmyk/youvideo';
 let janela;
 let store;
 let fila;
+let musicaAuto;
 let bloqueioSono = null;
 
 // Pasta de dados alternativa (usada só nos testes automáticos)
@@ -429,6 +431,19 @@ app.whenReady().then(() => {
     for (const j of fila.lista()) if (j.status === 'interrompido') fila.retentar(j.id);
   }
   fila.proximo(); // retoma o que ficou aguardando na última vez
+  // Fábrica de Música: álbum do dia para os canais de música (fica pronto para aprovar)
+  musicaAuto = new MusicaAuto({
+    dirDados,
+    obterConfig: () => store.ler(),
+    salvarConfig: (c) => store.salvar(c),
+    fila,
+    infoMusicas,
+    pastaMusicas: path.join(app.getPath('music'), 'Youvideo Estúdio'),
+    enviar,
+    notificar: (title, body) => Notification.isSupported() && new Notification({ title, body }).show(),
+  });
+  setTimeout(() => musicaAuto.verificarAgenda(), 60e3);
+  setInterval(() => musicaAuto.verificarAgenda(), 5 * 60e3);
   // A tela recebe a fila "enxuta" (sem roteiro, palavras da legenda etc.) e no máximo
   // ~3 vezes por segundo — antes ia tudo a cada % de progresso e a tela travava (ficava preta)
   // ---------- Tarja da Fila: este vídeo sobe sozinho no YouTube ou sou eu que preciso subir? ----------
@@ -992,6 +1007,15 @@ app.whenReady().then(() => {
     sincronizarDepois();
     return store.canaisParaTela();
   });
+
+  // ---------- Fábrica de Música ----------
+  ipcMain.handle('musicaAuto:resumo', () => musicaAuto.resumo());
+  ipcMain.handle('musicaAuto:salvarPrefs', (_e, prefs) => musicaAuto.salvarPrefs(prefs || {}));
+  ipcMain.handle('musicaAuto:fazer', (_e, canal) => musicaAuto.fazer(canal));
+  ipcMain.handle('musicaAuto:tentarDeNovo', (_e, id) => musicaAuto.tentarDeNovo(id));
+  ipcMain.handle('musicaAuto:paraSubir', (_e, id) => musicaAuto.paraSubir(id));
+  ipcMain.handle('musicaAuto:aprovar', (_e, id) => musicaAuto.aprovar(id));
+  ipcMain.handle('musicaAuto:descartar', (_e, id) => musicaAuto.descartar(id));
 
   // ---------- Fila ----------
   ipcMain.handle('fila:listar', () => fila.lista().map(paraTela));

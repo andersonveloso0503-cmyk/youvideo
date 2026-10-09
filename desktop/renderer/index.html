@@ -467,6 +467,7 @@
       <button type="button" data-marca="cortes">🎬 Cortes</button>
       <button type="button" data-marca="oracao">🙏 Oração do dia</button>
       <button type="button" data-marca="lcs">🏢 LCS Terceirização</button>
+      <button type="button" data-marca="musica">🎵 Músicas</button>
     </div>
     <p class="nota" id="fabNota">A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.</p>
     <div class="fab-config" id="fabConfigLcs" hidden>
@@ -499,7 +500,7 @@
     </div>
     <div class="fab-config" id="fabConfigBiblia">
       <div class="campo-config"><label>Quantos dias</label>
-        <select id="fabDias"><option value="3">3 dias</option><option value="7" selected>7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></div>
+        <select id="fabDias"><option value="1">1 dia</option><option value="3">3 dias</option><option value="7" selected>7 dias</option><option value="15">15 dias</option><option value="30">30 dias</option></select></div>
       <div class="campo-config"><label>Shorts por dia</label>
         <select id="fabPorDia"><option value="2" selected>2 (YouTube recebe 1)</option><option value="1">1</option></select></div>
       <div class="campo-config"><label>1º horário (vai também no YouTube)</label><input type="time" id="fabHora1" value="12:00" /></div>
@@ -516,6 +517,7 @@
       <div class="campo-config fab-temas"><label>Temas que você quer (opcional, um por linha — a IA completa o resto)</label>
         <textarea id="fabTemas" rows="3" placeholder="Ex.:&#10;Paulo ensina o jovem Timóteo&#10;Elias passa o manto para Eliseu"></textarea></div>
     </div>
+    <div id="fabMusica" hidden></div>
     <div class="fab-redes">
       <label class="interruptor so-biblia"><input type="checkbox" id="fabYoutube" checked /><span></span> YouTube (1 por dia)</label>
       <label class="interruptor"><input type="checkbox" id="fabFacebook" checked /><span></span> Facebook</label>
@@ -523,12 +525,12 @@
       <label class="interruptor so-biblia"><input type="checkbox" id="fabTiktok" checked /><span></span> TikTok <small>(celular)</small></label>
       <label class="interruptor so-biblia"><input type="checkbox" id="fabKwai" checked /><span></span> Kwai <small>(celular)</small></label>
     </div>
-    <div class="linha-botoes">
+    <div class="linha-botoes" id="fabLinhaCriar">
       <button class="btn-primario" id="btnFabCriar">🏭 Criar lote</button>
       <span class="nota" id="fabCusto"></span>
     </div>
     <p class="erro" id="fabErro"></p>
-    <div class="fab-topo-lista"><h3>Vídeos da fábrica</h3><button class="btn-mini" id="btnFabAtualizar">↻ Atualizar</button></div>
+    <div class="fab-topo-lista" id="fabTopoLista"><h3>Vídeos da fábrica</h3><button class="btn-mini" id="btnFabAtualizar">↻ Atualizar</button></div>
     <div id="fabLista"><p class="nota">Carregando...</p></div>
   </dialog>
 
@@ -757,6 +759,7 @@
   <script src="subir.js"></script>
   <script src="biblioteca.js"></script>
   <script src="fabrica.js"></script>
+  <script src="fabmusica.js"></script>
   <script src="arrumar.js"></script>
   <script src="cantor.js"></script>
   <script src="criar.js"></script>

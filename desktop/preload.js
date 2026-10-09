@@ -65,6 +65,15 @@ contextBridge.exposeInMainWorld('api', {
     abrirReceita: chamar('fila:abrirReceita'),
     outrosPcs: chamar('fila:outrosPcs'),
   },
+  musicaAuto: {
+    resumo: chamar('musicaAuto:resumo'),
+    salvarPrefs: chamar('musicaAuto:salvarPrefs'),
+    fazer: chamar('musicaAuto:fazer'),
+    tentarDeNovo: chamar('musicaAuto:tentarDeNovo'),
+    paraSubir: chamar('musicaAuto:paraSubir'),
+    aprovar: chamar('musicaAuto:aprovar'),
+    descartar: chamar('musicaAuto:descartar'),
+  },
   fabrica: {
     listar: chamar('fabrica:listar'),
     criar: chamar('fabrica:criar'),
@@ -73,7 +82,7 @@ contextBridge.exposeInMainWorld('api', {
   creditos: { ler: chamar('creditos:ler') },
   caminhoDoArquivo: (file) => webUtils.getPathForFile(file),
   ao: (canal, fn) => {
-    const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download', 'sync:feito', 'creditos:status', 'abrir:agenda', 'canais:progresso', 'cantor:progresso', 'estudio:musicas'];
+    const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download', 'sync:feito', 'creditos:status', 'abrir:agenda', 'canais:progresso', 'cantor:progresso', 'estudio:musicas', 'musicaAuto:mudou'];
     if (!permitidos.includes(canal)) return;
     ipcRenderer.on(canal, (_e, dados) => fn(dados));
   },

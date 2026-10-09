@@ -13,6 +13,7 @@ const Subir = (() => {
   };
   let ligado = false;
   let gerandoIa = false;
+  let aoSubir = null;
 
   const q = (s) => document.querySelector(s);
   const hojeISO = () => {
@@ -289,6 +290,7 @@ const Subir = (() => {
     }));
     try {
       const n = await window.api.envio.adicionar(lista);
+      if (aoSubir) { try { await aoSubir(); } catch { /* só um aviso */ } aoSubir = null; }
       q('#modalSubir').close();
       S.videos = [];
       avisar(`${n} vídeo${n > 1 ? 's' : ''} na fila de envio — acompanhe embaixo, na Fila`);
@@ -382,11 +384,13 @@ const Subir = (() => {
     q('.grade-agenda').style.pointerEvents = agenda ? '' : 'none';
   }
 
-  async function abrir(arquivos, prontos) {
+  // opcoes.canalId: já vem com o canal certo (ex.: álbum da Fábrica de Música); opcoes.aoSubir: avisa quem abriu
+  async function abrir(arquivos, prontos, opcoes = {}) {
     ligar();
     const prefs = config.envioPrefs || {};
+    aoSubir = opcoes.aoSubir || null;
     Object.assign(S, {
-      canalId: S.canalId || prefs.canalId || '',
+      canalId: opcoes.canalId || S.canalId || prefs.canalId || '',
       privacidade: prefs.privacidade || S.privacidade,
       hora: prefs.hora || S.hora,
       intervalo: prefs.intervalo || S.intervalo,

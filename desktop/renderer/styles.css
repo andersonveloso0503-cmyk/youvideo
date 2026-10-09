@@ -786,3 +786,29 @@ body { grid-template-columns: minmax(0, 1fr); }
 /* Fábrica: temas escolhidos pelo dono ocupam a linha inteira */
 .fab-temas { grid-column: 1 / -1; }
 .fab-temas textarea { width: 100%; resize: vertical; }
+
+/* Fábrica → Músicas */
+#fabMusica[hidden], .fab-redes[hidden], #fabLinhaCriar[hidden], #fabTopoLista[hidden], #fabLista[hidden], .fab-config[hidden] { display: none; }
+.fm-canais { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin: 10px 0; }
+.fm-canal { background: var(--bg-3); border: 1px solid var(--borda); border-radius: var(--raio); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.fm-canal-topo { display: flex; align-items: center; justify-content: space-between; font-size: 15px; }
+.fm-canal select { width: 100%; }
+.fm-estilos-tit { font-size: 12px; color: var(--texto-2); }
+.fm-estilos { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip-estilo { background: var(--bg-2); border: 1px solid var(--borda-forte); color: var(--mudo); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.chip-estilo.on { border-color: var(--ouro); background: var(--ouro-suave); color: var(--ouro); }
+.fm-agora { align-self: flex-start; }
+.fm-geral { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 14px; }
+.fm-geral select, .fm-geral input { width: 100%; }
+.fm-album { display: grid; grid-template-columns: 160px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 10px; background: var(--bg-3); border-radius: var(--raio); margin-bottom: 8px; border-left: 3px solid var(--borda-forte); }
+.fm-album.fase-pronto { border-left-color: var(--ouro); }
+.fm-album.fase-erro { border-left-color: var(--terracota); }
+.fm-album.fase-aprovado { opacity: 0.7; }
+.fm-album img, .fm-sem-capa { width: 160px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: var(--bg-4); display: flex; align-items: center; justify-content: center; font-size: 28px; }
+.fm-album-nome { font-weight: 600; font-size: 14px; }
+.fm-album-nome small { color: var(--ouro); font-weight: 500; margin-left: 4px; }
+.fm-fase { font-size: 12.5px; margin-top: 4px; }
+.fm-album details { font-size: 12px; color: var(--texto-2); margin-top: 4px; }
+.fm-album ol { margin: 4px 0 0; padding-left: 20px; }
+.fm-acoes { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+@media (max-width: 700px) { .fm-album { grid-template-columns: 1fr; } .fm-album img, .fm-sem-capa { width: 100%; } }
