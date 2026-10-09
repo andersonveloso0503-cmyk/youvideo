@@ -413,6 +413,27 @@ setInterval(() => {
   enviar('sistema:cpu', total ? Math.round((1 - ocioso / total) * 100) : 0);
 }, 2000);
 
+// Vídeos esperando na fila do PC para subir agendados num canal
+function enviosNaFila(canalId) {
+  if (!fila) return [];
+  return fila.lista()
+    .filter((j) => j.tipo === 'envio' && !['concluido', 'erro', 'cancelado'].includes(j.status) && j.envio?.canalId === canalId && j.envio.agendarPara && new Date(j.envio.agendarPara).getTime() > Date.now())
+    .map((j) => ({ titulo: j.envio.titulo || '', quando: new Date(j.envio.agendarPara).toISOString(), curto: !!j.envio.curto, naFila: true }));
+}
+// Tudo o que um canal já tem marcado para o futuro (YouTube + fila do PC). null = não deu para olhar o YouTube.
+async function agendaDoCanal(canalId) {
+  const canal = store.canal(canalId);
+  if (!canal) return null;
+  const cfg = store.ler();
+  let doYoutube;
+  try {
+    doYoutube = await YT.agendados({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect });
+  } catch {
+    return null;
+  }
+  return [...doYoutube, ...enviosNaFila(canalId)].sort((a, b) => a.quando.localeCompare(b.quando));
+}
+
 app.whenReady().then(() => {
   const dirDados = app.getPath('userData');
   store = new Store(dirDados, safeStorage);
@@ -438,6 +459,7 @@ app.whenReady().then(() => {
     salvarConfig: (c) => store.salvar(c),
     fila,
     infoMusicas,
+    verAgenda: agendaDoCanal,
     pastaMusicas: path.join(app.getPath('music'), 'Youvideo Estúdio'),
     enviar,
     notificar: (title, body) => Notification.isSupported() && new Notification({ title, body }).show(),
@@ -1012,6 +1034,7 @@ app.whenReady().then(() => {
   ipcMain.handle('musicaAuto:resumo', () => musicaAuto.resumo());
   ipcMain.handle('musicaAuto:salvarPrefs', (_e, prefs) => musicaAuto.salvarPrefs(prefs || {}));
   ipcMain.handle('musicaAuto:fazer', (_e, canal) => musicaAuto.fazer(canal));
+  ipcMain.handle('musicaAuto:agenda', (_e, canal) => musicaAuto.resumoAgenda(canal));
   ipcMain.handle('musicaAuto:tentarDeNovo', (_e, id) => musicaAuto.tentarDeNovo(id));
   ipcMain.handle('musicaAuto:paraSubir', (_e, id) => musicaAuto.paraSubir(id));
   ipcMain.handle('musicaAuto:aprovar', (_e, id) => musicaAuto.aprovar(id));
@@ -1358,15 +1381,17 @@ app.whenReady().then(() => {
     store.salvar({ historicoTextos: [...hist, { t: r.titulo, d: inicio }].slice(-40) });
     return r;
   });
+  // Último horário marcado: o que já está no YouTube E o que ainda está na fila do PC esperando para subir
   ipcMain.handle('envio:ultimoAgendado', async (_e, canalId) => {
     const canal = store.canal(canalId);
     if (!canal) return null;
     const cfg = store.ler();
+    let doYoutube = null;
     try {
-      return await YT.ultimoAgendado({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect });
-    } catch {
-      return null;
-    }
+      doYoutube = await YT.ultimoAgendado({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect });
+    } catch { /* sem internet: fica só com a fila */ }
+    const datas = [doYoutube, ...enviosNaFila(canalId).map((e) => e.quando)].filter(Boolean).sort();
+    return datas.length ? datas[datas.length - 1] : null;
   });
   // ---------- Short do cantor ----------
   // O vídeo do cantor é feito num site de fora; aqui é o antes (cortar o melhor trecho) e o depois (reconhecer e virar Short)

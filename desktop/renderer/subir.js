@@ -14,6 +14,7 @@ const Subir = (() => {
   let ligado = false;
   let gerandoIa = false;
   let aoSubir = null;
+  let continuarSozinho = false;
 
   const q = (s) => document.querySelector(s);
   const hojeISO = () => {
@@ -103,6 +104,10 @@ const Subir = (() => {
       q('#inEnvioData').value = iso;
       renderLista();
     };
+    if (continuarSozinho && S.data < iso) {
+      aviso.querySelector('button').click();
+      aviso.innerHTML = `Esse canal já tem vídeo agendado até <b>${dataBR(ultimo)}</b> — marquei para começar em <b>${dataBR(proximo)}</b>, depois deles. Dá para trocar a data aqui embaixo.`;
+    }
   }
 
   async function atualizarContador() {
@@ -389,6 +394,7 @@ const Subir = (() => {
     ligar();
     const prefs = config.envioPrefs || {};
     aoSubir = opcoes.aoSubir || null;
+    continuarSozinho = !!opcoes.continuarAgenda; // começa depois do último vídeo já agendado
     Object.assign(S, {
       canalId: opcoes.canalId || S.canalId || prefs.canalId || '',
       privacidade: prefs.privacidade || S.privacidade,

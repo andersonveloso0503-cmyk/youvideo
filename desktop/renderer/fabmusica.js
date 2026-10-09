@@ -40,6 +40,7 @@ const FabMusica = (() => {
         <div class="fm-estilos">${doGrupo
           .map((x) => `<button type="button" class="chip-estilo ${todos || marcados.has(x.id) ? 'on' : ''}" data-id="${esc(x.id)}">${esc(x.nome)}</button>`)
           .join('') || '<span class="nota">Sem internet para ler os estilos.</span>'}</div>
+        ${dados.pulos?.[canal] ? `<div class="fm-pulo">⏭ ${esc(dados.pulos[canal].texto)}</div>` : ''}
         <button class="btn-mini destaque fm-agora">▶ Fazer um álbum agora</button>
       </div>`;
   }
@@ -74,6 +75,7 @@ const FabMusica = (() => {
       <div class="fm-geral">
         <div class="campo-config"><label>Começar todo dia às</label><input type="time" id="fmHora" value="${esc(p.hora)}" /></div>
         <div class="campo-config"><label>Músicas por álbum</label><select id="fmQtd">${[5, 8, 10, 12, 15].map((n) => `<option ${n === p.qtd ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+        <div class="campo-config"><label>Não fazer se já tiver vídeo longo agendado para</label><select id="fmFolga">${[2, 3, 5, 7, 14].map((n) => `<option value="${n}" ${n === p.folgaDias ? 'selected' : ''}>${n} dias ou mais</option>`).join('')}</select></div>
         <div class="campo-config"><label>Shorts por álbum</label><select id="fmShorts">${[0, 1, 2, 3].map((n) => `<option ${n === p.shorts ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
       </div>
       <p class="nota" id="fmCusto"></p>
@@ -86,9 +88,9 @@ const FabMusica = (() => {
   function custo() {
     const p = dados.prefs;
     const ativos = ['gospel', 'normal'].filter((c) => p[c].ativo).length;
-    // ElevenLabs ~R$ 4 por música, Lyria ~R$ 0,75 (alterna um dia cada); capa ~R$ 1
-    const porAlbum = (p.qtd * (4 + 0.75)) / 2 + 1;
-    q('#fmCusto').innerHTML = `Cada álbum: ${p.qtd} músicas cantadas + capa do Gemini + 1 vídeo longo${p.shorts ? ` + ${p.shorts} Short${p.shorts > 1 ? 's' : ''}` : ''}. O motor alterna: um dia ElevenLabs (~R$ ${Math.round(p.qtd * 4)}), outro Google Lyria (~R$ ${Math.round(p.qtd * 0.75)}).` +
+    // Semana: 5 dias Lyria (~R$ 0,75 por música) e 2 dias ElevenLabs (~R$ 4); capa ~R$ 1
+    const porAlbum = (p.qtd * (5 * 0.75 + 2 * 4)) / 7 + 1;
+    q('#fmCusto').innerHTML = `Cada álbum: ${p.qtd} músicas cantadas + capa do Gemini + 1 vídeo longo${p.shorts ? ` + ${p.shorts} Short${p.shorts > 1 ? 's' : ''}` : ''}. Motor: Google Lyria em 5 dias da semana (~R$ ${Math.round(p.qtd * 0.75)} o álbum) e ElevenLabs na quarta e no sábado (~R$ ${Math.round(p.qtd * 4)} o álbum).` +
       (ativos ? ` <b>Média: ~R$ ${Math.round(porAlbum * ativos)} por dia (~R$ ${Math.round(porAlbum * ativos * 30)} por mês).</b>` : '') +
       ' Nada sobe sozinho: quando ficar pronto, você clica em <b>Ver e subir</b>. O computador precisa estar ligado com o Compilador aberto.';
   }
@@ -135,7 +137,19 @@ const FabMusica = (() => {
         if (!config.temCentral) return avisar('Cadastre a senha da Central em Configurações.', true);
         if (!dados.prefs[canal].canalId) return avisar('Escolha o canal do YouTube primeiro', true);
         const p = dados.prefs;
-        if (!confirm(`Fazer agora um álbum de ${p.qtd} músicas cantadas para ${NOME_CANAL[canal]}?\n\nCusto: ~R$ ${Math.round(p.qtd * 0.75)} (Lyria) a ~R$ ${Math.round(p.qtd * 4)} (ElevenLabs), conforme o motor da vez. Leva uns 20 a 40 minutos, mais a montagem dos vídeos.\n\nNada sobe para o YouTube sem você aprovar.`)) return;
+        const botao = el.querySelector('.fm-agora');
+        botao.disabled = true;
+        botao.textContent = 'Olhando a agenda do canal...';
+        const ag = await window.api.musicaAuto.agenda(canal).catch(() => null);
+        botao.disabled = false;
+        botao.textContent = '▶ Fazer um álbum agora';
+        const dataBR = (d) => new Date(d).toLocaleDateString('pt-BR');
+        const agendaTxt = !ag
+          ? 'Não consegui olhar a agenda do canal no YouTube agora.'
+          : ag.total
+          ? `ATENÇÃO: esse canal já tem ${ag.total} vídeo(s) agendado(s) — ${ag.longos} longo(s) e ${ag.shorts} Short(s)${ag.ultimoLongo ? `, vídeo longo até ${dataBR(ag.ultimoLongo)}` : ''}${ag.naFila ? ` (${ag.naFila} ainda na fila do PC)` : ''}.`
+          : 'Esse canal não tem nada agendado no YouTube.';
+        if (!confirm(`${agendaTxt}\n\nFazer agora um álbum de ${p.qtd} músicas cantadas para ${NOME_CANAL[canal]}?\n\nMotor de hoje: ${[3, 6].includes(new Date().getDay()) ? `ElevenLabs (~R$ ${Math.round(p.qtd * 4)})` : `Google Lyria (~R$ ${Math.round(p.qtd * 0.75)})`}. Leva uns 20 a 40 minutos, mais a montagem dos vídeos.\n\nNada sobe para o YouTube sem você aprovar.`)) return;
         try {
           await window.api.musicaAuto.fazer(canal);
           avisar('Álbum na fila — acompanhe aqui embaixo');
@@ -146,6 +160,7 @@ const FabMusica = (() => {
     });
     q('#fmHora').onchange = (e) => salvar({ hora: e.target.value || '08:00' });
     q('#fmQtd').onchange = async (e) => { await salvar({ qtd: Number(e.target.value) }); custo(); };
+    q('#fmFolga').onchange = (e) => salvar({ folgaDias: Number(e.target.value) });
     q('#fmShorts').onchange = async (e) => { await salvar({ shorts: Number(e.target.value) }); custo(); };
     document.querySelectorAll('#fabMusica .fm-subir').forEach((b) => (b.onclick = () => verESubir(b.dataset.id)));
     document.querySelectorAll('#fabMusica .fm-de-novo').forEach((b) => (b.onclick = () => window.api.musicaAuto.tentarDeNovo(b.dataset.id).catch((e) => avisar(msgErro(e), true))));
@@ -158,7 +173,7 @@ const FabMusica = (() => {
     try {
       const r = await window.api.musicaAuto.paraSubir(id);
       q('#modalFabrica').close();
-      await Subir.abrir(null, r.videos, { canalId: r.canalId, aoSubir: () => window.api.musicaAuto.aprovar(id) });
+      await Subir.abrir(null, r.videos, { canalId: r.canalId, continuarAgenda: true, aoSubir: () => window.api.musicaAuto.aprovar(id) });
     } catch (e) {
       avisar(msgErro(e), true);
     }

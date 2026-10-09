@@ -69,6 +69,7 @@ contextBridge.exposeInMainWorld('api', {
     resumo: chamar('musicaAuto:resumo'),
     salvarPrefs: chamar('musicaAuto:salvarPrefs'),
     fazer: chamar('musicaAuto:fazer'),
+    agenda: chamar('musicaAuto:agenda'),
     tentarDeNovo: chamar('musicaAuto:tentarDeNovo'),
     paraSubir: chamar('musicaAuto:paraSubir'),
     aprovar: chamar('musicaAuto:aprovar'),

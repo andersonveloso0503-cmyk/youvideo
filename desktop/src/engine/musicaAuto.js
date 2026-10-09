@@ -9,13 +9,16 @@ const path = require('path');
 const Central = require('./central');
 
 const CANAIS = {
-  gospel: { nome: 'Gospel', gospel: true, motorInicial: 'elevenlabs' },
-  normal: { nome: 'Músicas', gospel: false, motorInicial: 'lyria' },
+  gospel: { nome: 'Gospel', gospel: true },
+  normal: { nome: 'Músicas', gospel: false },
 };
 const PADRAO_CANAL = { ativo: false, canalId: '', estilos: [] };
-const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 2 };
+const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 2, folgaDias: 3 };
 const FORA_DO_NORMAL = ['infantil']; // estilos que não entram sozinhos no canal de música normal
 const MAX_TENTATIVAS_DIA = 2;
+// Motor da semana: 5 dias Google Lyria (mais barato) e 2 dias ElevenLabs (quarta e sábado)
+const DIAS_ELEVENLABS = [3, 6];
+const motorDoDia = (d) => (DIAS_ELEVENLABS.includes(d.getDay()) ? 'elevenlabs' : 'lyria');
 
 const hoje = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const limpo = (t) => String(t || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -86,6 +89,7 @@ class MusicaAuto {
     const m = { ...atual, ...novas, gospel: { ...atual.gospel, ...(novas.gospel || {}) }, normal: { ...atual.normal, ...(novas.normal || {}) } };
     m.qtd = Math.max(5, Math.min(20, Number(m.qtd) || 10));
     m.shorts = Math.max(0, Math.min(5, Number(m.shorts) || 0));
+    m.folgaDias = Math.max(1, Math.min(30, Number(m.folgaDias) || 3));
     this.salvarConfig({ musicaAuto: m });
     this.avisarTela();
     return m;
@@ -106,6 +110,7 @@ class MusicaAuto {
       prefs: this.prefs(),
       presets: presets.map(({ id, nome, gospel }) => ({ id, nome, gospel })),
       rodando: this.rodando,
+      pulos: Object.fromEntries(Object.entries(this.estado.pulos || {}).filter(([, v]) => v.dia === hoje())),
       albuns: [...this.estado.albuns].reverse().slice(0, 20).map((a) => ({
         id: a.id, canal: a.canal, dia: a.dia, preset: a.presetNome, motor: a.motor, fase: a.fase, etapa: a.etapa, erro: a.erro,
         titulo: a.capa?.titulo || '', subtitulo: a.capa?.subtitulo || '', capa: a.capa?.capaArquivo || null,
@@ -148,8 +153,63 @@ class MusicaAuto {
       const comErro = doDia.find((a) => a.fase === 'erro');
       // Com erro: tenta de novo sozinho só mais uma vez no dia (depois fica para o dono ver)
       if (comErro) { if ((comErro.tentativas || 0) < MAX_TENTATIVAS_DIA - 1) this.fazer(canal, { continuar: comErro.id, auto: true }); }
-      else if (!doDia.length) this.fazer(canal, { auto: true });
+      else if (!doDia.length) this.talvezComecar(canal, agora);
     }
+  }
+
+  /**
+   * Antes de criar o álbum do dia, olha o que o canal já tem marcado no YouTube (e na fila do PC).
+   * Não cria se: já tem álbum esperando aprovação, ou já tem vídeo longo agendado para os próximos dias.
+   * Olha o YouTube no máximo 1 vez por dia por canal (gasta pouco da cota).
+   */
+  async talvezComecar(canal, agora = new Date()) {
+    this.estado.pulos = this.estado.pulos || {};
+    const dia = hoje(agora);
+    if (this.estado.pulos[canal]?.dia === dia) return;
+    if (this.olhando?.[canal]) return;
+    this.olhando = { ...(this.olhando || {}), [canal]: true };
+    try {
+      const motivo = await this.motivoParaPular(canal, agora);
+      if (motivo) {
+        this.estado.pulos[canal] = { dia, texto: motivo };
+        this.salvar();
+        this.avisarTela();
+        return;
+      }
+      delete this.estado.pulos[canal];
+      this.fazer(canal, { auto: true });
+    } finally {
+      this.olhando[canal] = false;
+    }
+  }
+
+  async motivoParaPular(canal, agora = new Date()) {
+    const esperando = this.estado.albuns.filter((a) => a.canal === canal && a.fase === 'pronto');
+    if (esperando.length) return `Hoje não fiz álbum novo: ${esperando.length > 1 ? `${esperando.length} álbuns estão` : 'um álbum está'} esperando você aprovar.`;
+    const r = await this.resumoAgenda(canal, agora);
+    if (r && r.ultimoLongo && new Date(r.ultimoLongo).getTime() - agora.getTime() >= this.prefs().folgaDias * 86400e3) {
+      const ate = new Date(r.ultimoLongo).toLocaleDateString('pt-BR');
+      return `Hoje não fiz álbum novo: o canal já tem vídeo longo agendado até ${ate}. Volto a fazer quando faltar menos de ${this.prefs().folgaDias} dias.`;
+    }
+    return '';
+  }
+
+  /** O que o canal já tem marcado no futuro (para a tela e para decidir se faz álbum novo). */
+  async resumoAgenda(canal, agora = new Date()) {
+    const canalId = this.prefs()[canal]?.canalId;
+    if (!canalId || !this.verAgenda) return null;
+    const lista = await this.verAgenda(canalId).catch(() => null);
+    if (!lista) return null; // não deu para olhar o YouTube: segue normal
+    const futuros = lista.filter((x) => new Date(x.quando).getTime() > agora.getTime());
+    const longos = futuros.filter((x) => !x.curto);
+    return {
+      total: futuros.length,
+      longos: longos.length,
+      shorts: futuros.length - longos.length,
+      ultimo: futuros.length ? futuros[futuros.length - 1].quando : null,
+      ultimoLongo: longos.length ? longos[longos.length - 1].quando : null,
+      naFila: futuros.filter((x) => x.naFila).length,
+    };
   }
 
   /** Põe um álbum na vez (um de cada vez: os motores de música aceitam poucos pedidos juntos). */
@@ -202,8 +262,7 @@ class MusicaAuto {
       const opcoes = this.estilosDoCanal(a.canal, presets);
       const recentes = anteriores.slice(-opcoes.length + 1).map((x) => x.presetId);
       const escolhido = opcoes.find((x) => !recentes.includes(x.id)) || opcoes[anteriores.length % opcoes.length];
-      const ultimoMotor = anteriores.length ? anteriores[anteriores.length - 1].motor : null;
-      const motor = ultimoMotor ? (ultimoMotor === 'lyria' ? 'elevenlabs' : 'lyria') : info.motorInicial;
+      const motor = motorDoDia(new Date(`${a.dia}T12:00:00`));
       this.marcar(a, { presetId: escolhido.id, presetNome: escolhido.nome, motor, canalId: prefs[a.canal].canalId });
     }
     const preset = presets.find((x) => x.id === a.presetId);
@@ -414,4 +473,4 @@ class MusicaAuto {
   }
 }
 
-module.exports = { MusicaAuto, CANAIS, hoje };
+module.exports = { MusicaAuto, CANAIS, hoje, motorDoDia };

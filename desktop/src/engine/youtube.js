@@ -318,6 +318,28 @@ async function ultimoAgendado({ credenciais, refreshToken, redirectOriginal }) {
   return datas.length ? new Date(Math.max(...datas)).toISOString() : null;
 }
 
+/** Vídeos do canal com data marcada no futuro: [{ id, titulo, quando, duracaoSeg, curto }] (mais cedo primeiro). */
+async function agendados({ credenciais, refreshToken, redirectOriginal }) {
+  const auth = cliente(credenciais, redirectOriginal || REDIRECT);
+  auth.setCredentials({ refresh_token: refreshToken });
+  const yt = google.youtube({ version: 'v3', auth });
+  const c = await yt.channels.list({ part: ['contentDetails'], mine: true });
+  const uploads = c.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploads) return [];
+  const itens = await yt.playlistItems.list({ part: ['contentDetails'], playlistId: uploads, maxResults: 50 });
+  const ids = (itens.data.items || []).map((i) => i.contentDetails.videoId).filter(Boolean);
+  if (!ids.length) return [];
+  const v = await yt.videos.list({ part: ['status', 'snippet', 'contentDetails'], id: ids });
+  const agora = Date.now();
+  return (v.data.items || [])
+    .filter((x) => x.status?.publishAt && new Date(x.status.publishAt).getTime() > agora)
+    .map((x) => {
+      const duracaoSeg = segundosIso(x.contentDetails?.duration);
+      return { id: x.id, titulo: x.snippet?.title || '', quando: new Date(x.status.publishAt).toISOString(), duracaoSeg, curto: duracaoSeg > 0 && duracaoSeg <= 180 };
+    })
+    .sort((a, b) => a.quando.localeCompare(b.quando));
+}
+
 // ───────── Arrumar os vídeos que já estão no canal ─────────
 
 /** Por que um título é fraco (texto curto para mostrar na tela), ou '' se está bom. */
@@ -593,6 +615,7 @@ async function desprogramarVideos({ credenciais, refreshToken, redirectOriginal,
 }
 
 module.exports = {
+  agendados,
   desprogramarVideos,
   limparTags, autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT,
   etiquetasErradas, etiquetasAlheias, etiquetasParaTirar, semHashtagsDe, etiquetasDoTitulo,
