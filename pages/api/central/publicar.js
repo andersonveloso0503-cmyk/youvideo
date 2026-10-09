@@ -34,7 +34,7 @@ function comConviteYoutube(legenda, item) {
 
 async function publicarEm(rede, item) {
   const legenda = item.legenda || item.titulo;
-  if (rede === 'facebook') return publicarVideoFacebook({ videoUrl: item.videoUrl, legenda: comConviteYoutube(legenda, item), conta: item.conta || '' });
+  if (rede === 'facebook') return publicarVideoFacebook({ videoUrl: item.videoUrl, legenda: comConviteYoutube(legenda, item), conta: item.conta || '', curto: !!item.curto });
   throw new Error('Rede desconhecida');
 }
 
