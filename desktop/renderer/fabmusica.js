@@ -60,6 +60,7 @@ const FabMusica = (() => {
           <div class="nota">${NOME_CANAL[a.canal]} · ${esc(a.preset || '')} · ${nomeMotor(a.motor)} · ${new Date(`${a.dia}T12:00`).toLocaleDateString('pt-BR')}</div>
           <div class="fm-fase">${FASE[a.fase] || a.fase}${a.etapa && !['pronto', 'aprovado'].includes(a.fase) ? ` — ${esc(a.etapa)}` : ''}${progresso}</div>
           ${a.erro ? `<div class="erro">${esc(a.erro)}</div>` : ''}
+          ${a.recusadas ? `<div class="nota">🎧 ${a.recusadas} música${a.recusadas > 1 ? 's foram refeitas' : ' foi refeita'} porque a letra não ficou clara</div>` : ''}
           ${a.musicas.length && ['pronto', 'aprovado', 'montando'].includes(a.fase) ? `<details><summary>${a.musicas.length} músicas</summary><ol>${a.musicas.map((t) => `<li>${esc(t)}</li>`).join('')}</ol></details>` : ''}
         </div>
         <div class="fm-acoes">${acoes.join('')}</div>

@@ -16,6 +16,16 @@ const PADRAO_CANAL = { ativo: false, canalId: '', estilos: [] };
 const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 2, folgaDias: 3 };
 const FORA_DO_NORMAL = ['infantil']; // estilos que não entram sozinhos no canal de música normal
 const MAX_TENTATIVAS_DIA = 2;
+// Quanto da letra precisa ser entendido ao ouvir a música (0 a 1). Abaixo disso a música é refeita.
+const NOTA_MINIMA_LETRA = 0.5;
+const palavras = (t) =>
+  String(t || '')
+    .replace(/\[[^\]]*\]|\([^)]*\)/g, ' ') // tira [Refrão], (2x) etc.
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3);
 // Motor da semana: 5 dias Google Lyria (mais barato) e 2 dias ElevenLabs (quarta e sábado)
 const DIAS_ELEVENLABS = [3, 6];
 const motorDoDia = (d) => (DIAS_ELEVENLABS.includes(d.getDay()) ? 'elevenlabs' : 'lyria');
@@ -116,6 +126,7 @@ class MusicaAuto {
         titulo: a.capa?.titulo || '', subtitulo: a.capa?.subtitulo || '', capa: a.capa?.capaArquivo || null,
         musicas: (a.musicas || []).filter(Boolean).map((m) => m.titulo), total: a.ideias?.length || 0,
         prontas: (a.musicas || []).filter((m) => m && m.url).length,
+        recusadas: a.recusadas || 0,
       })),
     };
   }
@@ -279,7 +290,12 @@ class MusicaAuto {
       this.marcar(a, { ideias: pl.ideias, musicas: Array(pl.ideias.length).fill(null), grupoId: `auto-${a.id}` });
     }
 
-    // 3) Músicas (letra + áudio), 2 ao mesmo tempo, cada uma tenta 2 vezes
+    const pasta = path.join(this.pastaMusicas, limpo(`${info.nome} ${a.dia} ${preset.nome}`) || a.id);
+    fs.mkdirSync(pasta, { recursive: true });
+
+    // 3) Músicas (letra + áudio), 2 ao mesmo tempo, cada uma tenta 2 vezes.
+    //    Cada música é OUVIDA (transcrição) e comparada com a letra: se a letra cantada não bate
+    //    (palavras emboladas, trocadas, gritaria), ela é refeita; se falhar de novo, fica de fora do álbum.
     const faltam = a.ideias.map((_, i) => i).filter((i) => !a.musicas[i]?.url);
     if (faltam.length) {
       let feitas = a.ideias.length - faltam.length;
@@ -307,7 +323,15 @@ class MusicaAuto {
                 voz, instrumental: false, duracaoSeg: 180, grupoId: a.grupoId, versao: k + 1,
               },
             });
-            a.musicas[k] = { titulo: d.musica.titulo || ideia.titulo, url: d.musica.audioUrl };
+            const titulo = d.musica.titulo || ideia.titulo;
+            const arquivo = await this.central.baixar(d.musica.audioUrl, path.join(pasta, `${String(k + 1).padStart(2, '0')} - ${limpo(titulo) || `Música ${k + 1}`}${t > 1 ? ` (${t})` : ''}.mp3`));
+            const nota = await this.conferirLetra(arquivo, l.letra);
+            if (nota !== null && nota < NOTA_MINIMA_LETRA) {
+              fs.rmSync(arquivo, { force: true });
+              a.recusadas = (a.recusadas || 0) + 1;
+              throw new Error(`a letra cantada não ficou clara (${Math.round(nota * 100)}% das palavras entendidas)`);
+            }
+            a.musicas[k] = { titulo, url: d.musica.audioUrl, arquivo, notaLetra: nota };
             feitas++;
             this.marcar(a, { etapa: `Criando as músicas (${feitas} de ${a.ideias.length})` });
             return;
@@ -319,9 +343,6 @@ class MusicaAuto {
       const ok = a.musicas.filter((m) => m?.url).length;
       if (ok < Math.max(3, Math.ceil(a.ideias.length * 0.6))) throw new Error(`Só ${ok} música(s) deram certo. ${a.ultimoErroMusica || ''}`.trim());
     }
-
-    const pasta = path.join(this.pastaMusicas, limpo(`${info.nome} ${a.dia} ${preset.nome}`) || a.id);
-    fs.mkdirSync(pasta, { recursive: true });
 
     // 4) Capa no Gemini (16:9 com o título, e um fundo em pé sem texto para os Shorts)
     if (!a.capa?.capaArquivo || !fs.existsSync(a.capa.capaArquivo)) {
@@ -396,6 +417,24 @@ class MusicaAuto {
     }
     this.marcar(a, { fase: 'montando', etapa: 'Montando os vídeos', jobs: { longo: longo.map((j) => j.id), shorts: shorts.map((j) => j.id) } });
     this.conferirMontagem();
+  }
+
+  /**
+   * Ouve a música (transcrição da Groq) e diz quanto da letra foi entendido (0 a 1).
+   * null = não deu para conferir (sem chave da Groq ou erro): a música segue.
+   */
+  async conferirLetra(arquivo, letra) {
+    const cfg = this.obterConfig();
+    if (!this.transcrever || !cfg.groqKey || !letra) return null;
+    try {
+      const linhas = await this.transcrever(arquivo, { groqKey: cfg.groqKey, idioma: 'pt', dirCache: this.dirCache });
+      const ouvidas = new Set(palavras(linhas.map((l) => l.texto).join(' ')));
+      const daLetra = [...new Set(palavras(letra))];
+      if (daLetra.length < 8) return null;
+      return daLetra.filter((w) => ouvidas.has(w)).length / daLetra.length;
+    } catch {
+      return null;
+    }
   }
 
   /** Quando os vídeos de um álbum ficam prontos na fila, ele vira "pronto para aprovar". */
@@ -473,4 +512,4 @@ class MusicaAuto {
   }
 }
 
-module.exports = { MusicaAuto, CANAIS, hoje, motorDoDia };
+module.exports = { MusicaAuto, CANAIS, hoje, motorDoDia, palavras };

@@ -88,7 +88,7 @@ const GENEROS = {
   balada: { pos: ['romantic ballad', 'piano', 'strings', 'slow tempo', 'emotional vocals', 'big chorus'], neg: [...SEM_SERTANEJO, 'rock', 'distorted guitars'] },
   blues: { pos: ['blues', 'soul', 'hammond organ', 'bluesy electric guitar', 'soulful gritty vocals'], neg: [...SEM_SERTANEJO] },
   gospel: { pos: ['gospel', 'contemporary worship', 'louvor', 'piano', 'atmospheric pads', 'soaring worship vocals'], neg: [...SEM_SERTANEJO] },
-  'gospel-animado': { pos: ['upbeat gospel', 'praise', 'celebratory', 'live band', 'gospel choir responses'], neg: [...SEM_SERTANEJO] },
+  'gospel-animado': { pos: ['upbeat gospel', 'praise', 'celebratory', 'live band', 'backing vocal responses'], neg: [...SEM_SERTANEJO] },
   mpb: { pos: ['mpb', 'bossa nova', 'nylon guitar', 'intimate vocals'], neg: [...SEM_SERTANEJO, 'rock'] },
   pop: { pos: ['pop', 'modern pop production', 'catchy hook', 'polished pop vocals'], neg: [...SEM_SERTANEJO] },
   lofi: { pos: ['lo-fi', 'chill', 'soft breathy vocals'], neg: [...SEM_SERTANEJO] },
@@ -97,6 +97,10 @@ const GENEROS = {
   sertanejo: { pos: ['sertanejo'], neg: [] },
   'sertanejo-gospel': { pos: ['sertanejo gospel', 'brazilian worship', 'acoustic guitar', 'viola caipira', 'soft accordion', 'heartfelt worship vocals'], neg: ['arrocha', 'party', 'funk', 'electronic', 'drinking'] },
 };
+
+// Voz na frente e letra entendível em todos os estilos (pedido do dono: nada de gritaria, letra embolada ou coral por cima)
+const CLAREZA = 'Mix: the lead vocal is upfront, clear and intelligible, every word of the lyrics easy to understand. Smooth, catchy, singable melody. Backing vocals only subtle and low, answering in the chorus. No shouting, no screaming, no choir singing over the lead vocal, no mumbled or slurred words.';
+const NEG_CLAREZA = ['shouting', 'screaming', 'choir over lead vocal', 'mumbled vocals', 'slurred lyrics', 'buried vocals', 'chaotic mix'];
 
 // Música em inglês: o cantor é do gênero, mas sem o "brasileiro" (senão a IA puxa o sotaque e o português)
 function cantorEmIngles(texto) {
@@ -135,6 +139,8 @@ function montarPrompt({ modo, descricao, letra, estilo, voz, instrumental, durac
     if (!en && genero && !['sertanejo', 'gaucha', 'country'].includes(genero.id)) {
       partes.push('The singing style must match the genre: do NOT sing like sertanejo, no country twang.');
     }
+    // Voz nítida: a letra tem que ser entendida palavra por palavra (sem gritaria e sem coral por cima)
+    partes.push(CLAREZA + (voz === 'coral' ? ' The choir only answers softly in the chorus, never covering the lead.' : ''));
   }
   // Reforço no texto (o Google Lyria só entende o texto): gênero no começo e o que evitar
   const g = genero && GENEROS[genero.id];
@@ -169,7 +175,7 @@ async function planoComGenero(key, modelo, prompt, duracaoMs, genero, idioma) {
     return {
       ...plano,
       positive_global_styles: uniq([...estilosDoGenero(g, idioma), ...limpa(plano.positive_global_styles)]).slice(0, 20),
-      negative_global_styles: uniq([...(plano.negative_global_styles || []), ...g.neg]).slice(0, 20),
+      negative_global_styles: uniq([...NEG_CLAREZA, ...g.neg, ...(plano.negative_global_styles || [])]).slice(0, 20),
       sections: plano.sections.map((sec) => ({
         ...sec,
         positive_local_styles: limpa(sec.positive_local_styles),

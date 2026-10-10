@@ -460,6 +460,8 @@ app.whenReady().then(() => {
     fila,
     infoMusicas,
     verAgenda: agendaDoCanal,
+    transcrever: require('./src/engine/legenda').transcrever,
+    dirCache: path.join(dirDados, 'cache'),
     pastaMusicas: path.join(app.getPath('music'), 'Youvideo Estúdio'),
     enviar,
     notificar: (title, body) => Notification.isSupported() && new Notification({ title, body }).show(),

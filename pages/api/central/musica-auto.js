@@ -23,10 +23,10 @@ const VOZES_DO_PRESET = {
   rock: ['masc-rouca', 'masc-potente'],
   metal: ['masc-potente'],
   'blues-raiz': ['masc-rouca', 'feminina'],
-  'blues-gospel': ['masc-rouca', 'fem-potente', 'coral'],
+  'blues-gospel': ['masc-rouca', 'fem-potente'],
   rap: ['masculina'],
   trap: ['masculina'],
-  'gospel-animado': ['coral', 'fem-potente', 'masc-potente'],
+  'gospel-animado': ['fem-potente', 'masc-potente'],
   louvor: ['masc-potente', 'fem-potente', 'masc-suave', 'fem-suave'],
 };
 const VOZES_PADRAO = ['masc-potente', 'fem-potente', 'masc-suave', 'fem-suave'];
