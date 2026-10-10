@@ -13,17 +13,17 @@ const ORCAMENTO_MS = 240e3; // para antes do limite de 300 s da Vercel
 
 // Convite para o canal do YouTube nos posts da Página "Em Nome de Jesus" (só no Facebook: no Instagram o link não é clicável).
 // Vale para os vídeos da Fábrica (histórias e orações); os da empresa (LCS) têm a chamada do WhatsApp.
-const CANAL_YOUTUBE = process.env.YOUTUBE_CANAL_LINK || 'https://www.youtube.com/@EmNomedeJesus-h5x?sub_confirmation=1';
+// SEM link: o Facebook mostra bem menos os posts que mandam a pessoa para fora (principalmente para o YouTube).
 const CONVITES = [
-  '▶ Veja mais histórias da Bíblia no nosso canal do YouTube:',
-  '▶ Tem uma história nova todo dia no nosso canal do YouTube. Inscreva-se:',
-  '▶ Gostou? No YouTube tem muito mais. Inscreva-se no canal:',
-  '▶ Acompanhe todas as histórias e orações no nosso canal do YouTube:',
+  '▶ Mais histórias da Bíblia: procure "Em Nome de Jesus" no YouTube 🙏',
+  '▶ Tem uma história nova todo dia no YouTube — procure "Em Nome de Jesus" 🙏',
+  '▶ Gostou? Siga a Página para ver a próxima história 🙏',
+  '▶ Siga a Página e compartilhe com quem precisa ouvir isso hoje 🙏',
 ];
 function comConviteYoutube(legenda, item) {
   if (item.conta || item.origem !== 'fabrica' || /youtube\.com|youtu\.be/i.test(legenda)) return legenda;
   const dia = Math.floor(new Date(item.quando || Date.now()).getTime() / 86400e3);
-  const convite = `${CONVITES[dia % CONVITES.length]} ${CANAL_YOUTUBE}`;
+  const convite = CONVITES[dia % CONVITES.length];
   // As hashtags continuam por último
   const partes = String(legenda).trim().split(/\n\s*\n/);
   const ultima = partes[partes.length - 1] || '';
