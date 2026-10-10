@@ -1,6 +1,7 @@
 // Fábrica de Música (Compilador): dados dos álbuns automáticos e capa feita pelo Gemini.
 //
 // GET                         -> { presets: [{ id, nome, gospel, estilo, instrumentos, tema, vozes }] }
+// POST { acao: 'titulos', nomes[] }   -> { titulos[] | null }  (nomes de arquivo viram títulos)
 // POST { acao: 'capa', estilo, gospel, titulos[], ano? }
 //                             -> { titulo, subtitulo, capaUrl (16:9 com texto), fundoUrl (9:16 sem texto, para os Shorts) }
 //
@@ -111,6 +112,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ erro: 'Método não permitido.' });
 
   const { acao } = req.body || {};
+  // Nomes de arquivo (ex.: "nuivi-graca-que-me-alcancou-louvores-em-pagode-v1") viram títulos em português correto
+  if (acao === 'titulos') {
+    const nomes = (Array.isArray(req.body.nomes) ? req.body.nomes : []).map((t) => limparTexto(t, 120)).slice(0, 40);
+    if (!nomes.length) return res.status(200).json({ titulos: [] });
+    const r = await groqJson(`Estes são nomes de arquivos de músicas. Para cada um, escreva o TÍTULO da música em português do Brasil correto, com acentos e letras maiúsculas só onde precisa (ex.: "Graça Que Me Alcançou").
+Tire prefixos de site e de versão (nuivi, suno, v1, v2, final), números de faixa e palavras que são só a descrição do estilo quando sobrar um título claro antes delas. Não invente palavras novas.
+Responda só JSON: {"titulos": ["...", "..."]} na MESMA ordem e com a MESMA quantidade (${nomes.length}).
+Nomes:
+${nomes.map((n, i) => `${i + 1}. ${n}`).join('\n')}`);
+    const titulos = Array.isArray(r.titulos) && r.titulos.length === nomes.length ? r.titulos.map((t, i) => limparTexto(t, 80) || nomes[i]) : null;
+    return res.status(200).json({ titulos });
+  }
   if (acao !== 'capa') return res.status(400).json({ erro: 'Ação desconhecida.' });
   try {
     const estilo = limparTexto(req.body.estilo, 60) || 'Gospel';

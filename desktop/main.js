@@ -1037,6 +1037,17 @@ app.whenReady().then(() => {
   ipcMain.handle('musicaAuto:salvarPrefs', (_e, prefs) => musicaAuto.salvarPrefs(prefs || {}));
   ipcMain.handle('musicaAuto:fazer', (_e, canal) => musicaAuto.fazer(canal));
   ipcMain.handle('musicaAuto:agenda', (_e, canal) => musicaAuto.resumoAgenda(canal));
+  ipcMain.handle('musicaAuto:abrirPasta', async (_e, canal) => {
+    const raiz = musicaAuto.prepararPasta(canal);
+    await shell.openPath(raiz);
+    return raiz;
+  });
+  ipcMain.handle('musicaAuto:escolherPasta', async (_e, canal) => {
+    const r = await dialog.showOpenDialog(janela, { title: 'Pasta das suas músicas prontas (Nuivi, Suno...)', properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled) return null;
+    musicaAuto.salvarPrefs({ [canal]: { pasta: r.filePaths[0] } });
+    return r.filePaths[0];
+  });
   ipcMain.handle('musicaAuto:tentarDeNovo', (_e, id) => musicaAuto.tentarDeNovo(id));
   ipcMain.handle('musicaAuto:paraSubir', (_e, id) => musicaAuto.paraSubir(id));
   ipcMain.handle('musicaAuto:aprovar', (_e, id) => musicaAuto.aprovar(id));

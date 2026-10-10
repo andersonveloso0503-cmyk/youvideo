@@ -17,7 +17,7 @@ const FabMusica = (() => {
     aprovado: '📤 Aprovado',
     erro: '⚠ Erro',
   };
-  const nomeMotor = (m) => (m === 'lyria' ? 'Google Lyria' : 'ElevenLabs');
+  const nomeMotor = (m) => (m === 'lyria' ? 'Google Lyria' : m === 'pasta' ? 'Da sua pasta' : 'ElevenLabs');
 
   function opcoesCanais(sel) {
     const lista = typeof canais !== 'undefined' ? canais : [];
@@ -36,13 +36,32 @@ const FabMusica = (() => {
           <label class="interruptor"><input type="checkbox" class="fm-ativo" ${p.ativo ? 'checked' : ''} /><span></span> Todo dia</label>
         </div>
         <div class="campo-config"><label>Canal do YouTube</label><select class="fm-yt">${opcoesCanais(p.canalId)}</select></div>
+        <div class="campo-config"><label>De onde vêm as músicas</label><select class="fm-fonte">
+          <option value="pasta" ${p.fonte === 'pasta' ? 'selected' : ''}>Da minha pasta (fiz no Nuivi / Suno)</option>
+          <option value="ia" ${p.fonte !== 'pasta' ? 'selected' : ''}>A IA cria (ElevenLabs / Lyria)</option>
+        </select></div>
+        ${p.fonte === 'pasta' ? blocoPasta(canal) : `
         <div class="fm-estilos-tit">Estilos (alterna um por dia) ${todos ? '<small>— todos</small>' : ''}</div>
         <div class="fm-estilos">${doGrupo
           .map((x) => `<button type="button" class="chip-estilo ${todos || marcados.has(x.id) ? 'on' : ''}" data-id="${esc(x.id)}">${esc(x.nome)}</button>`)
-          .join('') || '<span class="nota">Sem internet para ler os estilos.</span>'}</div>
+          .join('') || '<span class="nota">Sem internet para ler os estilos.</span>'}</div>`}
         ${dados.pulos?.[canal] ? `<div class="fm-pulo">⏭ ${esc(dados.pulos[canal].texto)}</div>` : ''}
         <button class="btn-mini destaque fm-agora">▶ Fazer um álbum agora</button>
       </div>`;
+  }
+
+  // Modo pasta: mostra quantas músicas estão esperando, por estilo (cada subpasta é um estilo)
+  function blocoPasta(canal) {
+    const pa = dados.pastas?.[canal] || { grupos: [], total: 0 };
+    const qtd = dados.prefs.qtd;
+    const grupos = pa.grupos.length
+      ? pa.grupos.map((g) => `<span class="chip-estilo ${g.n >= qtd ? 'on' : ''}" title="${g.n >= qtd ? 'Dá um álbum' : `Faltam ${qtd - g.n} para um álbum`}">${esc(g.nome)}: ${g.n}</span>`).join('')
+      : '<span class="nota">Nenhuma música na pasta ainda.</span>';
+    return `
+        <div class="fm-estilos-tit">Músicas esperando na pasta (cada subpasta é um estilo; ${qtd} do mesmo estilo = 1 álbum)</div>
+        <div class="fm-estilos">${grupos}</div>
+        <div class="nota fm-caminho" title="${esc(pa.raiz || '')}">📁 ${esc(pa.raiz || '')}</div>
+        <div class="linha-botoes"><button class="btn-mini fm-abrir-pasta">📂 Abrir a pasta</button><button class="btn-mini fm-trocar-pasta">Trocar pasta</button></div>`;
   }
 
   function cartaoAlbum(a) {
@@ -88,7 +107,12 @@ const FabMusica = (() => {
 
   function custo() {
     const p = dados.prefs;
-    const ativos = ['gospel', 'normal'].filter((c) => p[c].ativo).length;
+    const ativos = ['gospel', 'normal'].filter((c) => p[c].ativo && p[c].fonte !== 'pasta').length;
+    const daPasta = ['gospel', 'normal'].filter((c) => p[c].fonte === 'pasta');
+    if (daPasta.length === 2 || (daPasta.length && !ativos)) {
+      q('#fmCusto').innerHTML = `Com as músicas da sua pasta, o Compilador só faz a <b>capa no Gemini</b> (centavos), o vídeo longo${p.shorts ? ` e ${p.shorts} Short${p.shorts > 1 ? 's' : ''}` : ''}. Crie as músicas no Nuivi, baixe e coloque na pasta do canal — de preferência numa subpasta com o nome do estilo (ex.: <b>Pagode Gospel</b>), que vira o tema da capa. As usadas vão para a subpasta "Usadas". Nada sobe sozinho: você aprova em <b>Ver e subir</b>.`;
+      return;
+    }
     // Semana: 5 dias Lyria (~R$ 0,75 por música) e 2 dias ElevenLabs (~R$ 4); capa ~R$ 1
     const porAlbum = (p.qtd * (5 * 0.75 + 2 * 4)) / 7 + 1;
     q('#fmCusto').innerHTML = `Cada álbum: ${p.qtd} músicas cantadas + capa do Gemini + 1 vídeo longo${p.shorts ? ` + ${p.shorts} Short${p.shorts > 1 ? 's' : ''}` : ''}. Motor: Google Lyria em 5 dias da semana (~R$ ${Math.round(p.qtd * 0.75)} o álbum) e ElevenLabs na quarta e no sábado (~R$ ${Math.round(p.qtd * 4)} o álbum).` +
@@ -122,7 +146,12 @@ const FabMusica = (() => {
         if (id && id === dados.prefs[outro].canalId && !confirm('Esse canal já está no outro cartão. Usar o mesmo canal para os dois?')) { e.target.value = dados.prefs[canal].canalId || ''; return; }
         await salvar({ [canal]: { canalId: id } });
       };
-      el.querySelectorAll('.chip-estilo').forEach((b) => {
+      el.querySelector('.fm-fonte').onchange = async (e) => { await salvar({ [canal]: { fonte: e.target.value } }); carregar(); };
+      const abrir = el.querySelector('.fm-abrir-pasta');
+      if (abrir) abrir.onclick = () => window.api.musicaAuto.abrirPasta(canal).then(() => setTimeout(carregar, 1500)).catch((er) => avisar(msgErro(er), true));
+      const trocar = el.querySelector('.fm-trocar-pasta');
+      if (trocar) trocar.onclick = async () => { if (await window.api.musicaAuto.escolherPasta(canal)) carregar(); };
+      el.querySelectorAll('.fm-estilos button.chip-estilo').forEach((b) => {
         b.onclick = async () => {
           const todosIds = [...el.querySelectorAll('.chip-estilo')].map((x) => x.dataset.id);
           let marcados = new Set(dados.prefs[canal].estilos?.length ? dados.prefs[canal].estilos : todosIds);
@@ -150,7 +179,10 @@ const FabMusica = (() => {
           : ag.total
           ? `ATENÇÃO: esse canal já tem ${ag.total} vídeo(s) agendado(s) — ${ag.longos} longo(s) e ${ag.shorts} Short(s)${ag.ultimoLongo ? `, vídeo longo até ${dataBR(ag.ultimoLongo)}` : ''}${ag.naFila ? ` (${ag.naFila} ainda na fila do PC)` : ''}.`
           : 'Esse canal não tem nada agendado no YouTube.';
-        if (!confirm(`${agendaTxt}\n\nFazer agora um álbum de ${p.qtd} músicas cantadas para ${NOME_CANAL[canal]}?\n\nMotor de hoje: ${[3, 6].includes(new Date().getDay()) ? `ElevenLabs (~R$ ${Math.round(p.qtd * 4)})` : `Google Lyria (~R$ ${Math.round(p.qtd * 0.75)})`}. Leva uns 20 a 40 minutos, mais a montagem dos vídeos.\n\nNada sobe para o YouTube sem você aprovar.`)) return;
+        const daPasta = p[canal].fonte === 'pasta';
+        if (daPasta && !(dados.pastas?.[canal]?.grupos || []).some((g) => g.n >= p.qtd)) return avisar(`Faltam músicas na pasta: precisa de ${p.qtd} do mesmo estilo`, true);
+        if (daPasta && !confirm(`${agendaTxt}\n\nFazer agora um álbum com ${p.qtd} músicas da sua pasta para ${NOME_CANAL[canal]}?\n\nO Compilador faz a capa no Gemini, o vídeo longo e os Shorts. As músicas usadas vão para a subpasta "Usadas".\n\nNada sobe para o YouTube sem você aprovar.`)) return;
+        if (!daPasta && !confirm(`${agendaTxt}\n\nFazer agora um álbum de ${p.qtd} músicas cantadas para ${NOME_CANAL[canal]}?\n\nMotor de hoje: ${[3, 6].includes(new Date().getDay()) ? `ElevenLabs (~R$ ${Math.round(p.qtd * 4)})` : `Google Lyria (~R$ ${Math.round(p.qtd * 0.75)})`}. Leva uns 20 a 40 minutos, mais a montagem dos vídeos.\n\nNada sobe para o YouTube sem você aprovar.`)) return;
         try {
           await window.api.musicaAuto.fazer(canal);
           avisar('Álbum na fila — acompanhe aqui embaixo');
