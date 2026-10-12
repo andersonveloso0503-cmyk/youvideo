@@ -1239,10 +1239,10 @@ async function iniciar() {
   const mostrarCreditos = (c) => {
     const chip = $('#chipCreditos');
     if (!c?.itens?.length) return;
-    const pior = c.itens.some((i) => i.nivel === 'critico') ? 'critico' : c.itens.some((i) => i.nivel === 'baixo') ? 'baixo' : 'ok';
+    const pior = c.itens.some((i) => i.nivel === 'critico') ? 'critico' : c.itens.some((i) => i.nivel === 'baixo') ? 'baixo' : c.itens.some((i) => i.nivel === 'desconhecido') ? 'desconhecido' : 'ok';
     chip.hidden = pior === 'ok';
-    chip.className = `chip chip-creditos ${pior}`;
-    chip.textContent = pior === 'critico' ? '⚠ Crédito acabando' : '💳 Crédito baixo';
+    chip.className = `chip chip-creditos ${pior === 'desconhecido' ? 'baixo' : pior}`;
+    chip.textContent = pior === 'critico' ? '⚠ Crédito acabando' : pior === 'baixo' ? '💳 Crédito baixo' : '💳 Confira os créditos';
     chip.title = c.itens.map((i) => `${i.nivel === 'ok' ? '✓' : '⚠'} ${i.nome}: ${i.texto}`).join('\n');
     chip.onclick = () => alert(`Créditos das IAs:\n\n${chip.title}\n\nfal.ai: fal.ai/dashboard/billing\nFlux: dashboard.bfl.ai\nElevenLabs: elevenlabs.io/app/subscription`);
   };

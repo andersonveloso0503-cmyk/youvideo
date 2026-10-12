@@ -475,12 +475,33 @@ app.whenReady().then(() => {
   let daFabrica = new Map();
   // O site guarda o pedido como "pc:<código>"; a Fila do Compilador guarda só o <código>
   const mapaDaFabrica = (itens) => new Map((itens || []).filter((i) => i.renderId).map((i) => [String(i.renderId).replace(/^pc:/, ''), i]));
+  // Vídeo da Fábrica com erro de crédito: avisa na hora (notificação do Windows + chip vermelho), uma vez por vídeo
+  const avisadosCredito = new Set();
+  function avisarSemCredito(itens) {
+    let novo = false;
+    errosDeCredito.clear();
+    for (const it of itens || []) {
+      const erro = String(it.erro || '');
+      if (!/insufficient credits|cr[ée]dito do flux|quota_exceeded|exhausted balance|sem cr[ée]dito|not enough credits/i.test(erro)) continue;
+      const servico = /flux|insufficient credits/i.test(erro) ? 'flux' : /quota|elevenlabs/i.test(erro) ? 'elevenlabs' : 'fal';
+      const nome = { flux: 'Flux (imagens)', elevenlabs: 'ElevenLabs (voz)', fal: 'fal.ai (animação)' }[servico];
+      errosDeCredito.set(servico, { servico, nome });
+      if (avisadosCredito.has(it.id)) continue;
+      avisadosCredito.add(it.id);
+      novo = true;
+      if (Notification.isSupported()) {
+        new Notification({ title: `⚠ Acabou o crédito: ${nome}`, body: `"${it.tema || it.titulo || 'Vídeo da Fábrica'}" parou. Recarregue e clique em ↻ na Fábrica.` }).show();
+      }
+    }
+    if (novo) checarCreditos();
+  }
   async function atualizarDaFabrica() {
     const cfg = store.ler();
     if (!cfg.centralToken) return;
     try {
       const { itens = [] } = await Central.chamar(cfg, '/api/central/fabrica');
       daFabrica = mapaDaFabrica(itens);
+      avisarSemCredito(itens);
       fila.emit('mudou');
     } catch {
       // sem internet: fica com o que já sabia
@@ -711,6 +732,7 @@ app.whenReady().then(() => {
   }
   // ---------- Créditos: avisa quando fal.ai, Flux (imagens) ou ElevenLabs estão acabando ----------
   let ultimosCreditos = null;
+  const errosDeCredito = new Map(); // serviço -> { servico, nome } (vídeo da Fábrica parou sem crédito)
   const avisados = {};
   async function checarCreditos() {
     const cfg = store.ler();
@@ -728,7 +750,8 @@ app.whenReady().then(() => {
       }
       const flux = servicos.flux;
       if (flux?.ok && flux.saldo != null) {
-        const n = flux.saldo < 100 ? 'critico' : flux.saldo < 300 ? 'baixo' : 'ok';
+        // 100 créditos = US$ 1; cada imagem gasta uns 3 a 5. Um lote da Fábrica usa centenas de imagens.
+        const n = flux.saldo < 500 ? 'critico' : flux.saldo < 1500 ? 'baixo' : 'ok';
         add('flux', 'Flux (imagens)', n, `${Math.round(flux.saldo)} créditos`);
       }
       const el = servicos.elevenlabs;
@@ -737,6 +760,13 @@ app.whenReady().then(() => {
         const n = el.saldo < 5000 ? 'critico' : el.saldo < Math.max(20000, limite * 0.1) ? 'baixo' : 'ok';
         add('elevenlabs', 'ElevenLabs (voz)', n, `${Math.round(el.saldo / 1000)} mil caracteres`);
       }
+      // Saldo que não deu para ler (chave sem permissão, serviço fora do ar) também aparece — antes ficava em silêncio
+      for (const [chave, nome] of [['fal', 'fal.ai (animação)'], ['flux', 'Flux (imagens)'], ['elevenlabs', 'ElevenLabs (voz)']]) {
+        const sv = servicos[chave];
+        if (sv && !sv.ok && !/não configurada/i.test(sv.erro || '')) add(chave, nome, 'desconhecido', `não consegui ler o saldo (${String(sv.erro || '').slice(0, 60)})`);
+      }
+      // Vídeo da Fábrica que parou por falta de crédito: crítico, mesmo que a leitura do saldo diga outra coisa
+      for (const e of errosDeCredito.values()) if (!itens.some((i) => i.servico === e.servico && i.nivel === 'critico')) add(e.servico, e.nome, 'critico', 'ACABOU — um vídeo da Fábrica parou por falta de crédito');
       ultimosCreditos = { itens, em: Date.now() };
       enviar('creditos:status', ultimosCreditos);
       // Notificação do Windows: uma vez por dia para cada serviço baixo/crítico
@@ -798,6 +828,7 @@ app.whenReady().then(() => {
     const r = await Central.chamar(store.ler(), '/api/central/fabrica');
     // Aproveita a mesma resposta para as tarjas da Fila (sem consultar o banco de novo)
     daFabrica = mapaDaFabrica(r.itens);
+    avisarSemCredito(r.itens);
     fila.emit('mudou'); // repinta as tarjas da Fila com o que acabou de chegar
     return r;
   });
