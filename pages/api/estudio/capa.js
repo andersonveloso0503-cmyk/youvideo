@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({ prompt, width: 1024, height: 1024 }),
     });
     const sd = await sub.json();
-    if (!sub.ok) throw new Error(sd.detail || 'Erro ao pedir a capa ao Flux');
+    if (!sub.ok) throw new Error(/insufficient credits/i.test(String(sd.detail || '')) ? 'Acabou o crédito do Flux (imagens). Recarregue em dashboard.bfl.ai → Credits.' : sd.detail || 'Erro ao pedir a capa ao Flux');
 
     let urlTemp = null;
     for (let i = 0; i < 90 && !urlTemp; i++) {
