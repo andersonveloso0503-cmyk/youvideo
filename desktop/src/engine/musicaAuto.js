@@ -28,6 +28,20 @@ const palavras = (t) =>
     .replace(/[\u0300-\u036f]/g, '')
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 3);
+// Idioma das músicas (para a capa sair no mesmo idioma): pelo nome da subpasta ou pelas palavras dos títulos
+const EN = new Set('the you your my me i im i\'m of and in on is it we he his to for love lord god heaven glory praise grace joy morning night light down up all every never forever be are was with this that what when how no yes oh come comes way king holy spirit sing song day days better open free walls fall'.split(' '));
+const PT = new Set('de do da dos das que meu minha teu tua seu sua tu eu ele nos nas no na em um uma e é sou senhor deus graça amor céu luz louvor fé para pra com sem por quando como mais minha vida coração jesus pai santo glória ao à'.split(' '));
+function idiomaDe(titulos, estilo = '') {
+  if (/ingl[eê]s|english|americ|internacional|international/i.test(estilo)) return 'en';
+  if (/portugu|brasil|nacional/i.test(estilo)) return 'pt';
+  let en = 0;
+  let pt = 0;
+  for (const w of String(titulos.join(' ')).toLowerCase().split(/[^a-zà-ú']+/)) {
+    if (EN.has(w)) en++;
+    if (PT.has(w)) pt++;
+  }
+  return en > pt * 1.5 && en >= 3 ? 'en' : 'pt';
+}
 // Motor da semana: 5 dias Google Lyria (mais barato) e 2 dias ElevenLabs (quarta e sábado)
 const DIAS_ELEVENLABS = [3, 6];
 const motorDoDia = (d) => (DIAS_ELEVENLABS.includes(d.getDay()) ? 'elevenlabs' : 'lyria');
@@ -375,7 +389,7 @@ class MusicaAuto {
         const evitar = this.estado.albuns.map((x) => x.capa?.titulo).filter(Boolean).slice(-30);
         const c = await this.central.chamar(cfg(), '/api/central/musica-auto', {
           metodo: 'POST',
-          corpo: { acao: 'capa', estilo: estilo.nome, gospel: estilo.gospel, titulos: a.musicas.filter(Boolean).map((m) => m.titulo), evitar },
+          corpo: { acao: 'capa', estilo: estilo.nome, gospel: estilo.gospel, idioma: a.idioma === 'en' ? 'en' : 'pt', titulos: a.musicas.filter(Boolean).map((m) => m.titulo), evitar },
         });
         a.capa = { titulo: c.titulo, subtitulo: c.subtitulo, capaUrl: c.capaUrl, fundoUrl: c.fundoUrl };
         this.salvar();
@@ -515,7 +529,9 @@ class MusicaAuto {
       titulos = (await this.central.chamar(this.obterConfig(), '/api/central/musica-auto', { metodo: 'POST', corpo: { acao: 'titulos', nomes } })).titulos;
     } catch { /* sem internet: arruma o nome aqui mesmo */ }
     const simples = (n) => n.replace(/^(nuivi|suno|somio|udio)[-_ ]+/i, '').replace(/[-_ ]+v\d+$/i, '').replace(/^\d+\s*[-._]\s*/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^./, (c) => c.toUpperCase());
+    const titulosFinais = nomes.map((n, i) => titulos?.[i] || simples(n));
     this.marcar(a, {
+      idioma: idiomaDe(titulosFinais, g.nome),
       pastaAlbum: destino,
       ideias: nomes.map((n, i) => ({ titulo: titulos?.[i] || simples(n), angulo: '' })),
       musicas: escolhidas.map((arquivo, i) => ({ titulo: titulos?.[i] || simples(nomes[i]), arquivo, url: '' })),
@@ -581,6 +597,7 @@ class MusicaAuto {
           capaManual: !curto && !!a.capa?.capaArquivo,
           musicas: (j.timeline || []).map((t) => ({ titulo: t.titulo, inicio: t.inicio })),
           clima: j.clima || '',
+          idioma: a.idioma === 'en' ? 'en' : undefined, // álbum em inglês: título e descrição do YouTube em inglês
         };
       }),
     };
@@ -616,4 +633,4 @@ class MusicaAuto {
   }
 }
 
-module.exports = { MusicaAuto, CANAIS, hoje, motorDoDia, palavras };
+module.exports = { MusicaAuto, CANAIS, hoje, motorDoDia, palavras, idiomaDe };

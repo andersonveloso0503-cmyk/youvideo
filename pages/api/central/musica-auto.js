@@ -2,7 +2,7 @@
 //
 // GET                         -> { presets: [{ id, nome, gospel, estilo, instrumentos, tema, vozes }] }
 // POST { acao: 'titulos', nomes[] }   -> { titulos[] | null }  (nomes de arquivo viram títulos)
-// POST { acao: 'capa', estilo, gospel, titulos[], ano? }
+// POST { acao: 'capa', estilo, gospel, titulos[], ano?, idioma? ('en' = capa em inglês) }
 //                             -> { titulo, subtitulo, capaUrl (16:9 com texto), fundoUrl (9:16 sem texto, para os Shorts) }
 //
 // Chaves na Vercel: GEMINI_API_KEY (a mesma do Lyria), GROQ_API_KEY. Opcional: GEMINI_IMAGE_MODEL.
@@ -116,7 +116,7 @@ export default async function handler(req, res) {
   if (acao === 'titulos') {
     const nomes = (Array.isArray(req.body.nomes) ? req.body.nomes : []).map((t) => limparTexto(t, 120)).slice(0, 40);
     if (!nomes.length) return res.status(200).json({ titulos: [] });
-    const r = await groqJson(`Estes são nomes de arquivos de músicas. Para cada um, escreva o TÍTULO da música em português do Brasil correto, com acentos e letras maiúsculas só onde precisa (ex.: "Graça Que Me Alcançou").
+    const r = await groqJson(`Estes são nomes de arquivos de músicas. Para cada um, escreva o TÍTULO da música NO MESMO IDIOMA do nome: se o nome está em português, em português do Brasil correto, com acentos (ex.: "Graça Que Me Alcançou"); se está em inglês, em inglês correto, com maiúsculas no estilo de título (ex.: "Joy Comes in the Morning"). Nunca traduza.
 Tire prefixos de site e de versão (nuivi, suno, v1, v2, final), números de faixa e palavras que são só a descrição do estilo quando sobrar um título claro antes delas. Não invente palavras novas.
 Responda só JSON: {"titulos": ["...", "..."]} na MESMA ordem e com a MESMA quantidade (${nomes.length}).
 Nomes:
@@ -126,6 +126,7 @@ ${nomes.map((n, i) => `${i + 1}. ${n}`).join('\n')}`);
   }
   if (acao !== 'capa') return res.status(400).json({ erro: 'Ação desconhecida.' });
   try {
+    const en = req.body.idioma === 'en'; // músicas em inglês: capa em inglês
     const estilo = limparTexto(req.body.estilo, 60) || 'Gospel';
     const gospel = req.body.gospel === true;
     const titulos = (Array.isArray(req.body.titulos) ? req.body.titulos : []).map((t) => limparTexto(t, 60)).filter(Boolean).slice(0, 20);
@@ -133,7 +134,16 @@ ${nomes.map((n, i) => `${i + 1}. ${n}`).join('\n')}`);
     const ano = Number(req.body.ano) || agora.getFullYear() + (agora.getMonth() >= 9 ? 1 : 0);
     const evitar = (Array.isArray(req.body.evitar) ? req.body.evitar : []).map((t) => limparTexto(t, 60)).filter(Boolean).slice(0, 30);
 
-    const ideia = await groqJson(`Você cria capas de coletâneas musicais para o YouTube no Brasil (estilo "LOUVORES QUE ACALMAM ${ano}", "SERTANEJO ROMÂNTICO AS MELHORES", "PAGODE GOSPEL VOL. 2").
+    const ideia = en
+      ? await groqJson(`You design YouTube thumbnails for music compilations in the United States (like "WORSHIP SONGS THAT HEAL ${ano}", "UPBEAT GOSPEL HITS", "SUNDAY MORNING PRAISE VOL. 2").
+Compilation of ${gospel ? 'GOSPEL ' : ''}songs in the style: ${estilo}. Some songs: ${titulos.join('; ') || '(no titles)'}.
+${evitar.length ? `Do not repeat these titles I already used: ${evitar.join('; ')}.\n` : ''}
+The English must sound natural to an American (no odd word choices, no literal translations from Portuguese).
+Reply only JSON:
+{"titulo": "cover title in UPPERCASE English, 2 to 5 words, catchy, says the style and the mood (e.g. WORSHIP SONGS THAT HEAL)",
+ "subtitulo": "smaller line in UPPERCASE English, up to 4 words (e.g. THE BEST OF ${ano} / VOL. 2 / FOR PRAYER)",
+ "cena": "1 to 2 sentences: the cover scene with a fictional singer singing or playing, the setting and light that match the style and mood${gospel ? ' (worship, faith, soft heavenly light, no symbols of other religions)' : ''}"}`)
+      : await groqJson(`Você cria capas de coletâneas musicais para o YouTube no Brasil (estilo "LOUVORES QUE ACALMAM ${ano}", "SERTANEJO ROMÂNTICO AS MELHORES", "PAGODE GOSPEL VOL. 2").
 Coletânea de músicas ${gospel ? 'GOSPEL ' : ''}no estilo ${estilo}. Algumas músicas: ${titulos.join('; ') || '(sem títulos)'}.
 ${evitar.length ? `Não repita estes títulos de capas que já fiz: ${evitar.join('; ')}.\n` : ''}
 Responda só JSON:
@@ -145,13 +155,13 @@ Responda só JSON:
     const cena = limparTexto(ideia.cena, 500) || `a fictional ${gospel ? 'worship ' : ''}singer performing ${estilo} music on a warmly lit stage`;
 
     const comum = `Scene: ${cena}
-Style: professional Brazilian ${gospel ? 'gospel ' : ''}${estilo} music album cover, cinematic lighting, rich vibrant colors, high contrast, sharp focus, photorealistic, premium look.
+Style: professional ${en ? 'American' : 'Brazilian'} ${gospel ? 'gospel ' : ''}${estilo} music album cover, cinematic lighting, rich vibrant colors, high contrast, sharp focus, photorealistic, premium look.
 The singer is a fictional person, not a celebrity or real person. No logos, no watermarks, no brand names, no extra words.`;
     const [capa, fundo] = await Promise.all([
       imagemGemini(
         `Create a YouTube thumbnail for a music compilation, 16:9 landscape.
 ${comum}
-Text on the image (Brazilian Portuguese, spelled EXACTLY like this, with the accents): big bold title "${titulo}" and a smaller line "${subtitulo}". The text must be large, clean and easy to read on a phone, with strong contrast. No other text.`,
+Text on the image (${en ? 'English' : 'Brazilian Portuguese, with the accents'}, spelled EXACTLY like this): big bold title "${titulo}" and a smaller line "${subtitulo}". The text must be large, clean and easy to read on a phone, with strong contrast. No other text.`,
         '16:9'
       ),
       imagemGemini(`Create a vertical 9:16 background image for a music video.\n${comum}\nNo text at all on the image. Keep the singer centered.`, '9:16').catch(() => null),
