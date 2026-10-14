@@ -783,9 +783,15 @@ export default function EstudioMusica() {
         }
         etapa('Baixando o áudio…');
         const audio = await fetch(m.audioUrl).then((r) => { if (!r.ok) throw new Error(`não baixou "${m.titulo}"`); return r.arrayBuffer(); });
-        add(`${pasta}audio.mp3`, new Uint8Array(audio));
-        etapa('Convertendo para WAV…');
-        try { add(`${pasta}audio.wav`, await paraWav(audio)); } catch { /* fica só o mp3 */ }
+        // Música importada em WAV (Suno/Nuivi): já é o arquivo de melhor qualidade, vai como está
+        const extOriginal = (String(m.audioUrl).split('?')[0].match(/\.(\w+)$/) || [, 'mp3'])[1].toLowerCase();
+        if (extOriginal === 'wav') {
+          add(`${pasta}audio.wav`, new Uint8Array(audio));
+        } else {
+          add(`${pasta}audio.${extOriginal === 'mp3' ? 'mp3' : extOriginal}`, new Uint8Array(audio));
+          etapa('Convertendo para WAV…');
+          try { add(`${pasta}audio.wav`, await paraWav(audio)); } catch { /* fica só o original */ }
+        }
         if (m.capaUrl) {
           etapa('Capas 1400 e 3000…');
           try {
