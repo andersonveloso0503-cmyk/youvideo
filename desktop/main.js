@@ -636,11 +636,16 @@ app.whenReady().then(() => {
         let quando = it.quandoYoutube ? new Date(it.quandoYoutube) : null;
         if (quando && quando.getTime() < Date.now() + 20 * 60e3) quando = new Date(Date.now() + 20 * 60e3); // ficou pronto atrasado
         let tags = Array.isArray(it.tags) ? it.tags : String(it.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
-        let titulo = String(it.titulo || it.tema || 'Short');
+        let titulo = String(it.titulo || it.tema || 'Vídeo');
         let descricao = it.descricao || '';
         // SEO de verdade: título, descrição e tags com base no que as pessoas buscam no YouTube
         let seoOk = false;
-        if (it.oracao) {
+        const longo = it.formato && it.formato !== 'short'; // vídeo longo da Fábrica (estilo mistério)
+        if (longo) {
+          // Vídeo longo: título (pergunta/mistério), descrição e tags já vêm prontos do roteiro do site.
+          // Não reescreve com a IA de Shorts para não perder o título de curiosidade.
+          seoOk = true;
+        } else if (it.oracao) {
           // Oração do dia: o título já vem pronto no formato que as pessoas procuram ("Oração da Manhã de 7 de Outubro: ...")
           const periodo = it.oracao.periodo === 'noite' ? 'oraçãodanoite' : 'oraçãodamanhã';
           const limpo = titulo.replace(/\s*#[\p{L}\p{N}_]+/gu, '').trim();
@@ -709,19 +714,20 @@ app.whenReady().then(() => {
           baixarDe: it.videoUrl,
           chaveArquivo: `fabrica-${it.id}`,
           capa: null,
-          capaUrl: it.thumbnailUrl || null, // cena do vídeo: base da capa chamativa
+          capaUrl: it.thumbnailUrl || null, // Short: cena do vídeo (base da capa chamativa); longo: thumbnail pronta com a frase
+          capaManual: longo, // longo: usa a thumbnail do site como está (já tem o texto grande)
           titulo: titulo.slice(0, 100),
-          descricao: /#shorts/i.test(descricao) ? descricao : `${descricao}\n\n#Shorts`.trim(),
+          descricao: longo || /#shorts/i.test(descricao) ? descricao : `${descricao}\n\n#Shorts`.trim(),
           tags,
           canalId,
           privacidade: 'private',
           agendarPara: quando ? quando.toISOString() : null,
-          curto: true,
+          curto: !longo,
           fabricaId: it.id,
           tipo: it.oracao ? 'oracao' : 'historias', // categoria "Pessoas e blogs" e idioma português (não "Música")
           playlist: it.oracao ? PLAYLISTS_ORACAO[it.oracao.periodo === 'noite' ? 'noite' : 'manha'] : null,
           conteudoIa: true, // histórias feitas com IA: marca no YouTube
-          botao: (() => { const f = path.join(app.getPath('userData'), 'cache', 'botao', 'v2-pt', 'botao.mov'); return fs.existsSync(f) ? f : null; })(),
+          botao: longo ? null : (() => { const f = path.join(app.getPath('userData'), 'cache', 'botao', 'v2-pt', 'botao.mov'); return fs.existsSync(f) ? f : null; })(),
         }]);
       }
     } catch {

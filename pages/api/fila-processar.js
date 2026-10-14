@@ -158,11 +158,30 @@ export default async function handler(req, res) {
       }
 
       case 'voz_ok': {
+        const visualImg = item.marca ? 'empresa' : item.oracao ? 'oracao' : 'biblico'; // empresa: nada bíblico; oração: paisagens serenas
+        if (item.formato !== 'short' && (item.roteiro.cenas || []).length > 8) {
+          // Vídeo longo tem ~30 cenas: gerar todas de uma vez passa do tempo máximo da função.
+          // Gera 8 por rodada (o cron roda a cada 5 min) e só segue quando todas estiverem prontas.
+          const feitas = item.arquivosParciais || [];
+          const novas = await gerarImagens({
+            cenas: item.roteiro.cenas.slice(feitas.length, feitas.length + 8),
+            estilo: item.estilo,
+            formato: item.formato,
+            visual: visualImg,
+          });
+          const todas = [...feitas, ...novas];
+          if (todas.length < item.roteiro.cenas.length) {
+            await ref.update({ arquivosParciais: todas });
+            break;
+          }
+          await ref.update({ arquivos: todas, arquivosParciais: null, status: 'imagens_ok' });
+          break;
+        }
         let arquivos = await gerarImagens({
           cenas: item.roteiro.cenas,
           estilo: item.estilo,
           formato: item.formato,
-          visual: item.marca ? 'empresa' : item.oracao ? 'oracao' : 'biblico', // empresa: nada bíblico; oração: paisagens serenas
+          visual: visualImg,
         });
         if (item.corte) {
           // Cada imagem entra e sai junto com a fala da sua cena (mesma ordem do roteiro)
@@ -281,13 +300,28 @@ export default async function handler(req, res) {
       case 'montando': {
         const check = await checarMontagemViaApi(item.renderId);
         if (check.status === 'done' && item.fabrica) {
-          // Fábrica: sem capa da Shotstack (Short usa a 1ª imagem) e sem subir no YouTube daqui —
+          // Fábrica: Short usa a 1ª imagem como capa (vídeo longo ganha thumbnail com texto, logo abaixo) e sem subir no YouTube daqui —
           // o Compilador sobe agendado no canal escolhido; as outras redes vão para a Agenda.
-          const thumbnailUrl = (item.arquivos || []).find((x) => x.imageUrl)?.imageUrl || null;
+          const primeiraImagem = (item.arquivos || []).find((x) => x.imageUrl)?.imageUrl || null;
+          let thumbnailUrl = primeiraImagem;
+          if (item.formato !== 'short') {
+            // Vídeo longo: thumbnail de verdade, com a frase grande do mistério (ex.: "ONDE ELE ESTAVA?")
+            try {
+              thumbnailUrl = (await gerarThumbnail({
+                tema: item.tema,
+                titulo: item.roteiro.titulo,
+                estilo: item.estilo,
+                thumbnailTitulo: item.roteiro.thumbnailTitulo,
+                thumbnailSubtitulo: item.roteiro.thumbnailSubtitulo,
+              })) || primeiraImagem;
+            } catch {
+              thumbnailUrl = primeiraImagem;
+            }
+          }
           const agendaId = await agendarItemPronto(item, check.videoUrl, thumbnailUrl);
           await db.collection('youvideo_projects').add({
             origem: 'fabrica',
-            categoria: item.marca ? 'empresa' : item.corte ? 'cortes' : item.estilo === 'desenho' ? 'historias' : 'series',
+            categoria: item.marca ? 'empresa' : item.corte ? 'cortes' : item.longo ? 'longos' : item.estilo === 'desenho' ? 'historias' : 'series',
             ...(item.marca ? { canal: item.marca } : {}),
             tema: item.tema,
             estilo: item.estilo,

@@ -6,9 +6,10 @@ const Fabrica = (() => {
   let ligado = false;
   let marca = ''; // '' = histórias bíblicas; 'cortes' = cortes de filme e cômicos; 'oracao' = oração do dia; 'lcs' = vídeos de divulgação da LCS
   // Em qual aba cada vídeo da fábrica aparece
-  const abaDe = (i) => i.marca || (i.oracao ? 'oracao' : i.corte ? 'cortes' : '');
+  const abaDe = (i) => i.marca || (i.oracao ? 'oracao' : i.corte ? 'cortes' : i.longo ? 'longos' : '');
   const NOTAS = {
     '': 'A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.',
+    longos: '<b>Vídeos longos</b> (cerca de 12 minutos) no estilo <b>mistério</b>: o título faz uma pergunta (ex.: "O que aconteceu com Jesus nos 3 dias no túmulo?"), o vídeo vai revelando detalhes e só responde no final. Thumbnail com a frase grande. São os vídeos que trazem <b>inscritos</b> e monetização. Vão para o <b>YouTube</b> (e Facebook, se marcar), com imagens em zoom para caber no orçamento.',
     cortes: 'Cenas curtas em <b>diálogo</b>, com uma voz para cada personagem. <b>Corte de filme</b>: cena bíblica dramática, com imagem realista (cerca de 45 s). <b>Corte cômico</b>: situação engraçada em desenho animado (cerca de 1 min). A IA escolhe as cenas sem repetir, escreve as falas, o seu PC monta, e cada corte é agendado sozinho nas redes.',
     oracao: 'Um Short de <b>oração por dia</b> (cerca de 1 minuto), com a data no título — por exemplo "Oração da Manhã de 7 de Outubro" —, que é como as pessoas procuram oração no YouTube. A IA escreve a oração (um assunto diferente por dia), narra com imagens calmas, o seu PC monta, e ela é publicada sozinha no horário.',
     musica: 'Um <b>álbum por dia</b> para cada canal de música. As músicas vêm <b>da sua pasta</b> (as que você fez no Nuivi/Suno — melhor qualidade) ou a IA cria (ElevenLabs/Lyria). O <b>Gemini faz a capa</b> e o Compilador monta o vídeo longo e os Shorts (começando no refrão). <b>Nada sobe sem você aprovar.</b>',
@@ -24,16 +25,22 @@ const Fabrica = (() => {
     for (const id of ['#fabLinhaCriar', '#fabErro', '#fabTopoLista', '#fabLista']) q(id).hidden = musica;
     q('#modalFabrica .fab-redes').hidden = musica;
     if (musica) {
-      ['#fabConfigLcs', '#fabConfigOracao', '#fabConfigCortes', '#fabConfigBiblia'].forEach((id) => (q(id).hidden = true));
+      ['#fabConfigLcs', '#fabConfigOracao', '#fabConfigCortes', '#fabConfigBiblia', '#fabConfigLongos'].forEach((id) => (q(id).hidden = true));
       FabMusica.mostrar();
       return;
     }
     q('#fabConfigLcs').hidden = marca !== 'lcs';
     q('#fabConfigOracao').hidden = marca !== 'oracao';
     q('#fabConfigCortes').hidden = marca !== 'cortes';
+    q('#fabConfigLongos').hidden = marca !== 'longos';
     q('#fabConfigBiblia').hidden = marca !== '';
-    q('#fabYoutube').parentElement.lastChild.textContent = marca === 'oracao' ? ' YouTube' : ' YouTube (1 por dia)';
+    q('#fabYoutube').parentElement.lastChild.textContent = marca === 'oracao' || marca === 'longos' ? ' YouTube' : ' YouTube (1 por dia)';
     document.querySelectorAll('#modalFabrica .so-biblia').forEach((el) => (el.hidden = marca === 'lcs'));
+    // Longos: só YouTube (sempre) e Facebook. Instagram, TikTok e Kwai são para vídeo curto.
+    q('#fabInstagram').parentElement.hidden = marca === 'longos';
+    for (const id of ['#fabTiktok', '#fabKwai']) q(id).parentElement.hidden = marca === 'lcs' || marca === 'longos';
+    q('#fabYoutube').disabled = marca === 'longos';
+    if (marca === 'longos') q('#fabYoutube').checked = true;
     custo();
     carregar();
   }
@@ -81,6 +88,14 @@ const Fabrica = (() => {
       q('#fabCusto').textContent = `${qtd} cortes · custo aproximado US$ ${Math.max(1, Math.round(total))} (${animado ? 'imagens, vozes e animação' : 'imagens e vozes'})`;
       return;
     }
+    if (marca === 'longos') {
+      const qtd = Number(q('#fabLgSemanas').value) * q('#fabLgDias').value.split(',').length;
+      const min = Number(q('#fabLgDuracao').value) / 60;
+      // ~2,5 imagens por minuto (Flux) + voz; cada minuto de narração gasta ~850 caracteres da ElevenLabs
+      const total = qtd * min * 0.16;
+      q('#fabCusto').textContent = `${qtd} vídeos longos · custo aproximado US$ ${Math.max(1, Math.round(total))} em imagens + ~${Math.round((qtd * min * 850) / 1000)} mil caracteres da ElevenLabs (voz)`;
+      return;
+    }
     if (marca === 'oracao') {
       const qtd = Number(q('#fabOrDias').value);
       q('#fabCusto').textContent = `${qtd} orações · custo aproximado US$ ${Math.max(1, Math.round(qtd * 0.25))} (imagens e voz)`;
@@ -103,7 +118,7 @@ const Fabrica = (() => {
   function preencherCanais() {
     const lista = typeof canais !== 'undefined' ? canais : [];
     const p = prefs();
-    for (const id of ['#fabCanal', '#fabOrCanal', '#fabCtCanal']) {
+    for (const id of ['#fabCanal', '#fabOrCanal', '#fabCtCanal', '#fabLgCanal']) {
       const sel = q(id);
       sel.innerHTML = lista.length
         ? lista.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)}</option>`).join('')
@@ -134,7 +149,7 @@ const Fabrica = (() => {
       })
     );
     document.querySelectorAll('#fabMarcaAbas button').forEach((b) => (b.onclick = () => trocarMarca(b.dataset.marca || '')));
-    ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs', '#fabOrDias'].forEach((id) => q(id).addEventListener('change', custo));
+    ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs', '#fabOrDias', '#fabLgSemanas', '#fabLgDias', '#fabLgDuracao'].forEach((id) => q(id).addEventListener('change', custo));
     // Cortes: lembra as escolhas da última vez
     const pc = p.cortes || {};
     for (const [chave, id] of [['tipo', '#fabCtTipo'], ['dias', '#fabCtDias'], ['porDia', '#fabCtPorDia'], ['hora1', '#fabCtHora1'], ['hora2', '#fabCtHora2'], ['animacao', '#fabCtAnimacao']]) {
@@ -161,6 +176,7 @@ const Fabrica = (() => {
     if (marca === 'lcs') return criarEmpresa(erro);
     if (marca === 'oracao') return criarOracao(erro);
     if (marca === 'cortes') return criarCortes(erro);
+    if (marca === 'longos') return criarLongos(erro);
     const redes = {
       youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked,
       tiktok: q('#fabTiktok').checked, kwai: q('#fabKwai').checked,
@@ -192,6 +208,41 @@ const Fabrica = (() => {
       });
       avisar(`${r.criados.length} Shorts na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}`);
       q('#fabTemas').value = ''; // temas usados: o próximo lote começa limpo
+      carregar();
+    } catch (e) {
+      erro.textContent = msgErro(e);
+    } finally {
+      b.disabled = false;
+      b.textContent = '🏭 Criar lote';
+    }
+  }
+
+  async function criarLongos(erro) {
+    const canalId = q('#fabLgCanal').value;
+    if (!canalId) return (erro.textContent = 'Conecte um canal em Contas YouTube: vídeo longo vai para o YouTube.');
+    if (!canalCombina(canalId, 'falado')) return (erro.textContent = 'Escolha o canal certo para o YouTube.');
+    const diasSemana = q('#fabLgDias').value.split(',').map(Number);
+    const qtd = Number(q('#fabLgSemanas').value) * diasSemana.length;
+    const temas = q('#fabLgTemas').value.split('\n').map((t) => t.trim()).filter(Boolean);
+    if (!confirm(`Criar ${qtd} vídeos longos no estilo mistério? ${q('#fabCusto').textContent.split('·')[1] || ''}\n${temas.length ? `Os ${temas.length} temas que você escreveu entram primeiro; a IA completa o resto.` : 'A IA escolhe os temas'} e eles já ficam agendados no YouTube às ${q('#fabLgHora').value}.`)) return;
+    const b = q('#btnFabCriar');
+    b.disabled = true;
+    b.textContent = '🏭 A IA está escolhendo os temas...';
+    try {
+      const canal = (typeof canais !== 'undefined' ? canais : []).find((c) => c.id === canalId);
+      const r = await window.api.fabrica.criar({
+        tipo: 'longos',
+        semanas: Number(q('#fabLgSemanas').value),
+        diasSemana,
+        horarios: [q('#fabLgHora').value],
+        duracao: Number(q('#fabLgDuracao').value),
+        estiloModo: q('#fabLgEstilo').value,
+        temas,
+        redes: { youtube: true, facebook: q('#fabFacebook').checked },
+        canalYoutube: canal ? { id: canal.id, titulo: canal.titulo } : null,
+      });
+      avisar(`${r.criados.length} vídeos longos na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}`);
+      q('#fabLgTemas').value = '';
       carregar();
     } catch (e) {
       erro.textContent = msgErro(e);
@@ -337,7 +388,7 @@ const Fabrica = (() => {
         l.className = `fab-item st-${i.status}`;
         l.innerHTML = `
           <span class="hora">${esc(new Date(i.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))}</span>
-          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.oracao ? 'Oração do dia' : `${i.corte ? (i.corte.tipo === 'comico' ? 'Corte cômico · ' : 'Corte de filme · ') : ''}${i.animar ? 'Animado' : 'Imagens com zoom'}`}">${i.marca ? '🏢' : i.oracao ? '🙏' : i.corte ? (i.corte.tipo === 'comico' ? '😂' : '🎬') : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
+          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.oracao ? 'Oração do dia' : i.longo ? 'Vídeo longo (mistério)' : `${i.corte ? (i.corte.tipo === 'comico' ? 'Corte cômico · ' : 'Corte de filme · ') : ''}${i.animar ? 'Animado' : 'Imagens com zoom'}`}">${i.marca ? '🏢' : i.oracao ? '🙏' : i.longo ? '📺' : i.corte ? (i.corte.tipo === 'comico' ? '😂' : '🎬') : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
           <span class="txt"><b></b><small></small></span>
           <span class="acoes"></span>`;
         l.querySelector('b').textContent = i.titulo || (i.serie ? `${i.serie.nome} (Parte ${i.serie.parte}/${i.serie.total})` : i.tema);

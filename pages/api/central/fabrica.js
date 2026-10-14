@@ -4,6 +4,8 @@
 // POST { acao:'criar', dias, horarios, redes, canalYoutube, animacao }  -> cria o lote (a IA escolhe os temas)
 // POST { acao:'criar', tipo:'cortes', estiloCorte:'filme'|'comico'|'alternar', dias, porDia, horarios, animacao, redes, canalYoutube }
 //                                        -> lote de cortes (cenas em diálogo: de filme e/ou cômicos)
+// POST { acao:'criar', tipo:'longos', semanas, diasSemana, horarios, canalYoutube, redes, temas }
+//                                        -> vídeos longos (~12 min) no estilo mistério, só YouTube (+ Facebook opcional)
 // POST { acao:'youtube-pegar'|'youtube-feito'|'youtube-erro', id, ... }
 // POST { acao:'cancelar', id }
 import { getDb } from '../../../lib/firebase-admin';
@@ -51,6 +53,47 @@ async function temasDaIa(qtd, evitar) {
     temas = await pedir('llama-3.3-70b-versatile');
   }
   const vistos = new Set(evitar.map((t) => t.toLowerCase()));
+  return temas.map((t) => String(t).trim()).filter((t) => t && !vistos.has(t.toLowerCase())).slice(0, qtd);
+}
+
+// Vídeos longos (~12 min) no estilo "mistério": cada tema já vem como a PERGUNTA que o vídeo responde.
+async function temasLongosDaIa(qtd, evitar) {
+  const pedir = async (modelo) => {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      body: JSON.stringify({
+        model: modelo,
+        temperature: 0.9,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Você escolhe temas de VÍDEOS LONGOS (cerca de 12 minutos) para um canal cristão brasileiro chamado "Em Nome de Jesus". ' +
+              'O canal usa o estilo MISTÉRIO: cada tema é uma PERGUNTA ou um SEGREDO sobre uma passagem bíblica específica, que dá muita vontade de clicar e que o vídeo responde até o final. ' +
+              'Responda só JSON: {"temas": ["...", "..."]}. ' +
+              'Exemplos: "O que aconteceu com Jesus nos 3 dias dentro do túmulo?", "O que os soldados viram no túmulo e esconderam", ' +
+              '"Por que Judas traiu Jesus? O que a Bíblia revela", "O que Jesus escreveu no chão diante da mulher adúltera?", ' +
+              '"Onde estava a Arca da Aliança? O mistério que atravessou séculos", "Quem eram os magos que visitaram Jesus?". ' +
+              'Regras: tudo precisa ter base na Bíblia ou em contexto histórico conhecido (nada de teoria da conspiração ou fato inventado); ' +
+              'varie entre vida de Jesus, Antigo Testamento, apóstolos, profecias e personagens; até 80 caracteres por tema; nada repetido nem parecido com a lista de já usados.',
+          },
+          { role: 'user', content: `Quero ${qtd} temas diferentes.\n\nJá usados (não repetir):\n${evitar.slice(0, 250).map((t) => `- ${t}`).join('\n') || '(nenhum)'}` },
+        ],
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d?.error?.message || `Groq respondeu ${r.status}`);
+    return JSON.parse(d.choices?.[0]?.message?.content || '{}').temas || [];
+  };
+  let temas = [];
+  try {
+    temas = await pedir('openai/gpt-oss-120b');
+  } catch {
+    temas = await pedir('llama-3.3-70b-versatile');
+  }
+  const vistos = new Set(evitar.map((t) => String(t).toLowerCase()));
   return temas.map((t) => String(t).trim()).filter((t) => t && !vistos.has(t.toLowerCase())).slice(0, qtd);
 }
 
@@ -147,6 +190,8 @@ export default async function handler(req, res) {
           serie: x.serie || null,
           marca: x.marca || '',
           oracao: x.oracao || null,
+          formato: x.formato || 'short',
+          longo: x.longo === true,
           renderId: x.renderId || null, // pedido de montagem no PC: liga o cartão da Fila do Compilador a este vídeo
           corte: x.corte ? { tipo: x.corte.tipo === 'comico' ? 'comico' : 'filme' } : null,
         };
@@ -276,6 +321,66 @@ export default async function handler(req, res) {
         return res.status(200).json({ lote: loteOr, criados: criadasOr, primeiroDia: primeiroOr });
       }
 
+      // ── Vídeos longos (~12 min, estilo mistério): 2 ou 3 por semana, só no YouTube (+ Facebook opcional) ──
+      if (b.tipo === 'longos') {
+        if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube: vídeo longo vai principalmente para o YouTube.' });
+        const semanasLg = Math.max(1, Math.min(8, Number(b.semanas) || 4));
+        const diasSemanaLg = (Array.isArray(b.diasSemana) && b.diasSemana.length ? b.diasSemana : [2, 4, 6]).map(Number); // 2 = terça
+        const horarioLg = hora(b.horarios?.[0], '18:00');
+        const redesLg = { youtube: true, facebook: !!b.redes?.facebook, instagram: false, tiktok: false, kwai: false };
+        const todosLg = await col.where('fabrica.ativo', '==', true).get();
+        const meusLg = todosLg.docs.filter((d) => d.data().longo === true);
+        const ultimoLg = meusLg.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
+        // Vídeo longo leva mais tempo (roteiro grande, ~30 imagens, voz de 12 min, montagem): começa daqui a 2 dias
+        let diaLg = somarDias(diaBrasilia(), 2);
+        if (ultimoLg && diaBrasilia(new Date(ultimoLg)) >= diaLg) diaLg = somarDias(diaBrasilia(new Date(ultimoLg)), 1);
+        const qtdLg = semanasLg * diasSemanaLg.length;
+        const datasLg = [];
+        for (let guarda = 0; datasLg.length < qtdLg && guarda < 400; guarda++) {
+          if (diasSemanaLg.includes(new Date(`${diaLg}T12:00:00Z`).getUTCDay())) datasLg.push(diaLg);
+          diaLg = somarDias(diaLg, 1);
+        }
+        const usadosLg = meusLg.map((d) => d.data().tema).filter(Boolean);
+        const projLg = await db.collection('youvideo_projects').orderBy('criadoEm', 'desc').limit(200).get();
+        projLg.docs.forEach((d) => usadosLg.push(d.data().tema || d.data().titulo));
+        const temasDonoLg = (Array.isArray(b.temas) ? b.temas : []).map((t) => String(t).trim().slice(0, 160)).filter(Boolean).slice(0, 40);
+        let temasLg = temasDonoLg.slice(0, qtdLg);
+        if (temasLg.length < qtdLg) temasLg = [...temasLg, ...(await temasLongosDaIa(qtdLg - temasLg.length, [...usadosLg, ...temasLg].filter(Boolean)))];
+        if (temasLg.length < qtdLg) temasLg = [...temasLg, ...(await temasLongosDaIa(qtdLg - temasLg.length, [...usadosLg, ...temasLg].filter(Boolean)))];
+        if (!temasLg.length) return res.status(500).json({ erro: 'A IA não devolveu temas. Tente de novo.' });
+        const estiloModoLg = ['desenho', 'realista'].includes(b.estiloModo) ? b.estiloModo : 'realista';
+        const loteLg = Date.now().toString(36);
+        const batchLg = db.batch();
+        const criadosLg = [];
+        temasLg.slice(0, datasLg.length).forEach((tema, i) => {
+          const quando = horarioBrasilia(datasLg[i], horarioLg);
+          const estilo = estiloModoLg;
+          const ref = col.doc();
+          batchLg.set(ref, {
+            tema,
+            longo: true,
+            estilo,
+            formato: 'longo',
+            duracaoDesejada: String(Math.max(480, Math.min(1200, Number(b.duracao) || 720))),
+            animar: false, // 12 min animado sairia caro demais: imagens com zoom
+            status: 'pendente',
+            origem: 'fabrica',
+            criadoEm: new Date().toISOString(),
+            fabrica: {
+              ativo: true,
+              lote: loteLg,
+              quando,
+              quandoYoutube: quando,
+              redes: redesLg,
+              canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') },
+            },
+          });
+          criadosLg.push({ id: ref.id, tema, quando });
+        });
+        await batchLg.commit();
+        return res.status(200).json({ lote: loteLg, criados: criadosLg, primeiroDia: datasLg[0] });
+      }
+
       // ── Cortes: cenas curtas em diálogo. De filme (imagem realista, dramático) e/ou cômicos (desenho animado) ──
       if (b.tipo === 'cortes') {
         const estiloCorte = ['filme', 'comico', 'alternar'].includes(b.estiloCorte) ? b.estiloCorte : 'alternar';
@@ -367,7 +472,7 @@ export default async function handler(req, res) {
 
       // Continua depois do último horário já reservado pela fábrica (não encavala lotes)
       const todosAtivos = await col.where('fabrica.ativo', '==', true).get();
-      const ativos = { docs: todosAtivos.docs.filter((d) => !d.data().marca && !d.data().oracao && !d.data().corte) }; // empresa, oração do dia e cortes têm agenda própria
+      const ativos = { docs: todosAtivos.docs.filter((d) => !d.data().marca && !d.data().oracao && !d.data().corte && !d.data().longo) }; // empresa, oração do dia, cortes e longos têm agenda própria
       const ultimo = ativos.docs.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
       const amanha = somarDias(diaBrasilia(), 1);
       const primeiroDia = ultimo && diaBrasilia(new Date(ultimo)) >= amanha ? somarDias(diaBrasilia(new Date(ultimo)), 1) : amanha;
