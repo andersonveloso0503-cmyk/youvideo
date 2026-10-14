@@ -159,9 +159,13 @@ Style: professional ${en ? 'American' : 'Brazilian'} ${gospel ? 'gospel ' : ''}$
 The singer is a fictional person, not a celebrity or real person. No logos, no watermarks, no brand names, no extra words.`;
     const [capa, fundo] = await Promise.all([
       imagemGemini(
-        `Create a YouTube thumbnail for a music compilation, 16:9 landscape.
+        `Create a VERY eye-catching YouTube thumbnail for a music compilation, 16:9 landscape.
 ${comum}
-Text on the image (${en ? 'English' : 'Brazilian Portuguese, with the accents'}, spelled EXACTLY like this): big bold title "${titulo}" and a smaller line "${subtitulo}". The text must be large, clean and easy to read on a phone, with strong contrast. No other text.`,
+Make it bold and flashy: rich saturated colors, warm glow and light effects, dramatic sky (deep purple/blue night or golden sunset), the singer close to the camera on one side with a strong emotional expression.
+Text on the image (${en ? 'English' : 'Brazilian Portuguese, with the accents'}, spelled EXACTLY like this and nothing else):
+- the title "${titulo}" HUGE, filling about half of the image, in thick bold 3D letters, bright yellow/gold and white with a thick black outline and a soft glow; the most important word even bigger, the words can have different sizes and colors
+- "${subtitulo}" smaller, inside a ribbon/banner badge (white text on a red or purple banner) under the title
+Put the text on the side opposite to the singer's face, and keep the bottom-right corner free (YouTube shows the duration there). Must be readable as a tiny thumbnail on a phone. No other text.`,
         '16:9'
       ),
       imagemGemini(`Create a vertical 9:16 background image for a music video.\n${comum}\nNo text at all on the image. Keep the singer centered.`, '9:16').catch(() => null),
