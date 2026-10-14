@@ -1,14 +1,28 @@
 import { put } from '@vercel/blob';
+import { thumbBiblicaGemini } from '../../lib/thumbGemini';
+
+export const maxDuration = 120;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { tema, titulo, estilo, thumbnailTitulo, thumbnailSubtitulo, imagemReferenciaUrl } = req.body;
 
-  if (!process.env.FLUX_API_KEY) {
+  if (!process.env.FLUX_API_KEY && !process.env.GEMINI_API_KEY) {
     return res.status(500).json({
       error: 'FLUX_API_KEY não configurada ainda.',
     });
+  }
+
+  // Thumbnail chamativa no Gemini (texto 3D escrito pela própria IA), igual às capas de música que
+  // mais dão visualização. Com imagem de referência do personagem, ou se o Gemini falhar, segue o modo antigo.
+  if (!imagemReferenciaUrl && process.env.GEMINI_API_KEY && (thumbnailTitulo || titulo)) {
+    try {
+      const imageUrl = await thumbBiblicaGemini({ tema, titulo, estilo, thumbnailTitulo, thumbnailSubtitulo });
+      return res.status(200).json({ imageUrl, motor: 'gemini' });
+    } catch {
+      /* cai no Flux + texto por cima */
+    }
   }
 
   try {
