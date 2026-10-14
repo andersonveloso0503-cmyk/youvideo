@@ -4,6 +4,7 @@ import { agendarItemPronto } from '../../lib/fabrica';
 import { empresa, gerarRoteiroEmpresa } from '../../lib/empresa';
 import { gerarRoteiroOracaoDia } from '../../lib/oracaoDia';
 import { buscarSaldoFal } from '../../lib/orcamento';
+import { passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario } from '../../lib/documentario';
 import {
   gerarRoteiro,
   garantirChamada,
@@ -31,13 +32,13 @@ export default async function handler(req, res) {
   // pros dois de uma vez. Também repassa audioSegments quando a narração
   // foi dividida em mais de um pedaço (textos longos passam do limite de
   // caracteres da ElevenLabs numa chamada só).
-  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta }) => {
+  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta, legenda }) => {
     const temVariosPedacos = (audioSegments || []).length > 1;
     const r = await fetch(`${baseUrl}/api/assemble-video`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}) }
+        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}) }
       ),
     });
     const data = await r.json();
@@ -73,6 +74,12 @@ export default async function handler(req, res) {
     const ref = doc.ref;
     switch (item.status) {
       case 'pendente': {
+        if (item.documentario) {
+          // Documentário para dormir: o roteiro já vem escrito, só libera para a voz
+          // (fica 'pendente' até faltar 3 dias para ir ao ar, para não gastar crédito antes da hora)
+          await ref.update({ status: 'roteiro_ok' });
+          break;
+        }
         if (item.marca) {
           // Vídeo de divulgação da empresa: roteiro publicitário
           const roteiroEmp = await gerarRoteiroEmpresa(item.marca, { tema: item.tema, duracaoDesejada: item.duracaoDesejada });
@@ -130,6 +137,11 @@ export default async function handler(req, res) {
       }
 
       case 'roteiro_ok': {
+        if (item.documentario) {
+          // Voz lenta, em pedaços (o texto é longo): cada rodada do cron faz alguns pedaços
+          await ref.update(await passoVozDocumentario(item));
+          break;
+        }
         if (item.corte) {
           // Uma voz por personagem; a resposta traz o tempo exato de cada fala,
           // que vira o tempo da imagem daquela cena
@@ -158,6 +170,11 @@ export default async function handler(req, res) {
       }
 
       case 'voz_ok': {
+        if (item.documentario) {
+          // Vídeos e fotos reais (Pexels e Wikimedia), 10 cenas por rodada
+          await ref.update(await passoMidiaDocumentario(item));
+          break;
+        }
         const visualImg = item.marca ? 'empresa' : item.oracao ? 'oracao' : 'biblico'; // empresa: nada bíblico; oração: paisagens serenas
         if (item.formato !== 'short' && (item.roteiro.cenas || []).length > 8) {
           // Vídeo longo tem ~30 cenas: gerar todas de uma vez passa do tempo máximo da função.
@@ -216,9 +233,11 @@ export default async function handler(req, res) {
             titulo: item.roteiro?.titulo || item.tema,
             cenas: item.arquivos,
             formato: item.formato,
-            palavras: item.narracao.palavras,
+            // Documentário para dormir: sem legenda na tela (não acorda quem está dormindo)
+            palavras: item.documentario ? [] : item.narracao.palavras,
             marca: marcaDe(item),
             cta: item.marca ? empresa(item.marca)?.cta : '',
+            ...(item.documentario ? { legenda: false } : {}),
           });
           await ref.update({ duracaoAlvo, renderId, status: 'montando' });
           break;
@@ -304,7 +323,10 @@ export default async function handler(req, res) {
           // o Compilador sobe agendado no canal escolhido; as outras redes vão para a Agenda.
           const primeiraImagem = (item.arquivos || []).find((x) => x.imageUrl)?.imageUrl || null;
           let thumbnailUrl = primeiraImagem;
-          if (item.formato !== 'short') {
+          if (item.documentario) {
+            // Documentário: foto real escurecida + a pergunta da capa
+            thumbnailUrl = (await thumbDocumentario({ fotoUrl: item.capaUrl || primeiraImagem, texto: item.roteiro.thumbnailTitulo })) || primeiraImagem;
+          } else if (item.formato !== 'short') {
             // Vídeo longo: thumbnail de verdade, com a frase grande do mistério (ex.: "ONDE ELE ESTAVA?")
             try {
               thumbnailUrl = (await gerarThumbnail({
@@ -321,7 +343,7 @@ export default async function handler(req, res) {
           const agendaId = await agendarItemPronto(item, check.videoUrl, thumbnailUrl);
           await db.collection('youvideo_projects').add({
             origem: 'fabrica',
-            categoria: item.marca ? 'empresa' : item.corte ? 'cortes' : item.longo ? 'longos' : item.estilo === 'desenho' ? 'historias' : 'series',
+            categoria: item.marca ? 'empresa' : item.documentario ? 'documentarios' : item.corte ? 'cortes' : item.longo ? 'longos' : item.estilo === 'desenho' ? 'historias' : 'series',
             ...(item.marca ? { canal: item.marca } : {}),
             tema: item.tema,
             estilo: item.estilo,

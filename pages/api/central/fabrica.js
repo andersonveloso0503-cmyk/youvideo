@@ -6,6 +6,8 @@
 //                                        -> lote de cortes (cenas em diálogo: de filme e/ou cômicos)
 // POST { acao:'criar', tipo:'longos', semanas, diasSemana, horarios, canalYoutube, redes, temas }
 //                                        -> vídeos longos (~12 min) no estilo mistério, só YouTube (+ Facebook opcional)
+// POST { acao:'criar', tipo:'documentario', quantos, inicio, horarios, canalYoutube, vozId }
+//                                        -> documentários para dormir já escritos (1 por dia), voz lenta e imagens reais, só YouTube
 // POST { acao:'youtube-pegar'|'youtube-feito'|'youtube-erro', id, ... }
 // POST { acao:'cancelar', id }
 import { getDb } from '../../../lib/firebase-admin';
@@ -15,6 +17,8 @@ import { empresa, faltaConfigurar, temasEmpresa } from '../../../lib/empresa';
 import { PERIODOS, intencaoDoDia, tituloOracao } from '../../../lib/oracaoDia';
 import { testarConta } from '../../../lib/publicarSocial';
 import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
+import { roteiroDoEpisodio } from '../../../lib/documentario';
+import { EPISODIOS } from '../../../lib/documentarioEpisodios';
 
 export const config = { maxDuration: 60 };
 
@@ -192,6 +196,7 @@ export default async function handler(req, res) {
           oracao: x.oracao || null,
           formato: x.formato || 'short',
           longo: x.longo === true,
+          documentario: x.documentario === true,
           comBotao: x.comBotao === true,
           renderId: x.renderId || null, // pedido de montagem no PC: liga o cartão da Fila do Compilador a este vídeo
           corte: x.corte ? { tipo: x.corte.tipo === 'comico' ? 'comico' : 'filme' } : null,
@@ -320,6 +325,54 @@ export default async function handler(req, res) {
         }
         await batchOr.commit();
         return res.status(200).json({ lote: loteOr, criados: criadasOr, primeiroDia: primeiroOr });
+      }
+
+      // ── Documentários para dormir: episódios já escritos, 1 por dia, só YouTube ──
+      if (b.tipo === 'documentario') {
+        if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube do documentário.' });
+        const horarioDoc = hora(b.horarios?.[0], '19:30');
+        const todosDoc = await col.where('documentario', '==', true).get();
+        const jaUsados = new Set(todosDoc.docs.filter((d) => d.data().status !== 'erro' && d.data().fabrica?.ativo !== false).map((d) => d.data().episodioId));
+        const livres = EPISODIOS.filter((e) => !jaUsados.has(e.id));
+        if (!livres.length) return res.status(400).json({ erro: 'Todos os episódios já escritos estão na fábrica. Peça novos roteiros.' });
+        const quantos = Math.max(1, Math.min(livres.length, Number(b.quantos) || livres.length));
+        // Começa no dia pedido (ou daqui a 2 dias: o documentário precisa de tempo para voz, imagens e montagem)
+        const minimo = somarDias(diaBrasilia(), 1);
+        let diaDoc = /^\d{4}-\d{2}-\d{2}$/.test(String(b.inicio || '')) && b.inicio >= minimo ? b.inicio : somarDias(diaBrasilia(), 2);
+        const ultimoDoc = todosDoc.docs.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
+        if (ultimoDoc && diaBrasilia(new Date(ultimoDoc)) >= diaDoc) diaDoc = somarDias(diaBrasilia(new Date(ultimoDoc)), 1);
+        const loteDoc = Date.now().toString(36);
+        const batchDoc = db.batch();
+        const criadosDoc = [];
+        livres.slice(0, quantos).forEach((ep, i) => {
+          const quando = horarioBrasilia(somarDias(diaDoc, i), horarioDoc);
+          const ref = col.doc();
+          batchDoc.set(ref, {
+            tema: ep.titulo,
+            documentario: true,
+            episodioId: ep.id,
+            serie: null,
+            estilo: 'realista',
+            formato: 'longo',
+            animar: false,
+            ...(String(b.vozId || '').trim() ? { vozId: String(b.vozId).trim().slice(0, 60) } : {}),
+            roteiro: roteiroDoEpisodio(ep),
+            status: 'pendente',
+            origem: 'fabrica',
+            criadoEm: new Date().toISOString(),
+            fabrica: {
+              ativo: true,
+              lote: loteDoc,
+              quando,
+              quandoYoutube: quando,
+              redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
+              canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') },
+            },
+          });
+          criadosDoc.push({ id: ref.id, tema: ep.titulo, quando });
+        });
+        await batchDoc.commit();
+        return res.status(200).json({ lote: loteDoc, criados: criadosDoc, primeiroDia: diaDoc });
       }
 
       // ── Vídeos longos (~12 min, estilo mistério): 2 ou 3 por semana, só no YouTube (+ Facebook opcional) ──
@@ -473,7 +526,7 @@ export default async function handler(req, res) {
 
       // Continua depois do último horário já reservado pela fábrica (não encavala lotes)
       const todosAtivos = await col.where('fabrica.ativo', '==', true).get();
-      const ativos = { docs: todosAtivos.docs.filter((d) => !d.data().marca && !d.data().oracao && !d.data().corte && !d.data().longo) }; // empresa, oração do dia, cortes e longos têm agenda própria
+      const ativos = { docs: todosAtivos.docs.filter((d) => !d.data().marca && !d.data().oracao && !d.data().corte && !d.data().longo && !d.data().documentario) }; // empresa, oração do dia, cortes, longos e documentários têm agenda própria
       const ultimo = ativos.docs.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
       const amanha = somarDias(diaBrasilia(), 1);
       const primeiroDia = ultimo && diaBrasilia(new Date(ultimo)) >= amanha ? somarDias(diaBrasilia(new Date(ultimo)), 1) : amanha;

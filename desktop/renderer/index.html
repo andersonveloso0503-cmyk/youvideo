@@ -465,6 +465,7 @@
     <div class="segmentado" id="fabMarcaAbas" style="max-width:860px;margin-bottom:10px">
       <button type="button" class="ativo" data-marca="">📖 Histórias bíblicas</button>
       <button type="button" data-marca="longos">📺 Vídeos longos</button>
+      <button type="button" data-marca="documentario">🌙 Documentários para dormir</button>
       <button type="button" data-marca="cortes">🎬 Cortes</button>
       <button type="button" data-marca="oracao">🙏 Oração do dia</button>
       <button type="button" data-marca="lcs">🏢 LCS Terceirização</button>
@@ -499,6 +500,14 @@
       <div class="campo-config"><label>Canal do YouTube</label><select id="fabLgCanal"></select></div>
       <div class="campo-config fab-temas"><label>Temas que você quer (opcional, um por linha — a IA completa o resto em forma de pergunta/mistério)</label>
         <textarea id="fabLgTemas" rows="3" placeholder="Ex.:&#10;O que aconteceu com Jesus nos 3 dias dentro do túmulo?&#10;O que os soldados viram no túmulo e esconderam"></textarea></div>
+    </div>
+    <div class="fab-config" id="fabConfigDoc" hidden>
+      <div class="campo-config"><label>Quantos episódios</label>
+        <select id="fabDocQuantos"><option value="10" selected>Todos os prontos (até 10)</option><option value="5">5</option><option value="3">3</option><option value="1">1 (teste)</option></select></div>
+      <div class="campo-config"><label>Primeiro dia no ar</label><input type="date" id="fabDocInicio" /></div>
+      <div class="campo-config"><label>Horário no YouTube (1 por dia)</label><input type="time" id="fabDocHora" value="19:30" /></div>
+      <div class="campo-config"><label>Canal do YouTube</label><select id="fabDocCanal"></select></div>
+      <div class="campo-config"><label>Voz da ElevenLabs (ID, opcional — vazio = voz padrão)</label><input type="text" id="fabDocVoz" placeholder="Ex.: pNInz6obpgDQGcFmaJgB" /></div>
     </div>
     <div class="fab-config" id="fabConfigCortes" hidden>
       <div class="campo-config"><label>Tipo de corte</label>

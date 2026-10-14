@@ -134,7 +134,8 @@ export default async function handler(req, res) {
     }
   }
   const duracoesReais = await Promise.all(
-    videosValidos.map((c) => (c.videoUrl ? probarDuracaoVideo(c.videoUrl) : Promise.resolve(null)))
+    // Vídeo do Pexels já vem com a duração: não precisa sondar
+    videosValidos.map((c) => (c.videoUrl ? (Number(c.duracao) > 0 ? Promise.resolve(Number(c.duracao)) : probarDuracaoVideo(c.videoUrl)) : Promise.resolve(null)))
   );
 
   let inicio = 0;
@@ -198,6 +199,7 @@ export default async function handler(req, res) {
       duracao: duracaoTotalAudio,
       marca: marca || '',
       cta: String(req.body.cta || '').slice(0, 60), // chamada grande nos últimos segundos (ex.: WhatsApp da empresa)
+      ...(req.body.legenda === false ? { legenda: false } : {}), // documentário para dormir: sem legenda na tela
       audio: temAudioSegments
         ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length }))
         : [{ url: audioUrl, start: 0, length: duracaoTotalAudio }],
