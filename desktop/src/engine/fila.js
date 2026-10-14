@@ -358,6 +358,39 @@ class Fila extends EventEmitter {
     return criados;
   }
 
+  /**
+   * Próximo horário livre para publicar neste canal, respeitando o máximo de vídeos por dia
+   * (config "limitePorDia", padrão 2). Devolve null quando ainda cabe vídeo hoje (sobe na hora).
+   * Conta os vídeos já enviados hoje e os já agendados para os próximos dias neste canal.
+   */
+  proximaVagaDoCanal(canalId, jobAtual) {
+    const cfg = this.obterConfig() || {};
+    const limite = Math.max(1, Number(cfg.limitePorDia) || 2);
+    const horarios = [12, 19, 9, 15, 21]; // 1º vídeo do dia ao meio-dia, 2º às 19h...
+    const chaveDia = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    const porDia = {};
+    for (const x of this.jobs) {
+      if (x === jobAtual || x.status !== 'concluido' || !x.youtube) continue;
+      const mesmoCanal = (x.envio?.canalId || x.projeto?.publicar?.canalId) === canalId;
+      if (!mesmoCanal) continue;
+      const quando = new Date(x.youtube.agendadoPara || x.concluidoEm || 0);
+      if (!quando.getTime()) continue;
+      const k = chaveDia(quando);
+      porDia[k] = (porDia[k] || 0) + 1;
+    }
+    const agora = new Date();
+    if ((porDia[chaveDia(agora)] || 0) < limite) return null;
+    for (let i = 1; i <= 60; i++) {
+      const dia = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i);
+      const usados = porDia[chaveDia(dia)] || 0;
+      if (usados < limite) {
+        dia.setHours(horarios[usados % horarios.length], 0, 0, 0);
+        return dia;
+      }
+    }
+    return null;
+  }
+
   async processarEnvio(job) {
     const cfg = this.obterConfig();
     const e = job.envio;
@@ -411,7 +444,17 @@ class Fila extends EventEmitter {
         }
       }
       if (job.cancelado) throw new Error('CANCELADO');
-      this.atualizar(job, { etapa: 'Enviando para o YouTube' });
+      // Trava de envios por dia: se o PC ficou desligado e acumulou vídeos, não solta todos de uma vez
+      // (o YouTube derruba o alcance de canal que posta muitos vídeos no mesmo dia). O excedente
+      // sobe como "agendado" para os próximos dias, no próximo horário livre.
+      if (!e.agendarPara && e.privacidade !== 'private' && e.privacidade !== 'unlisted') {
+        const vaga = this.proximaVagaDoCanal(e.canalId, job);
+        if (vaga) {
+          e.agendarPara = vaga.toISOString();
+          this.salvar();
+        }
+      }
+      this.atualizar(job, { etapa: e.agendarPara ? 'Enviando para o YouTube (agendado)' : 'Enviando para o YouTube' });
       const r = await YT.publicar({
         credenciais: cfg.google,
         redirectOriginal: canal.redirect,

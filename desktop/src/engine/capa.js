@@ -35,7 +35,8 @@ async function fraseDeEfeito(groqKey, { titulo, descricao }) {
               'Você cria o TEXTO DA CAPA (thumbnail) de vídeos do YouTube em português do Brasil, para canais cristãos e de música. ' +
               'Responda só JSON: {"frase": "...", "destaque": "..."}. ' +
               'frase: de 2 a 5 palavras, em CAIXA ALTA, frase de efeito que dá vontade de clicar (curiosidade, emoção, promessa), sem repetir o título inteiro, sem emoji, sem aspas, sem hashtag. ' +
-              'Exemplos: "ELE NÃO DESISTIU", "DEUS OUVIU O CHORO", "O MILAGRE QUE NINGUÉM VIU", "1 HORA DE PAZ", "LOUVE ANTES DA VITÓRIA". ' +
+              'Em vídeos de HISTÓRIA BÍBLICA (não música/oração), prefira uma PERGUNTA curta ou um segredo que só o vídeo responde, ligado ao título: "ONDE ELE ESTAVA?", "O QUE ELES VIRAM?", "3 DIAS DE SILÊNCIO", "ELE NEGOU 3 VEZES". ' +
+              'Exemplos para música/oração: "DEUS OUVIU O CHORO", "1 HORA DE PAZ", "LOUVE ANTES DA VITÓRIA". ' +
               'destaque: UMA palavra da frase para ficar em amarelo (a mais forte).',
           },
           { role: 'user', content: `Título do vídeo: ${titulo || ''}\n${descricao ? `Descrição: ${String(descricao).slice(0, 600)}` : ''}` },

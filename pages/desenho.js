@@ -51,7 +51,7 @@ export default function Desenho() {
   const tema = usarCustom ? temaCustom : (HISTORIAS.find((h) => h.nome === historiaEscolhida)?.tema || '');
 
   const [formato, setFormato] = useState('longo');
-  const [duracaoDesejada, setDuracaoDesejada] = useState('420');
+  const [duracaoDesejada, setDuracaoDesejada] = useState('720');
   const [vozId, setVozId] = useState('');
   const [modeloVoz, setModeloVoz] = useState('eleven');
   const [motorRender, setMotorRender] = useState('pc');
@@ -309,6 +309,7 @@ export default function Desenho() {
                 <>
                   <option value="420">7 minutos</option>
                   <option value="600">10 minutos</option>
+                  <option value="720">12 minutos (recomendado)</option>
                   <option value="900">15 minutos</option>
                 </>
               )}

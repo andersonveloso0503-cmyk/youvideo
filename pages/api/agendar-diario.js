@@ -30,7 +30,7 @@ export default async function handler(req, res) {
 
     const ultimoFormato = ultimoAutoSnap.empty ? null : ultimoAutoSnap.docs[0].data().formato;
     const formato = ultimoFormato === 'longo' ? 'short' : 'longo';
-    const duracaoDesejada = formato === 'short' ? '180' : '420';
+    const duracaoDesejada = formato === 'short' ? '180' : '720';
 
     // Anima só 1 vídeo a cada 7 (uma vez por semana) — o resto sai estático,
     // pra caber no orçamento combinado.

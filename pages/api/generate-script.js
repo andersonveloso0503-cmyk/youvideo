@@ -1,4 +1,4 @@
-import { variacaoRoteiro } from '../../lib/ganchos';
+import { variacaoRoteiro, ESTRUTURA_MISTERIO, THUMB_TITULO, THUMB_SUBTITULO, instrucaoVideoLongo } from '../../lib/ganchos';
 
 // Aumenta o limite de execução da função (padrão é bem curto e cortava
 // respostas de IA mais demoradas no meio). Precisa do plano Pro do
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GROQ_API_KEY não configurada no Vercel' });
   }
 
-  const duracaoSegundos = Number(duracaoDesejada) || (formato === 'short' ? 180 : 420);
+  const duracaoSegundos = Number(duracaoDesejada) || (formato === 'short' ? 180 : 720);
   const palavrasAlvo = Math.round(duracaoSegundos * 2.3); // ritmo médio de narração em português
   const duracaoMin = Math.floor(duracaoSegundos / 60);
   const duracaoSeg = duracaoSegundos % 60;
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   const formatoInstrucao =
     formato === 'short'
       ? `Formato Short: a narração precisa ter aproximadamente ${palavrasAlvo} palavras (pra durar bem perto de ${duracaoMin > 0 ? `${duracaoMin}min ` : ''}${duracaoSeg}s ao ser falada), gancho forte nos primeiros 3 segundos, ritmo direto.`
-      : `Formato vídeo longo: a narração precisa ter aproximadamente ${palavrasAlvo} palavras (pra durar bem perto de ${duracaoMin}min ao ser falada), com introdução, desenvolvimento e conclusão bem desenvolvidos — não encurte o conteúdo, expanda com contexto histórico e detalhes da história pra atingir esse tamanho.`;
+      : instrucaoVideoLongo(palavrasAlvo, duracaoMin);
 
   const varia = variacaoRoteiro(); // abertura e título diferentes a cada vídeo
   const prompt = `Você é roteirista de um canal de histórias bíblicas no YouTube.
@@ -35,16 +35,16 @@ IMPORTANTE:
 - Descreva cenas de forma visualmente segura para geração por IA: evite completamente palavras como "cruz", "crucificação", "sangue", "ferimentos", "soldados armados", "chicote", "coroa de espinhos", "espada", "faca", "lança", "arma" nas descrições visuais — mesmo cenas de conflito ou perseguição devem ser descritas sem mencionar objetos que cortam ou ferem. Também evite descrever personagens sem camisa/torso nu, mesmo em cenas de trabalho braçal ou calor — vista sempre os personagens com roupas típicas da época, completas. Mesmo cenas de sofrimento ou morte devem ser descritas de forma simbólica e indireta (ex: "silhueta ao entardecer, luz dourada, expressão serena", "figura solitária numa colina, céu dramático") em vez de literal. Transmita a emoção pela luz, composição e expressão do rosto, nunca por elementos de violência explícitos na descrição.
 - Não copie trechos literais de nenhuma tradução da Bíblia; narre a história com suas próprias palavras, de forma envolvente e fiel ao relato.
 - Divida a narração em cenas curtas, pensando em cada cena como um clipe de vídeo separado.
-- GATILHOS DE RETENÇÃO (aplique de verdade, não apenas mencione):
+${formato === 'short' ? '' : ESTRUTURA_MISTERIO + '\n'}- GATILHOS DE RETENÇÃO (aplique de verdade, não apenas mencione):
   1. ABERTURA (primeiros 3-5 segundos): ${varia.abertura}. É PROIBIDO começar com ${varia.proibidas} ou qualquer apresentação genérica.
   2. No meio da narração, insira pelo menos um "gancho de continuidade" (ex: "mas o que aconteceu a seguir mudaria tudo...") pra segurar quem está pensando em sair.
   3. Termine com uma pergunta reflexiva pro espectador ou um convite claro pra comentar/seguir a série (ex: "Você já passou por uma situação parecida? Conta nos comentários.").
   4. Use frases curtas e diretas na narração, evite parágrafos longos e formais — o tom deve soar como alguém contando uma história empolgante, não uma aula.
 - Retorne APENAS um JSON válido, sem texto antes ou depois, no formato:
 {
-  "titulo": "título no estilo ${varia.titulo}. Chamativo mas não enganoso, em português",
-  "thumbnailTitulo": "o NOME do personagem principal, ou no máximo 2 palavras, pra aparecer BEM GRANDE na thumbnail como título de pôster de filme (ex: 'LUCAS', 'A TRAIÇÃO', 'O MILAGRE'), em maiúsculas, em português",
-  "thumbnailSubtitulo": "frase curta de 4 a 7 palavras que gera curiosidade/mistério e reforça o CTA de clicar, pra aparecer menor logo abaixo do título (ex: 'A HISTÓRIA QUE NINGUÉM CONTOU', 'O QUE A BÍBLIA REVELA SOBRE ELE'), em maiúsculas, em português",
+  "titulo": "título no estilo ${varia.titulo}. Até 70 caracteres, desperta curiosidade, chamativo mas não enganoso (a pergunta precisa ser respondida no vídeo), em português",
+  "thumbnailTitulo": "${THUMB_TITULO}",
+  "thumbnailSubtitulo": "${THUMB_SUBTITULO}",
   "descricao": "descrição CURTA e direta para o YouTube, em português: 1 a 2 frases (no máximo 30 palavras) resumindo o vídeo de forma atrativa, sem contar a história inteira nem dar spoiler — só o suficiente pra gerar curiosidade. Depois disso, pule uma linha e coloque de 5 a 8 hashtags relevantes (ex: #biblia #fe #jesus).",
   "tags": ["12 a 15 tags relevantes em português, misturando termos amplos (ex: história bíblica) e específicos (ex: nome do personagem)"],
   "narracao": "texto completo da narração, em português. IMPORTANTE: termine sempre com uma chamada pra ação curta e natural (1-2 frases), variando a forma a cada vídeo — pedindo pra curtir, se inscrever, ativar o sininho e/ou compartilhar, de um jeito que combine com o tom da história (ex: 'Se essa história te tocou, deixa o like, se inscreve e ativa o sininho pra não perder o próximo vídeo da série' ou 'Compartilha esse vídeo com alguém que precisa ouvir isso hoje, e se inscreve aqui pra acompanhar mais histórias como essa'). Não repita sempre a mesma frase.",

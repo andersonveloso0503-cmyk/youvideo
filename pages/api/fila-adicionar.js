@@ -12,7 +12,7 @@ export default async function handler(req, res) {
       tema,
       estilo: estilo || 'realista',
       formato: formato || 'longo',
-      duracaoDesejada: duracaoDesejada || (formato === 'short' ? '180' : '420'),
+      duracaoDesejada: duracaoDesejada || (formato === 'short' ? '180' : '720'),
       status: 'pendente',
       criadoEm: new Date().toISOString(),
     });
