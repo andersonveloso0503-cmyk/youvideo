@@ -338,6 +338,7 @@ export default async function handler(req, res) {
             videoUrl: check.videoUrl,
             thumbnailUrl,
             'fabrica.agendaId': agendaId,
+            comBotao: check.comBotao === true, // botão de like já gravado na montagem: o PC não põe de novo no YouTube
             'fabrica.youtube': item.fabrica.redes?.youtube ? { status: 'pendente' } : null,
           });
         } else if (check.status === 'done') {

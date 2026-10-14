@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     }
     if (acao === 'feito') {
       if (!/^https:\/\//.test(String(req.body.videoUrl || ''))) return res.status(400).json({ erro: 'videoUrl inválido.' });
-      await ref.update({ status: 'feito', videoUrl: req.body.videoUrl, progresso: 1, feitoEm: Date.now(), atualizadoEm: Date.now() });
+      await ref.update({ status: 'feito', videoUrl: req.body.videoUrl, comBotao: req.body.comBotao === true, progresso: 1, feitoEm: Date.now(), atualizadoEm: Date.now() });
       return res.status(200).json({ ok: true });
     }
     if (acao === 'erro') {

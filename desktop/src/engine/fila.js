@@ -733,6 +733,12 @@ class Fila extends EventEmitter {
   }
 
   /** Botão animado "Deixe seu like / Inscreva-se" por cima de um vídeo pronto (versão do YouTube). */
+  /** Clipe animado do botão "Deixe seu like" guardado no PC (feito pela tela ao abrir o app). */
+  arquivoBotaoLike() {
+    const f = path.join(this.dirDados, 'cache', 'botao', 'v2-pt', 'botao.mov');
+    return fs.existsSync(f) ? f : null;
+  }
+
   async aplicarBotao(job, arquivo, botao, curto) {
     const info = await probe(arquivo);
     const W = info.largura, H = info.altura, total = info.duracao || 60;
@@ -785,7 +791,7 @@ class Fila extends EventEmitter {
         await new Promise((ok) => setTimeout(ok, 5000 * tentativa));
       }
     }
-    await Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: job.pedidoId, acao: 'feito', videoUrl } });
+    await Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: job.pedidoId, acao: 'feito', videoUrl, comBotao: !!job.comBotao } });
     this.atualizar(job, { videoUrlSite: videoUrl });
   }
 
@@ -855,13 +861,20 @@ class Fila extends EventEmitter {
       }
       checar();
       const progR = faixa(0.65, 0.35, 'renderizando', 'Gerando vídeo');
+      // Fábrica / fila automática: o botão "Deixe seu like" já sai gravado no vídeo, assim ele aparece
+      // em TODAS as redes (YouTube, Facebook, Instagram, TikTok e Kwai). Vídeo de empresa (tem CTA) fica sem.
+      const botaoLike = job.origemPedido === 'fila' && !rc.cta ? this.arquivoBotaoLike() : null;
+      const inscreverMontagem = botaoLike
+        ? { arquivo: botaoLike, ...(curto ? { tamanho: 46, posicao: 'topo', primeiroSeg: 5, intervaloMin: 0.5 } : { tamanho: 28, posicao: 'inf_dir', primeiroSeg: 10, intervaloMin: 5 }) }
+        : null;
+      job.comBotao = !!botaoLike;
       const saida = caminhoLivre(pasta, nomeSeguro(job.nome));
       const temporario = path.join(dir, 'final.mp4');
       const encoder = cfg.encoder && cfg.encoder !== 'auto' ? cfg.encoder : await detectarEncoder();
       const inicio = Date.now();
       const renderizar = (enc) => R.renderizarFinal({
         fundo: { tipo: 'loop', arquivo: fundo }, audioArquivo: audio, total: rc.duracao, W, H,
-        efeito: { estilo: 'nenhum' }, textura: {}, assArquivo, fontsDir: path.join(dir, 'fonts'), inscrever: null,
+        efeito: { estilo: 'nenhum' }, textura: {}, assArquivo, fontsDir: path.join(dir, 'fonts'), inscrever: inscreverMontagem,
         saida: temporario, encoder: enc, modo, dir, registrarCancelar,
         onProgresso: (x) => {
           progR(x);

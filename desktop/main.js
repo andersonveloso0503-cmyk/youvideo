@@ -727,7 +727,7 @@ app.whenReady().then(() => {
           tipo: it.oracao ? 'oracao' : 'historias', // categoria "Pessoas e blogs" e idioma português (não "Música")
           playlist: it.oracao ? PLAYLISTS_ORACAO[it.oracao.periodo === 'noite' ? 'noite' : 'manha'] : null,
           conteudoIa: true, // histórias feitas com IA: marca no YouTube
-          botao: longo ? null : (() => { const f = path.join(app.getPath('userData'), 'cache', 'botao', 'v2-pt', 'botao.mov'); return fs.existsSync(f) ? f : null; })(),
+          botao: it.comBotao ? null : (() => { const f = path.join(app.getPath('userData'), 'cache', 'botao', 'v2-pt', 'botao.mov'); return fs.existsSync(f) ? f : null; })(),
         }]);
       }
     } catch {

@@ -192,6 +192,7 @@ export default async function handler(req, res) {
           oracao: x.oracao || null,
           formato: x.formato || 'short',
           longo: x.longo === true,
+          comBotao: x.comBotao === true,
           renderId: x.renderId || null, // pedido de montagem no PC: liga o cartão da Fila do Compilador a este vídeo
           corte: x.corte ? { tipo: x.corte.tipo === 'comico' ? 'comico' : 'filme' } : null,
         };
