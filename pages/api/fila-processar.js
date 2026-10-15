@@ -181,17 +181,21 @@ export default async function handler(req, res) {
           // Vídeo longo tem ~30 cenas: gerar todas de uma vez passa do tempo máximo da função.
           // Gera 8 por rodada (o cron roda a cada 5 min) e só segue quando todas estiverem prontas.
           const feitas = item.arquivosParciais || [];
-          // A cada 3 cenas, uma vira vídeo REAL de banco de imagens (Pexels), escolhido pelo clima
-          // da cena (campo "broll" do roteiro): o vídeo ganha movimento e ainda economiza imagem do Flux.
+          // Algumas cenas viram vídeo REAL de banco de imagens (Pexels), pelo campo "broll" do roteiro:
+          // o vídeo ganha movimento e ainda economiza imagem do Flux.
           // Empresa, oração e cortes ficam como estavam.
           const comBroll = !item.marca && !item.oracao && !item.corte;
           const usados = new Set(feitas.map((a) => a.midiaId).filter(Boolean));
           const novas = [];
+          // Vídeo real só onde a fala é sobre lugar/natureza/objeto (a IA deixa "broll" vazio quando fala de
+          // personagem) e no máximo 1 a cada 3 cenas, para a imagem sempre mostrar o que está sendo dito
+          let ultimoBroll = feitas.map((a, k) => (a.videoUrl ? k : -9)).reduce((a, b) => Math.max(a, b), -9);
           for (let i = feitas.length; i < Math.min(item.roteiro.cenas.length, feitas.length + 8); i++) {
             const cena = item.roteiro.cenas[i];
-            if (comBroll && i % 3 === 2 && cena.broll) {
+            if (comBroll && i - ultimoBroll >= 3 && String(cena.broll || '').trim()) {
               const m = await buscarMidiaReal(String(cena.broll), usados).catch(() => null);
               if (m?.videoUrl) {
+                ultimoBroll = i;
                 usados.add(m.id);
                 novas.push({ cena: cena.descricao, textoNarrado: cena.textoNarrado || '', midiaId: m.id, imageUrl: m.imageUrl || null, videoUrl: m.videoUrl, videoLoop: true, duracao: m.duracao || null, animar: false });
                 continue;
