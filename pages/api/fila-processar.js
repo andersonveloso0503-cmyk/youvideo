@@ -240,7 +240,8 @@ export default async function handler(req, res) {
             cta: item.marca ? empresa(item.marca)?.cta : '',
             ...(item.documentario ? { legenda: false } : {}),
           });
-          await ref.update({ duracaoAlvo, renderId, status: 'montando' });
+          // duracaoAlvo só existe quando a narração guarda as palavras (o documentário não guarda)
+          await ref.update({ ...(duracaoAlvo != null ? { duracaoAlvo } : {}), renderId, status: 'montando' });
           break;
         }
 
@@ -270,7 +271,7 @@ export default async function handler(req, res) {
         const faltamEnviar = arquivosAnimados.some((a, i) => i < limiteAnimadas && a.imageUrl && !a.klingTaskId && !a.avisoVideo);
         await ref.update({
           arquivos: arquivosAnimados,
-          duracaoAlvo,
+          ...(duracaoAlvo != null ? { duracaoAlvo } : {}),
           status: faltamEnviar ? 'imagens_ok' : 'animando',
         });
         break;
