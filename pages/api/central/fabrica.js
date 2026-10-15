@@ -154,6 +154,94 @@ async function seriesDaIa(qtd, partes, evitar, pedidos = []) {
     .slice(0, qtd);
 }
 
+
+/** Próximo horário igual ao de `iso` (mesma hora do dia) que esteja pelo menos 2 h no futuro. */
+function proximoHorario(iso) {
+  let t = new Date(iso || Date.now()).getTime();
+  if (!Number.isFinite(t)) t = Date.now();
+  while (t < Date.now() + 2 * 3600e3) t += 24 * 3600e3;
+  return new Date(t).toISOString();
+}
+
+/**
+ * Séries que perderam uma parte (apagada sem querer ou com erro antigo que sumiu da lista):
+ * recria a parte que falta com o mesmo personagem, estilo e canal, ou põe a parte com erro para tentar de novo.
+ * Roda no máximo 1 vez por hora (economiza leituras do banco) e não recria a mesma parte duas vezes.
+ */
+async function completarSeries(db, col) {
+  const cfg = db.collection('youvideo_config').doc('fabrica_series');
+  const c = (await cfg.get()).data() || {};
+  if (c.em && Date.now() - c.em < 3600e3) return;
+  const refeitas = new Set(c.refeitas || []);
+  await cfg.set({ em: Date.now() }, { merge: true });
+  const snap = await col.where('criadoEm', '>=', new Date(Date.now() - 21 * 24 * 3600e3).toISOString()).get();
+  const grupos = {};
+  snap.docs.forEach((d) => {
+    const x = d.data();
+    if (x.origem !== 'fabrica' || !x.serie?.id || !x.serie?.total) return;
+    (grupos[x.serie.id] = grupos[x.serie.id] || []).push(d);
+  });
+  const novasRefeitas = [];
+  for (const [serieId, docs] of Object.entries(grupos)) {
+    const total = docs[0].data().serie.total;
+    // Só mexe em série que já começou a sair (alguma parte pronta); série inteira apagada fica apagada
+    if (!docs.some((d) => d.data().status === 'concluido')) continue;
+    const porParte = {};
+    docs.forEach((d) => (porParte[d.data().serie.parte] = d));
+    for (let parte = 1; parte <= total; parte++) {
+      const marca = `${serieId}#${parte}`;
+      const d = porParte[parte];
+      if (d) {
+        const x = d.data();
+        // Parte com erro que já sumiu da lista: tenta de novo (o cron só olha a janela de dias perto de hoje)
+        if (x.status === 'erro' && x.fabrica?.ativo !== false && !refeitas.has(marca) && x.fabrica?.quando < new Date(Date.now() - 2 * 24 * 3600e3).toISOString()) {
+          await d.ref.update({
+            status: x.statusAntes || 'pendente',
+            tentativas: 0,
+            erro: null,
+            ultimoErro: null,
+            'fabrica.quando': new Date().toISOString(),
+            ...(x.fabrica?.quandoYoutube ? { 'fabrica.quandoYoutube': proximoHorario(x.fabrica.quandoYoutube) } : {}),
+          });
+          novasRefeitas.push(marca);
+        }
+        continue;
+      }
+      if (refeitas.has(marca)) continue; // já recriamos uma vez e o dono apagou de novo: respeita
+      // Só recria a continuação de uma parte que está pronta e ainda na fábrica (lote cancelado de propósito fica cancelado)
+      const ant = porParte[parte - 1]?.data();
+      if (!ant || ant.status !== 'concluido' || ant.fabrica?.ativo === false) continue;
+      const base = ant;
+      const f = base.fabrica || {};
+      const resumo = base.serie.resumos?.[parte - 1] || '';
+      const anteriorYt = ant.fabrica?.quandoYoutube;
+      await col.doc().set({
+        tema: `${base.serie.nome} (Parte ${parte} de ${total})${resumo ? `: ${resumo}` : ''}`,
+        serie: { ...base.serie, parte },
+        estilo: base.estilo,
+        formato: base.formato || 'short',
+        duracaoDesejada: base.duracaoDesejada || '60',
+        animar: base.animar !== false,
+        animacaoCompleta: base.animacaoCompleta === true,
+        status: 'pendente',
+        origem: 'fabrica',
+        completaSerie: true,
+        criadoEm: new Date().toISOString(),
+        fabrica: {
+          ativo: true,
+          lote: f.lote || Date.now().toString(36),
+          quando: new Date().toISOString(),
+          quandoYoutube: f.redes?.youtube ? proximoHorario(anteriorYt ? new Date(new Date(anteriorYt).getTime() + 24 * 3600e3).toISOString() : f.quandoYoutube) : null,
+          redes: f.redes || {},
+          canalYoutube: f.canalYoutube || null,
+        },
+      });
+      novasRefeitas.push(marca);
+    }
+  }
+  if (novasRefeitas.length) await cfg.set({ refeitas: [...refeitas, ...novasRefeitas].slice(-300) }, { merge: true });
+}
+
 export default async function handler(req, res) {
   if (!exigirToken(req, res)) return;
   const db = getDb();
@@ -165,13 +253,21 @@ export default async function handler(req, res) {
       return res.status(200).json(await testarConta(String(req.query.conexao)));
     }
     if (req.method === 'GET') {
+      if (req.query.youtube !== '1') await completarSeries(db, col).catch(() => {});
       // Economia de leituras do banco (o plano grátis tem limite por dia):
       //  - ?youtube=1 (o PC pergunta a cada 2 min): lê só os vídeos que estão esperando para subir no YouTube
       //  - lista da Fábrica: lê só de 3 dias atrás em diante (o que já passou não aparece mais na tela)
       const snap = req.query.youtube === '1'
         ? await col.where('fabrica.youtube.status', 'in', ['pendente', 'enviando', 'erro']).get()
         : await col.where('fabrica.quando', '>=', new Date(Date.now() - 3 * 24 * 3600e3).toISOString()).get();
-      let itens = snap.docs.filter((d) => d.data().fabrica?.ativo === true).map((d) => {
+      // Vídeos com erro aparecem sempre, mesmo os antigos (antes sumiam da lista depois de 3 dias)
+      const docsLista = [...snap.docs];
+      if (req.query.youtube !== '1') {
+        const comErro = await col.where('status', '==', 'erro').get().catch(() => ({ docs: [] }));
+        const ja = new Set(docsLista.map((d) => d.id));
+        comErro.docs.forEach((d) => !ja.has(d.id) && d.data().fabrica && docsLista.push(d));
+      }
+      let itens = docsLista.filter((d) => d.data().fabrica?.ativo === true).map((d) => {
         const x = d.data();
         return {
           id: d.id,
@@ -695,7 +791,16 @@ export default async function handler(req, res) {
     if (b.acao === 'repetir') {
       // Continua da etapa em que parou (não gera tudo de novo)
       const d = (await ref.get()).data() || {};
-      await ref.update({ status: d.statusAntes || 'pendente', tentativas: 0, erro: null, ultimoErro: null });
+      const antigo = d.fabrica?.quando && d.fabrica.quando < new Date(Date.now() - 2 * 24 * 3600e3).toISOString();
+      await ref.update({
+        status: d.statusAntes || 'pendente',
+        tentativas: 0,
+        erro: null,
+        ultimoErro: null,
+        // Erro antigo: traz para hoje (o cron só olha os vídeos perto da data) e marca o YouTube para o próximo horário livre
+        ...(antigo ? { 'fabrica.quando': new Date().toISOString() } : {}),
+        ...(antigo && d.fabrica?.quandoYoutube ? { 'fabrica.quandoYoutube': proximoHorario(d.fabrica.quandoYoutube) } : {}),
+      });
       return res.status(200).json({ ok: true });
     }
     return res.status(400).json({ erro: 'Ação desconhecida.' });
