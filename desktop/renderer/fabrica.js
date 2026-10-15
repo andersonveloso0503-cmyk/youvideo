@@ -451,6 +451,17 @@ const Fabrica = (() => {
         };
         if (i.videoUrl) botao('▶', 'Assistir', () => window.api.abrir.link(i.videoUrl));
         if (i.status === 'erro') botao('↻', 'Tentar de novo (continua de onde parou)', async () => { await window.api.fabrica.acao({ id: i.id, acao: 'repetir' }); carregar(); });
+        if (i.longo) botao('⤢', 'Refazer mais longo (roteiro novo, mesmo tema e horário)', async () => {
+          const min = Math.round(Number(q('#fabLgDuracao')?.value || 720) / 60);
+          if (!confirm(`Refazer "${i.titulo || i.tema}" com uns ${min} minutos?\n\nA fábrica escreve um roteiro novo (mesmo tema e mesmo horário) e monta de novo. O custo é o de um vídeo novo (imagens e voz).${i.youtube?.status === 'ok' ? '\n\nEste já subiu para o YouTube: apague o antigo no YouTube Studio para não ficar repetido.' : ''}`)) return;
+          try {
+            const r = await window.api.fabrica.acao({ id: i.id, acao: 'refazer-longo', duracao: Number(q('#fabLgDuracao')?.value || 720) });
+            avisar(r?.jaNoYoutube ? 'Refazendo. Lembre de apagar o vídeo antigo no YouTube Studio.' : 'Refazendo com roteiro mais longo');
+          } catch (e) {
+            avisar(msgErro(e), true);
+          }
+          carregar();
+        });
         botao('🗑', i.status === 'concluido' ? 'Tirar da fábrica e da agenda das redes' : 'Cancelar este vídeo', async () => {
           if (!confirm(`Tirar "${i.titulo || i.tema}" da fábrica?`)) return;
           await window.api.fabrica.acao({ id: i.id, acao: 'cancelar' });

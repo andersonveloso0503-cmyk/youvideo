@@ -656,6 +656,42 @@ export default async function handler(req, res) {
       }
       return res.status(200).json({ ok: true });
     }
+    // Vídeo longo que saiu curto: cria de novo com o mesmo tema e o mesmo horário (roteiro novo, em blocos)
+    // e tira o antigo da fábrica. O vídeo que já tiver subido no YouTube o dono apaga lá.
+    if (b.acao === 'refazer-longo') {
+      const d = (await ref.get()).data();
+      if (!d || !d.longo) return res.status(400).json({ erro: 'Só dá para refazer vídeos longos.' });
+      const f = d.fabrica || {};
+      const novo = col.doc();
+      await novo.set({
+        tema: d.tema,
+        longo: true,
+        estilo: d.estilo || 'realista',
+        formato: 'longo',
+        duracaoDesejada: String(Math.max(480, Math.min(1200, Number(b.duracao) || Number(d.duracaoDesejada) || 720))),
+        animar: false,
+        status: 'pendente',
+        origem: 'fabrica',
+        refeitoDe: ref.id,
+        criadoEm: new Date().toISOString(),
+        fabrica: {
+          ativo: true,
+          lote: f.lote || Date.now().toString(36),
+          quando: f.quando,
+          quandoYoutube: f.quandoYoutube || f.quando,
+          redes: f.redes || {},
+          canalYoutube: f.canalYoutube || null,
+        },
+      });
+      const jaNoYoutube = f.youtube?.status === 'ok' ? f.youtube.url || 'sim' : '';
+      if (d.status === 'concluido') {
+        await ref.update({ 'fabrica.ativo': false });
+        if (f.agendaId) await db.collection('youvideo_agenda').doc(f.agendaId).delete().catch(() => {});
+      } else {
+        await ref.delete();
+      }
+      return res.status(200).json({ ok: true, id: novo.id, jaNoYoutube });
+    }
     if (b.acao === 'repetir') {
       // Continua da etapa em que parou (não gera tudo de novo)
       const d = (await ref.get()).data() || {};
