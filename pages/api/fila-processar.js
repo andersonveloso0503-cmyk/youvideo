@@ -5,6 +5,7 @@ import { empresa, gerarRoteiroEmpresa } from '../../lib/empresa';
 import { gerarRoteiroOracaoDia } from '../../lib/oracaoDia';
 import { buscarSaldoFal } from '../../lib/orcamento';
 import { passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario } from '../../lib/documentario';
+import { EPISODIOS } from '../../lib/documentarioEpisodios';
 import {
   gerarRoteiro,
   garantirChamada,
@@ -325,7 +326,15 @@ export default async function handler(req, res) {
           let thumbnailUrl = primeiraImagem;
           if (item.documentario) {
             // Documentário: foto real escurecida + a pergunta da capa
-            thumbnailUrl = (await thumbDocumentario({ fotoUrl: item.capaUrl || primeiraImagem, texto: item.roteiro.thumbnailTitulo })) || primeiraImagem;
+            // Episódios criados antes da capa pintada: pega título, subtítulo e pintura do episódio escrito
+            const ep = EPISODIOS.find((e) => e.id === item.episodioId) || {};
+            thumbnailUrl =
+              (await thumbDocumentario({
+                fotoUrl: item.capaUrl || primeiraImagem,
+                texto: ep.thumb || item.roteiro.thumbnailTitulo,
+                subtitulo: ep.thumbSub || item.roteiro.thumbnailSubtitulo,
+                arte: ep.arte || item.roteiro.arte,
+              })) || primeiraImagem;
           } else if (item.formato !== 'short') {
             // Vídeo longo: thumbnail de verdade, com a frase grande do mistério (ex.: "ONDE ELE ESTAVA?")
             try {
