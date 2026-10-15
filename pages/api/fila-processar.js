@@ -4,7 +4,7 @@ import { agendarItemPronto } from '../../lib/fabrica';
 import { empresa, gerarRoteiroEmpresa } from '../../lib/empresa';
 import { gerarRoteiroOracaoDia } from '../../lib/oracaoDia';
 import { buscarSaldoFal } from '../../lib/orcamento';
-import { passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario } from '../../lib/documentario';
+import { passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario, temposDasCenas, buscarMidiaReal } from '../../lib/documentario';
 import { EPISODIOS } from '../../lib/documentarioEpisodios';
 import {
   gerarRoteiro,
@@ -181,12 +181,24 @@ export default async function handler(req, res) {
           // Vídeo longo tem ~30 cenas: gerar todas de uma vez passa do tempo máximo da função.
           // Gera 8 por rodada (o cron roda a cada 5 min) e só segue quando todas estiverem prontas.
           const feitas = item.arquivosParciais || [];
-          const novas = await gerarImagens({
-            cenas: item.roteiro.cenas.slice(feitas.length, feitas.length + 8),
-            estilo: item.estilo,
-            formato: item.formato,
-            visual: visualImg,
-          });
+          // A cada 3 cenas, uma vira vídeo REAL de banco de imagens (Pexels), escolhido pelo clima
+          // da cena (campo "broll" do roteiro): o vídeo ganha movimento e ainda economiza imagem do Flux.
+          // Empresa, oração e cortes ficam como estavam.
+          const comBroll = !item.marca && !item.oracao && !item.corte;
+          const usados = new Set(feitas.map((a) => a.midiaId).filter(Boolean));
+          const novas = [];
+          for (let i = feitas.length; i < Math.min(item.roteiro.cenas.length, feitas.length + 8); i++) {
+            const cena = item.roteiro.cenas[i];
+            if (comBroll && i % 3 === 2 && cena.broll) {
+              const m = await buscarMidiaReal(String(cena.broll), usados).catch(() => null);
+              if (m?.videoUrl) {
+                usados.add(m.id);
+                novas.push({ cena: cena.descricao, textoNarrado: cena.textoNarrado || '', midiaId: m.id, imageUrl: m.imageUrl || null, videoUrl: m.videoUrl, videoLoop: true, duracao: m.duracao || null, animar: false });
+                continue;
+              }
+            }
+            novas.push(...(await gerarImagens({ cenas: [cena], estilo: item.estilo, formato: item.formato, visual: visualImg })));
+          }
           const todas = [...feitas, ...novas];
           if (todas.length < item.roteiro.cenas.length) {
             await ref.update({ arquivosParciais: todas });
@@ -214,6 +226,19 @@ export default async function handler(req, res) {
       }
 
       case 'imagens_ok': {
+        // Sincroniza cada imagem com a fala: a cena entra no segundo em que a frase dela começa
+        // (antes o tempo era dividido igualmente entre as cenas). Corte e documentário já vêm com tempo.
+        if (!item.corte && !item.documentario && (item.narracao?.palavras || []).length && (item.arquivos || []).every((a) => a.start == null)) {
+          const pal = item.narracao.palavras.filter((p) => p.end != null);
+          const duracaoTotal = (item.narracao.audioSegments || []).length > 1
+            ? Math.max(...item.narracao.audioSegments.map((x) => x.start + x.length))
+            : (pal[pal.length - 1]?.end || 0) + 0.4;
+          const tempos = temposDasCenas((item.roteiro.cenas || []).map((c) => c.textoNarrado || ''), pal, duracaoTotal);
+          if (tempos.length === item.arquivos.length) {
+            item.arquivos = item.arquivos.map((a, i) => ({ ...a, ...tempos[i] }));
+            await ref.update({ arquivos: item.arquivos });
+          }
+        }
         const emLoop = !!item.fabrica; // fábrica: animação em loop, sem imagem parada
         const numCenas = item.roteiro.cenas.length || 1;
         const ultimaPalavra = (item.narracao.palavras || []).filter((p) => p.end != null).pop();
@@ -258,7 +283,7 @@ export default async function handler(req, res) {
         for (let i = 0; i < arquivosAnimados.length && enviadosNesseLote < LOTE; i++) {
           const arquivo = arquivosAnimados[i];
           if (i >= limiteAnimadas) break;
-          if (!arquivo.imageUrl || arquivo.klingTaskId || arquivo.avisoVideo) continue;
+          if (!arquivo.imageUrl || arquivo.videoUrl || arquivo.klingTaskId || arquivo.avisoVideo) continue;
           try {
             const { requestId, statusUrl, responseUrl } = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo, emLoop);
             arquivosAnimados[i] = { ...arquivo, klingTaskId: requestId, statusUrl, responseUrl, ...(emLoop ? { videoLoop: true } : {}) };
@@ -268,7 +293,7 @@ export default async function handler(req, res) {
           enviadosNesseLote++;
         }
 
-        const faltamEnviar = arquivosAnimados.some((a, i) => i < limiteAnimadas && a.imageUrl && !a.klingTaskId && !a.avisoVideo);
+        const faltamEnviar = arquivosAnimados.some((a, i) => i < limiteAnimadas && a.imageUrl && !a.videoUrl && !a.klingTaskId && !a.avisoVideo);
         await ref.update({
           arquivos: arquivosAnimados,
           ...(duracaoAlvo != null ? { duracaoAlvo } : {}),
