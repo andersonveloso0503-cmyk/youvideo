@@ -315,6 +315,7 @@ const Fabrica = (() => {
         animacao: anim === 'nada' ? 'nada' : 'tudo',
         animacaoCompleta: anim === 'todas',
         duracao: Number(q('#fabIfDuracao').value),
+        shortsMusica: q('#fabIfShorts').value !== 'nao',
         vozId: q('#fabIfVoz').value.trim(),
         temas,
         canalYoutube: canal ? { id: canal.id, titulo: canal.titulo } : null,

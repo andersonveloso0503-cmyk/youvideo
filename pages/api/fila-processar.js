@@ -15,6 +15,9 @@ import {
   linhaDoTempo,
   vozesDosPersonagens,
   falasDoBloco,
+  escutarFala,
+  falaConfere,
+  reencaixarBloco,
   gerarEfeitosSonoros,
   duracaoMp3,
   ESTILO_MUSICA,
@@ -81,7 +84,8 @@ export default async function handler(req, res) {
   // foi dividida em mais de um pedaço (textos longos passam do limite de
   // caracteres da ElevenLabs numa chamada só).
   const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta, legenda, semBotao }) => {
-    const temVariosPedacos = (audioSegments || []).length > 1;
+    // Um pedaço só e sem palavras (Short da música): manda o pedaço com a duração, senão a montagem não sabe o tamanho
+    const temVariosPedacos = (audioSegments || []).length > 1 || ((audioSegments || []).length === 1 && !(palavras || []).length);
     const r = await fetch(`${baseUrl}/api/assemble-video`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -201,8 +205,7 @@ export default async function handler(req, res) {
           const vi = item.vozInfantil || {};
           const vozNarrador = item.vozId || process.env.INFANTIL_VOICE_ID || undefined;
           const modeloIf = item.modelo || process.env.ELEVENLABS_MODELO_PADRAO;
-          const gerarBloco = async (cenas) => {
-            const falas = falasDoBloco(cenas);
+          const gerarFalas = async (falas) => {
             const vozes = await vozesDosPersonagens({ personagem: item.infantil.personagem, falas, vozNarrador });
             const v = await chamarApi('/api/generate-voice-dialogo', {
               falas: falas.map((f) => ({ personagem: f.personagem, texto: f.texto, vozTipo: f.vozTipo, ...(f.sexo ? { sexo: f.sexo } : {}) })),
@@ -212,14 +215,67 @@ export default async function handler(req, res) {
             if (!v.audioSegments?.length) throw new Error('As vozes do episódio vieram vazias.');
             return { audioUrl: v.audioUrl, audioSegments: v.audioSegments, cenasComTempo: v.cenasComTempo || [] };
           };
+          const gerarBloco = (cenas) => gerarFalas(falasDoBloco(cenas));
+          // Conferência: escuta cada fala (12 por rodada) e refaz as que não batem com o roteiro.
+          // Devolve true quando o bloco inteiro está conferido.
+          const conferir = async (nome, cenas) => {
+            if (vi.ok?.[nome]) return true;
+            const falas = falasDoBloco(cenas);
+            let voz = vi[nome];
+            const conf = vi.conf?.[nome] || { i: 0, tent: {} };
+            const ate = Math.min(falas.length, conf.i + 12);
+            let mudou = false;
+            for (let k = conf.i; k < ate; k++) {
+              const seg = voz.audioSegments[k];
+              if (!seg) break;
+              let ouvido;
+              try {
+                ouvido = await escutarFala(seg.url);
+              } catch {
+                break; // Whisper ocupado: continua desta fala na próxima rodada
+              }
+              if (!falaConfere(falas[k].texto, ouvido)) {
+                const t = (conf.tent[k] || 0) + 1;
+                conf.tent[k] = t;
+                if (t > 3) {
+                  // Não acertou nem refazendo: para aqui (nada é publicado) e o ↻ refaz as vozes do bloco do zero
+                  await ref.update({
+                    status: 'erro',
+                    statusAntes: 'roteiro_ok',
+                    erro: `A fala ${k + 1} (${falas[k].personagem}) não saiu igual ao roteiro nem refazendo 3 vezes: "${falas[k].texto.slice(0, 60)}". Ouvido: "${ouvido.texto.slice(0, 60)}". Clique em ↻ para refazer as vozes.`,
+                    [`vozInfantil.${nome}`]: null,
+                    [`vozInfantil.conf.${nome}`]: null,
+                  });
+                  return false;
+                }
+                const nova = await gerarFalas([falas[k]]);
+                voz = { ...voz, audioSegments: voz.audioSegments.map((x, j) => (j === k ? { ...x, url: nova.audioSegments[0].url, length: nova.audioSegments[0].length } : x)) };
+                voz = reencaixarBloco(voz);
+                mudou = true;
+                conf.i = k; // escuta de novo a fala refeita na próxima rodada
+                await ref.update({ [`vozInfantil.${nome}`]: voz, [`vozInfantil.conf.${nome}`]: conf });
+                return false;
+              }
+              conf.i = k + 1;
+            }
+            const pronto = conf.i >= falas.length;
+            await ref.update({
+              ...(mudou ? { [`vozInfantil.${nome}`]: voz } : {}),
+              [`vozInfantil.conf.${nome}`]: conf,
+              ...(pronto ? { [`vozInfantil.ok.${nome}`]: true } : {}),
+            });
+            return false; // conferido: segue na próxima rodada (não estoura o tempo da função)
+          };
           if (!vi.antes) {
             await ref.update({ 'vozInfantil.antes': await gerarBloco(item.roteiro.antes) });
             break;
           }
+          if (!(await conferir('antes', item.roteiro.antes))) break;
           if (!vi.depois) {
             await ref.update({ 'vozInfantil.depois': await gerarBloco(item.roteiro.depois) });
             break;
           }
+          if (!(await conferir('depois', item.roteiro.depois))) break;
           if (!vi.musica) {
             // Música cantada pelo Estúdio de Música (ElevenLabs, com direito de uso comercial)
             const r = await chamarApi('/api/estudio/gerar', {
@@ -511,7 +567,7 @@ export default async function handler(req, res) {
           // o Compilador sobe agendado no canal escolhido; as outras redes vão para a Agenda.
           const primeiraImagem = (item.arquivos || []).find((x) => x.imageUrl)?.imageUrl || null;
           let thumbnailUrl = primeiraImagem;
-          if (item.infantil) {
+          if (item.infantil && !item.shortMusica) {
             // Desenho infantil: o personagem grande e alegre (o Compilador põe o título por cima, se quiser)
             thumbnailUrl = (await thumbInfantil({ personagem: item.infantil.personagem, referencia: item.infantil.refUrl, titulo: item.roteiro.titulo, thumbnailTitulo: item.roteiro.thumbnailTitulo, cena: (item.roteiro.cenas || []).find((c) => c.bloco === 'antes' && !/close-up/i.test(c.descricao))?.descricao || '' }).catch(() => null)) || primeiraImagem;
           } else if (item.documentario) {
@@ -562,6 +618,51 @@ export default async function handler(req, res) {
             comBotao: check.comBotao === true, // botão de like já gravado na montagem: o PC não põe de novo no YouTube
             'fabrica.youtube': item.fabrica.redes?.youtube ? { status: 'pendente' } : null,
           });
+          // Desenho infantil: o clipe da música vira um Short vertical, que sai no dia seguinte (mesmo horário)
+          if (item.infantil && !item.shortMusica && !item.infantil.teste && item.infantil.shortsMusica !== false && item.vozInfantil?.musica?.audioUrl) {
+            try {
+              const cenasMus = (item.arquivos || []).filter((a) => a.bloco === 'musica' && (a.videoUrl || a.imageUrl) && a.start != null);
+              const ini = cenasMus[0]?.start || 0;
+              const dur = Number(item.vozInfantil.musica.duracao) || 60;
+              if (cenasMus.length) {
+                const base = item.fabrica.quandoYoutube || item.fabrica.quando;
+                const quando = new Date(new Date(base).getTime() + 24 * 3600e3).toISOString();
+                const nomeMus = item.roteiro.musica?.titulo || 'Música do episódio';
+                const quem = item.infantil.personagem?.nome || 'Pingo';
+                await db.collection('youvideo_fila').add({
+                  tema: `${nomeMus} (Short da música)`,
+                  infantil: { ...item.infantil, teste: false },
+                  shortMusica: true,
+                  estilo: 'infantil',
+                  formato: 'short',
+                  animar: false,
+                  roteiro: {
+                    titulo: `${nomeMus} 🎵 ${quem} | Música Infantil`.slice(0, 95),
+                    descricao: `Canta junto com o ${quem}! 🎵 "${nomeMus}", a música do episódio "${String(item.roteiro.titulo || '').split('|')[0].trim()}".\n\n${item.roteiro.musica?.letra || ''}\n\n#musicainfantil #${quem.replace(/\s+/g, '')} #PlanetaFofura #Shorts`.slice(0, 4500),
+                    tags: ['música infantil', 'musica para criança', quem, 'Planeta Fofura', 'cantar junto', ...(item.roteiro.tags || [])].slice(0, 18),
+                    musica: { titulo: nomeMus },
+                    licao: item.roteiro.licao || '',
+                  },
+                  narracao: { audioUrl: item.vozInfantil.musica.audioUrl, audioSegments: [{ url: item.vozInfantil.musica.audioUrl, start: 0, length: dur }], palavras: [] },
+                  arquivos: cenasMus.map((a) => ({ ...a, start: Number((a.start - ini).toFixed(2)), klingTaskId: null })),
+                  status: 'imagens_ok',
+                  origem: 'fabrica',
+                  criadoEm: new Date().toISOString(),
+                  fabrica: {
+                    ativo: true,
+                    lote: item.fabrica.lote,
+                    quando,
+                    quandoYoutube: quando,
+                    redes: { youtube: true, facebook: !!item.fabrica.redes?.facebook, instagram: false, tiktok: false, kwai: false },
+                    canalYoutube: item.fabrica.canalYoutube || null,
+                    ...(item.fabrica.conta ? { conta: item.fabrica.conta } : {}),
+                  },
+                });
+              }
+            } catch {
+              /* o Short da música é um extra: se falhar, o episódio segue normal */
+            }
+          }
         } else if (check.status === 'done') {
           const thumbnailUrl = await gerarThumbnail({
             tema: item.tema,

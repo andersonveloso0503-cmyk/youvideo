@@ -297,7 +297,7 @@ export default async function handler(req, res) {
           formato: x.formato || 'short',
           longo: x.longo === true,
           documentario: x.documentario === true,
-          infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true } : null,
+          infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true, shortMusica: x.shortMusica === true } : null,
           comBotao: x.comBotao === true,
           renderId: x.renderId || null, // pedido de montagem no PC: liga o cartão da Fila do Compilador a este vídeo
           corte: x.corte ? { tipo: x.corte.tipo === 'comico' ? 'comico' : 'filme' } : null,
@@ -489,7 +489,7 @@ export default async function handler(req, res) {
           const ref = col.doc();
           batchIf.set(ref, {
             tema,
-            infantil: { personagem, ...(testeIf ? { teste: true } : {}) },
+            infantil: { personagem, ...(testeIf ? { teste: true } : {}), shortsMusica: b.shortsMusica !== false },
             estilo: 'infantil',
             formato: 'longo',
             duracaoDesejada: String(Math.max(180, Math.min(600, Number(b.duracao) || 270))), // 4–5 min ou ~8 min

@@ -645,6 +645,9 @@ app.whenReady().then(() => {
           // Vídeo longo: título (pergunta/mistério), descrição e tags já vêm prontos do roteiro do site.
           // Não reescreve com a IA de Shorts para não perder o título de curiosidade.
           seoOk = true;
+        } else if (it.infantil) {
+          // Desenho infantil (episódio ou Short da música): título, descrição e tags já vêm prontos do site
+          seoOk = true;
         } else if (it.oracao) {
           // Oração do dia: o título já vem pronto no formato que as pessoas procuram ("Oração da Manhã de 7 de Outubro: ...")
           const periodo = it.oracao.periodo === 'noite' ? 'oraçãodanoite' : 'oraçãodamanhã';
@@ -728,6 +731,11 @@ app.whenReady().then(() => {
           // Desenho infantil: cada personagem é uma série com a sua playlist (ex.: "As Aventuras do Pingo — Historinhas e Músicas")
           playlist: it.oracao
             ? PLAYLISTS_ORACAO[it.oracao.periodo === 'noite' ? 'noite' : 'manha']
+            : it.infantil?.shortMusica
+              ? {
+                  titulo: `Músicas do ${it.infantil.personagem || 'Pingo'} — Canta Junto!`,
+                  descricao: `As músicas dos episódios do ${it.infantil.personagem || 'Pingo'} para cantar e dançar junto. 🎵`,
+                }
             : it.infantil
               ? {
                   titulo: `As Aventuras do ${it.infantil.personagem || 'Pingo'} — Historinhas e Músicas`,
