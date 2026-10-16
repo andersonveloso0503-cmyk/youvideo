@@ -45,7 +45,9 @@ async function prepararAudio(receita, locais, dir, { modo, registrarCancelar }) 
     const corte = p.length ? `atrim=0:${Number(p.length).toFixed(3)},` : '';
     // volume: efeito sonoro mais baixo que as falas (desenho infantil)
     const vol = p.volume != null && Number(p.volume) !== 1 ? `volume=${Math.max(0, Math.min(2, Number(p.volume))).toFixed(2)},` : '';
-    return `[${i}:a]${corte}${vol}aresample=48000,adelay=${ms}:all=1[a${i}]`;
+    // fade: some devagar nos últimos N segundos (música de encerramento do desenho infantil)
+    const fd = p.fade && p.length ? `afade=t=out:st=${Math.max(0, Number(p.length) - Number(p.fade)).toFixed(2)}:d=${Number(p.fade).toFixed(2)},` : '';
+    return `[${i}:a]${corte}${vol}${fd}aresample=48000,adelay=${ms}:all=1[a${i}]`;
   });
   partes.push(`${pedacos.map((_, i) => `[a${i}]`).join('')}amix=inputs=${pedacos.length}:normalize=0:dropout_transition=0,apad[mix]`);
   args.push('-filter_complex', partes.join(';'), '-map', '[mix]', '-t', receita.duracao.toFixed(3), '-c:a', 'aac', '-b:a', '192k', saida);

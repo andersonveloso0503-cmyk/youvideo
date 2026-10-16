@@ -202,7 +202,7 @@ export default async function handler(req, res) {
       ...(req.body.legenda === false ? { legenda: false } : {}), // documentário para dormir: sem legenda na tela
       ...(req.body.semBotao ? { semBotao: true } : {}), // desenho infantil: sem botão de like/inscrever
       audio: temAudioSegments
-        ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length, ...(s.volume != null ? { volume: s.volume } : {}) }))
+        ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length, ...(s.volume != null ? { volume: s.volume } : {}), ...(s.fade ? { fade: s.fade } : {}) }))
         : [{ url: audioUrl, start: 0, length: duracaoTotalAudio }],
       clipes: clipsVideo.map((c) => ({
         tipo: c.asset.type === 'video' ? 'video' : 'imagem',
