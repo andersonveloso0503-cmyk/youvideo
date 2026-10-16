@@ -253,9 +253,18 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px;
 
 /* ---------- Fila ---------- */
 .fila {
-  display: flex; align-items: center; gap: 12px; padding: 8px 16px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 8px 16px 4px;
   border-top: 1px solid var(--borda); background: var(--bg-2); min-height: 92px;
 }
+/* Botões pouco usados da fila: pequenos, numa linha embaixo dos cartões */
+.fila-ferramentas { flex-basis: 100%; display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
+.btn-fila-mini {
+  background: transparent; border: 1px solid var(--borda); border-radius: 6px;
+  padding: 2px 8px; font-size: 11px; font-weight: 600; color: var(--mudo); cursor: pointer;
+}
+.btn-fila-mini:hover { color: var(--texto); border-color: var(--borda-forte); background: var(--bg-3); }
+.btn-fila-link { border-color: transparent; opacity: .7; }
+.btn-fila-perigo:hover { background: var(--terracota); border-color: var(--terracota-forte); color: #fff; }
 .fila-rotulo { display: flex; flex-direction: column; align-items: center; color: var(--mudo); font-size: 10.5px; font-weight: 700; letter-spacing: .1em; }
 .fila-rotulo b { font-size: 16px; color: var(--texto); }
 .fila-cartoes { flex: 1; display: flex; gap: 8px; overflow-x: auto; padding: 2px 0; }

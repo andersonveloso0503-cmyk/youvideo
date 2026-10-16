@@ -104,7 +104,9 @@ const Fabrica = (() => {
       // ~25 imagens (Flux) + narração + música (ElevenLabs) + animação (US$ 0,10 por cena na fal.ai)
       const fator = Number(q('#fabIfDuracao').value) >= 480 ? 1.9 : 1; // 8 min ≈ o dobro de cenas
       // uma imagem por fala (a imagem troca junto com quem fala): ~45 cenas num episódio de 4 min
-      const porEp = ({ todas: 5.5, 3: 1.8, nada: 1.5 }[q('#fabIfAnim').value] || 5.5) * (q('#fabIfAnim').value === '3' ? 1.6 : fator);
+      // animação = ~45 cenas × preço da qualidade escolhida; o resto (imagens, voz, música) ~US$ 1
+      const precoCena = { '720p': 0.1, '580p': 0.075, '480p': 0.05 }[q('#fabIfRes').value] || 0.1;
+      const porEp = ({ todas: 1 + 45 * precoCena, 3: 1 + 3 * precoCena, nada: 1 }[q('#fabIfAnim').value] || 1 + 45 * precoCena) * (q('#fabIfAnim').value === '3' ? 1.6 : fator);
       q('#fabCusto').textContent = `${qtd} episódios · custo aproximado US$ ${Math.max(1, Math.round(qtd * porEp))} (imagens, voz, música e animação) + ~${qtd * 3} mil caracteres e ${qtd} músicas da ElevenLabs`;
       return;
     }
@@ -196,6 +198,8 @@ const Fabrica = (() => {
     q('#fabOrPeriodo').addEventListener('change', () => (q('#fabOrHora').value = q('#fabOrPeriodo').value === 'noite' ? '21:00' : '06:00'));
     q('#btnFabCriar').onclick = criar;
     q('#btnFabIfPrevia').onclick = previaInfantil;
+    q('#btnFabIfComparar').onclick = compararQualidades;
+    q('#fabIfRes').addEventListener('change', custo);
     q('#btnFabAtualizar').onclick = () => carregar(true);
   }
 
@@ -316,6 +320,7 @@ const Fabrica = (() => {
         animacaoCompleta: anim === 'todas',
         duracao: Number(q('#fabIfDuracao').value),
         shortsMusica: q('#fabIfShorts').value !== 'nao',
+        resolucaoAnim: q('#fabIfRes').value,
         vozId: q('#fabIfVoz').value.trim(),
         temas,
         canalYoutube: canal ? { id: canal.id, titulo: canal.titulo } : null,
@@ -378,6 +383,46 @@ const Fabrica = (() => {
     } finally {
       b.disabled = false;
       b.textContent = '👀 Prévia grátis do roteiro';
+    }
+  }
+
+  // Anima a mesma cena em 720p, 580p e 480p e mostra lado a lado (custa uns US$ 0,23)
+  async function compararQualidades() {
+    const erro = q('#fabErro');
+    erro.textContent = '';
+    if (!confirm('Animar a mesma cena nas 3 qualidades para comparar? Custa uns US$ 0,23 na fal.ai e leva uns 2 a 4 minutos.')) return;
+    const b = q('#btnFabIfComparar');
+    b.disabled = true;
+    b.textContent = '🔍 Animando nas 3 qualidades...';
+    try {
+      const { jobs } = await window.api.fabrica.criar({ tipo: 'comparar-anim' });
+      let prontos = [];
+      for (let volta = 0; volta < 60; volta++) {
+        await new Promise((ok) => setTimeout(ok, 6000));
+        const r = await window.api.fabrica.criar({ tipo: 'comparar-status', jobs });
+        prontos = r.jobs || [];
+        if (prontos.every((j) => j.status === 'done' || j.status === 'failed')) break;
+      }
+      const preco = { '720p': 'US$ 0,10', '580p': 'US$ 0,075', '480p': 'US$ 0,05' };
+      let d = document.getElementById('dlgCompararAnim');
+      if (!d) {
+        d = document.createElement('dialog');
+        d.id = 'dlgCompararAnim';
+        d.style.cssText = 'max-width:1200px;width:96vw;border:none;border-radius:16px;padding:20px';
+        document.body.appendChild(d);
+      }
+      d.innerHTML =
+        '<h3 style="margin-top:0">🔍 A mesma cena nas 3 qualidades</h3><p class="nota">Veja em tela cheia (⤢) para notar a diferença. Depois escolha em "Qualidade da animação".</p>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">' +
+        prontos.map((j) => `<div><b>${esc(j.res)}</b> <small>· ${preco[j.res] || ''} por cena</small>${j.videoUrl ? `<video src="${esc(j.videoUrl)}" controls autoplay loop muted style="width:100%;border-radius:10px;margin-top:6px"></video>` : `<p class="erro">${esc(j.erro || 'Não ficou pronto a tempo')}</p>`}</div>`).join('') +
+        '</div><div style="text-align:right;margin-top:12px"><button type="button" class="btn-mini" id="btnFecharCmp">Fechar</button></div>';
+      d.querySelector('#btnFecharCmp').onclick = () => d.close();
+      if (!d.open) d.showModal();
+    } catch (e) {
+      erro.textContent = msgErro(e);
+    } finally {
+      b.disabled = false;
+      b.textContent = '🔍 Comparar as 3 qualidades';
     }
   }
 

@@ -502,7 +502,7 @@ export default async function handler(req, res) {
           if (i >= limiteAnimadas) break;
           if (!arquivo.imageUrl || arquivo.videoUrl || arquivo.klingTaskId || arquivo.avisoVideo) continue;
           try {
-            const { requestId, statusUrl, responseUrl } = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo, emLoop);
+            const { requestId, statusUrl, responseUrl } = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo, emLoop, item.resolucaoAnim || '720p');
             arquivosAnimados[i] = { ...arquivo, klingTaskId: requestId, statusUrl, responseUrl, ...(emLoop ? { videoLoop: true } : {}) };
           } catch (err) {
             arquivosAnimados[i] = { ...arquivo, avisoVideo: err.message };

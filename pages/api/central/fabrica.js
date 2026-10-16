@@ -22,6 +22,7 @@ import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS } from '../../../lib/documentarioEpisodios';
 import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil } from '../../../lib/infantil';
+import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
 export const config = { maxDuration: 120 }; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
 
@@ -429,6 +430,32 @@ export default async function handler(req, res) {
       }
 
       // ── Prévia grátis do infantil: só escreve o roteiro e a letra (Groq), sem imagem, voz, música nem banco ──
+      // ── Comparar a qualidade da animação: a mesma cena animada em 720p, 580p e 480p (custa ~US$ 0,23) ──
+      if (b.tipo === 'comparar-anim') {
+        const snapCmp = await col.where('estilo', '==', 'infantil').get();
+        const cenaCmp = snapCmp.docs
+          .map((d) => d.data())
+          .filter((x) => !x.shortMusica && Array.isArray(x.arquivos))
+          .sort((a, b2) => String(b2.criadoEm).localeCompare(String(a.criadoEm)))
+          .flatMap((x) => x.arquivos.filter((a) => a.imageUrl && a.bloco === 'antes'))[2];
+        if (!cenaCmp) return res.status(400).json({ erro: 'Ainda não tem nenhuma cena de episódio infantil para comparar. Faça um episódio de teste primeiro.' });
+        const jobs = [];
+        for (const r of ['720p', '580p', '480p']) {
+          const j = await enviarAnimacao(cenaCmp.imageUrl, cenaCmp.cena, 'longo', undefined, true, r);
+          jobs.push({ res: r, statusUrl: j.statusUrl, responseUrl: j.responseUrl });
+        }
+        return res.status(200).json({ imagem: cenaCmp.imageUrl, jobs });
+      }
+      if (b.tipo === 'comparar-status') {
+        const jobs = Array.isArray(b.jobs) ? b.jobs.slice(0, 3) : [];
+        const saida = [];
+        for (const j of jobs) {
+          const c = await checarAnimacao(j.statusUrl, j.responseUrl).catch((e) => ({ status: 'failed', error: e.message }));
+          saida.push({ res: j.res, status: c.status, videoUrl: c.videoUrl || null, erro: c.error || null });
+        }
+        return res.status(200).json({ jobs: saida });
+      }
+
       if (b.tipo === 'previa-infantil') {
         const personagemPv = normalizarPersonagem(b.personagem);
         let temaPv = String(b.tema || '').trim().slice(0, 200);
@@ -495,6 +522,7 @@ export default async function handler(req, res) {
             duracaoDesejada: String(Math.max(180, Math.min(600, Number(b.duracao) || 270))), // 4–5 min ou ~8 min
             animar: b.animacao !== 'nada',
             animacaoCompleta: b.animacaoCompleta !== false, // desenho infantil: todas as cenas animadas (o dono pode escolher o econômico)
+            resolucaoAnim: ['720p', '580p', '480p'].includes(b.resolucaoAnim) ? b.resolucaoAnim : '720p',
             ...(String(b.vozId || '').trim() ? { vozId: String(b.vozId).trim().slice(0, 60) } : {}),
             status: 'pendente',
             origem: 'fabrica',

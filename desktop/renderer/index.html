@@ -257,9 +257,12 @@
   <section class="fila">
     <div class="fila-rotulo"><span>FILA</span><b id="qtdFila">0</b></div>
     <div class="fila-cartoes" id="filaCartoes"><p class="fila-vazia">Os vídeos que você mandar gerar aparecem aqui.</p></div>
-    <button class="btn-limpar" id="btnOutrosPcs" title="Ver a fila dos outros computadores com o Youvideo Compilador">🖥 Outros PCs</button>
-    <button class="btn-limpar" id="btnAbrirReceita" title="Monta aqui no PC um vídeo criado no site (arquivo .youvideo.json baixado em &quot;Montar no PC&quot;)">📥 Abrir receita</button>
-    <button class="btn-limpar" id="btnLimparFila" title="Tira todos os cartões da fila (os vídeos já gerados continuam na pasta)">🗑 Limpar fila</button>
+    <!-- Botões pouco usados: pequenos, embaixo da produção dos vídeos -->
+    <div class="fila-ferramentas">
+      <button class="btn-fila-mini btn-fila-link" id="btnAbrirReceita" title="Monta aqui no PC um vídeo criado no site (arquivo .youvideo.json baixado em &quot;Montar no PC&quot;)">📥 receita</button>
+      <button class="btn-fila-mini" id="btnOutrosPcs" title="Ver a fila dos outros computadores com o Youvideo Compilador">🖥 Outros PCs</button>
+      <button class="btn-fila-mini btn-fila-perigo" id="btnLimparFila" title="Tira todos os cartões da fila (os vídeos já gerados continuam na pasta)">🗑 Limpar fila</button>
+    </div>
   </section>
 
   <!-- Rodapé -->
@@ -521,6 +524,9 @@
       <div class="campo-config"><label>Horário no YouTube</label><input type="time" id="fabIfHora" value="10:00" /></div>
       <div class="campo-config"><label>Animação</label>
         <select id="fabIfAnim" title="Cada cena animada custa cerca de US$ 0,10 na fal.ai; o episódio tem umas 25 cenas."><option value="todas" selected>Tudo animado (recomendado)</option><option value="3">Só as 3 primeiras cenas (econômico)</option><option value="nada">Nenhuma (imagens com zoom)</option></select></div>
+      <div class="campo-config"><label>Qualidade da animação</label>
+        <select id="fabIfRes"><option value="720p" selected>720p — melhor (US$ 0,10 por cena)</option><option value="580p">580p — boa (US$ 0,075 por cena)</option><option value="480p">480p — econômica (US$ 0,05 por cena)</option></select>
+        <button type="button" class="btn-mini" id="btnFabIfComparar" title="Anima a mesma cena nas 3 qualidades para você ver a diferença (custa uns US$ 0,23)" style="margin-top:6px">🔍 Comparar as 3 qualidades</button></div>
       <div class="campo-config"><label>Canal do YouTube</label><select id="fabIfCanal"></select></div>
       <div class="campo-config"><label>Short da música</label>
         <select id="fabIfShorts" title="O clipe da música de cada episódio vira um Short vertical, no dia seguinte"><option value="sim" selected>Sim, 1 Short por episódio (dia seguinte)</option><option value="nao">Não</option></select></div>
