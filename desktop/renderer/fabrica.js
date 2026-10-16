@@ -190,6 +190,7 @@ const Fabrica = (() => {
     // Oração da noite: sugere o horário da noite
     q('#fabOrPeriodo').addEventListener('change', () => (q('#fabOrHora').value = q('#fabOrPeriodo').value === 'noite' ? '21:00' : '06:00'));
     q('#btnFabCriar').onclick = criar;
+    q('#btnFabIfPrevia').onclick = previaInfantil;
     q('#btnFabAtualizar').onclick = () => carregar(true);
   }
 
@@ -319,6 +320,56 @@ const Fabrica = (() => {
     } finally {
       b.disabled = false;
       b.textContent = '🏭 Criar lote';
+    }
+  }
+
+  // Prévia grátis: a IA escreve o roteiro e a letra do próximo episódio (sem imagem, voz, música — não gasta crédito)
+  async function previaInfantil() {
+    const erro = q('#fabErro');
+    erro.textContent = '';
+    if (!config.temCentral) return (erro.textContent = 'Cadastre a senha da Central em Configurações.');
+    const nome = q('#fabIfNome').value.trim();
+    const descricao = q('#fabIfDesc').value.trim();
+    if (!nome || !descricao) return (erro.textContent = 'Escreva o nome e a aparência do personagem.');
+    const b = q('#btnFabIfPrevia');
+    b.disabled = true;
+    b.textContent = '✍️ Escrevendo o roteiro (até 1 min)...';
+    try {
+      const tema = q('#fabIfTemas').value.split('\n').map((t) => t.trim()).find(Boolean) || '';
+      const { tema: temaUsado, roteiro: r } = await window.api.fabrica.criar({ tipo: 'previa-infantil', personagem: { nome, descricao }, tema });
+      const cor = (p) => (/^narrador$/i.test(p) ? '#7E57C2' : p.toLowerCase() === nome.toLowerCase() ? '#1E88E5' : '#E91E63');
+      const cenaHtml = (c, i) =>
+        `<div style="margin:10px 0;padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.08)"><small style="opacity:.6">Cena ${i + 1} · ${esc(c.descricao)}</small>` +
+        (c.falas || []).map((f) => `<div style="margin-top:4px"><b style="color:${cor(f.personagem)}">${esc(f.personagem)}${f.vozTipo !== 'normal' ? ` <small>(voz ${esc(f.vozTipo)})</small>` : ''}:</b> ${esc(f.texto)}</div>`).join('') +
+        '</div>';
+      let d = document.getElementById('dlgPreviaInfantil');
+      if (!d) {
+        d = document.createElement('dialog');
+        d.id = 'dlgPreviaInfantil';
+        d.style.cssText = 'max-width:760px;width:92vw;max-height:86vh;overflow:auto;border:none;border-radius:16px;padding:22px';
+        document.body.appendChild(d);
+      }
+      d.innerHTML =
+        `<h3 style="margin-top:0">👀 Prévia: ${esc(r.titulo)}</h3>` +
+        `<p class="nota">Episódio: ${esc(temaUsado)}<br><b>Lição:</b> ${esc(r.licao || '')}<br>Nada foi gerado nem gasto. Se gostar, escreva esse episódio no campo "Episódios que você quer" e crie o teste.</p>` +
+        `<h4>Parte 1 — antes da música</h4>${r.antes.map(cenaHtml).join('')}` +
+        `<h4>🎵 Música: ${esc(r.musica.titulo)}</h4><pre style="white-space:pre-wrap;font-family:inherit;background:rgba(255,235,59,.15);padding:12px;border-radius:10px">${esc(r.musica.letra)}</pre>` +
+        `<h4>Parte 2 — depois da música</h4>${r.depois.map((c, i) => cenaHtml(c, r.antes.length + i)).join('')}` +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button type="button" class="btn-mini" id="btnPreviaUsar">Usar este episódio</button><button type="button" class="btn-mini" id="btnPreviaOutra">Gerar outra</button><button type="button" class="btn-mini" id="btnPreviaFechar">Fechar</button></div>';
+      d.querySelector('#btnPreviaFechar').onclick = () => d.close();
+      d.querySelector('#btnPreviaOutra').onclick = () => { d.close(); previaInfantil(); };
+      d.querySelector('#btnPreviaUsar').onclick = () => {
+        const linhas = q('#fabIfTemas').value.split('\n').map((t) => t.trim()).filter(Boolean);
+        if (!linhas.includes(temaUsado)) q('#fabIfTemas').value = [temaUsado, ...linhas.filter((t) => t !== tema)].join('\n');
+        d.close();
+        avisar('Episódio colocado na lista. Agora é só criar o teste.');
+      };
+      if (!d.open) d.showModal();
+    } catch (e) {
+      erro.textContent = msgErro(e);
+    } finally {
+      b.disabled = false;
+      b.textContent = '👀 Prévia grátis do roteiro';
     }
   }
 

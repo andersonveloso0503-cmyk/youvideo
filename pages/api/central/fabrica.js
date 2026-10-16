@@ -21,9 +21,9 @@ import { testarConta } from '../../../lib/publicarSocial';
 import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS } from '../../../lib/documentarioEpisodios';
-import { normalizarPersonagem, temasInfantisDaIa, EPISODIOS_PINGO, slug as slugInfantil } from '../../../lib/infantil';
+import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil } from '../../../lib/infantil';
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 120 }; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
 
 const COL = 'youvideo_fila';
 
@@ -425,6 +425,21 @@ export default async function handler(req, res) {
         }
         await batchOr.commit();
         return res.status(200).json({ lote: loteOr, criados: criadasOr, primeiroDia: primeiroOr });
+      }
+
+      // ── Prévia grátis do infantil: só escreve o roteiro e a letra (Groq), sem imagem, voz, música nem banco ──
+      if (b.tipo === 'previa-infantil') {
+        const personagemPv = normalizarPersonagem(b.personagem);
+        let temaPv = String(b.tema || '').trim().slice(0, 200);
+        if (!temaPv) {
+          const todosPv = await col.where('fabrica.ativo', '==', true).get();
+          const usadosPv = todosPv.docs.filter((d) => d.data().infantil).map((d) => String(d.data().tema || '').toLowerCase());
+          const planejados = slugInfantil(personagemPv.nome) === 'pingo' ? EPISODIOS_PINGO : [];
+          temaPv = planejados.find((t) => !usadosPv.some((u) => u.startsWith(t.split('—')[0].trim().toLowerCase()))) ||
+            (await temasInfantisDaIa(1, personagemPv, usadosPv))[0] || `${personagemPv.nome} e um novo amigo — amizade`;
+        }
+        const roteiroPv = await gerarRoteiroInfantil({ tema: temaPv, personagem: personagemPv });
+        return res.status(200).json({ tema: temaPv, roteiro: roteiroPv });
       }
 
       // ── Infantil: episódios animados (~4 a 5 min) com um personagem fixo e uma música chiclete, só YouTube ──
