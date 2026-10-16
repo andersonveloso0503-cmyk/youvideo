@@ -564,6 +564,7 @@ const Fabrica = (() => {
           acoes.appendChild(bt);
         };
         if (i.videoUrl) botao('▶', 'Assistir', () => window.api.abrir.link(i.videoUrl));
+        if (i.thumbnailUrl) botao('🖼', 'Ver a thumbnail (capa) que vai para o YouTube', () => window.api.abrir.link(i.thumbnailUrl));
         if (naEspera(i)) botao('⚡', 'Produzir agora (não esperar a vez; o horário no YouTube continua o mesmo)', async () => {
           try {
             await window.api.fabrica.acao({ id: i.id, acao: 'produzir-agora' });
