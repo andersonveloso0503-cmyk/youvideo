@@ -466,6 +466,7 @@
       <button type="button" class="ativo" data-marca="">📖 Histórias bíblicas</button>
       <button type="button" data-marca="longos">📺 Vídeos longos</button>
       <button type="button" data-marca="documentario">🌙 Documentários para dormir</button>
+      <button type="button" data-marca="infantil">🧸 Infantil</button>
       <button type="button" data-marca="cortes">🎬 Cortes</button>
       <button type="button" data-marca="oracao">🙏 Oração do dia</button>
       <button type="button" data-marca="lcs">🏢 LCS Terceirização</button>
@@ -508,6 +509,22 @@
       <div class="campo-config"><label>Horário no YouTube (1 por dia)</label><input type="time" id="fabDocHora" value="19:30" /></div>
       <div class="campo-config"><label>Canal do YouTube</label><select id="fabDocCanal"></select></div>
       <div class="campo-config"><label>Voz da ElevenLabs (ID, opcional — vazio = voz padrão)</label><input type="text" id="fabDocVoz" placeholder="Ex.: pNInz6obpgDQGcFmaJgB" /></div>
+    </div>
+    <div class="fab-config" id="fabConfigInfantil" hidden>
+      <div class="campo-config"><label>Personagem</label><input type="text" id="fabIfNome" value="Pingo" maxlength="40" /></div>
+      <div class="campo-config"><label>Episódios</label>
+        <select id="fabIfSemanas"><option value="teste" selected>1 episódio de teste (assistir antes)</option><option value="2">2 semanas</option><option value="4">4 semanas</option><option value="8">8 semanas</option></select></div>
+      <div class="campo-config"><label>Dias no YouTube</label>
+        <select id="fabIfDias"><option value="2,5" selected>Terça e sexta</option><option value="6">Só sábado</option><option value="1,3,5">Segunda, quarta e sexta</option><option value="1,2,3,4,5">Segunda a sexta</option></select></div>
+      <div class="campo-config"><label>Horário no YouTube</label><input type="time" id="fabIfHora" value="10:00" /></div>
+      <div class="campo-config"><label>Animação</label>
+        <select id="fabIfAnim" title="Cada cena animada custa cerca de US$ 0,10 na fal.ai; o episódio tem umas 25 cenas."><option value="todas" selected>Tudo animado (recomendado)</option><option value="3">Só as 3 primeiras cenas (econômico)</option><option value="nada">Nenhuma (imagens com zoom)</option></select></div>
+      <div class="campo-config"><label>Canal do YouTube</label><select id="fabIfCanal"></select></div>
+      <div class="campo-config"><label>Voz do narrador (ID da ElevenLabs, opcional)</label><input type="text" id="fabIfVoz" placeholder="Vazio = voz padrão" /></div>
+      <div class="campo-config fab-temas"><label>Aparência do personagem (em inglês — vira a ficha que mantém o personagem igual em todas as cenas)</label>
+        <textarea id="fabIfDesc" rows="3">Pingo, a small cute water droplet character, translucent light blue glossy body with soft highlights, big round shiny black eyes with white sparkles, rosy pink cheeks, tiny friendly smile, small rounded arms and tiny feet, a little curled tip on top of his head, a tiny sparkle glowing inside his body</textarea></div>
+      <div class="campo-config fab-temas"><label>Episódios que você quer (opcional, um por linha — no Pingo os 6 já planejados entram primeiro; a IA completa o resto)</label>
+        <textarea id="fabIfTemas" rows="3" placeholder="Ex.:&#10;Pingo e a Hora de Escovar os Dentes — cuidar do corpo"></textarea></div>
     </div>
     <div class="fab-config" id="fabConfigCortes" hidden>
       <div class="campo-config"><label>Tipo de corte</label>

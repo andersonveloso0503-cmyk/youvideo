@@ -8,6 +8,8 @@
 //                                        -> vídeos longos (~12 min) no estilo mistério, só YouTube (+ Facebook opcional)
 // POST { acao:'criar', tipo:'documentario', quantos, inicio, horarios, canalYoutube, vozId }
 //                                        -> documentários para dormir já escritos (1 por dia), voz lenta e imagens reais, só YouTube
+// POST { acao:'criar', tipo:'infantil', personagem:{nome,descricao}, semanas, diasSemana, horarios, canalYoutube, animacaoCompleta, temas, vozId }
+//                                        -> episódios de historinha infantil animada (~4 min) com música chiclete, só YouTube (conteúdo para crianças)
 // POST { acao:'youtube-pegar'|'youtube-feito'|'youtube-erro', id, ... }
 // POST { acao:'cancelar', id }
 import { getDb } from '../../../lib/firebase-admin';
@@ -19,6 +21,7 @@ import { testarConta } from '../../../lib/publicarSocial';
 import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS } from '../../../lib/documentarioEpisodios';
+import { normalizarPersonagem, temasInfantisDaIa, EPISODIOS_PINGO, slug as slugInfantil } from '../../../lib/infantil';
 
 export const config = { maxDuration: 60 };
 
@@ -293,6 +296,7 @@ export default async function handler(req, res) {
           formato: x.formato || 'short',
           longo: x.longo === true,
           documentario: x.documentario === true,
+          infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true } : null,
           comBotao: x.comBotao === true,
           renderId: x.renderId || null, // pedido de montagem no PC: liga o cartão da Fila do Compilador a este vídeo
           corte: x.corte ? { tipo: x.corte.tipo === 'comico' ? 'comico' : 'filme' } : null,
@@ -421,6 +425,72 @@ export default async function handler(req, res) {
         }
         await batchOr.commit();
         return res.status(200).json({ lote: loteOr, criados: criadasOr, primeiroDia: primeiroOr });
+      }
+
+      // ── Infantil: episódios animados (~4 a 5 min) com um personagem fixo e uma música chiclete, só YouTube ──
+      if (b.tipo === 'infantil') {
+        if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube do desenho infantil.' });
+        const personagem = normalizarPersonagem(b.personagem);
+        if (!personagem.descricao) return res.status(400).json({ erro: 'Descreva a aparência do personagem.' });
+        const semanasIf = Math.max(1, Math.min(12, Number(b.semanas) || 4));
+        const diasSemanaIf = (Array.isArray(b.diasSemana) && b.diasSemana.length ? b.diasSemana : [2, 5]).map(Number); // 2 = terça
+        const horarioIf = hora(b.horarios?.[0], '10:00');
+        const todosIf = await col.where('fabrica.ativo', '==', true).get();
+        const meusIf = todosIf.docs.filter((d) => d.data().infantil && slugInfantil(d.data().infantil.personagem?.nome) === slugInfantil(personagem.nome));
+        const ultimoIf = meusIf.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
+        // Episódio animado leva tempo (roteiro, voz, música, ~25 imagens, animação, montagem): começa daqui a 2 dias
+        let diaIf = somarDias(diaBrasilia(), 2);
+        if (ultimoIf && diaBrasilia(new Date(ultimoIf)) >= diaIf) diaIf = somarDias(diaBrasilia(new Date(ultimoIf)), 1);
+        // Teste: 1 episódio só, que sobe PRIVADO (o dono assiste antes de publicar)
+        const testeIf = b.teste === true;
+        const qtdIf = testeIf ? 1 : semanasIf * diasSemanaIf.length;
+        const datasIf = [];
+        for (let guarda = 0; datasIf.length < qtdIf && guarda < 400; guarda++) {
+          if (diasSemanaIf.includes(new Date(`${diaIf}T12:00:00Z`).getUTCDay())) datasIf.push(diaIf);
+          diaIf = somarDias(diaIf, 1);
+        }
+        // Temas: os escritos pelo dono primeiro; no Pingo, os episódios já planejados; a IA completa o resto
+        const usadosIf = meusIf.map((d) => d.data().tema).filter(Boolean);
+        const jaUsado = (t) => usadosIf.some((u) => u.toLowerCase().startsWith(t.split('—')[0].trim().toLowerCase()));
+        let temasIf = (Array.isArray(b.temas) ? b.temas : []).map((t) => String(t).trim().slice(0, 200)).filter(Boolean).slice(0, 40);
+        if (slugInfantil(personagem.nome) === 'pingo') temasIf = [...temasIf, ...EPISODIOS_PINGO.filter((t) => !jaUsado(t))];
+        temasIf = temasIf.slice(0, qtdIf);
+        for (let volta = 0; temasIf.length < qtdIf && volta < 2; volta++) {
+          temasIf = [...temasIf, ...(await temasInfantisDaIa(qtdIf - temasIf.length, personagem, [...usadosIf, ...temasIf]))];
+        }
+        if (!temasIf.length) return res.status(500).json({ erro: 'A IA não devolveu temas. Tente de novo.' });
+        const loteIf = Date.now().toString(36);
+        const batchIf = db.batch();
+        const criadosIf = [];
+        temasIf.slice(0, datasIf.length).forEach((tema, i) => {
+          const quando = horarioBrasilia(datasIf[i], horarioIf);
+          const ref = col.doc();
+          batchIf.set(ref, {
+            tema,
+            infantil: { personagem, ...(testeIf ? { teste: true } : {}) },
+            estilo: 'infantil',
+            formato: 'longo',
+            duracaoDesejada: String(Math.max(180, Math.min(420, Number(b.duracao) || 270))),
+            animar: b.animacao !== 'nada',
+            animacaoCompleta: b.animacaoCompleta !== false, // desenho infantil: todas as cenas animadas (o dono pode escolher o econômico)
+            ...(String(b.vozId || '').trim() ? { vozId: String(b.vozId).trim().slice(0, 60) } : {}),
+            status: 'pendente',
+            origem: 'fabrica',
+            criadoEm: new Date().toISOString(),
+            fabrica: {
+              ativo: true,
+              lote: loteIf,
+              quando,
+              quandoYoutube: testeIf ? null : quando, // teste: sobe privado, sem data para publicar
+              // Conteúdo para crianças: só no YouTube (as Páginas do Facebook/Instagram são de outro assunto)
+              redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
+              canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') },
+            },
+          });
+          criadosIf.push({ id: ref.id, tema, quando });
+        });
+        await batchIf.commit();
+        return res.status(200).json({ lote: loteIf, criados: criadosIf, primeiroDia: datasIf[0] });
       }
 
       // ── Documentários para dormir: episódios já escritos, 1 por dia, só YouTube ──

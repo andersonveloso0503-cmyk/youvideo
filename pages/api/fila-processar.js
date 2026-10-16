@@ -7,6 +7,18 @@ import { buscarSaldoFal } from '../../lib/orcamento';
 import { passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario, temposDasCenas, buscarMidiaReal } from '../../lib/documentario';
 import { EPISODIOS } from '../../lib/documentarioEpisodios';
 import {
+  gerarRoteiroInfantil,
+  garantirReferencia,
+  gerarImagensInfantis,
+  thumbInfantil,
+  linhaDoTempo,
+  vozesDosPersonagens,
+  falasDoBloco,
+  duracaoMp3,
+  ESTILO_MUSICA,
+  DURACAO_MUSICA,
+} from '../../lib/infantil';
+import {
   gerarRoteiro,
   garantirChamada,
   gerarNarracao,
@@ -75,6 +87,16 @@ export default async function handler(req, res) {
     const ref = doc.ref;
     switch (item.status) {
       case 'pendente': {
+        if (item.infantil) {
+          // Desenho infantil: roteiro em 3 blocos (antes da música, a música chiclete, depois)
+          const roteiroIf = await gerarRoteiroInfantil({
+            tema: item.tema,
+            personagem: item.infantil.personagem,
+            duracaoSeg: Number(item.duracaoDesejada) || 270,
+          });
+          await ref.update({ roteiro: roteiroIf, status: 'roteiro_ok' });
+          break;
+        }
         if (item.documentario) {
           // Documentário para dormir: o roteiro já vem escrito, só libera para a voz
           // (fica 'pendente' até faltar 3 dias para ir ao ar, para não gastar crédito antes da hora)
@@ -138,6 +160,62 @@ export default async function handler(req, res) {
       }
 
       case 'roteiro_ok': {
+        if (item.infantil) {
+          // Uma coisa por rodada do cron (cada uma pode demorar): falas do bloco antes, do bloco depois, a música.
+          // Narrador + cada bichinho com a sua voz (sempre a mesma em todos os episódios).
+          const vi = item.vozInfantil || {};
+          const vozNarrador = item.vozId || process.env.INFANTIL_VOICE_ID || undefined;
+          const modeloIf = item.modelo || process.env.ELEVENLABS_MODELO_PADRAO;
+          const gerarBloco = async (cenas) => {
+            const falas = falasDoBloco(cenas);
+            const vozes = await vozesDosPersonagens({ personagem: item.infantil.personagem, falas, vozNarrador });
+            const v = await chamarApi('/api/generate-voice-dialogo', {
+              falas: falas.map((f) => ({ personagem: f.personagem, texto: f.texto, vozTipo: f.vozTipo, ...(f.sexo ? { sexo: f.sexo } : {}) })),
+              vozes,
+              ...(modeloIf === 'flash' ? { modelo: 'flash' } : {}),
+            });
+            if (!v.audioSegments?.length) throw new Error('As vozes do episódio vieram vazias.');
+            return { audioUrl: v.audioUrl, audioSegments: v.audioSegments, cenasComTempo: v.cenasComTempo || [] };
+          };
+          if (!vi.antes) {
+            await ref.update({ 'vozInfantil.antes': await gerarBloco(item.roteiro.antes) });
+            break;
+          }
+          if (!vi.depois) {
+            await ref.update({ 'vozInfantil.depois': await gerarBloco(item.roteiro.depois) });
+            break;
+          }
+          if (!vi.musica) {
+            // Música cantada pelo Estúdio de Música (ElevenLabs, com direito de uso comercial)
+            const r = await chamarApi('/api/estudio/gerar', {
+              motor: 'elevenlabs',
+              modo: 'personalizado',
+              titulo: item.roteiro.musica.titulo,
+              letra: item.roteiro.musica.letra,
+              estilo: ESTILO_MUSICA,
+              voz: '',
+              duracaoSeg: DURACAO_MUSICA,
+            });
+            const audioUrl = r.musica?.audioUrl;
+            if (!audioUrl) throw new Error('O Estúdio de Música não devolveu o áudio da música do episódio.');
+            let duracao = 0;
+            try {
+              duracao = duracaoMp3(Buffer.from(await (await fetch(audioUrl)).arrayBuffer()));
+            } catch {
+              /* usa a duração pedida */
+            }
+            await ref.update({ 'vozInfantil.musica': { audioUrl, duracao: duracao || DURACAO_MUSICA, id: r.musica.id || null } });
+            break;
+          }
+          // Tudo pronto: junta na linha do tempo e dá o tempo de cada cena
+          const lt = linhaDoTempo({ roteiro: item.roteiro, narracaoAntes: vi.antes, musica: vi.musica, narracaoDepois: vi.depois });
+          await ref.update({
+            narracao: { audioUrl: vi.antes.audioUrl, audioSegments: lt.audioSegments, palavras: [] },
+            'roteiro.cenas': item.roteiro.cenas.map((c, i) => ({ ...c, start: lt.tempos[i]?.start ?? null, length: lt.tempos[i]?.length ?? null })),
+            status: 'voz_ok',
+          });
+          break;
+        }
         if (item.documentario) {
           // Voz lenta, em pedaços (o texto é longo): cada rodada do cron faz alguns pedaços
           await ref.update(await passoVozDocumentario(item));
@@ -171,6 +249,32 @@ export default async function handler(req, res) {
       }
 
       case 'voz_ok': {
+        if (item.infantil) {
+          // Ficha do personagem (uma vez) e depois 5 imagens por rodada, todas com o personagem igual
+          let refUrl = item.infantil.refUrl;
+          if (!refUrl) {
+            refUrl = await garantirReferencia(item.infantil.personagem);
+            await ref.update({ 'infantil.refUrl': refUrl });
+          }
+          const feitas = item.arquivosParciais || [];
+          const novas = await gerarImagensInfantis({
+            cenas: item.roteiro.cenas.slice(feitas.length, feitas.length + 5),
+            personagem: item.infantil.personagem,
+            referencia: refUrl,
+          });
+          const todas = [...feitas, ...novas];
+          if (todas.length < item.roteiro.cenas.length) {
+            await ref.update({ arquivosParciais: todas });
+            break;
+          }
+          const arquivosIf = todas.map((a, i) => {
+            const c = item.roteiro.cenas[i];
+            return c && c.start != null && c.length != null ? { ...a, start: c.start, length: c.length } : a;
+          });
+          if (!arquivosIf.some((a) => a.imageUrl)) throw new Error('Nenhuma imagem do episódio passou pelo filtro de conteúdo.');
+          await ref.update({ arquivos: arquivosIf, arquivosParciais: null, status: 'imagens_ok' });
+          break;
+        }
         if (item.documentario) {
           // Vídeos e fotos reais (Pexels e Wikimedia), 10 cenas por rodada
           await ref.update(await passoMidiaDocumentario(item));
@@ -232,7 +336,7 @@ export default async function handler(req, res) {
       case 'imagens_ok': {
         // Sincroniza cada imagem com a fala: a cena entra no segundo em que a frase dela começa
         // (antes o tempo era dividido igualmente entre as cenas). Corte e documentário já vêm com tempo.
-        if (!item.corte && !item.documentario && (item.narracao?.palavras || []).length && (item.arquivos || []).every((a) => a.start == null)) {
+        if (!item.corte && !item.documentario && !item.infantil && (item.narracao?.palavras || []).length && (item.arquivos || []).every((a) => a.start == null)) {
           const pal = item.narracao.palavras.filter((p) => p.end != null);
           const duracaoTotal = (item.narracao.audioSegments || []).length > 1
             ? Math.max(...item.narracao.audioSegments.map((x) => x.start + x.length))
@@ -264,10 +368,11 @@ export default async function handler(req, res) {
             cenas: item.arquivos,
             formato: item.formato,
             // Documentário para dormir: sem legenda na tela (não acorda quem está dormindo)
-            palavras: item.documentario ? [] : item.narracao.palavras,
+            palavras: item.documentario || item.infantil ? [] : item.narracao.palavras,
             marca: marcaDe(item),
             cta: item.marca ? empresa(item.marca)?.cta : '',
-            ...(item.documentario ? { legenda: false } : {}),
+            // Documentário: sem legenda (não acorda quem dorme); infantil: criança pequena não lê, a tela fica limpa
+            ...(item.documentario || item.infantil ? { legenda: false } : {}),
           });
           // duracaoAlvo só existe quando a narração guarda as palavras (o documentário não guarda)
           await ref.update({ ...(duracaoAlvo != null ? { duracaoAlvo } : {}), renderId, status: 'montando' });
@@ -337,8 +442,9 @@ export default async function handler(req, res) {
             titulo: item.roteiro?.titulo || item.tema,
             cenas: arquivosAtualizados,
             formato: item.formato,
-            palavras: item.narracao.palavras,
+            palavras: item.infantil ? [] : item.narracao.palavras,
             marca: marcaDe(item),
+            ...(item.infantil ? { legenda: false } : {}),
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
         } else {
@@ -354,7 +460,10 @@ export default async function handler(req, res) {
           // o Compilador sobe agendado no canal escolhido; as outras redes vão para a Agenda.
           const primeiraImagem = (item.arquivos || []).find((x) => x.imageUrl)?.imageUrl || null;
           let thumbnailUrl = primeiraImagem;
-          if (item.documentario) {
+          if (item.infantil) {
+            // Desenho infantil: o personagem grande e alegre (o Compilador põe o título por cima, se quiser)
+            thumbnailUrl = (await thumbInfantil({ personagem: item.infantil.personagem, referencia: item.infantil.refUrl, titulo: item.roteiro.titulo }).catch(() => null)) || primeiraImagem;
+          } else if (item.documentario) {
             // Documentário: foto real escurecida + a pergunta da capa
             // Episódios criados antes da capa pintada: pega título, subtítulo e pintura do episódio escrito
             const ep = EPISODIOS.find((e) => e.id === item.episodioId) || {};
@@ -382,7 +491,7 @@ export default async function handler(req, res) {
           const agendaId = await agendarItemPronto(item, check.videoUrl, thumbnailUrl);
           await db.collection('youvideo_projects').add({
             origem: 'fabrica',
-            categoria: item.marca ? 'empresa' : item.documentario ? 'documentarios' : item.corte ? 'cortes' : item.longo ? 'longos' : item.estilo === 'desenho' ? 'historias' : 'series',
+            categoria: item.marca ? 'empresa' : item.infantil ? 'infantil' : item.documentario ? 'documentarios' : item.corte ? 'cortes' : item.longo ? 'longos' : item.estilo === 'desenho' ? 'historias' : 'series',
             ...(item.marca ? { canal: item.marca } : {}),
             tema: item.tema,
             estilo: item.estilo,

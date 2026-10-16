@@ -461,6 +461,7 @@ class Fila extends EventEmitter {
         refreshToken: canal.refreshToken,
         arquivo: arquivoEnvio,
         conteudoIa: e.conteudoIa ?? cfg.conteudoIa !== false,
+        paraCriancas: !!e.paraCriancas, // desenho infantil: marcado como conteúdo para crianças
         // Categoria certa (história bíblica não é "Música") e idioma do vídeo falado
         ...(() => {
           const categoria = YT.categoriaDoVideo({ categoria: e.categoria, tipo: e.tipo, canalTitulo: canal.titulo });

@@ -725,9 +725,18 @@ app.whenReady().then(() => {
           curto: !longo,
           fabricaId: it.id,
           tipo: it.oracao ? 'oracao' : 'historias', // categoria "Pessoas e blogs" e idioma português (não "Música")
-          playlist: it.oracao ? PLAYLISTS_ORACAO[it.oracao.periodo === 'noite' ? 'noite' : 'manha'] : null,
+          // Desenho infantil: cada personagem é uma série com a sua playlist (ex.: "As Aventuras do Pingo — Historinhas e Músicas")
+          playlist: it.oracao
+            ? PLAYLISTS_ORACAO[it.oracao.periodo === 'noite' ? 'noite' : 'manha']
+            : it.infantil
+              ? {
+                  titulo: `As Aventuras do ${it.infantil.personagem || 'Pingo'} — Historinhas e Músicas`,
+                  descricao: `Todas as aventuras do ${it.infantil.personagem || 'Pingo'}: historinhas animadas com lições e uma música nova para cantar em cada episódio. 🎵`,
+                }
+              : null,
           conteudoIa: true, // histórias feitas com IA: marca no YouTube
-          botao: it.comBotao ? null : (() => { const f = path.join(app.getPath('userData'), 'cache', 'botao', 'v2-pt', 'botao.mov'); return fs.existsSync(f) ? f : null; })(),
+          paraCriancas: !!it.infantil, // desenho infantil: "conteúdo para crianças" (regra do YouTube/COPPA)
+          botao: it.comBotao || it.infantil ? null : (() => { const f = path.join(app.getPath('userData'), 'cache', 'botao', 'v2-pt', 'botao.mov'); return fs.existsSync(f) ? f : null; })(),
         }]);
       }
     } catch {

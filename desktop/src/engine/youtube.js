@@ -140,15 +140,16 @@ const DE_CRIANCA = /\b(infantil|infantis|crian[cç]as?|kids|ni[nñ]os?)\b/i;
  * Etiquetas que não são do vídeo em nenhum canal: nome de outra pessoa (pregador, padre, cantor), outra crença
  * e, em canal falado em português, outro idioma e rótulo de conteúdo infantil.
  */
-function etiquetasAlheias(tags, { falado = false } = {}) {
+function etiquetasAlheias(tags, { falado = false, criancas = false } = {}) {
   const lista = (Array.isArray(tags) ? tags : String(tags || '').split(',')).map((t) => String(t || '').trim()).filter(Boolean);
-  return lista.filter((t) => !buscaSegura(t, { idioma: falado ? 'pt' : '' }) || (falado && DE_CRIANCA.test(t)));
+  // criancas: canal infantil (marcado como conteúdo para crianças) — aí "infantil", "crianças" são as etiquetas certas
+  return lista.filter((t) => !buscaSegura(t, { idioma: falado ? 'pt' : '' }) || (falado && !criancas && DE_CRIANCA.test(t)));
 }
 
 /** Tudo que deve sair das etiquetas de um vídeo. musica = vídeo na categoria Música (confere também o estilo). */
-function etiquetasParaTirar({ titulo, descricao, tags, musica, comClima = true }) {
+function etiquetasParaTirar({ titulo, descricao, tags, musica, comClima = true, criancas = false }) {
   const estilo = musica ? etiquetasErradas({ titulo, descricao, tags, comClima }) : [];
-  return [...new Set([...estilo, ...etiquetasAlheias(tags, { falado: !musica })])];
+  return [...new Set([...estilo, ...etiquetasAlheias(tags, { falado: !musica, criancas })])];
 }
 
 /** Tira do texto as hashtags das etiquetas erradas (#lofi, #rock...), sem mexer no resto. */
@@ -214,7 +215,7 @@ function categoriaDoVideo({ categoria, tipo, canalTitulo } = {}) {
   return canalFalado(canalTitulo) ? CATEGORIA_FALADO : CATEGORIA_MUSICA;
 }
 
-async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, titulo, descricao, tags, privacidade, miniatura, categoria, idioma, agendarPara, onProgresso, conteudoIa = false }) {
+async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, titulo, descricao, tags, privacidade, miniatura, categoria, idioma, agendarPara, onProgresso, conteudoIa = false, paraCriancas = false }) {
   const auth = cliente(credenciais, redirectOriginal || REDIRECT);
   auth.setCredentials({ refresh_token: refreshToken });
   const yt = google.youtube({ version: 'v3', auth });
@@ -235,7 +236,8 @@ async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, 
   }
 
   // conteudoIa: marca "conteúdo alterado ou sintético" (feito com IA), como pede a regra do YouTube
-  const status = { privacyStatus: privacidade || 'private', selfDeclaredMadeForKids: false, ...(conteudoIa ? { containsSyntheticMedia: true } : {}) };
+  // paraCriancas: desenho infantil é "conteúdo para crianças" (obrigatório pela regra do YouTube/COPPA)
+  const status = { privacyStatus: privacidade || 'private', selfDeclaredMadeForKids: !!paraCriancas, ...(conteudoIa ? { containsSyntheticMedia: true } : {}) };
   if (agendarPara) {
     status.privacyStatus = 'private';
     // Horário que já passou (envio atrasado por limite do YouTube, por exemplo): publica daqui a 20 min
@@ -246,7 +248,7 @@ async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, 
   // Não sobe junto: etiqueta de outro estilo de música, nome de outra pessoa, outra crença ou outro idioma (nem a hashtag dela)
   {
     const lista = limparTags(tags);
-    const erradas = etiquetasParaTirar({ titulo, descricao, tags: lista, musica: (categoria || CATEGORIA_MUSICA) === CATEGORIA_MUSICA, comClima: false });
+    const erradas = etiquetasParaTirar({ titulo, descricao, tags: lista, musica: (categoria || CATEGORIA_MUSICA) === CATEGORIA_MUSICA, comClima: false, criancas: !!paraCriancas });
     if (erradas.length) {
       tags = lista.filter((t) => !erradas.includes(t));
       descricao = semHashtagsDe(descricao, erradas);
