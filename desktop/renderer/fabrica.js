@@ -558,6 +558,15 @@ const Fabrica = (() => {
           acoes.appendChild(bt);
         };
         if (i.videoUrl) botao('▶', 'Assistir', () => window.api.abrir.link(i.videoUrl));
+        if (naEspera(i)) botao('⚡', 'Produzir agora (não esperar a vez; o horário no YouTube continua o mesmo)', async () => {
+          try {
+            await window.api.fabrica.acao({ id: i.id, acao: 'produzir-agora' });
+            avisar('Vai começar a ser produzido em até 5 minutos');
+          } catch (e) {
+            avisar(msgErro(e), true);
+          }
+          carregar();
+        });
         if (i.status === 'erro') botao('↻', 'Tentar de novo (continua de onde parou)', async () => { await window.api.fabrica.acao({ id: i.id, acao: 'repetir' }); carregar(); });
         if (i.longo) botao('⤢', 'Refazer mais longo (roteiro novo, mesmo tema e horário)', async () => {
           const min = Math.round(Number(q('#fabLgDuracao')?.value || 720) / 60);

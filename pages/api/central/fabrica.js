@@ -478,7 +478,8 @@ export default async function handler(req, res) {
         const batchIf = db.batch();
         const criadosIf = [];
         temasIf.slice(0, datasIf.length).forEach((tema, i) => {
-          const quando = horarioBrasilia(datasIf[i], horarioIf);
+          // Teste: começa a ser produzido AGORA (não espera o dia da semana escolhido)
+          const quando = testeIf ? new Date().toISOString() : horarioBrasilia(datasIf[i], horarioIf);
           const ref = col.doc();
           batchIf.set(ref, {
             tema,
@@ -505,7 +506,7 @@ export default async function handler(req, res) {
           criadosIf.push({ id: ref.id, tema, quando });
         });
         await batchIf.commit();
-        return res.status(200).json({ lote: loteIf, criados: criadosIf, primeiroDia: datasIf[0] });
+        return res.status(200).json({ lote: loteIf, criados: criadosIf, primeiroDia: testeIf ? diaBrasilia() : datasIf[0] });
       }
 
       // ── Documentários para dormir: episódios já escritos, 1 por dia, só YouTube ──
@@ -872,6 +873,15 @@ export default async function handler(req, res) {
         await ref.delete();
       }
       return res.status(200).json({ ok: true, id: novo.id, jaNoYoutube });
+    }
+    if (b.acao === 'produzir-agora') {
+      // Adianta um vídeo que está esperando a vez: a fábrica começa já na próxima volta (5 min).
+      // O horário no YouTube continua o mesmo (o vídeo fica pronto antes e espera o dia de ir ao ar).
+      const d = (await ref.get()).data() || {};
+      if (d.status !== 'pendente') return res.status(400).json({ erro: 'Esse vídeo já está em produção.' });
+      // Guarda o horário original: Facebook/Instagram/TikTok continuam postando no dia marcado
+      await ref.update({ 'fabrica.quando': new Date().toISOString(), 'fabrica.quandoOriginal': d.fabrica?.quandoOriginal || d.fabrica?.quando || null });
+      return res.status(200).json({ ok: true });
     }
     if (b.acao === 'repetir') {
       // Continua da etapa em que parou (não gera tudo de novo)
