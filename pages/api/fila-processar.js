@@ -4,7 +4,7 @@ import { agendarItemPronto } from '../../lib/fabrica';
 import { empresa, gerarRoteiroEmpresa } from '../../lib/empresa';
 import { gerarRoteiroOracaoDia } from '../../lib/oracaoDia';
 import { buscarSaldoFal } from '../../lib/orcamento';
-import { passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario, temposDasCenas, buscarMidiaReal } from '../../lib/documentario';
+import { passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario, temposDasCenas, buscarMidiaReal, conferidorDeCena } from '../../lib/documentario';
 import { EPISODIOS } from '../../lib/documentarioEpisodios';
 import {
   gerarRoteiroInfantil,
@@ -36,6 +36,39 @@ import {
 export const maxDuration = 300;
 
 const CENAS_ANIMADAS_ECONOMICO = 3;
+
+
+/**
+ * Documentários que já tinham as imagens prontas antes da conferência por IA (algumas imagens fora de
+ * contexto: coisa moderna no meio da história) e ainda não foram ao ar: refaz só as imagens e a montagem.
+ * A voz fica a mesma. Roda no máximo 1 vez por hora.
+ */
+async function refazerImagensDocumentarios(db) {
+  if (!process.env.GEMINI_API_KEY) return;
+  const cfg = db.collection('youvideo_config').doc('documentario_midia');
+  const c = (await cfg.get()).data() || {};
+  if (c.em && Date.now() - c.em < 3600e3) return;
+  await cfg.set({ em: Date.now() }, { merge: true });
+  const snap = await db.collection('youvideo_fila').where('documentario', '==', true).get();
+  const agora = new Date().toISOString();
+  for (const d of snap.docs) {
+    const x = d.data();
+    if (x.midiaConferida || x.fabrica?.ativo === false) continue;
+    if (!['imagens_ok', 'animando', 'montando', 'concluido'].includes(x.status)) continue;
+    if (!x.fabrica?.quandoYoutube || x.fabrica.quandoYoutube < agora) continue; // já foi ao ar: não mexe
+    await d.ref.update({
+      status: 'voz_ok',
+      arquivos: null,
+      arquivosParciais: null,
+      videoUrl: null,
+      renderId: null,
+      thumbnailUrl: null,
+      'fabrica.youtube': null,
+      'fabrica.quando': agora,
+      imagensRefeitas: true,
+    });
+  }
+}
 
 export default async function handler(req, res) {
   const db = getDb();
@@ -304,7 +337,8 @@ export default async function handler(req, res) {
           for (let i = feitas.length; i < Math.min(item.roteiro.cenas.length, feitas.length + 8); i++) {
             const cena = item.roteiro.cenas[i];
             if (comBroll && i - ultimoBroll >= 3 && String(cena.broll || '').trim()) {
-              const m = await buscarMidiaReal(String(cena.broll), usados).catch(() => null);
+              const conferir = conferidorDeCena({ tema: item.roteiro.titulo || item.tema || '', trecho: cena.textoNarrado || '', busca: String(cena.broll) });
+              const m = await buscarMidiaReal(String(cena.broll), usados, conferir).catch(() => null);
               if (m?.videoUrl) {
                 ultimoBroll = i;
                 usados.add(m.id);
@@ -579,6 +613,7 @@ export default async function handler(req, res) {
   // da fila só andam quando alguém chama manualmente, como sempre foi)
   const soFabrica = req.query.fabrica === '1';
   const inicio = Date.now();
+  if (soFabrica) await refazerImagensDocumentarios(db).catch(() => {});
 
   const feitos = [];
   const vistos = new Set();
