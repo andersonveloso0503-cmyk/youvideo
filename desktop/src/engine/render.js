@@ -42,20 +42,26 @@ function threadsPorModo(modo) {
   return 0; // automático = todos
 }
 
-function argsEncoder(encoder, modo) {
+// teto (kbps): vídeos longos ganham um limite de bitrate. Uma história de 1h30 com zoom lento ficava com
+// 3 a 5 GB (subir para a nuvem e depois para o YouTube levava horas); com o teto fica perto de 1,5 GB,
+// sem diferença visível (o YouTube recomprime tudo de qualquer jeito).
+function argsEncoder(encoder, modo, teto = 0) {
   const threads = String(threadsPorModo(modo));
+  const limite = teto ? ['-maxrate', `${teto}k`, '-bufsize', `${teto * 2}k`] : [];
   switch (encoder) {
     case 'h264_nvenc':
-      return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'vbr', '-cq', '23', '-b:v', '0', '-pix_fmt', 'yuv420p'];
+      return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'vbr', '-cq', '23', '-b:v', '0', ...limite, '-pix_fmt', 'yuv420p'];
     case 'h264_qsv':
-      return ['-c:v', 'h264_qsv', '-preset', 'veryfast', '-global_quality', '23', '-pix_fmt', 'nv12'];
+      return ['-c:v', 'h264_qsv', '-preset', 'veryfast', '-global_quality', '23', ...limite, '-pix_fmt', 'nv12'];
     case 'h264_amf':
-      return ['-c:v', 'h264_amf', '-quality', 'speed', '-rc', 'cqp', '-qp_i', '22', '-qp_p', '24', '-pix_fmt', 'yuv420p'];
+      return teto
+        ? ['-c:v', 'h264_amf', '-quality', 'speed', '-rc', 'vbr_peak', '-b:v', `${Math.round(teto * 0.75)}k`, ...limite, '-pix_fmt', 'yuv420p']
+        : ['-c:v', 'h264_amf', '-quality', 'speed', '-rc', 'cqp', '-qp_i', '22', '-qp_p', '24', '-pix_fmt', 'yuv420p'];
     default:
       return [
         '-c:v', 'libx264',
         '-preset', modo === 'maximo' ? 'veryfast' : 'superfast',
-        '-crf', '23', '-pix_fmt', 'yuv420p', '-threads', threads,
+        '-crf', '23', ...limite, '-pix_fmt', 'yuv420p', '-threads', threads,
       ];
   }
 }
@@ -577,7 +583,7 @@ function filtroInscrever(cfg, W, H, total) {
 }
 
 /** Renderização final: fundo + onda + textura + textos + áudio. */
-async function renderizarFinal({ fundo, audioArquivo, total, W, H, efeito, textura, assArquivo, fontsDir, inscrever, saida, encoder, modo, onProgresso, registrarCancelar, dir }) {
+async function renderizarFinal({ fundo, audioArquivo, total, W, H, efeito, textura, assArquivo, fontsDir, inscrever, saida, encoder, modo, onProgresso, registrarCancelar, dir, teto = 0 }) {
   const args = [];
   if (fundo.tipo === 'imagens') {
     args.push('-f', 'concat', '-safe', '0', '-i', path.basename(fundo.lista));
@@ -623,7 +629,7 @@ async function renderizarFinal({ fundo, audioArquivo, total, W, H, efeito, textu
   args.push(
     '-filter_complex', partes.join(';'),
     '-map', '[v]', '-map', '1:a',
-    ...argsEncoder(encoder, modo),
+    ...argsEncoder(encoder, modo, teto),
     '-g', String(FPS * 2),
     '-c:a', 'copy',
     '-t', total.toFixed(3),

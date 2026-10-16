@@ -391,12 +391,47 @@ class Fila extends EventEmitter {
     return null;
   }
 
+  /** Guarda onde ficou no PC o vídeo que subiu para a nuvem (para o YouTube não precisar baixar de novo). */
+  lembrarLocal(url, arquivo) {
+    try {
+      const arq = path.join(this.dirCache, 'videos-no-pc.json');
+      const mapa = fs.existsSync(arq) ? JSON.parse(fs.readFileSync(arq, 'utf8')) : {};
+      mapa[url] = arquivo;
+      const chaves = Object.keys(mapa);
+      for (const k of chaves.slice(0, Math.max(0, chaves.length - 300))) delete mapa[k];
+      fs.writeFileSync(arq, JSON.stringify(mapa));
+    } catch {}
+  }
+
+  arquivoLocalDe(url) {
+    try {
+      const mapa = JSON.parse(fs.readFileSync(path.join(this.dirCache, 'videos-no-pc.json'), 'utf8'));
+      const a = mapa[url];
+      return a && fs.existsSync(a) ? a : null;
+    } catch {
+      return null;
+    }
+  }
+
   async processarEnvio(job) {
     const cfg = this.obterConfig();
     const e = job.envio;
     job.cancelado = false;
     job.naoAntesDe = null;
     try {
+      // Vídeo montado neste PC: usa o arquivo que já está aqui (antes baixava de novo da nuvem, horas nos longos)
+      if (e.baixarDe && (!e.arquivo || !fs.existsSync(e.arquivo))) {
+        const local = this.arquivoLocalDe(e.baixarDe);
+        if (local) {
+          e.arquivo = local;
+          if (e.capaUrl && !e.capa) {
+            try {
+              e.capa = await Central.baixar(e.capaUrl, path.join(this.dirCache, 'biblioteca', `${e.chaveArquivo || job.id}-capa.jpg`));
+            } catch {}
+          }
+          this.salvar();
+        }
+      }
       // Vídeo da Biblioteca (na nuvem): baixa primeiro
       if (e.baixarDe && (!e.arquivo || !fs.existsSync(e.arquivo))) {
         this.atualizar(job, { status: 'publicando', etapa: 'Baixando o vídeo' });
@@ -792,6 +827,7 @@ class Fila extends EventEmitter {
         await new Promise((ok) => setTimeout(ok, 5000 * tentativa));
       }
     }
+    this.lembrarLocal(videoUrl, arquivo);
     await Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: job.pedidoId, acao: 'feito', videoUrl, comBotao: !!job.comBotao } });
     this.atualizar(job, { videoUrlSite: videoUrl });
   }
@@ -878,6 +914,8 @@ class Fila extends EventEmitter {
         fundo: { tipo: 'loop', arquivo: fundo }, audioArquivo: audio, total: rc.duracao, W, H,
         efeito: { estilo: 'nenhum' }, textura: {}, assArquivo, fontsDir: path.join(dir, 'fonts'), inscrever: inscreverMontagem,
         saida: temporario, encoder: enc, modo, dir, registrarCancelar,
+        // Vídeo longo (mais de 20 min): limite de bitrate para o arquivo não ficar gigante
+        teto: !curto && rc.duracao > 20 * 60 ? 2500 : 0,
         onProgresso: (x) => {
           progR(x);
           const dec = (Date.now() - inicio) / 1000;
