@@ -201,7 +201,7 @@ export default async function handler(req, res) {
       cta: String(req.body.cta || '').slice(0, 60), // chamada grande nos últimos segundos (ex.: WhatsApp da empresa)
       ...(req.body.legenda === false ? { legenda: false } : {}), // documentário para dormir: sem legenda na tela
       audio: temAudioSegments
-        ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length }))
+        ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length, ...(s.volume != null ? { volume: s.volume } : {}) }))
         : [{ url: audioUrl, start: 0, length: duracaoTotalAudio }],
       clipes: clipsVideo.map((c) => ({
         tipo: c.asset.type === 'video' ? 'video' : 'imagem',

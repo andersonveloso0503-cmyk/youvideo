@@ -102,7 +102,8 @@ const Fabrica = (() => {
       const teste = q('#fabIfSemanas').value === 'teste';
       const qtd = teste ? 1 : Number(q('#fabIfSemanas').value) * q('#fabIfDias').value.split(',').length;
       // ~25 imagens (Flux) + narração + música (ElevenLabs) + animação (US$ 0,10 por cena na fal.ai)
-      const porEp = { todas: 3.5, 3: 1.3, nada: 1 }[q('#fabIfAnim').value] || 3.5;
+      const fator = Number(q('#fabIfDuracao').value) >= 480 ? 1.9 : 1; // 8 min ≈ o dobro de cenas
+      const porEp = ({ todas: 3.5, 3: 1.3, nada: 1 }[q('#fabIfAnim').value] || 3.5) * (q('#fabIfAnim').value === '3' ? 1.6 : fator);
       q('#fabCusto').textContent = `${qtd} episódios · custo aproximado US$ ${Math.max(1, Math.round(qtd * porEp))} (imagens, voz, música e animação) + ~${qtd * 3} mil caracteres e ${qtd} músicas da ElevenLabs`;
       return;
     }
@@ -173,7 +174,7 @@ const Fabrica = (() => {
       })
     );
     document.querySelectorAll('#fabMarcaAbas button').forEach((b) => (b.onclick = () => trocarMarca(b.dataset.marca || '')));
-    ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs', '#fabOrDias', '#fabLgSemanas', '#fabLgDias', '#fabLgDuracao', '#fabDocQuantos', '#fabIfSemanas', '#fabIfDias', '#fabIfAnim'].forEach((id) => q(id).addEventListener('change', custo));
+    ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs', '#fabOrDias', '#fabLgSemanas', '#fabLgDias', '#fabLgDuracao', '#fabDocQuantos', '#fabIfSemanas', '#fabIfDias', '#fabIfAnim', '#fabIfDuracao'].forEach((id) => q(id).addEventListener('change', custo));
     // Cortes: lembra as escolhas da última vez
     const pc = p.cortes || {};
     for (const [chave, id] of [['tipo', '#fabCtTipo'], ['dias', '#fabCtDias'], ['porDia', '#fabCtPorDia'], ['hora1', '#fabCtHora1'], ['hora2', '#fabCtHora2'], ['animacao', '#fabCtAnimacao']]) {
@@ -308,6 +309,7 @@ const Fabrica = (() => {
         horarios: [q('#fabIfHora').value],
         animacao: anim === 'nada' ? 'nada' : 'tudo',
         animacaoCompleta: anim === 'todas',
+        duracao: Number(q('#fabIfDuracao').value),
         vozId: q('#fabIfVoz').value.trim(),
         temas,
         canalYoutube: canal ? { id: canal.id, titulo: canal.titulo } : null,
@@ -336,7 +338,7 @@ const Fabrica = (() => {
     b.textContent = '✍️ Escrevendo o roteiro (até 1 min)...';
     try {
       const tema = q('#fabIfTemas').value.split('\n').map((t) => t.trim()).find(Boolean) || '';
-      const { tema: temaUsado, roteiro: r } = await window.api.fabrica.criar({ tipo: 'previa-infantil', personagem: { nome, descricao }, tema });
+      const { tema: temaUsado, roteiro: r } = await window.api.fabrica.criar({ tipo: 'previa-infantil', personagem: { nome, descricao }, tema, duracao: Number(q('#fabIfDuracao').value) });
       const cor = (p) => (/^narrador$/i.test(p) ? '#7E57C2' : p.toLowerCase() === nome.toLowerCase() ? '#1E88E5' : '#E91E63');
       const cenaHtml = (c, i) =>
         `<div style="margin:10px 0;padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.08)"><small style="opacity:.6">Cena ${i + 1} · ${esc(c.descricao)}</small>` +

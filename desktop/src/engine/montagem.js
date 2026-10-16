@@ -43,7 +43,9 @@ async function prepararAudio(receita, locais, dir, { modo, registrarCancelar }) 
   const partes = pedacos.map((p, i) => {
     const ms = Math.max(0, Math.round((Number(p.start) || 0) * 1000));
     const corte = p.length ? `atrim=0:${Number(p.length).toFixed(3)},` : '';
-    return `[${i}:a]${corte}aresample=48000,adelay=${ms}:all=1[a${i}]`;
+    // volume: efeito sonoro mais baixo que as falas (desenho infantil)
+    const vol = p.volume != null && Number(p.volume) !== 1 ? `volume=${Math.max(0, Math.min(2, Number(p.volume))).toFixed(2)},` : '';
+    return `[${i}:a]${corte}${vol}aresample=48000,adelay=${ms}:all=1[a${i}]`;
   });
   partes.push(`${pedacos.map((_, i) => `[a${i}]`).join('')}amix=inputs=${pedacos.length}:normalize=0:dropout_transition=0,apad[mix]`);
   args.push('-filter_complex', partes.join(';'), '-map', '[mix]', '-t', receita.duracao.toFixed(3), '-c:a', 'aac', '-b:a', '192k', saida);

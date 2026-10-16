@@ -14,6 +14,7 @@ import {
   linhaDoTempo,
   vozesDosPersonagens,
   falasDoBloco,
+  gerarEfeitosSonoros,
   duracaoMp3,
   ESTILO_MUSICA,
   DURACAO_MUSICA,
@@ -207,8 +208,14 @@ export default async function handler(req, res) {
             await ref.update({ 'vozInfantil.musica': { audioUrl, duracao: duracao || DURACAO_MUSICA, id: r.musica.id || null } });
             break;
           }
+          if (!vi.sons) {
+            // Efeitos sonoros das cenas (splash, bzzz...); se a ElevenLabs recusar, segue sem eles
+            const ef = await gerarEfeitosSonoros(item.roteiro);
+            await ref.update({ 'vozInfantil.sons': ef.sons, ...(ef.aviso ? { aviso: ef.aviso } : {}) });
+            break;
+          }
           // Tudo pronto: junta na linha do tempo e dá o tempo de cada cena
-          const lt = linhaDoTempo({ roteiro: item.roteiro, narracaoAntes: vi.antes, musica: vi.musica, narracaoDepois: vi.depois });
+          const lt = linhaDoTempo({ roteiro: item.roteiro, narracaoAntes: vi.antes, musica: vi.musica, narracaoDepois: vi.depois, sons: vi.sons || [] });
           await ref.update({
             narracao: { audioUrl: vi.antes.audioUrl, audioSegments: lt.audioSegments, palavras: [] },
             'roteiro.cenas': item.roteiro.cenas.map((c, i) => ({ ...c, start: lt.tempos[i]?.start ?? null, length: lt.tempos[i]?.length ?? null })),

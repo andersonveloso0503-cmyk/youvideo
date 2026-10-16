@@ -438,7 +438,7 @@ export default async function handler(req, res) {
           temaPv = planejados.find((t) => !usadosPv.some((u) => u.startsWith(t.split('—')[0].trim().toLowerCase()))) ||
             (await temasInfantisDaIa(1, personagemPv, usadosPv))[0] || `${personagemPv.nome} e um novo amigo — amizade`;
         }
-        const roteiroPv = await gerarRoteiroInfantil({ tema: temaPv, personagem: personagemPv });
+        const roteiroPv = await gerarRoteiroInfantil({ tema: temaPv, personagem: personagemPv, duracaoSeg: Math.max(180, Math.min(600, Number(b.duracao) || 270)) });
         return res.status(200).json({ tema: temaPv, roteiro: roteiroPv });
       }
 
@@ -485,7 +485,7 @@ export default async function handler(req, res) {
             infantil: { personagem, ...(testeIf ? { teste: true } : {}) },
             estilo: 'infantil',
             formato: 'longo',
-            duracaoDesejada: String(Math.max(180, Math.min(420, Number(b.duracao) || 270))),
+            duracaoDesejada: String(Math.max(180, Math.min(600, Number(b.duracao) || 270))), // 4–5 min ou ~8 min
             animar: b.animacao !== 'nada',
             animacaoCompleta: b.animacaoCompleta !== false, // desenho infantil: todas as cenas animadas (o dono pode escolher o econômico)
             ...(String(b.vozId || '').trim() ? { vozId: String(b.vozId).trim().slice(0, 60) } : {}),
