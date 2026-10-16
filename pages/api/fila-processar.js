@@ -290,7 +290,7 @@ export default async function handler(req, res) {
 
       case 'voz_ok': {
         if (item.infantil) {
-          // Ficha do personagem (uma vez) e depois 5 imagens por rodada, todas com o personagem igual
+          // Ficha do personagem (uma vez) e depois 8 imagens por rodada, todas com o personagem igual
           let refUrl = item.infantil.refUrl;
           if (!refUrl) {
             refUrl = await garantirReferencia(item.infantil.personagem);
@@ -298,7 +298,7 @@ export default async function handler(req, res) {
           }
           const feitas = item.arquivosParciais || [];
           const novas = await gerarImagensInfantis({
-            cenas: item.roteiro.cenas.slice(feitas.length, feitas.length + 5),
+            cenas: item.roteiro.cenas.slice(feitas.length, feitas.length + 8),
             personagem: item.infantil.personagem,
             referencia: refUrl,
           });

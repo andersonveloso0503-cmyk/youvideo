@@ -23,6 +23,9 @@ const PITCH_FATORES = {
   normal: 1,
   grave: 0.82,
   aguda: 1.28,
+  // Desenho infantil: ajuste leve (o 1.28 deixava a voz robótica, tipo esquilo)
+  leve: 1.12,
+  levegrave: 0.92,
 };
 
 export default async function handler(req, res) {

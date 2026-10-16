@@ -103,7 +103,8 @@ const Fabrica = (() => {
       const qtd = teste ? 1 : Number(q('#fabIfSemanas').value) * q('#fabIfDias').value.split(',').length;
       // ~25 imagens (Flux) + narração + música (ElevenLabs) + animação (US$ 0,10 por cena na fal.ai)
       const fator = Number(q('#fabIfDuracao').value) >= 480 ? 1.9 : 1; // 8 min ≈ o dobro de cenas
-      const porEp = ({ todas: 3.5, 3: 1.3, nada: 1 }[q('#fabIfAnim').value] || 3.5) * (q('#fabIfAnim').value === '3' ? 1.6 : fator);
+      // uma imagem por fala (a imagem troca junto com quem fala): ~45 cenas num episódio de 4 min
+      const porEp = ({ todas: 5.5, 3: 1.8, nada: 1.5 }[q('#fabIfAnim').value] || 5.5) * (q('#fabIfAnim').value === '3' ? 1.6 : fator);
       q('#fabCusto').textContent = `${qtd} episódios · custo aproximado US$ ${Math.max(1, Math.round(qtd * porEp))} (imagens, voz, música e animação) + ~${qtd * 3} mil caracteres e ${qtd} músicas da ElevenLabs`;
       return;
     }
