@@ -216,14 +216,14 @@ export default async function handler(req, res) {
             return { audioUrl: v.audioUrl, audioSegments: v.audioSegments, cenasComTempo: v.cenasComTempo || [] };
           };
           const gerarBloco = (cenas) => gerarFalas(falasDoBloco(cenas));
-          // Conferência: escuta cada fala (12 por rodada) e refaz as que não batem com o roteiro.
+          // Conferência: escuta cada fala (24 por rodada) e refaz as que não batem com o roteiro.
           // Devolve true quando o bloco inteiro está conferido.
           const conferir = async (nome, cenas) => {
             if (vi.ok?.[nome]) return true;
             const falas = falasDoBloco(cenas);
             let voz = vi[nome];
             const conf = vi.conf?.[nome] || { i: 0, tent: {} };
-            const ate = Math.min(falas.length, conf.i + 12);
+            const ate = Math.min(falas.length, conf.i + 24);
             let mudou = false;
             for (let k = conf.i; k < ate; k++) {
               const seg = voz.audioSegments[k];
@@ -347,7 +347,7 @@ export default async function handler(req, res) {
 
       case 'voz_ok': {
         if (item.infantil) {
-          // Ficha do personagem (uma vez) e depois 8 imagens por rodada, todas com o personagem igual
+          // Ficha do personagem (uma vez) e depois 16 imagens por rodada (4 ao mesmo tempo), todas com o personagem igual
           let refUrl = item.infantil.refUrl;
           if (!refUrl) {
             refUrl = await garantirReferencia(item.infantil.personagem);
@@ -362,7 +362,7 @@ export default async function handler(req, res) {
           }
           const feitas = item.arquivosParciais || [];
           const novas = await gerarImagensInfantis({
-            cenas: item.roteiro.cenas.slice(feitas.length, feitas.length + 8),
+            cenas: item.roteiro.cenas.slice(feitas.length, feitas.length + 16),
             personagem: item.infantil.personagem,
             referencia: refUrl,
             referenciasAmigos: refsAmigos,
@@ -489,7 +489,8 @@ export default async function handler(req, res) {
         // Manda animar só um LOTE pequeno de cenas por execução (evita estourar
         // o tempo limite quando há muitas cenas). O que já foi enviado fica
         // marcado; a próxima execução do cron continua de onde parou.
-        const LOTE = 5;
+        // Enviar para animar é rápido (só entra na fila da fal.ai): o desenho infantil manda 20 por rodada
+        const LOTE = item.infantil ? 20 : 5;
         const arquivosAnimados = [...item.arquivos];
         let enviadosNesseLote = 0;
         // Fábrica em modo econômico (padrão): anima só as 3 primeiras cenas — o começo é o que segura quem assiste —
