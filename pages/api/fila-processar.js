@@ -10,6 +10,7 @@ import {
   gerarRoteiroInfantil,
   garantirReferencia,
   gerarImagensInfantis,
+  garantirReferenciasAmigos,
   thumbInfantil,
   linhaDoTempo,
   vozesDosPersonagens,
@@ -296,11 +297,19 @@ export default async function handler(req, res) {
             refUrl = await garantirReferencia(item.infantil.personagem);
             await ref.update({ 'infantil.refUrl': refUrl });
           }
+          // Fichas dos amigos (Zuzu, Tonico, Margarida, Dona Nuvem): uma vez só, guardadas no banco
+          let refsAmigos = item.infantil.refsAmigos;
+          if (!refsAmigos) {
+            refsAmigos = await garantirReferenciasAmigos(item.infantil.personagem);
+            await ref.update({ 'infantil.refsAmigos': refsAmigos });
+            break; // as fichas levam um tempo: as cenas começam na próxima rodada
+          }
           const feitas = item.arquivosParciais || [];
           const novas = await gerarImagensInfantis({
             cenas: item.roteiro.cenas.slice(feitas.length, feitas.length + 8),
             personagem: item.infantil.personagem,
             referencia: refUrl,
+            referenciasAmigos: refsAmigos,
           });
           const todas = [...feitas, ...novas];
           if (todas.length < item.roteiro.cenas.length) {
