@@ -79,13 +79,13 @@ export default async function handler(req, res) {
   // pros dois de uma vez. Também repassa audioSegments quando a narração
   // foi dividida em mais de um pedaço (textos longos passam do limite de
   // caracteres da ElevenLabs numa chamada só).
-  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta, legenda }) => {
+  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta, legenda, semBotao }) => {
     const temVariosPedacos = (audioSegments || []).length > 1;
     const r = await fetch(`${baseUrl}/api/assemble-video`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}) }
+        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}), ...(semBotao ? { semBotao: true } : {}) }
       ),
     });
     const data = await r.json();
@@ -414,6 +414,7 @@ export default async function handler(req, res) {
             cta: item.marca ? empresa(item.marca)?.cta : '',
             // Documentário: sem legenda (não acorda quem dorme); infantil: criança pequena não lê, a tela fica limpa
             ...(item.documentario || item.infantil ? { legenda: false } : {}),
+            ...(item.infantil ? { semBotao: true } : {}), // conteúdo para crianças: sem botão de like/inscrever gravado
           });
           // duracaoAlvo só existe quando a narração guarda as palavras (o documentário não guarda)
           await ref.update({ ...(duracaoAlvo != null ? { duracaoAlvo } : {}), renderId, status: 'montando' });
@@ -485,7 +486,7 @@ export default async function handler(req, res) {
             formato: item.formato,
             palavras: item.infantil ? [] : item.narracao.palavras,
             marca: marcaDe(item),
-            ...(item.infantil ? { legenda: false } : {}),
+            ...(item.infantil ? { legenda: false, semBotao: true } : {}),
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
         } else {

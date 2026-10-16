@@ -551,7 +551,7 @@ const Fabrica = (() => {
           <span class="txt"><b></b><small></small></span>
           <span class="acoes"></span>`;
         l.querySelector('b').textContent = i.titulo || (i.serie ? `${i.serie.nome} (Parte ${i.serie.parte}/${i.serie.total})` : i.tema);
-        l.querySelector('small').innerHTML = `${esc(i.status === 'erro' ? `Erro: ${i.erro || ''}` : naEspera(i) ? `Aguardando a vez: começa a ser produzido ${comecaEm(i)}` : ETAPA[i.status] || i.status)} · ${esc(redes)} ${seloYoutube(i)}`;
+        l.querySelector('small').innerHTML = `${i.aviso ? `<span style="color:var(--terracota)">⚠ ${esc(String(i.aviso).slice(0, 140))}</span> · ` : ''}${esc(i.status === 'erro' ? `Erro: ${i.erro || ''}` : naEspera(i) ? `Aguardando a vez: começa a ser produzido ${comecaEm(i)}` : ETAPA[i.status] || i.status)} · ${esc(redes)} ${seloYoutube(i)}`;
         const acoes = l.querySelector('.acoes');
         const botao = (txt, titulo, fn) => {
           const bt = document.createElement('button');

@@ -282,6 +282,7 @@ export default async function handler(req, res) {
           animar: x.animar !== false,
           status: x.status,
           erro: x.erro || x.ultimoErro || null,
+          aviso: x.aviso || null, // ex.: efeitos sonoros não saíram (chave sem permissão)
           videoUrl: x.videoUrl || null,
           thumbnailUrl: x.thumbnailUrl || null,
           quando: x.fabrica.quando,

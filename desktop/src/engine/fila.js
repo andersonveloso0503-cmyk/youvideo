@@ -864,7 +864,8 @@ class Fila extends EventEmitter {
       const progR = faixa(0.65, 0.35, 'renderizando', 'Gerando vídeo');
       // Fábrica / fila automática: o botão "Deixe seu like" já sai gravado no vídeo, assim ele aparece
       // em TODAS as redes (YouTube, Facebook, Instagram, TikTok e Kwai). Vídeo de empresa (tem CTA) fica sem.
-      const botaoLike = job.origemPedido === 'fila' && !rc.cta ? this.arquivoBotaoLike() : null;
+      // semBotao: desenho infantil (conteúdo para crianças não pode pedir like/inscrição)
+      const botaoLike = job.origemPedido === 'fila' && !rc.cta && !rc.semBotao ? this.arquivoBotaoLike() : null;
       const inscreverMontagem = botaoLike
         ? { arquivo: botaoLike, ...(curto ? { tamanho: 46, posicao: 'topo', primeiroSeg: 5, intervaloMin: 0.5 } : { tamanho: 28, posicao: 'inf_dir', primeiroSeg: 10, intervaloMin: 5 }) }
         : null;
