@@ -504,7 +504,7 @@ export default async function handler(req, res) {
           let thumbnailUrl = primeiraImagem;
           if (item.infantil) {
             // Desenho infantil: o personagem grande e alegre (o Compilador põe o título por cima, se quiser)
-            thumbnailUrl = (await thumbInfantil({ personagem: item.infantil.personagem, referencia: item.infantil.refUrl, titulo: item.roteiro.titulo }).catch(() => null)) || primeiraImagem;
+            thumbnailUrl = (await thumbInfantil({ personagem: item.infantil.personagem, referencia: item.infantil.refUrl, titulo: item.roteiro.titulo, thumbnailTitulo: item.roteiro.thumbnailTitulo, cena: (item.roteiro.cenas || []).find((c) => c.bloco === 'antes' && !/close-up/i.test(c.descricao))?.descricao || '' }).catch(() => null)) || primeiraImagem;
           } else if (item.documentario) {
             // Documentário: foto real escurecida + a pergunta da capa
             // Episódios criados antes da capa pintada: pega título, subtítulo e pintura do episódio escrito
