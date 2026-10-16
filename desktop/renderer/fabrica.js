@@ -47,7 +47,7 @@ const Fabrica = (() => {
     document.querySelectorAll('#modalFabrica .so-biblia').forEach((el) => (el.hidden = marca === 'lcs'));
     // Longos: só YouTube (sempre) e Facebook. Instagram, TikTok e Kwai são para vídeo curto.
     q('#fabInstagram').parentElement.hidden = soYoutube;
-    q('#fabFacebook').parentElement.hidden = marca === 'documentario' || marca === 'infantil'; // infantil: só YouTube
+    q('#fabFacebook').parentElement.hidden = marca === 'documentario'; // infantil: YouTube + Página do Planeta Fofura
     for (const id of ['#fabTiktok', '#fabKwai']) q(id).parentElement.hidden = marca === 'lcs' || soYoutube;
     q('#fabYoutube').disabled = soYoutube;
     if (soYoutube) q('#fabYoutube').checked = true;
@@ -308,6 +308,7 @@ const Fabrica = (() => {
         personagem: { nome, descricao },
         semanas: teste ? 1 : Number(q('#fabIfSemanas').value),
         teste,
+        redes: { youtube: true, facebook: q('#fabFacebook').checked },
         diasSemana,
         horarios: [q('#fabIfHora').value],
         animacao: anim === 'nada' ? 'nada' : 'tudo',

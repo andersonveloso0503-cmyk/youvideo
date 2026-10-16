@@ -446,6 +446,11 @@ export default async function handler(req, res) {
       if (b.tipo === 'infantil') {
         if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube do desenho infantil.' });
         const personagem = normalizarPersonagem(b.personagem);
+        // Facebook: Página do Planeta Fofura (o teste nunca vai para o Facebook: sobe só privado no YouTube)
+        const facebookIf = !!b.redes?.facebook && b.teste !== true;
+        if (facebookIf && (!process.env.INFANTIL_FACEBOOK_PAGE_ACCESS_TOKEN || !process.env.INFANTIL_FACEBOOK_PAGE_ID)) {
+          return res.status(400).json({ erro: 'Falta ligar a Página do Planeta Fofura ao Youvideo. Na Vercel (projeto youvideo → Settings → Environment Variables) crie INFANTIL_FACEBOOK_PAGE_ID e INFANTIL_FACEBOOK_PAGE_ACCESS_TOKEN e faça um novo deploy. Ou desmarque o Facebook.' });
+        }
         if (!personagem.descricao) return res.status(400).json({ erro: 'Descreva a aparência do personagem.' });
         const semanasIf = Math.max(1, Math.min(12, Number(b.semanas) || 4));
         const diasSemanaIf = (Array.isArray(b.diasSemana) && b.diasSemana.length ? b.diasSemana : [2, 5]).map(Number); // 2 = terça
@@ -498,8 +503,9 @@ export default async function handler(req, res) {
               lote: loteIf,
               quando,
               quandoYoutube: testeIf ? null : quando, // teste: sobe privado, sem data para publicar
-              // Conteúdo para crianças: só no YouTube (as Páginas do Facebook/Instagram são de outro assunto)
-              redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
+              // YouTube (conteúdo para crianças) + Página do Planeta Fofura no Facebook, se marcada
+              redes: { youtube: true, facebook: facebookIf, instagram: false, tiktok: false, kwai: false },
+              ...(facebookIf ? { conta: 'infantil' } : {}),
               canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') },
             },
           });
