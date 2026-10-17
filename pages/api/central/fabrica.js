@@ -606,7 +606,7 @@ export default async function handler(req, res) {
             duracaoDesejada: String(Math.max(180, Math.min(600, Number(b.duracao) || 270))), // 4–5 min ou ~8 min
             animar: b.animacao !== 'nada',
             animacaoCompleta: b.animacaoCompleta !== false, // desenho infantil: todas as cenas animadas (o dono pode escolher o econômico)
-            resolucaoAnim: ['720p', '580p', '480p', 'kling'].includes(b.resolucaoAnim) ? b.resolucaoAnim : '720p',
+            resolucaoAnim: ['720p', '580p', '480p', 'kling', 'omnihuman'].includes(b.resolucaoAnim) ? b.resolucaoAnim : '720p',
             ...(String(b.vozId || '').trim() ? { vozId: String(b.vozId).trim().slice(0, 60) } : {}),
             status: 'pendente',
             origem: 'fabrica',

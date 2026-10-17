@@ -105,7 +105,7 @@ const Fabrica = (() => {
       const fator = Number(q('#fabIfDuracao').value) >= 480 ? 1.9 : 1; // 8 min ≈ o dobro de cenas
       // uma imagem por fala (a imagem troca junto com quem fala): ~45 cenas num episódio de 4 min
       // animação = ~45 cenas × preço da qualidade escolhida; o resto (imagens, voz, música) ~US$ 1
-      const precoCena = { kling: 0.35, '720p': 0.1, '580p': 0.075, '480p': 0.05 }[q('#fabIfRes').value] || 0.1;
+      const precoCena = { omnihuman: 0.65, kling: 0.35, '720p': 0.1, '580p': 0.075, '480p': 0.05 }[q('#fabIfRes').value] || 0.1;
       const porEp = ({ todas: 1 + 45 * precoCena, 3: 1 + 3 * precoCena, nada: 1 }[q('#fabIfAnim').value] || 1 + 45 * precoCena) * (q('#fabIfAnim').value === '3' ? 1.6 : fator);
       q('#fabCusto').textContent = `${qtd} episódios · custo aproximado US$ ${Math.max(1, Math.round(qtd * porEp))} (imagens, voz, música e animação) + ~${qtd * 3} mil caracteres e ${qtd} músicas da ElevenLabs`;
       return;

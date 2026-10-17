@@ -12,6 +12,8 @@ import {
   gerarImagensInfantis,
   garantirReferenciasAmigos,
   thumbInfantil,
+  falasDasCenas,
+  enviarLabios,
   linhaDoTempo,
   vozesDosPersonagens,
   falasDoBloco,
@@ -494,19 +496,37 @@ export default async function handler(req, res) {
         // o tempo limite quando há muitas cenas). O que já foi enviado fica
         // marcado; a próxima execução do cron continua de onde parou.
         // Enviar para animar é rápido (só entra na fila da fal.ai): o desenho infantil manda 20 por rodada
-        const LOTE = item.infantil ? 20 : 5;
+        const LOTE = item.infantil ? (item.resolucaoAnim === 'omnihuman' ? 12 : 20) : 5;
         const arquivosAnimados = [...item.arquivos];
         let enviadosNesseLote = 0;
         // Fábrica em modo econômico (padrão): anima só as 3 primeiras cenas — o começo é o que segura quem assiste —
         // e o resto entra como imagem com zoom. Cada cena animada custa cerca de US$ 0,10 na fal.ai.
         const limiteAnimadas = item.fabrica && item.animacaoCompleta !== true ? CENAS_ANIMADAS_ECONOMICO : Infinity;
 
+        // Boca sincronizada (OmniHuman): cenas em que um personagem fala; o resto (narrador, música, dança) vai no Kling
+        const labios = item.infantil && item.resolucaoAnim === 'omnihuman' ? falasDasCenas(item) : [];
         for (let i = 0; i < arquivosAnimados.length && enviadosNesseLote < LOTE; i++) {
           const arquivo = arquivosAnimados[i];
           if (i >= limiteAnimadas) break;
           if (!arquivo.imageUrl || arquivo.videoUrl || arquivo.klingTaskId || arquivo.avisoVideo) continue;
+          if (labios[i] && item.roteiro.cenas.length === arquivosAnimados.length) {
+            try {
+              const { requestId, statusUrl, responseUrl } = await enviarLabios({ imageUrl: arquivo.imageUrl, fala: labios[i], cena: item.roteiro.cenas[i]?.descricao || '' });
+              arquivosAnimados[i] = { ...arquivo, klingTaskId: requestId, statusUrl, responseUrl, labios: true };
+            } catch (err) {
+              // Não deu a boca sincronizada: essa cena vai no Kling, como antes
+              try {
+                const k = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo, emLoop, 'kling');
+                arquivosAnimados[i] = { ...arquivo, klingTaskId: k.requestId, statusUrl: k.statusUrl, responseUrl: k.responseUrl, videoLoop: true, avisoLabios: err.message };
+              } catch (err2) {
+                arquivosAnimados[i] = { ...arquivo, avisoVideo: err2.message };
+              }
+            }
+            enviadosNesseLote++;
+            continue;
+          }
           try {
-            const { requestId, statusUrl, responseUrl } = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo, emLoop, item.resolucaoAnim || '720p');
+            const { requestId, statusUrl, responseUrl } = await enviarAnimacao(arquivo.imageUrl, arquivo.cena, item.formato, duracaoAlvo, emLoop, item.resolucaoAnim === 'omnihuman' ? 'kling' : item.resolucaoAnim || '720p');
             arquivosAnimados[i] = { ...arquivo, klingTaskId: requestId, statusUrl, responseUrl, ...(emLoop ? { videoLoop: true } : {}) };
           } catch (err) {
             arquivosAnimados[i] = { ...arquivo, avisoVideo: err.message };
