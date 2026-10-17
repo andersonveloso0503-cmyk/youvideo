@@ -199,7 +199,8 @@ const Fabrica = (() => {
     q('#btnFabCriar').onclick = criar;
     q('#btnFabIfPrevia').onclick = previaInfantil;
     q('#btnFabIfComparar').onclick = compararQualidades;
-    q('#btnFabIfBoca').onclick = testarBoca;
+    q('#btnFabIfBoca').onclick = () => testarBoca();
+    q('#btnFabIfBoca2').onclick = () => testarBoca('imagem');
     q('#fabIfRes').addEventListener('change', custo);
     q('#btnFabAtualizar').onclick = () => carregar(true);
   }
@@ -428,15 +429,19 @@ const Fabrica = (() => {
   }
 
   // Teste da boca sincronizada: uma fala do Pingo em 2 serviços, lado a lado, com som
-  async function testarBoca() {
+  async function testarBoca(metodo) {
     const erro = q('#fabErro');
     erro.textContent = '';
-    if (!confirm('Testar a boca sincronizada numa fala do Pingo, em 2 serviços? Custa menos de US$ 0,50 na fal.ai e leva uns 2 a 5 minutos.')) return;
-    const b = q('#btnFabIfBoca');
+    const segunda = metodo === 'imagem';
+    if (!confirm(segunda
+      ? 'Criar o Pingo falando a partir da imagem + voz, em 2 serviços (VEED Fabric e OmniHuman)? Custa cerca de US$ 1 na fal.ai e leva uns 3 a 8 minutos.'
+      : 'Testar a boca sincronizada numa fala do Pingo, em 2 serviços? Custa menos de US$ 0,50 na fal.ai e leva uns 2 a 5 minutos.')) return;
+    const b = q(segunda ? '#btnFabIfBoca2' : '#btnFabIfBoca');
+    const rotulo = b.textContent;
     b.disabled = true;
     b.textContent = '👄 Sincronizando a boca...';
     try {
-      let t = await window.api.fabrica.criar({ tipo: 'testar-boca' });
+      let t = await window.api.fabrica.criar({ tipo: 'testar-boca', ...(segunda ? { metodo: 'imagem' } : {}) });
       if (t.precisaAnimar) {
         // A cena estava parada: anima primeiro e depois sincroniza a boca
         b.textContent = '👄 Animando a cena primeiro...';
@@ -453,7 +458,7 @@ const Fabrica = (() => {
         t = await window.api.fabrica.criar({ tipo: 'testar-boca', videoUrl: anim, audioUrl: t.audioUrl, texto: t.texto, personagem: t.personagem });
       }
       let prontos = [];
-      for (let volta = 0; volta < 80; volta++) {
+      for (let volta = 0; volta < 120; volta++) {
         await new Promise((ok) => setTimeout(ok, 6000));
         const r = await window.api.fabrica.criar({ tipo: 'comparar-status', jobs: t.jobs });
         prontos = r.jobs || [];
@@ -477,7 +482,7 @@ const Fabrica = (() => {
       erro.textContent = msgErro(e);
     } finally {
       b.disabled = false;
-      b.textContent = '👄 Testar boca sincronizada';
+      b.textContent = rotulo;
     }
   }
 

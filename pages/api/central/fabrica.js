@@ -472,6 +472,26 @@ export default async function handler(req, res) {
           if (achado) break;
         }
         if (!achado) return res.status(400).json({ erro: 'Não achei uma cena do Pingo falando (2 a 8 s) nos episódios prontos. Faça um episódio de teste primeiro.' });
+        // 2ª rodada: ferramentas que criam o personagem falando a partir da IMAGEM parada + a voz
+        // (a sincronia em cima do vídeo pronto não funcionou na gotinha)
+        if (b.metodo === 'imagem') {
+          if (!achado.imagem) return res.status(400).json({ erro: 'A cena escolhida não tem imagem.' });
+          const enviarImg = async (modelo, corpo) => {
+            const r = await fetch(`https://queue.fal.run/${modelo}`, {
+              method: 'POST',
+              headers: { Authorization: `Key ${process.env.FAL_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify(corpo),
+            });
+            const d = await r.json();
+            if (!r.ok) return { erro: d.detail ? JSON.stringify(d.detail).slice(0, 200) : d.message || `fal.ai ${r.status}` };
+            return { statusUrl: d.status_url, responseUrl: d.response_url };
+          };
+          const jobsImg = [
+            { res: 'fabric', nome: 'VEED Fabric 480p (US$ 0,08/s)', ...(await enviarImg('veed/fabric-1.0', { image_url: achado.imagem, audio_url: achado.audioUrl, resolution: '480p' })) },
+            { res: 'omnihuman', nome: 'OmniHuman 1.5 (US$ 0,16/s)', ...(await enviarImg('fal-ai/bytedance/omnihuman/v1.5', { image_url: achado.imagem, audio_url: achado.audioUrl })) },
+          ];
+          return res.status(200).json({ ...achado, jobs: jobsImg });
+        }
         if (!achado.videoUrl) {
           // A cena saiu sem animação (sem crédito na fal.ai): anima primeiro (US$ 0,10) e a tela chama de novo
           const anim = await enviarAnimacao(achado.imagem, `${achado.cena || ''} ${achado.personagem} talking happily`, 'longo', undefined, true, '720p');
