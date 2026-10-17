@@ -766,7 +766,11 @@ export default async function handler(req, res) {
       } catch (err) {
         // Não deixa um item com erro travar a fila (nem gastar crédito repetindo para sempre)
         const tentativas = (doc.data().tentativas || 0) + 1;
-        await doc.ref.update(tentativas >= 3 ? { status: 'erro', erro: err.message, tentativas, statusAntes: statusAnterior } : { tentativas, ultimoErro: err.message });
+        // Falta de crédito (Flux, fal.ai, ElevenLabs): espera a recarga automática cair — tenta por até ~1 hora
+        // (12 rodadas) antes de dar erro, em vez de parar na 3ª tentativa
+        const semCredito = /cr[eé]dito|insufficient credits|quota|payment required|402/i.test(err.message);
+        const limite = semCredito ? 12 : 3;
+        await doc.ref.update(tentativas >= limite ? { status: 'erro', erro: err.message, tentativas, statusAntes: statusAnterior } : { tentativas, ultimoErro: semCredito ? `Esperando crédito (tentativa ${tentativas} de ${limite}): ${err.message}` : err.message });
         feitos.push({ id: doc.id, statusAnterior, erro: err.message });
       }
       if (!soFabrica) break; // chamada manual: um passo só, como antes
