@@ -46,7 +46,7 @@ function Barra({ valor, cor = '#7c5cff' }) {
   );
 }
 
-function Item({ i }) {
+function Item({ i, acao }) {
   const [emoji, tipo] = TIPO(i);
   const etapaIdx = ETAPAS.indexOf(i.status);
   let detalhe = ETAPA[i.status] || i.status;
@@ -73,18 +73,42 @@ function Item({ i }) {
             {tipo} · {i.status === 'concluido' ? `vai ao ar ${quando(i.quandoYoutube || i.quando)}` : naEspera(i) ? `começa ${quando(i.quando)}` : detalhe}
           </div>
           {i.status === 'erro' && <div style={{ fontSize: 13, color: '#ff8a8a', marginTop: 4 }}>{i.erro || 'Erro sem detalhe'}</div>}
+          {i.status !== 'erro' && i.status !== 'concluido' && i.erro && <div style={{ fontSize: 12.5, color: '#ffb36b', marginTop: 4 }}>⏳ Travou e está tentando de novo: {i.erro}</div>}
           {i.aviso && <div style={{ fontSize: 12.5, color: '#ffb36b', marginTop: 4 }}>⚠ {i.aviso}</div>}
           {ytTxt && <div style={{ fontSize: 12.5, marginTop: 4, color: '#cfcfe0' }}>{ytTxt}{yt === 'erro' && i.youtube?.erro ? `: ${i.youtube.erro}` : ''}</div>}
         </div>
       </div>
       {!['concluido', 'erro'].includes(i.status) && !naEspera(i) && <Barra valor={prog} />}
-      {(i.videoUrl || i.youtube?.url) && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+      {(i.videoUrl || i.youtube?.url || i.status === 'erro' || yt === 'erro' || naEspera(i) || (i.erro && i.status !== 'concluido')) && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          {i.status === 'erro' && <BotaoAcao acao={acao} id={i.id} tipo="repetir" texto="↻ Tentar de novo" ok="Volta a produzir em até 5 min, de onde parou" />}
+          {i.status !== 'erro' && i.status !== 'concluido' && !naEspera(i) && i.erro && <BotaoAcao acao={acao} id={i.id} tipo="destravar" texto="↻ Tentar agora" ok="Tenta de novo em até 5 min" />}
+          {yt === 'erro' && <BotaoAcao acao={acao} id={i.id} tipo="youtube-repetir" texto="↻ Subir de novo no YouTube" ok="O PC tenta subir de novo em até 2 min" />}
+          {naEspera(i) && <BotaoAcao acao={acao} id={i.id} tipo="produzir-agora" texto="⚡ Produzir agora" ok="Começa em até 5 min (a data no YouTube continua a mesma)" />}
           {i.videoUrl && <a href={i.videoUrl} target="_blank" rel="noreferrer" style={botao}>▶ Assistir</a>}
           {i.youtube?.url && <a href={i.youtube.url} target="_blank" rel="noreferrer" style={botao}>Abrir no YouTube</a>}
         </div>
       )}
     </div>
+  );
+}
+
+function BotaoAcao({ acao, id, tipo, texto, ok }) {
+  const [estado, setEstado] = useState('');
+  return (
+    <button
+      disabled={estado === '…'}
+      onClick={async () => {
+        setEstado('…');
+        const r = await acao(id, tipo);
+        setEstado(r === true ? '✓' : '');
+        if (r !== true) alert(r);
+        else alert(`✓ ${ok}`);
+      }}
+      style={{ ...botao, border: 0, background: tipo === 'produzir-agora' ? '#2d2d44' : '#7c5cff' }}
+    >
+      {estado === '…' ? 'Enviando…' : estado === '✓' ? '✓ Feito' : texto}
+    </button>
   );
 }
 
@@ -152,6 +176,21 @@ export default function Acompanhar() {
       setCarregando(false);
     }
   }, [senha]);
+
+  const acao = useCallback(
+    async (id, tipo) => {
+      try {
+        const r = await fetch('/api/central/fabrica', { method: 'POST', headers: { 'x-central-token': senha, 'Content-Type': 'application/json' }, body: JSON.stringify({ id, acao: tipo }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) return d.erro || `Erro ${r.status}`;
+        setTimeout(carregar, 1500);
+        return true;
+      } catch (e) {
+        return e.message;
+      }
+    },
+    [senha, carregar]
+  );
 
   useEffect(() => {
     carregar();
@@ -237,13 +276,30 @@ export default function Acompanhar() {
 
           {aba === 'andamento' && (
             <>
-              {erros.length > 0 && <h3 style={titulo}>⚠ Com erro</h3>}
-              {erros.map((i) => <Item key={i.id} i={i} />)}
+              {erros.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h3 style={titulo}>⚠ Com erro</h3>
+                  {erros.length > 1 && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Tentar de novo os ${erros.length} vídeos com erro?`)) return;
+                        const r = await Promise.all(erros.map((i) => acao(i.id, 'repetir')));
+                        const falhas = r.filter((x) => x !== true).length;
+                        alert(falhas ? `${erros.length - falhas} voltaram a produzir; ${falhas} deram erro.` : '✓ Todos voltam a produzir em até 5 min, de onde pararam');
+                      }}
+                      style={{ ...botao, border: 0, background: '#7c5cff' }}
+                    >
+                      ↻ Tentar todos
+                    </button>
+                  )}
+                </div>
+              )}
+              {erros.map((i) => <Item key={i.id} i={i} acao={acao} />)}
               <h3 style={titulo}>⚙ Produzindo agora</h3>
               {!produzindo.length && <p style={vazio}>Nenhum vídeo sendo produzido agora.</p>}
-              {produzindo.map((i) => <Item key={i.id} i={i} />)}
+              {produzindo.map((i) => <Item key={i.id} i={i} acao={acao} />)}
               {avisos.length > 0 && <h3 style={titulo}>Avisos</h3>}
-              {avisos.filter((i) => !produzindo.includes(i)).map((i) => <Item key={i.id} i={i} />)}
+              {avisos.filter((i) => !produzindo.includes(i)).map((i) => <Item key={i.id} i={i} acao={acao} />)}
             </>
           )}
           {aba === 'pcs' && (
@@ -255,13 +311,13 @@ export default function Acompanhar() {
           {aba === 'prontos' && (
             <>
               {!prontos.length && <p style={vazio}>Nenhum vídeo pronto nos últimos dias.</p>}
-              {prontos.map((i) => <Item key={i.id} i={i} />)}
+              {prontos.map((i) => <Item key={i.id} i={i} acao={acao} />)}
             </>
           )}
           {aba === 'espera' && (
             <>
               {!espera.length && <p style={vazio}>Nada esperando a vez.</p>}
-              {espera.map((i) => <Item key={i.id} i={i} />)}
+              {espera.map((i) => <Item key={i.id} i={i} acao={acao} />)}
             </>
           )}
 

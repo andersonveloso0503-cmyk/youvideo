@@ -574,9 +574,11 @@ export default async function handler(req, res) {
             titulo: item.roteiro?.titulo || item.tema,
             cenas: arquivosAtualizados,
             formato: item.formato,
-            palavras: item.infantil ? [] : item.narracao.palavras,
+            palavras: item.documentario || item.infantil ? [] : item.narracao.palavras,
             marca: marcaDe(item),
-            ...(item.infantil ? { legenda: false, semBotao: true } : {}),
+            cta: item.marca ? empresa(item.marca)?.cta : '',
+            ...(item.documentario || item.infantil ? { legenda: false } : {}),
+            ...(item.infantil ? { semBotao: true } : {}),
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
         } else {
@@ -736,7 +738,7 @@ export default async function handler(req, res) {
             youtubeVideoId: youtubeVideoId || null,
           });
         } else if (check.status === 'failed') {
-          await ref.update({ status: 'erro', erro: `Falha na montagem: ${check.erro || 'motivo não informado'}` });
+          await ref.update({ status: 'erro', statusAntes: 'imagens_ok', erro: `Falha na montagem: ${check.erro || 'motivo não informado'}` }); // ↻ monta de novo sem refazer nada
         }
         break;
       }

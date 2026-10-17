@@ -1052,12 +1052,20 @@ export default async function handler(req, res) {
       await ref.update({ 'fabrica.quando': new Date().toISOString(), 'fabrica.quandoOriginal': d.fabrica?.quandoOriginal || d.fabrica?.quando || null });
       return res.status(200).json({ ok: true });
     }
+    if (b.acao === 'destravar') {
+      // Vídeo em produção que está repetindo um erro (ex.: esperando crédito): zera as tentativas e tenta já na próxima volta
+      const d = (await ref.get()).data() || {};
+      if (['concluido', 'erro'].includes(d.status)) return res.status(400).json({ erro: 'Esse vídeo não está em produção.' });
+      await ref.update({ tentativas: 0, ultimoErro: null });
+      return res.status(200).json({ ok: true });
+    }
     if (b.acao === 'repetir') {
       // Continua da etapa em que parou (não gera tudo de novo)
       const d = (await ref.get()).data() || {};
       const antigo = d.fabrica?.quando && d.fabrica.quando < new Date(Date.now() - 2 * 24 * 3600e3).toISOString();
       await ref.update({
-        status: d.statusAntes || 'pendente',
+        // Falha na montagem (erros antigos não guardavam a etapa): monta de novo com o que já existe, sem gastar de novo
+        status: d.statusAntes || (/^Falha na montagem/.test(d.erro || '') && Array.isArray(d.arquivos) && d.arquivos.length ? 'imagens_ok' : 'pendente'),
         tentativas: 0,
         erro: null,
         ultimoErro: null,
