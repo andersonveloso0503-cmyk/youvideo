@@ -272,6 +272,10 @@ export default function Home() {
       <PainelOrcamento />
 
       <div className="hub-grid">
+        <a href="/acompanhar" className="hub-tile hub-tile--teal">
+          <div className="hub-tile-title">📱 Acompanhar produção</div>
+          <div className="hub-tile-desc">O que a Fábrica está fazendo agora, erros, vídeos prontos e a fila de cada PC — feito para o celular</div>
+        </a>
         <a href="/radar" className="hub-tile hub-tile--terracotta">
           <div className="hub-tile-title">Youvideo Radar</div>
           <div className="hub-tile-desc">Canais e vídeos em alta no YouTube pra modelar: busca por score, crescimento, tendências e spy de canal</div>
