@@ -21,7 +21,7 @@ import { testarConta } from '../../../lib/publicarSocial';
 import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS } from '../../../lib/documentarioEpisodios';
-import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil } from '../../../lib/infantil';
+import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
 export const config = { maxDuration: 120 }; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
@@ -255,6 +255,15 @@ export default async function handler(req, res) {
     // GET ?conexao=lcs -> confere se a Página/Instagram da empresa estão ligados (não publica nada)
     if (req.method === 'GET' && req.query.conexao) {
       return res.status(200).json(await testarConta(String(req.query.conexao)));
+    }
+    if (req.method === 'GET' && req.query.capas === '1') {
+      // Capas refeitas de vídeos que já estão no YouTube: o PC troca a miniatura lá
+      const snap = await col.where('fabrica.capaYoutube.status', '==', 'pendente').get();
+      const itens = snap.docs.map((d) => {
+        const x = d.data();
+        return { id: d.id, url: x.fabrica.capaYoutube.url, youtubeUrl: x.fabrica.youtube?.url || '', canalYoutube: x.fabrica.canalYoutube || null };
+      });
+      return res.status(200).json({ itens });
     }
     if (req.method === 'GET') {
       if (req.query.youtube !== '1') await completarSeries(db, col).catch(() => {});
@@ -926,7 +935,47 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok });
     }
     if (b.acao === 'youtube-feito') {
-      await ref.update({ 'fabrica.youtube': { status: 'ok', em: Date.now(), url: String(b.url || '').slice(0, 200) } });
+      const capaErro = b.capaErro ? String(b.capaErro).slice(0, 300) : null;
+      await ref.update({
+        'fabrica.youtube': { status: 'ok', em: Date.now(), url: String(b.url || '').slice(0, 200), ...(capaErro ? { capaErro } : {}) },
+        // O vídeo subiu, mas o YouTube recusou a thumbnail: aparece na Fábrica (antes só ficava escondido na Fila do PC)
+        ...(capaErro ? { aviso: `YouTube recusou a thumbnail: ${capaErro}` } : {}),
+      });
+      return res.status(200).json({ ok: true });
+    }
+    if (b.acao === 'refazer-thumb') {
+      // Desenho infantil: faz a thumbnail com título de novo. Se o vídeo já está no YouTube, o PC troca lá.
+      const d = (await ref.get()).data() || {};
+      if (!d.infantil || !d.roteiro) return res.status(400).json({ erro: 'Só dá para refazer a thumbnail dos desenhos infantis prontos.' });
+      if (d.shortMusica) return res.status(400).json({ erro: 'O Short da música usa a cena do vídeo como capa.' });
+      let url;
+      try {
+        url = await thumbInfantil({
+          exigirTexto: true,
+          personagem: d.infantil.personagem,
+          referencia: d.infantil.refUrl,
+          titulo: d.roteiro.titulo,
+          thumbnailTitulo: d.roteiro.thumbnailTitulo,
+          cena: (d.roteiro.cenas || []).find((c) => c.bloco === 'antes' && !/close-up/i.test(c.descricao))?.descricao || '',
+        });
+      } catch (e) {
+        return res.status(500).json({ erro: e.message });
+      }
+      const noYoutube = d.fabrica?.youtube?.status === 'ok' && d.fabrica.youtube.url;
+      await ref.update({
+        thumbnailUrl: url,
+        aviso: null,
+        ...(noYoutube ? { 'fabrica.capaYoutube': { status: 'pendente', url, em: Date.now() } } : {}),
+      });
+      if (d.fabrica?.agendaId) await db.collection('youvideo_agenda').doc(d.fabrica.agendaId).update({ thumbnailUrl: url }).catch(() => {});
+      return res.status(200).json({ ok: true, url, noYoutube: !!noYoutube });
+    }
+    if (b.acao === 'capa-feita') {
+      const erro = b.erro ? String(b.erro).slice(0, 300) : null;
+      await ref.update({
+        'fabrica.capaYoutube': erro ? { status: 'erro', erro, em: Date.now() } : { status: 'ok', em: Date.now() },
+        aviso: erro ? `YouTube recusou a thumbnail: ${erro}` : null,
+      });
       return res.status(200).json({ ok: true });
     }
     if (b.acao === 'youtube-erro') {

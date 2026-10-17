@@ -140,9 +140,9 @@ class Fila extends EventEmitter {
       fs.writeFileSync(path.join(this.dirDados, 'fabrica-enviados.json'), JSON.stringify(Object.fromEntries(recentes)));
     } catch {}
   }
-  anotarFabricaEnviado(id, url) {
+  anotarFabricaEnviado(id, url, capaErro = null) {
     const m = this.fabricaEnviados();
-    m[id] = { url: url || '', em: Date.now(), avisado: false };
+    m[id] = { url: url || '', em: Date.now(), avisado: false, ...(capaErro ? { capaErro } : {}) };
     this.gravarFabricaEnviados(m);
   }
   /** Já subiu por este PC? Devolve { url, em, avisado } ou null. */
@@ -154,7 +154,7 @@ class Fila extends EventEmitter {
     const reg = this.fabricaJaEnviado(id);
     if (!reg) return false;
     try {
-      await Central.chamar(this.obterConfig(), '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao: 'youtube-feito', url: reg.url || '' } });
+      await Central.chamar(this.obterConfig(), '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao: 'youtube-feito', url: reg.url || '', capaErro: reg.capaErro || null } });
       const m = this.fabricaEnviados();
       if (m[id]) {
         m[id].avisado = true;
@@ -532,7 +532,7 @@ class Fila extends EventEmitter {
       }
       // Vídeo da Fábrica: anota aqui no PC que já subiu (vale mesmo se a Fila for limpa) e avisa o site
       if (e.fabricaId) {
-        this.anotarFabricaEnviado(e.fabricaId, r.url || '');
+        this.anotarFabricaEnviado(e.fabricaId, r.url || '', r.miniaturaErro || null);
         this.avisarFabricaEnviado(e.fabricaId);
       }
       // Playlist (ex.: "Oração da Manhã" / "Oração da Noite"): o vídeo já subiu — se a playlist falhar, só avisa

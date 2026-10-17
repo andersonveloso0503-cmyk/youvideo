@@ -369,6 +369,16 @@ function youtubeDoCanal({ credenciais, refreshToken, redirectOriginal }) {
   return google.youtube({ version: 'v3', auth });
 }
 
+/** Troca a miniatura (capa) de um vídeo que já está no canal. */
+async function trocarCapa({ credenciais, refreshToken, redirectOriginal, videoId, arquivo }) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  try {
+    await yt.thumbnails.set({ videoId, media: { mimeType: 'image/jpeg', body: fs.createReadStream(arquivo) } });
+  } catch (e) {
+    throw new Error(/verif|permission|forbidden/i.test(e.message) ? 'o canal precisa estar verificado por telefone (youtube.com/verify)' : e.message);
+  }
+}
+
 const semAcento = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 const playlistsConhecidas = new Map(); // "canal|título" -> id da playlist (para não procurar toda vez)
 
@@ -618,6 +628,7 @@ async function desprogramarVideos({ credenciais, refreshToken, redirectOriginal,
 
 module.exports = {
   agendados,
+  trocarCapa,
   desprogramarVideos,
   limparTags, autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT,
   etiquetasErradas, etiquetasAlheias, etiquetasParaTirar, semHashtagsDe, etiquetasDoTitulo,

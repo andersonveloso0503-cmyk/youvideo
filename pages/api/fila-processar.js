@@ -572,9 +572,10 @@ export default async function handler(req, res) {
           // o Compilador sobe agendado no canal escolhido; as outras redes vão para a Agenda.
           const primeiraImagem = (item.arquivos || []).find((x) => x.imageUrl)?.imageUrl || null;
           let thumbnailUrl = primeiraImagem;
+          let avisoThumb = null;
           if (item.infantil && !item.shortMusica) {
             // Desenho infantil: o personagem grande e alegre (o Compilador põe o título por cima, se quiser)
-            thumbnailUrl = (await thumbInfantil({ personagem: item.infantil.personagem, referencia: item.infantil.refUrl, titulo: item.roteiro.titulo, thumbnailTitulo: item.roteiro.thumbnailTitulo, cena: (item.roteiro.cenas || []).find((c) => c.bloco === 'antes' && !/close-up/i.test(c.descricao))?.descricao || '' }).catch(() => null)) || primeiraImagem;
+            thumbnailUrl = (await thumbInfantil({ avisar: (m) => { avisoThumb = `A thumbnail com título não saiu (${m}) — foi uma imagem sem texto. Use 🎨 na Fábrica para refazer.`; }, personagem: item.infantil.personagem, referencia: item.infantil.refUrl, titulo: item.roteiro.titulo, thumbnailTitulo: item.roteiro.thumbnailTitulo, cena: (item.roteiro.cenas || []).find((c) => c.bloco === 'antes' && !/close-up/i.test(c.descricao))?.descricao || '' }).catch(() => null)) || primeiraImagem;
           } else if (item.documentario) {
             // Documentário: foto real escurecida + a pergunta da capa
             // Episódios criados antes da capa pintada: pega título, subtítulo e pintura do episódio escrito
@@ -619,6 +620,7 @@ export default async function handler(req, res) {
             status: 'concluido',
             videoUrl: check.videoUrl,
             thumbnailUrl,
+            ...(avisoThumb ? { aviso: avisoThumb } : {}),
             'fabrica.agendaId': agendaId,
             comBotao: check.comBotao === true, // botão de like já gravado na montagem: o PC não põe de novo no YouTube
             'fabrica.youtube': item.fabrica.redes?.youtube ? { status: 'pendente' } : null,

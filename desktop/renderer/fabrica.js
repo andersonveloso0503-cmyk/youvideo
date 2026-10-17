@@ -670,6 +670,26 @@ const Fabrica = (() => {
         };
         if (i.videoUrl) botao('▶', 'Assistir', () => window.api.abrir.link(i.videoUrl));
         if (i.thumbnailUrl) botao('🖼', 'Ver a thumbnail (capa) que vai para o YouTube', () => window.api.abrir.link(i.thumbnailUrl));
+        // Desenho infantil: a thumbnail aparece na própria lista, e dá para refazer (troca no YouTube também)
+        if (i.infantil && i.thumbnailUrl && !i.infantil.shortMusica && !l.querySelector('.thumb-mini')) {
+          const im = document.createElement('img');
+          im.className = 'thumb-mini';
+          im.src = i.thumbnailUrl;
+          im.title = 'Thumbnail do episódio (clique para ver grande)';
+          im.style.cssText = 'width:128px;height:72px;object-fit:cover;border-radius:6px;cursor:pointer;margin-bottom:4px';
+          im.onclick = () => window.api.abrir.link(i.thumbnailUrl);
+          l.querySelector('.txt').prepend(im);
+        }
+        if (i.infantil && i.status === 'concluido' && !i.infantil.shortMusica) botao('🎨', 'Refazer a thumbnail com o título (se já subiu, troca no YouTube)', async () => {
+          avisar('Fazendo a thumbnail nova… (até 1 minuto)');
+          try {
+            const r = await window.api.fabrica.acao({ id: i.id, acao: 'refazer-thumb' });
+            avisar(r.noYoutube ? 'Thumbnail nova pronta — o Compilador troca no YouTube em até 3 minutos' : 'Thumbnail nova pronta');
+          } catch (e) {
+            avisar(msgErro(e), true);
+          }
+          carregar();
+        });
         if (naEspera(i)) botao('⚡', 'Produzir agora (não esperar a vez; o horário no YouTube continua o mesmo)', async () => {
           try {
             await window.api.fabrica.acao({ id: i.id, acao: 'produzir-agora' });

@@ -847,6 +847,39 @@ app.whenReady().then(() => {
 
   setTimeout(fabricaParaYoutube, 15000);
   setInterval(fabricaParaYoutube, 120000);
+
+  // ---------- Fábrica: thumbnail refeita (🎨) de vídeo que já está no YouTube → troca a capa lá ----------
+  let trocandoCapas = false;
+  async function trocarCapasFabrica() {
+    const cfg = store.ler();
+    if (trocandoCapas || !cfg.centralToken) return;
+    trocandoCapas = true;
+    try {
+      const { itens = [] } = await Central.chamar(cfg, '/api/central/fabrica', { query: { capas: '1' } });
+      for (const it of itens) {
+        const canal = it.canalYoutube?.id ? store.canal(it.canalYoutube.id) : null;
+        if (!canal) continue; // canal conectado em outro PC
+        const videoId = (String(it.youtubeUrl || '').match(/(?:youtu\.be\/|v=|shorts\/)([\w-]{11})/) || [])[1];
+        let erro = null;
+        try {
+          if (!videoId) throw new Error('não achei o vídeo no YouTube');
+          const bruta = await Central.baixar(it.url, path.join(os.tmpdir(), `youvideo-capa-nova-${it.id}`));
+          const pronta = path.join(os.tmpdir(), `youvideo-capa-nova-${it.id}.jpg`);
+          await gerarMiniatura(bruta, pronta, { vertical: false });
+          await YT.trocarCapa({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect, videoId, arquivo: pronta });
+        } catch (e) {
+          erro = e.message || String(e);
+        }
+        await Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: it.id, acao: 'capa-feita', erro } }).catch(() => {});
+      }
+    } catch {
+      // sem internet: tenta na próxima volta
+    } finally {
+      trocandoCapas = false;
+    }
+  }
+  setTimeout(trocarCapasFabrica, 40000);
+  setInterval(trocarCapasFabrica, 180000);
   ipcMain.handle('fabrica:listar', async () => {
     const r = await Central.chamar(store.ler(), '/api/central/fabrica');
     // Aproveita a mesma resposta para as tarjas da Fila (sem consultar o banco de novo)
