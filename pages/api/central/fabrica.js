@@ -258,8 +258,12 @@ export default async function handler(req, res) {
     }
     if (req.method === 'GET' && req.query.capas === '1') {
       // Capas refeitas de vídeos que já estão no YouTube: o PC troca a miniatura lá
-      const snap = await col.where('fabrica.capaYoutube.status', '==', 'pendente').get();
-      const itens = snap.docs.map((d) => {
+      // 'erro' também volta (até 3 tentativas): falha no PC ou canal ainda sem verificação, que o dono pode resolver depois
+      const snap = await col.where('fabrica.capaYoutube.status', 'in', ['pendente', 'erro']).get();
+      const itens = snap.docs.filter((d) => {
+        const c = d.data().fabrica.capaYoutube;
+        return c.status === 'pendente' || ((c.tentativas || 0) < 3 && Date.now() - (c.em || 0) > 10 * 60e3);
+      }).map((d) => {
         const x = d.data();
         return { id: d.id, url: x.fabrica.capaYoutube.url, youtubeUrl: x.fabrica.youtube?.url || '', canalYoutube: x.fabrica.canalYoutube || null };
       });
@@ -972,8 +976,9 @@ export default async function handler(req, res) {
     }
     if (b.acao === 'capa-feita') {
       const erro = b.erro ? String(b.erro).slice(0, 300) : null;
+      const antes = (await ref.get()).data()?.fabrica?.capaYoutube || {};
       await ref.update({
-        'fabrica.capaYoutube': erro ? { status: 'erro', erro, em: Date.now() } : { status: 'ok', em: Date.now() },
+        'fabrica.capaYoutube': erro ? { ...antes, status: 'erro', erro, em: Date.now(), tentativas: (antes.tentativas || 0) + 1 } : { status: 'ok', em: Date.now() },
         aviso: erro ? `YouTube recusou a thumbnail: ${erro}` : null,
       });
       return res.status(200).json({ ok: true });

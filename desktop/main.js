@@ -863,8 +863,10 @@ app.whenReady().then(() => {
         let erro = null;
         try {
           if (!videoId) throw new Error('não achei o vídeo no YouTube');
-          const bruta = await Central.baixar(it.url, path.join(os.tmpdir(), `youvideo-capa-nova-${it.id}`));
-          const pronta = path.join(os.tmpdir(), `youvideo-capa-nova-${it.id}.jpg`);
+          // Com extensão: sem ela a miniatura achava que era vídeo e não gerava a capa
+          const ext = (String(it.url).split('?')[0].match(/\.(png|jpe?g|webp)$/i) || [, 'png'])[1].toLowerCase();
+          const bruta = await Central.baixar(it.url, path.join(os.tmpdir(), `youvideo-capa-nova-${it.id}-${Date.now()}.${ext}`));
+          const pronta = path.join(os.tmpdir(), `youvideo-capa-pronta-${it.id}-${Date.now()}.jpg`);
           await gerarMiniatura(bruta, pronta, { vertical: false });
           await YT.trocarCapa({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect, videoId, arquivo: pronta });
         } catch (e) {
