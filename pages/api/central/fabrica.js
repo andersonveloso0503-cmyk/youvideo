@@ -297,6 +297,11 @@ export default async function handler(req, res) {
           status: x.status,
           erro: x.erro || x.ultimoErro || null,
           aviso: x.aviso || null, // ex.: efeitos sonoros não saíram (chave sem permissão)
+          // Andamento da animação (acompanhar pelo celular): quantas cenas já estão prontas
+          cenas: Array.isArray(x.arquivos) && x.arquivos.length
+            ? { total: x.arquivos.length, imagens: x.arquivos.filter((a) => a.imageUrl).length, animadas: x.arquivos.filter((a) => a.videoUrl).length, animando: x.arquivos.filter((a) => a.klingTaskId && !a.videoUrl && !a.falhouAnimacao).length }
+            : null,
+          criadoEm: x.criadoEm || null,
           videoUrl: x.videoUrl || null,
           thumbnailUrl: x.thumbnailUrl || null,
           quando: x.fabrica.quando,
