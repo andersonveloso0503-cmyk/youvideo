@@ -265,7 +265,7 @@ export default async function handler(req, res) {
         return c.status === 'pendente' || ((c.tentativas || 0) < 3 && Date.now() - (c.em || 0) > 10 * 60e3);
       }).map((d) => {
         const x = d.data();
-        return { id: d.id, url: x.fabrica.capaYoutube.url, youtubeUrl: x.fabrica.youtube?.url || '', canalYoutube: x.fabrica.canalYoutube || null };
+        return { id: d.id, url: x.fabrica.capaYoutube.url || x.thumbnailUrl, youtubeUrl: x.fabrica.youtube?.url || '', canalYoutube: x.fabrica.canalYoutube || null };
       });
       return res.status(200).json({ itens });
     }
