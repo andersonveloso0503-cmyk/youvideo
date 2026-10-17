@@ -105,7 +105,7 @@ const Fabrica = (() => {
       const fator = Number(q('#fabIfDuracao').value) >= 480 ? 1.9 : 1; // 8 min ≈ o dobro de cenas
       // uma imagem por fala (a imagem troca junto com quem fala): ~45 cenas num episódio de 4 min
       // animação = ~45 cenas × preço da qualidade escolhida; o resto (imagens, voz, música) ~US$ 1
-      const precoCena = { '720p': 0.1, '580p': 0.075, '480p': 0.05 }[q('#fabIfRes').value] || 0.1;
+      const precoCena = { kling: 0.35, '720p': 0.1, '580p': 0.075, '480p': 0.05 }[q('#fabIfRes').value] || 0.1;
       const porEp = ({ todas: 1 + 45 * precoCena, 3: 1 + 3 * precoCena, nada: 1 }[q('#fabIfAnim').value] || 1 + 45 * precoCena) * (q('#fabIfAnim').value === '3' ? 1.6 : fator);
       q('#fabCusto').textContent = `${qtd} episódios · custo aproximado US$ ${Math.max(1, Math.round(qtd * porEp))} (imagens, voz, música e animação) + ~${qtd * 3} mil caracteres e ${qtd} músicas da ElevenLabs`;
       return;
@@ -390,7 +390,7 @@ const Fabrica = (() => {
   async function compararQualidades() {
     const erro = q('#fabErro');
     erro.textContent = '';
-    if (!confirm('Animar a mesma cena nas 3 qualidades para comparar? Custa uns US$ 0,23 na fal.ai e leva uns 2 a 4 minutos.')) return;
+    if (!confirm('Animar a mesma cena no Kling, no Wan 720p e no Wan 480p para comparar? Custa uns US$ 0,50 na fal.ai e leva uns 2 a 5 minutos.')) return;
     const b = q('#btnFabIfComparar');
     b.disabled = true;
     b.textContent = '🔍 Animando nas 3 qualidades...';
@@ -403,7 +403,7 @@ const Fabrica = (() => {
         prontos = r.jobs || [];
         if (prontos.every((j) => j.status === 'done' || j.status === 'failed')) break;
       }
-      const preco = { '720p': 'US$ 0,10', '580p': 'US$ 0,075', '480p': 'US$ 0,05' };
+      const preco = { kling: 'US$ 0,35', '720p': 'US$ 0,10', '580p': 'US$ 0,075', '480p': 'US$ 0,05' };
       let d = document.getElementById('dlgCompararAnim');
       if (!d) {
         d = document.createElement('dialog');
@@ -414,7 +414,7 @@ const Fabrica = (() => {
       d.innerHTML =
         '<h3 style="margin-top:0">🔍 A mesma cena nas 3 qualidades</h3><p class="nota">Veja em tela cheia (⤢) para notar a diferença. Depois escolha em "Qualidade da animação".</p>' +
         '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">' +
-        prontos.map((j) => `<div><b>${esc(j.res)}</b> <small>· ${preco[j.res] || ''} por cena</small>${j.videoUrl ? `<video src="${esc(j.videoUrl)}" controls autoplay loop muted style="width:100%;border-radius:10px;margin-top:6px"></video>` : `<p class="erro">${esc(j.erro || 'Não ficou pronto a tempo')}</p>`}</div>`).join('') +
+        prontos.map((j) => `<div><b>${esc(j.res === 'kling' ? 'Kling 2.5 Pro' : `Wan ${j.res}`)}</b> <small>· ${preco[j.res] || ''} por cena</small>${j.videoUrl ? `<video src="${esc(j.videoUrl)}" controls autoplay loop muted style="width:100%;border-radius:10px;margin-top:6px"></video>` : `<p class="erro">${esc(j.erro || 'Não ficou pronto a tempo')}</p>`}</div>`).join('') +
         '</div><div style="text-align:right;margin-top:12px"><button type="button" class="btn-mini" id="btnFecharCmp">Fechar</button></div>';
       d.querySelector('#btnFecharCmp').onclick = () => d.close();
       if (!d.open) d.showModal();

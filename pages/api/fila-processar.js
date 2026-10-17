@@ -467,6 +467,10 @@ export default async function handler(req, res) {
         if (item.animar === false || semCreditoFal) {
           // Vídeo estático (mais barato): pula a animação e já manda montar
           // direto com as imagens paradas.
+          if (semCreditoFal && item.animar !== false) {
+            // Avisa na Fábrica: antes caía em imagem parada sem ninguém saber (o episódio parecia "slideshow")
+            await ref.update({ aviso: 'Acabou o crédito da fal.ai: este vídeo saiu com imagens paradas (zoom), sem animação. Recarregue em fal.ai → Billing.' });
+          }
           const renderId = await iniciarMontagemViaApi({
             audioUrl: item.narracao.audioUrl,
             audioSegments: item.narracao.audioSegments,

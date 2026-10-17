@@ -440,7 +440,7 @@ export default async function handler(req, res) {
           .flatMap((x) => x.arquivos.filter((a) => a.imageUrl && a.bloco === 'antes'))[2];
         if (!cenaCmp) return res.status(400).json({ erro: 'Ainda não tem nenhuma cena de episódio infantil para comparar. Faça um episódio de teste primeiro.' });
         const jobs = [];
-        for (const r of ['720p', '580p', '480p']) {
+        for (const r of ['kling', '720p', '480p']) {
           const j = await enviarAnimacao(cenaCmp.imageUrl, cenaCmp.cena, 'longo', undefined, true, r);
           jobs.push({ res: r, statusUrl: j.statusUrl, responseUrl: j.responseUrl });
         }
@@ -522,7 +522,7 @@ export default async function handler(req, res) {
             duracaoDesejada: String(Math.max(180, Math.min(600, Number(b.duracao) || 270))), // 4–5 min ou ~8 min
             animar: b.animacao !== 'nada',
             animacaoCompleta: b.animacaoCompleta !== false, // desenho infantil: todas as cenas animadas (o dono pode escolher o econômico)
-            resolucaoAnim: ['720p', '580p', '480p'].includes(b.resolucaoAnim) ? b.resolucaoAnim : '720p',
+            resolucaoAnim: ['720p', '580p', '480p', 'kling'].includes(b.resolucaoAnim) ? b.resolucaoAnim : '720p',
             ...(String(b.vozId || '').trim() ? { vozId: String(b.vozId).trim().slice(0, 60) } : {}),
             status: 'pendente',
             origem: 'fabrica',
