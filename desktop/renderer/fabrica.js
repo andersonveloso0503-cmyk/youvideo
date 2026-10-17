@@ -199,6 +199,7 @@ const Fabrica = (() => {
     q('#btnFabCriar').onclick = criar;
     q('#btnFabIfPrevia').onclick = previaInfantil;
     q('#btnFabIfComparar').onclick = compararQualidades;
+    q('#btnFabIfBoca').onclick = testarBoca;
     q('#fabIfRes').addEventListener('change', custo);
     q('#btnFabAtualizar').onclick = () => carregar(true);
   }
@@ -423,6 +424,60 @@ const Fabrica = (() => {
     } finally {
       b.disabled = false;
       b.textContent = '🔍 Comparar as 3 qualidades';
+    }
+  }
+
+  // Teste da boca sincronizada: uma fala do Pingo em 2 serviços, lado a lado, com som
+  async function testarBoca() {
+    const erro = q('#fabErro');
+    erro.textContent = '';
+    if (!confirm('Testar a boca sincronizada numa fala do Pingo, em 2 serviços? Custa menos de US$ 0,50 na fal.ai e leva uns 2 a 5 minutos.')) return;
+    const b = q('#btnFabIfBoca');
+    b.disabled = true;
+    b.textContent = '👄 Sincronizando a boca...';
+    try {
+      let t = await window.api.fabrica.criar({ tipo: 'testar-boca' });
+      if (t.precisaAnimar) {
+        // A cena estava parada: anima primeiro e depois sincroniza a boca
+        b.textContent = '👄 Animando a cena primeiro...';
+        let anim = null;
+        for (let volta = 0; volta < 60 && !anim; volta++) {
+          await new Promise((ok) => setTimeout(ok, 6000));
+          const r = await window.api.fabrica.criar({ tipo: 'comparar-status', jobs: t.jobs });
+          const j = (r.jobs || [])[0];
+          if (j?.status === 'done') anim = j.videoUrl;
+          if (j?.status === 'failed') throw new Error(`A animação da cena falhou: ${j.erro || ''}`);
+        }
+        if (!anim) throw new Error('A animação da cena demorou demais. Tente de novo.');
+        b.textContent = '👄 Sincronizando a boca...';
+        t = await window.api.fabrica.criar({ tipo: 'testar-boca', videoUrl: anim, audioUrl: t.audioUrl, texto: t.texto, personagem: t.personagem });
+      }
+      let prontos = [];
+      for (let volta = 0; volta < 80; volta++) {
+        await new Promise((ok) => setTimeout(ok, 6000));
+        const r = await window.api.fabrica.criar({ tipo: 'comparar-status', jobs: t.jobs });
+        prontos = r.jobs || [];
+        if (prontos.every((j) => j.status === 'done' || j.status === 'failed')) break;
+      }
+      let d = document.getElementById('dlgTesteBoca');
+      if (!d) {
+        d = document.createElement('dialog');
+        d.id = 'dlgTesteBoca';
+        d.style.cssText = 'max-width:1100px;width:94vw;border:none;border-radius:16px;padding:20px';
+        document.body.appendChild(d);
+      }
+      d.innerHTML =
+        `<h3 style="margin-top:0">👄 Boca sincronizada — fala do ${esc(t.personagem)}</h3><p class="nota">"${esc(t.texto)}"<br>Ligue o som. Se a boca do Pingo acompanhar bem a fala em algum dos dois, eu ligo ele para todas as falas dos personagens.</p>` +
+        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">' +
+        prontos.map((j) => `<div><b>${esc(j.nome || j.res)}</b>${j.videoUrl ? `<video src="${esc(j.videoUrl)}" controls loop style="width:100%;border-radius:10px;margin-top:6px"></video>` : `<p class="erro">${esc(j.erro || 'Não ficou pronto a tempo')}</p>`}</div>`).join('') +
+        '</div><div style="text-align:right;margin-top:12px"><button type="button" class="btn-mini" id="btnFecharBoca">Fechar</button></div>';
+      d.querySelector('#btnFecharBoca').onclick = () => d.close();
+      if (!d.open) d.showModal();
+    } catch (e) {
+      erro.textContent = msgErro(e);
+    } finally {
+      b.disabled = false;
+      b.textContent = '👄 Testar boca sincronizada';
     }
   }
 

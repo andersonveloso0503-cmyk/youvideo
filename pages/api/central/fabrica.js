@@ -446,12 +446,67 @@ export default async function handler(req, res) {
         }
         return res.status(200).json({ imagem: cenaCmp.imageUrl, jobs });
       }
+      // ── Teste de boca sincronizada: uma fala do Pingo de um episódio pronto, em 2 serviços (menos de US$ 0,50) ──
+      if (b.tipo === 'testar-boca') {
+        const snapB = await col.where('estilo', '==', 'infantil').get();
+        const eps = snapB.docs
+          .map((d) => d.data())
+          .filter((x) => !x.shortMusica && Array.isArray(x.arquivos) && x.vozInfantil && x.roteiro?.cenas)
+          .sort((a, b2) => String(b2.criadoEm).localeCompare(String(a.criadoEm)));
+        // Segunda chamada (a cena já foi animada pelo teste): usa o clipe e o áudio que a tela mandou
+        let achado = b.videoUrl && b.audioUrl ? { texto: String(b.texto || ''), personagem: String(b.personagem || 'Pingo'), audioUrl: b.audioUrl, videoUrl: b.videoUrl } : null;
+        for (const ep of achado ? [] : eps) {
+          const principal = ep.infantil?.personagem?.nome || 'Pingo';
+          const contagem = { antes: 0, depois: 0 };
+          ep.roteiro.cenas.forEach((c, i) => {
+            if (achado || !['antes', 'depois'].includes(c.bloco)) return;
+            const k = contagem[c.bloco];
+            contagem[c.bloco] += (c.falas || []).length || 0;
+            const f = (c.falas || [])[0];
+            const seg = ep.vozInfantil?.[c.bloco]?.audioSegments?.[k];
+            const clip = ep.arquivos[i];
+            if (f && f.personagem === principal && (c.falas || []).length === 1 && seg && seg.length >= 2.2 && seg.length <= 8 && (clip?.videoUrl || clip?.imageUrl)) {
+              achado = { texto: f.texto, personagem: f.personagem, audioUrl: seg.url, videoUrl: clip.videoUrl || null, imagem: clip.imageUrl, cena: clip.cena };
+            }
+          });
+          if (achado) break;
+        }
+        if (!achado) return res.status(400).json({ erro: 'Não achei uma cena do Pingo falando (2 a 8 s) nos episódios prontos. Faça um episódio de teste primeiro.' });
+        if (!achado.videoUrl) {
+          // A cena saiu sem animação (sem crédito na fal.ai): anima primeiro (US$ 0,10) e a tela chama de novo
+          const anim = await enviarAnimacao(achado.imagem, `${achado.cena || ''} ${achado.personagem} talking happily`, 'longo', undefined, true, '720p');
+          return res.status(200).json({ precisaAnimar: true, texto: achado.texto, personagem: achado.personagem, audioUrl: achado.audioUrl, jobs: [{ res: 'anim', nome: 'animação', statusUrl: anim.statusUrl, responseUrl: anim.responseUrl }] });
+        }
+        const enviar = async (modelo, corpo) => {
+          const r = await fetch(`https://queue.fal.run/${modelo}`, {
+            method: 'POST',
+            headers: { Authorization: `Key ${process.env.FAL_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(corpo),
+          });
+          const d = await r.json();
+          if (!r.ok) return { erro: d.detail ? JSON.stringify(d.detail).slice(0, 200) : d.message || `fal.ai ${r.status}` };
+          const raiz = modelo.split('/').slice(0, 2).join('/');
+          return {
+            statusUrl: d.status_url || `https://queue.fal.run/${raiz}/requests/${d.request_id}/status`,
+            responseUrl: d.response_url || `https://queue.fal.run/${raiz}/requests/${d.request_id}`,
+          };
+        };
+        const jobs = [
+          { res: 'sync', nome: 'Sync Lipsync 2 (US$ 3/min)', ...(await enviar('fal-ai/sync-lipsync/v2', { video_url: achado.videoUrl, audio_url: achado.audioUrl, model: 'lipsync-2', sync_mode: 'loop' })) },
+          { res: 'kling', nome: 'Kling Lipsync', ...(await enviar('fal-ai/kling-video/lipsync/audio-to-video', { video_url: achado.videoUrl, audio_url: achado.audioUrl })) },
+        ];
+        return res.status(200).json({ ...achado, jobs });
+      }
       if (b.tipo === 'comparar-status') {
         const jobs = Array.isArray(b.jobs) ? b.jobs.slice(0, 3) : [];
         const saida = [];
         for (const j of jobs) {
+          if (j.erro || !j.statusUrl) {
+            saida.push({ res: j.res, nome: j.nome, status: 'failed', videoUrl: null, erro: j.erro || 'não enviado' });
+            continue;
+          }
           const c = await checarAnimacao(j.statusUrl, j.responseUrl).catch((e) => ({ status: 'failed', error: e.message }));
-          saida.push({ res: j.res, status: c.status, videoUrl: c.videoUrl || null, erro: c.error || null });
+          saida.push({ res: j.res, nome: j.nome, status: c.status, videoUrl: c.videoUrl || null, erro: c.error || null });
         }
         return res.status(200).json({ jobs: saida });
       }
