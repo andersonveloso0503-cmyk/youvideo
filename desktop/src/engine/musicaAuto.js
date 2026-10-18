@@ -15,7 +15,7 @@ const CANAIS = {
 const PADRAO_CANAL = { ativo: false, canalId: '', estilos: [], fonte: 'pasta', pasta: '' }; // fonte: 'ia' (cria as músicas) | 'pasta' (usa as músicas que o dono fez)
 const EXT_AUDIO = ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus'];
 const USADAS = 'Usadas';
-const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 2, folgaDias: 3 };
+const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 2, folgaDias: 3, fundoAnimado: true };
 const FORA_DO_NORMAL = ['infantil']; // estilos que não entram sozinhos no canal de música normal
 const MAX_TENTATIVAS_DIA = 2;
 // Quanto da letra precisa ser entendido ao ouvir a música (0 a 1). Abaixo disso a música é refeita.
@@ -400,6 +400,16 @@ class MusicaAuto {
       this.salvar();
     }
 
+    // 4b) Fundo animado do vídeo longo: cena desenhada que combina com o estilo, animada em loop
+    if (prefs.fundoAnimado !== false && !(a.cena?.arquivo && fs.existsSync(a.cena.arquivo))) {
+      try {
+        await this.fazerFundoAnimado(a, estilo, pasta);
+      } catch (e) {
+        a.cena = { ...(a.cena || {}), erro: String(e.message || e).slice(0, 200) }; // segue com a capa de fundo
+        this.salvar();
+      }
+    }
+
     // 5) Baixar os áudios
     const prontas = a.musicas.map((m, i) => ({ m, i })).filter((x) => x.m?.url || (x.m?.arquivo && fs.existsSync(x.m.arquivo)));
     this.marcar(a, { etapa: 'Baixando as músicas' });
@@ -432,7 +442,7 @@ class MusicaAuto {
       ...comum,
       nome,
       musicas,
-      fundos: [a.capa.capaArquivo],
+      fundos: [(a.cena?.arquivo && fs.existsSync(a.cena.arquivo)) ? a.cena.arquivo : a.capa.capaArquivo],
       legenda: { ...(base.legenda || {}), ativo: false, mostrarNome: false },
       formato: { tipo: 'longo', resolucao: base.formato?.resolucao || '1080', versoes: '', qtdVideos: '1', duracaoMaxMin: '', limiteMusicaSeg: '' },
       saida: { pasta: base.saida?.pasta || '', nome },
@@ -555,6 +565,37 @@ class MusicaAuto {
     } catch {
       return null;
     }
+  }
+
+  /** Pede a cena ao site (Gemini desenha, a fal.ai anima) e espera o vídeo ficar pronto (até ~12 min). */
+  async fazerFundoAnimado(a, estilo, pasta, esperarMs = 15000) {
+    const cfg = () => this.obterConfig();
+    this.marcar(a, { etapa: 'Desenhando o fundo animado' });
+    if (!a.cena?.imagemUrl) {
+      const evitar = this.estado.albuns.map((x) => x.cena?.descricao).filter(Boolean).slice(-10);
+      const c = await this.central.chamar(cfg(), '/api/central/musica-auto', {
+        metodo: 'POST',
+        corpo: { acao: 'cena', estilo: estilo.nome, gospel: estilo.gospel, idioma: a.idioma === 'en' ? 'en' : 'pt', evitar },
+      });
+      a.cena = { imagemUrl: c.imagemUrl, descricao: c.cena, statusUrl: c.statusUrl || null, responseUrl: c.responseUrl || null };
+      this.salvar();
+    }
+    let videoUrl = null;
+    if (a.cena.statusUrl) {
+      this.marcar(a, { etapa: 'Animando o fundo (leva alguns minutos)' });
+      for (let i = 0; i < 48 && !videoUrl; i++) {
+        const r = await this.central.chamar(cfg(), '/api/central/musica-auto', { metodo: 'POST', corpo: { acao: 'cenaStatus', statusUrl: a.cena.statusUrl, responseUrl: a.cena.responseUrl } }).catch(() => ({ status: 'processing' }));
+        if (r.status === 'done' && r.videoUrl) videoUrl = r.videoUrl;
+        else if (r.status === 'failed') break;
+        else await new Promise((ok) => setTimeout(ok, esperarMs));
+      }
+    }
+    // Sem animação (falhou ou demorou demais): usa a cena parada, que já é bem melhor que só a capa
+    a.cena.arquivo = videoUrl
+      ? await this.central.baixar(videoUrl, path.join(pasta, '00 - Fundo animado.mp4'))
+      : await this.central.baixar(a.cena.imagemUrl, path.join(pasta, `00 - Cena.${/\.jpe?g(\?|$)/i.test(a.cena.imagemUrl) ? 'jpg' : 'png'}`));
+    a.cena.animado = !!videoUrl;
+    this.salvar();
   }
 
   /** Quando os vídeos de um álbum ficam prontos na fila, ele vira "pronto para aprovar". */

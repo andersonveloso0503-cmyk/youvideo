@@ -9,6 +9,7 @@
 import { put } from '@vercel/blob';
 import { exigirToken } from '../../../lib/central';
 import { ALBUM_PRESETS, ESTILOS, TODAS_IDEIAS, ritmoEn, ideiasEmTexto } from '../../../lib/estudioDados';
+import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
 export const config = { maxDuration: 300 };
 
@@ -123,6 +124,49 @@ Nomes:
 ${nomes.map((n, i) => `${i + 1}. ${n}`).join('\n')}`);
     const titulos = Array.isArray(r.titulos) && r.titulos.length === nomes.length ? r.titulos.map((t, i) => limparTexto(t, 80) || nomes[i]) : null;
     return res.status(200).json({ titulos });
+  }
+  // Fundo animado do vídeo longo: uma cena desenhada (estilo lo-fi) que combina com o estilo da música,
+  // animada em loop (o disco gira, o personagem balança a cabeça...). O Compilador repete o loop o vídeo todo.
+  if (acao === 'cena') {
+    try {
+      const estilo = limparTexto(req.body.estilo, 60) || 'Gospel';
+      const gospel = req.body.gospel === true;
+      const en = req.body.idioma === 'en';
+      const evitar = (Array.isArray(req.body.evitar) ? req.body.evitar : []).map((t) => limparTexto(t, 120)).filter(Boolean).slice(0, 10);
+      const ideia = await groqJson(`You create background scenes for music videos on YouTube, in a cozy lo-fi cartoon illustration style (like the famous "lo-fi girl studying" or "animal relaxing with headphones on a rooftop" videos), but always ORIGINAL characters.
+Music style: ${estilo}${gospel ? ' (Christian gospel / worship music)' : ''}.
+Pick a scene that matches the style, like these examples: rock = an animal driving a vintage car on a desert highway at sunset; reggae = a turtle in a hammock on a tropical beach; lo-fi = a cat with headphones on a city rooftop with a record player; sertanejo = a dog with a straw hat playing viola on a farmhouse porch; blues/jazz = an owl playing guitar in a cozy bar at night; pagode/samba = friends playing cavaquinho and pandeiro at a backyard party; worship = a person reading the Bible on a hill at sunrise with headphones.
+${evitar.length ? `Do not repeat these scenes: ${evitar.join(' | ')}\n` : ''}${gospel ? 'Keep it wholesome and Christian-friendly (no alcohol, no bar for gospel, no symbols of other religions).\n' : ''}Reply only JSON:
+{"cena": "1-2 sentences in English describing the scene: the original character (animal or person, what it wears), what it is doing with music, the setting, time of day and colors",
+ "movimento": "1 sentence in English: the subtle looping motions (e.g. head nodding, vinyl spinning, steam rising, waves rolling, road moving)",
+ "placa": "a short sign text (1 to 3 words) that appears on a small sign in the scene, in ${en ? 'English' : 'Brazilian Portuguese'} (e.g. ${en ? '"GOOD VIBES", "CHILL"' : '"BOAS VIBES", "BOA NOITE", "LOUVOR"'})"}`);
+      const cena = limparTexto(ideia.cena, 500) || `an original cartoon cat with big headphones relaxing on a rooftop at sunset with a record player, ${estilo} music vibe`;
+      const movimento = limparTexto(ideia.movimento, 300) || 'the character gently nods its head, the vinyl record spins, steam rises from the cup, string lights sway softly';
+      const placa = limparTexto(ideia.placa, 24).toUpperCase();
+      const img = await imagemGemini(`Create a 16:9 landscape illustration for a music video background.
+Style: cozy lo-fi cartoon illustration, hand-drawn with clean ink outlines, warm limited color palette, soft lighting, detailed but calm, like a lo-fi chill music video.
+Scene: ${cena}
+${placa ? `A small wooden sign in the scene says "${placa}" (spelled exactly). ` : ''}The character is original (not a known character, mascot or celebrity). No logos, no brand names, no watermarks, no other text. Keep the main character in the center-left with room around it.`, '16:9');
+      const imagemUrl = await salvar(img, `cena-${Date.now()}`);
+      let anim = null;
+      try {
+        anim = await enviarAnimacao(imagemUrl, `${cena} Seamless loop, camera completely still, subtle calm movements only: ${movimento}`, 'longo', 5, true);
+      } catch (e) {
+        return res.status(200).json({ imagemUrl, cena, erroAnimacao: e.message });
+      }
+      return res.status(200).json({ imagemUrl, cena, statusUrl: anim.statusUrl, responseUrl: anim.responseUrl });
+    } catch (e) {
+      return res.status(500).json({ erro: e.message });
+    }
+  }
+  if (acao === 'cenaStatus') {
+    try {
+      const { statusUrl, responseUrl } = req.body || {};
+      if (!/^https:\/\/queue\.fal\.run\//.test(String(statusUrl || '')) || !/^https:\/\/queue\.fal\.run\//.test(String(responseUrl || ''))) return res.status(400).json({ erro: 'Pedido inválido.' });
+      return res.status(200).json(await checarAnimacao(statusUrl, responseUrl));
+    } catch (e) {
+      return res.status(500).json({ erro: e.message });
+    }
   }
   if (acao !== 'capa') return res.status(400).json({ erro: 'Ação desconhecida.' });
   try {

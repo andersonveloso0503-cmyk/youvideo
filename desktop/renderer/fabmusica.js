@@ -96,6 +96,7 @@ const FabMusica = (() => {
         <div class="campo-config"><label>Começar todo dia às</label><input type="time" id="fmHora" value="${esc(p.hora)}" /></div>
         <div class="campo-config"><label>Músicas por álbum</label><select id="fmQtd">${[5, 8, 10, 12, 15].map((n) => `<option ${n === p.qtd ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="campo-config"><label>Não fazer se já tiver vídeo longo agendado para</label><select id="fmFolga">${[2, 3, 5, 7, 14].map((n) => `<option value="${n}" ${n === p.folgaDias ? 'selected' : ''}>${n} dias ou mais</option>`).join('')}</select></div>
+        <div class="campo-config"><label>Fundo do vídeo longo</label><select id="fmFundo"><option value="1" ${p.fundoAnimado !== false ? 'selected' : ''}>Cena desenhada que se mexe (~US$ 0,50)</option><option value="0" ${p.fundoAnimado === false ? 'selected' : ''}>Só a capa parada</option></select></div>
         <div class="campo-config"><label>Shorts por álbum</label><select id="fmShorts">${[0, 1, 2, 3].map((n) => `<option ${n === p.shorts ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
       </div>
       <p class="nota" id="fmCusto"></p>
@@ -194,6 +195,7 @@ const FabMusica = (() => {
     q('#fmHora').onchange = (e) => salvar({ hora: e.target.value || '08:00' });
     q('#fmQtd').onchange = async (e) => { await salvar({ qtd: Number(e.target.value) }); custo(); };
     q('#fmFolga').onchange = (e) => salvar({ folgaDias: Number(e.target.value) });
+    q('#fmFundo').onchange = (e) => salvar({ fundoAnimado: e.target.value === '1' });
     q('#fmShorts').onchange = async (e) => { await salvar({ shorts: Number(e.target.value) }); custo(); };
     document.querySelectorAll('#fabMusica .fm-subir').forEach((b) => (b.onclick = () => verESubir(b.dataset.id)));
     document.querySelectorAll('#fabMusica .fm-de-novo').forEach((b) => (b.onclick = () => window.api.musicaAuto.tentarDeNovo(b.dataset.id).catch((e) => avisar(msgErro(e), true))));
