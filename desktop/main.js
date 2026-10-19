@@ -1146,6 +1146,7 @@ app.whenReady().then(() => {
   ipcMain.handle('musicaAuto:tentarDeNovo', (_e, id) => musicaAuto.tentarDeNovo(id));
   ipcMain.handle('musicaAuto:refazerCapa', async (_e, id) => capaDoAlbumNoYoutube(id, await musicaAuto.refazerCapa(id)));
   ipcMain.handle('musicaAuto:promptCapa', (_e, id) => musicaAuto.promptCapa(id));
+  ipcMain.handle('musicaAuto:refazerFundo', (_e, id) => musicaAuto.refazerFundo(id));
   ipcMain.handle('musicaAuto:usarCapa', async (_e, { id, arquivo }) => capaDoAlbumNoYoutube(id, musicaAuto.usarCapa(id, arquivo)));
   // Álbum que já subiu: troca a thumbnail do vídeo longo lá no YouTube também
   async function capaDoAlbumNoYoutube(id, capa) {

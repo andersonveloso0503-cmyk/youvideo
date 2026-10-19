@@ -472,7 +472,7 @@ class MusicaAuto {
       ...comum,
       nome,
       musicas: musicasLongo,
-      fundos: [(a.cena?.arquivo && fs.existsSync(a.cena.arquivo)) ? a.cena.arquivo : a.capa.capaArquivo],
+      fundos: [await this.fundoDoLongo(a, pasta)],
       legenda: { ...(base.legenda || {}), ativo: false, mostrarNome: false },
       formato: { tipo: 'longo', resolucao: base.formato?.resolucao || '1080', versoes: '', qtdVideos: '1', duracaoMaxMin: '', limiteMusicaSeg: '' },
       saida: { pasta: base.saida?.pasta || '', nome },
@@ -644,6 +644,30 @@ class MusicaAuto {
     a.capa.capaArquivo = await this.central.baixar(a.capa.capaUrl, path.join(pasta, `00 - Capa ${Date.now().toString(36)}.${ext(a.capa.capaUrl)}`));
     if (a.capa.fundoUrl) a.capa.fundoArquivo = await this.central.baixar(a.capa.fundoUrl, path.join(pasta, `00 - Fundo Shorts.${ext(a.capa.fundoUrl)}`)).catch(() => null);
     this.salvar();
+  }
+
+  /** Fundo do vídeo longo: a cena (animada ou parada); sem cena, a capa — mas nunca a capa simples com texto. */
+  async fundoDoLongo(a, pasta) {
+    if (a.cena?.arquivo && fs.existsSync(a.cena.arquivo)) return a.cena.arquivo;
+    if (!a.capa?.simples) return a.capa.capaArquivo;
+    if (a.capa.fundoArquivo && fs.existsSync(a.capa.fundoArquivo)) return a.capa.fundoArquivo;
+    const liso = path.join(pasta, '00 - Fundo liso.jpg');
+    const { rodar } = require('./ffmpeg');
+    await rodar(['-f', 'lavfi', '-i', 'gradients=s=1920x1080:c0=0x3b1405:c1=0xa3410f:x0=0:y0=0:x1=1920:y1=1080:d=1', '-frames:v', '1', '-y', liso]).promise
+      .catch(() => rodar(['-f', 'lavfi', '-i', 'color=c=0x5a2208:s=1920x1080', '-frames:v', '1', '-y', liso]).promise);
+    return liso;
+  }
+
+  /** 🎬 Refazer o fundo: desenha a cena de novo (Gemini ou Flux), anima e monta o vídeo longo outra vez. */
+  refazerFundo(id) {
+    const a = this.estado.albuns.find((x) => x.id === id);
+    if (!a) throw new Error('Álbum não encontrado.');
+    if (a.fase === 'aprovado') throw new Error('Este álbum já foi enviado para o YouTube. Para trocar o vídeo, apague lá e use "Tentar de novo" num álbum novo.');
+    if (['trabalhando', 'na vez'].includes(a.fase)) throw new Error('O álbum ainda está sendo feito.');
+    a.cena = null;
+    a.jobs = null;
+    this.salvar();
+    return this.fazer(a.canal, { continuar: a.id });
   }
 
   /** 🎨 Refazer capa: tenta o Gemini de novo (ex.: depois de pôr crédito). Vale para a capa do vídeo longo no YouTube. */
