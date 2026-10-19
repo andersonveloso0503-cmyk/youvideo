@@ -135,7 +135,7 @@ function montarPrompt({ modo, descricao, letra, estilo, voz, instrumental, durac
     if (genero) partes.push(`Singer: ${en ? cantorEmIngles(genero.cantor) : genero.cantor}.`);
     partes.push(en
       ? 'Sung entirely in English by a native English-speaking singer, natural pronunciation. Do not sing in Portuguese.'
-      : 'Sung in Brazilian Portuguese, clear pronunciation.');
+      : 'Sung entirely in Brazilian Portuguese with a Brazilian accent (from Brazil, not from Portugal), clear pronunciation. Every line in Portuguese: no English words or English lines.');
     if (!en && genero && !['sertanejo', 'gaucha', 'country'].includes(genero.id)) {
       partes.push('The singing style must match the genre: do NOT sing like sertanejo, no country twang.');
     }
@@ -169,6 +169,13 @@ async function planoComGenero(key, modelo, prompt, duracaoMs, genero, idioma) {
     if (!r.ok) return null;
     const plano = await r.json();
     if (!Array.isArray(plano?.sections) || !plano.sections.length) return null;
+    // O plano às vezes reescreve versos em inglês: em português, plano com linha em inglês é descartado
+    // (a música sai só pelo texto, com a letra exata)
+    if (idioma !== 'en') {
+      const EN = /\b(the|and|you|your|we|let's|with|this|that|is|are|my|love|baby|yeah|come on|tonight|every|world)\b/i;
+      const linhas = plano.sections.flatMap((sec) => (Array.isArray(sec.lines) ? sec.lines : []));
+      if (linhas.some((l) => (String(l).match(new RegExp(EN.source, 'gi')) || []).length >= 2)) return null;
+    }
     const proibidos = g.neg.map((x) => x.toLowerCase());
     const limpa = (lista) => (Array.isArray(lista) ? lista : []).filter((x) => !proibidos.some((p) => String(x).toLowerCase().includes(p)));
     const uniq = (lista) => [...new Map(lista.map((x) => [String(x).toLowerCase(), x])).values()];
