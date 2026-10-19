@@ -79,6 +79,7 @@ const Subir = (() => {
       b.querySelector('span').textContent = (c.id === S.canalId ? '✓ ' : '') + c.titulo;
       b.onclick = () => {
         S.canalId = c.id;
+        delete q('#cCriancas').dataset.mexeu; // trocou de canal: volta a marcar sozinho
         salvarPrefs();
         renderCanais();
         conferirAgenda();
@@ -86,6 +87,10 @@ const Subir = (() => {
       box.appendChild(b);
     });
     q('#canalEscolhido').textContent = canais.find((c) => c.id === S.canalId)?.titulo || '—';
+    // Canal infantil: já marca "para crianças" (dá para desmarcar)
+    const ck = q('#cCriancas');
+    if (ck && !ck.dataset.mexeu) ck.checked = /fofura|infantil|kids|crian[cç]a|pingo/i.test(canais.find((c) => c.id === S.canalId)?.titulo || '');
+    if (ck) ck.onchange = () => (ck.dataset.mexeu = '1');
   }
 
   async function conferirAgenda() {
@@ -293,6 +298,9 @@ const Subir = (() => {
       capa: v.capa || v.previa || null,
       capaManual: !!v.capaManual,
       curto: v.curto,
+      // Vídeo feito fora (ex.: desenho infantil pronto): marca "para crianças" e entra na playlist escolhida
+      ...(q('#cCriancas').checked ? { paraCriancas: true, semBotao: true } : {}),
+      ...(q('#inPlaylistEnvio').value.trim() ? { playlist: { titulo: q('#inPlaylistEnvio').value.trim().slice(0, 150), descricao: '' } } : {}),
     }));
     try {
       const n = await window.api.envio.adicionar(lista);
