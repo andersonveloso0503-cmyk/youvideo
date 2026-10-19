@@ -654,7 +654,8 @@ export default async function handler(req, res) {
               const cenasMus = (item.arquivos || []).filter((a) => a.bloco === 'musica' && (a.videoUrl || a.imageUrl) && a.start != null);
               const ini = cenasMus[0]?.start || 0;
               const dur = Number(item.vozInfantil.musica.duracao) || 60;
-              if (cenasMus.length) {
+              if (!cenasMus.length) throw new Error('as cenas da música não ficaram prontas');
+              {
                 const base = item.fabrica.quandoYoutube || item.fabrica.quando;
                 const quando = new Date(new Date(base).getTime() + 24 * 3600e3).toISOString();
                 const nomeMus = item.roteiro.musica?.titulo || 'Música do episódio';
@@ -689,8 +690,9 @@ export default async function handler(req, res) {
                   },
                 });
               }
-            } catch {
-              /* o Short da música é um extra: se falhar, o episódio segue normal */
+            } catch (e) {
+              // O Short da música é um extra: se falhar, o episódio segue normal — mas avisa (antes falhava calado)
+              await ref.update({ aviso: `O Short da música não foi criado: ${String(e?.message || e).slice(0, 160)}` }).catch(() => {});
             }
           }
         } else if (check.status === 'done') {
