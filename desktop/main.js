@@ -1144,9 +1144,11 @@ app.whenReady().then(() => {
     return r.filePaths[0];
   });
   ipcMain.handle('musicaAuto:tentarDeNovo', (_e, id) => musicaAuto.tentarDeNovo(id));
-  ipcMain.handle('musicaAuto:refazerCapa', async (_e, id) => {
-    const capa = await musicaAuto.refazerCapa(id);
-    // Álbum que já subiu: troca a thumbnail do vídeo longo lá no YouTube também
+  ipcMain.handle('musicaAuto:refazerCapa', async (_e, id) => capaDoAlbumNoYoutube(id, await musicaAuto.refazerCapa(id)));
+  ipcMain.handle('musicaAuto:promptCapa', (_e, id) => musicaAuto.promptCapa(id));
+  ipcMain.handle('musicaAuto:usarCapa', async (_e, { id, arquivo }) => capaDoAlbumNoYoutube(id, musicaAuto.usarCapa(id, arquivo)));
+  // Álbum que já subiu: troca a thumbnail do vídeo longo lá no YouTube também
+  async function capaDoAlbumNoYoutube(id, capa) {
     const a = musicaAuto.estado.albuns.find((x) => x.id === id);
     const longo = (a?.jobs?.longo || []).map((jid) => fila.lista().find((j) => j.id === jid)).find(Boolean);
     const envio = longo?.arquivoFinal && fila.lista().find((j) => j.tipo === 'envio' && j.envio?.arquivo === longo.arquivoFinal && j.youtube?.id);
@@ -1161,7 +1163,7 @@ app.whenReady().then(() => {
       }
     }
     return { ok: true, noYoutube: false };
-  });
+  }
   ipcMain.handle('musicaAuto:paraSubir', (_e, id) => musicaAuto.paraSubir(id));
   ipcMain.handle('musicaAuto:aprovar', (_e, id) => musicaAuto.aprovar(id));
   ipcMain.handle('musicaAuto:descartar', (_e, id) => musicaAuto.descartar(id));

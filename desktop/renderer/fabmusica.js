@@ -69,6 +69,10 @@ const FabMusica = (() => {
     if (a.fase === 'pronto') acoes.push(`<button class="btn-primario fm-subir" data-id="${a.id}">👀 Ver e subir</button>`);
     if (a.fase === 'erro') acoes.push(`<button class="btn-mini destaque fm-de-novo" data-id="${a.id}">↻ Tentar de novo</button>`);
     // Capa simples (o Gemini não conseguiu): o álbum segue mesmo assim; dá para refazer a capa depois
+    if (a.capa && ['pronto', 'aprovado', 'montando', 'erro'].includes(a.fase)) {
+      acoes.push(`<button class="btn-mini fm-prompt-capa" data-id="${a.id}" title="Copia o pedido da capa para você fazer no Gemini (app ou gemini.google.com)">📝 Prompt da capa</button>`);
+      acoes.push(`<button class="btn-mini fm-usar-capa" data-id="${a.id}" title="Escolhe a imagem que você fez no Gemini (ou no Canva) e usa como capa">📥 Trazer capa</button>`);
+    }
     if (a.capa && ['pronto', 'aprovado', 'montando', 'erro'].includes(a.fase)) acoes.push(`<button class="btn-mini ${a.capaSimples ? 'destaque' : ''} fm-refazer-capa" data-id="${a.id}" title="Faz a capa de novo no Gemini">🎨 ${a.capaSimples ? 'Refazer capa' : 'Outra capa'}</button>`);
     if (!['trabalhando', 'na vez'].includes(a.fase)) acoes.push(`<button class="btn-mini fm-descartar" data-id="${a.id}" title="Tira da lista (as músicas e os vídeos continuam na pasta)">✕</button>`);
     const nome = a.titulo ? `${esc(a.titulo)}${a.subtitulo ? ` <small>${esc(a.subtitulo)}</small>` : ''}` : esc(a.preset || 'Álbum');
@@ -81,7 +85,7 @@ const FabMusica = (() => {
           <div class="nota">${NOME_CANAL[a.canal]} · ${esc(a.preset || '')} · ${nomeMotor(a.motor)} · ${new Date(`${a.dia}T12:00`).toLocaleDateString('pt-BR')}</div>
           <div class="fm-fase">${FASE[a.fase] || a.fase}${a.etapa && !['pronto', 'aprovado'].includes(a.fase) ? ` — ${esc(a.etapa)}` : ''}${progresso}</div>
           ${a.erro ? `<div class="erro">${esc(a.erro)}</div>` : ''}
-          ${a.capaSimples ? `<div class="nota" style="color:var(--terracota)">⚠ Capa simples: o Gemini não conseguiu fazer a capa${a.capaErro ? ` (${esc(a.capaErro.slice(0, 120))})` : ''}. O álbum seguiu mesmo assim — clique em 🎨 Refazer capa quando quiser.</div>` : ''}
+          ${a.capaSimples ? `<div class="nota" style="color:var(--terracota)">⚠ Capa simples: o Gemini não conseguiu fazer a capa${a.capaErro ? ` (${esc(a.capaErro.slice(0, 120))})` : ''}. O álbum seguiu mesmo assim — depois use 🎨 Refazer capa, ou 📝 Prompt da capa para fazer no Gemini e 📥 Trazer capa.</div>` : ''}
           ${a.recusadas ? `<div class="nota">🎧 ${a.recusadas} música${a.recusadas > 1 ? 's foram refeitas' : ' foi refeita'} porque a letra não ficou clara</div>` : ''}
           ${a.musicas.length && ['pronto', 'aprovado', 'montando'].includes(a.fase) ? `<details><summary>${a.musicas.length} músicas</summary><ol>${a.musicas.map((t) => `<li>${esc(t)}</li>`).join('')}</ol></details>` : ''}
         </div>
@@ -203,6 +207,34 @@ const FabMusica = (() => {
     q('#fmShorts').onchange = async (e) => { await salvar({ shorts: Number(e.target.value) }); custo(); };
     q('#fmLongo').onchange = async (e) => { await salvar({ longoMin: Number(e.target.value) }); custo(); };
     document.querySelectorAll('#fabMusica .fm-subir').forEach((b) => (b.onclick = () => verESubir(b.dataset.id)));
+    document.querySelectorAll('#fabMusica .fm-prompt-capa').forEach((b) => (b.onclick = async () => {
+      try {
+        const texto = await window.api.musicaAuto.promptCapa(b.dataset.id);
+        try {
+          await navigator.clipboard.writeText(texto);
+        } catch {
+          const t = document.createElement('textarea');
+          t.value = texto;
+          document.body.appendChild(t);
+          t.select();
+          document.execCommand('copy');
+          t.remove();
+        }
+        avisar('Prompt copiado! Cole no Gemini, baixe a imagem e clique em 📥 Trazer capa');
+      } catch (e) {
+        avisar(msgErro(e), true);
+      }
+    }));
+    document.querySelectorAll('#fabMusica .fm-usar-capa').forEach((b) => (b.onclick = async () => {
+      try {
+        const arquivo = await window.api.envio.escolherCapa();
+        if (!arquivo) return;
+        const r = await window.api.musicaAuto.usarCapa({ id: b.dataset.id, arquivo });
+        avisar(r?.noYoutube ? 'Capa trocada — e já trocada no YouTube' : 'Capa trocada — ela vai como thumbnail quando o álbum subir');
+      } catch (e) {
+        avisar(msgErro(e), true);
+      }
+    }));
     document.querySelectorAll('#fabMusica .fm-refazer-capa').forEach((b) => (b.onclick = async () => {
       b.disabled = true;
       b.textContent = '🎨 Fazendo...';

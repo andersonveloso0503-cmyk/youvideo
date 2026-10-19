@@ -668,6 +668,44 @@ class MusicaAuto {
     return a.capa;
   }
 
+  /** 📝 Prompt da capa para o dono gerar no Gemini (app/site) com a conta dele e trazer a imagem depois. */
+  promptCapa(id) {
+    const a = this.estado.albuns.find((x) => x.id === id);
+    if (!a) throw new Error('Álbum não encontrado.');
+    const en = a.idioma === 'en';
+    const gospel = CANAIS[a.canal].gospel;
+    const estilo = a.presetNome || (gospel ? 'Gospel' : 'Músicas');
+    const ano = new Date().getFullYear();
+    const titulo = (a.capa?.titulo || `${estilo} ${gospel ? 'Louvores' : 'As Melhores'}`).toUpperCase();
+    const subtitulo = (a.capa?.subtitulo || `AS MELHORES ${ano}`).toUpperCase();
+    const musicas = (a.musicas || []).filter(Boolean).map((m) => m.titulo).slice(0, 8).join('; ');
+    return `Crie uma thumbnail de YouTube MUITO chamativa, formato 16:9 (paisagem, 1280x720), para uma coletânea de músicas ${gospel ? 'GOSPEL ' : ''}no estilo ${estilo}.
+Algumas músicas: ${musicas || '(sem títulos)'}.
+
+Cena: um(a) cantor(a) fictício(a) (não é celebridade nem pessoa real) cantando ou tocando ${/sertanej|modão|raiz/i.test(estilo) ? 'viola ou sanfona numa varanda de fazenda ao pôr do sol, campo dourado ao fundo' : /pagode|samba/i.test(estilo) ? 'cavaquinho numa roda de amigos à noite, luzes quentes' : 'num palco com luz suave vinda do céu'}${gospel ? ', clima de louvor e fé, sem símbolos de outras religiões' : ''}.
+Estilo: capa profissional de álbum ${en ? 'americano' : 'brasileiro'}, luz cinematográfica, cores vivas e saturadas, alto contraste, foto realista, visual premium. O cantor perto da câmera, de um lado, com expressão emocionante.
+
+Texto na imagem (${en ? 'em inglês' : 'em português do Brasil, com os acentos'}, escrito EXATAMENTE assim e nada mais):
+- "${titulo}" ENORME, ocupando metade da imagem, em letras 3D grossas e pesadas com acabamento DOURADO metálico brilhante, contorno escuro grosso e brilho dourado
+- "${subtitulo}" menor, dentro de uma faixa (texto branco numa faixa vermelha ou roxa) embaixo do título
+
+Coloque o texto do lado oposto ao rosto do cantor e deixe o canto inferior direito livre (o YouTube mostra a duração ali). Tem que ser legível numa miniatura pequena no celular. Sem logos, sem marca d'água, sem outros textos.`;
+  }
+
+  /** 📥 Usa a capa que o dono fez fora (Gemini, Canva...). */
+  usarCapa(id, arquivo) {
+    const a = this.estado.albuns.find((x) => x.id === id);
+    if (!a) throw new Error('Álbum não encontrado.');
+    if (!arquivo || !fs.existsSync(arquivo)) throw new Error('Imagem não encontrada.');
+    const pasta = a.capa?.capaArquivo ? path.dirname(a.capa.capaArquivo) : a.pastaAlbum || this.pastaMusicas;
+    const destino = path.join(pasta, `00 - Capa minha ${Date.now().toString(36)}${path.extname(arquivo) || '.png'}`);
+    fs.copyFileSync(arquivo, destino);
+    a.capa = { ...(a.capa || {}), capaArquivo: destino, simples: false, erro: '' };
+    this.salvar();
+    this.avisarTela();
+    return a.capa;
+  }
+
   /** Quando os vídeos de um álbum ficam prontos na fila, ele vira "pronto para aprovar". */
   conferirMontagem() {
     for (const a of this.estado.albuns) {
