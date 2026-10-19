@@ -302,6 +302,18 @@ const Subir = (() => {
       ...(q('#cCriancas').checked ? { paraCriancas: true, semBotao: true } : {}),
       ...(q('#inPlaylistEnvio').value.trim() ? { playlist: { titulo: q('#inPlaylistEnvio').value.trim().slice(0, 150), descricao: '' } } : {}),
     }));
+    // Já está no canal com o mesmo título? Avisa antes (subir duas vezes o mesmo vídeo prejudica o canal)
+    try {
+      const dups = await window.api.envio.duplicados({ canalId: S.canalId, titulos: lista.map((x) => x.titulo) });
+      const achados = lista.map((x, i) => ({ x, d: dups?.[i] })).filter((p) => p.d);
+      if (achados.length) {
+        const txt = achados.map((p) => `• "${p.x.titulo}"\n   já está no canal: ${p.d.url}`).join('\n');
+        if (!confirm(`⚠ ${achados.length === 1 ? 'Este vídeo já está' : `${achados.length} vídeos já estão`} no canal com o mesmo título:\n\n${txt}\n\nSubir de novo mesmo assim? (Cancelar = não sobe nenhum)`)) return;
+        achados.forEach((p) => (p.x.forcarDuplicado = true));
+      }
+    } catch {
+      /* sem conferir: a fila ainda confere antes de cada envio */
+    }
     try {
       const n = await window.api.envio.adicionar(lista);
       if (aoSubir) { try { await aoSubir(); } catch { /* só um aviso */ } aoSubir = null; }

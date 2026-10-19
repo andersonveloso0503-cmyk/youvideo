@@ -413,12 +413,44 @@ class Fila extends EventEmitter {
     }
   }
 
+  /** Vídeos recentes do canal (guardados 3 min, para não perguntar ao YouTube a cada envio). */
+  async ultimosDoCanal(canalId) {
+    this.cacheCanal = this.cacheCanal || {};
+    const c = this.cacheCanal[canalId];
+    if (c && Date.now() - c.em < 3 * 60e3) return c.lista;
+    const canal = this.obterCanal(canalId);
+    if (!canal) return [];
+    const cfg = this.obterConfig();
+    const lista = await YT.ultimosDoCanal({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect });
+    this.cacheCanal[canalId] = { em: Date.now(), lista };
+    return lista;
+  }
+
   async processarEnvio(job) {
     const cfg = this.obterConfig();
     const e = job.envio;
     job.cancelado = false;
     job.naoAntesDe = null;
     try {
+      // Não sobe duas vezes: se o canal já tem um vídeo com o mesmo título (subido por este ou por outro PC,
+      // num "tentar de novo" repetido, por exemplo), não sobe de novo e avisa com o link do que já está lá.
+      if (!e.forcarDuplicado) {
+        let ja = null;
+        try {
+          ja = YT.mesmoTitulo(await this.ultimosDoCanal(e.canalId), e.titulo);
+        } catch {
+          /* sem conseguir olhar o canal: segue (melhor subir do que travar) */
+        }
+        if (ja) {
+          const aviso = `Já estava no canal (${ja.url}) — não subi de novo para não duplicar. Se for outro vídeo, mude o título e mande de novo.`;
+          this.atualizar(job, { status: 'concluido', etapa: 'Já estava no canal', progresso: 1, youtube: { id: ja.id, url: ja.url, jaExistia: true }, aviso, concluidoEm: new Date().toISOString() });
+          if (e.fabricaId) {
+            this.anotarFabricaEnviado(e.fabricaId, ja.url);
+            this.avisarFabricaEnviado(e.fabricaId);
+          }
+          return;
+        }
+      }
       // Vídeo montado neste PC: usa o arquivo que já está aqui (antes baixava de novo da nuvem, horas nos longos)
       if (e.baixarDe && (!e.arquivo || !fs.existsSync(e.arquivo))) {
         const local = this.arquivoLocalDe(e.baixarDe);
@@ -514,6 +546,7 @@ class Fila extends EventEmitter {
         },
       });
       this.registrarEnvio();
+      if (this.cacheCanal) delete this.cacheCanal[e.canalId]; // o canal mudou: a próxima conferência olha de novo
       this.atualizar(job, {
         status: 'concluido',
         etapa: e.agendarPara ? 'Agendado' : 'Enviado',

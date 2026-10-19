@@ -1542,6 +1542,15 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('envio:contador', () => ({ hoje: enviosHoje(), limite: 100, renova: horaRenovacao() }));
+  // Antes de subir: quais títulos já estão no canal (para avisar e não duplicar)
+  ipcMain.handle('envio:duplicados', async (_e, { canalId, titulos }) => {
+    try {
+      const lista = await fila.ultimosDoCanal(canalId);
+      return (titulos || []).map((t) => YT.mesmoTitulo(lista, t));
+    } catch {
+      return (titulos || []).map(() => null);
+    }
+  });
   ipcMain.handle('envio:adicionar', (_e, lista) => {
     if (!Array.isArray(lista) || !lista.length) throw new Error('Nenhum vídeo para subir.');
     const livres = 100 - enviosHoje();

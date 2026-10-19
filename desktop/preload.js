@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('api', {
     gerarTextos: chamar('envio:gerarTextos'),
     ultimoAgendado: chamar('envio:ultimoAgendado'),
     contador: chamar('envio:contador'),
+    duplicados: chamar('envio:duplicados'),
     adicionar: chamar('envio:adicionar'),
   },
   cantor: {

@@ -369,6 +369,43 @@ function youtubeDoCanal({ credenciais, refreshToken, redirectOriginal }) {
   return google.youtube({ version: 'v3', auth });
 }
 
+/** Título comparável: sem acento, sem hashtag, sem emoji, sem pontuação e sem espaço sobrando. */
+function tituloComparavel(t) {
+  return String(t || '')
+    .replace(/#[\p{L}\p{N}_]+/gu, ' ')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * Vídeos que o canal subiu por último (inclui privados e agendados), para não subir o mesmo vídeo duas vezes
+ * — por exemplo, um PC tentou de novo e o outro também. Devolve [{ id, titulo, url, subidoEm }].
+ */
+async function ultimosDoCanal({ credenciais, refreshToken, redirectOriginal }, maximo = 200) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const c = await yt.channels.list({ part: ['contentDetails'], mine: true });
+  const uploads = c.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploads) return [];
+  const saida = [];
+  let pageToken;
+  do {
+    const r = await yt.playlistItems.list({ part: ['snippet', 'contentDetails'], playlistId: uploads, maxResults: 50, pageToken });
+    for (const it of r.data.items || []) {
+      const id = it.contentDetails?.videoId;
+      if (id) saida.push({ id, titulo: it.snippet?.title || '', url: `https://youtu.be/${id}`, subidoEm: it.snippet?.publishedAt || it.contentDetails?.videoPublishedAt || null });
+    }
+    pageToken = r.data.nextPageToken;
+  } while (pageToken && saida.length < maximo);
+  return saida;
+}
+
+/** O vídeo com o mesmo título que já está no canal (ou null). */
+function mesmoTitulo(lista, titulo) {
+  const alvo = tituloComparavel(titulo);
+  if (alvo.length < 6) return null; // título curto demais para comparar com segurança
+  return lista.find((v) => tituloComparavel(v.titulo) === alvo) || null;
+}
+
 /** Troca a miniatura (capa) de um vídeo que já está no canal. */
 async function trocarCapa({ credenciais, refreshToken, redirectOriginal, videoId, arquivo }) {
   const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
@@ -629,6 +666,8 @@ async function desprogramarVideos({ credenciais, refreshToken, redirectOriginal,
 module.exports = {
   agendados,
   trocarCapa,
+  ultimosDoCanal,
+  mesmoTitulo,
   desprogramarVideos,
   limparTags, autorizarCanal, canalPorToken, publicar, montarDescricao, ultimoAgendado, REDIRECT,
   etiquetasErradas, etiquetasAlheias, etiquetasParaTirar, semHashtagsDe, etiquetasDoTitulo,
