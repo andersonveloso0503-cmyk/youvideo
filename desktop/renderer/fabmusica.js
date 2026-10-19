@@ -75,7 +75,7 @@ const FabMusica = (() => {
       acoes.push(`<button class="btn-mini fm-prompt-capa" data-id="${a.id}" title="Copia o pedido da capa para você fazer no Gemini (app ou gemini.google.com)">📝 Prompt da capa</button>`);
       acoes.push(`<button class="btn-mini fm-usar-capa" data-id="${a.id}" title="Escolhe a imagem que você fez no Gemini (ou no Canva) e usa como capa">📥 Trazer capa</button>`);
     }
-    if (['pronto', 'erro'].includes(a.fase)) acoes.push(`<button class="btn-mini ${a.fundo !== 'animado' ? 'destaque' : ''} fm-refazer-fundo" data-id="${a.id}" title="Desenha a cena de novo, anima e monta o vídeo longo outra vez (~US$ 0,50)">🎬 Refazer fundo</button>`);
+    if (['pronto', 'erro', 'aprovado'].includes(a.fase)) acoes.push(`<button class="btn-mini ${a.fundo !== 'animado' ? 'destaque' : ''} fm-refazer-fundo" data-id="${a.id}" title="Desenha a cena de novo, anima e monta o vídeo longo outra vez (~US$ 0,50)">🎬 Refazer fundo</button>`);
     if (!['trabalhando', 'na vez'].includes(a.fase)) acoes.push(`<button class="btn-mini ${a.capaSimples ? 'destaque' : ''} fm-refazer-capa" data-id="${a.id}" title="Faz a capa de novo no Gemini">🎨 ${a.capaSimples ? 'Refazer capa' : 'Outra capa'}</button>`);
     if (!['trabalhando', 'na vez'].includes(a.fase)) acoes.push(`<button class="btn-mini fm-descartar" data-id="${a.id}" title="Tira da lista (as músicas e os vídeos continuam na pasta)">✕</button>`);
     const nome = a.titulo ? `${esc(a.titulo)}${a.subtitulo ? ` <small>${esc(a.subtitulo)}</small>` : ''}` : esc(a.preset || 'Álbum');
@@ -247,7 +247,10 @@ const FabMusica = (() => {
       }
     }));
     document.querySelectorAll('#fabMusica .fm-refazer-fundo').forEach((b) => (b.onclick = async () => {
-      if (!confirm('Desenhar o fundo de novo e montar o vídeo longo outra vez? (uns US$ 0,50 e alguns minutos)')) return;
+      const jaSubiu = b.closest('.fm-album')?.classList.contains('fase-aprovado');
+      if (!confirm(jaSubiu
+        ? 'Este álbum já subiu. Antes, APAGUE o vídeo longo no YouTube Studio (senão ficam dois). Depois o vídeo é montado de novo com fundo novo e você sobe em "Ver e subir". Continuar?'
+        : 'Desenhar o fundo de novo e montar o vídeo longo outra vez? (uns US$ 0,50 e alguns minutos)')) return;
       try {
         await window.api.musicaAuto.refazerFundo(b.dataset.id);
         avisar('Refazendo o fundo — acompanhe no cartão do álbum');

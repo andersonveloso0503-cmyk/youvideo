@@ -662,7 +662,6 @@ class MusicaAuto {
   refazerFundo(id) {
     const a = this.estado.albuns.find((x) => x.id === id);
     if (!a) throw new Error('Álbum não encontrado.');
-    if (a.fase === 'aprovado') throw new Error('Este álbum já foi enviado para o YouTube. Para trocar o vídeo, apague lá e use "Tentar de novo" num álbum novo.');
     if (['trabalhando', 'na vez'].includes(a.fase)) throw new Error('O álbum ainda está sendo feito.');
     a.cena = null;
     a.jobs = null;
