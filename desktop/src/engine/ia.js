@@ -278,6 +278,41 @@ function descreverVideo(info) {
     .join('\n');
 }
 
+// Título de vídeo de MÚSICA: o formato que mais deu views no canal Nova Frequência
+// ("Sertanejo Gospel De Madrugada | Oração Que Acalma A Alma" — 756 views; os títulos de palavras-chave
+// grudadas, tipo "gospel animadas mais tocadas — Playlist Energética...", ficaram com ~30).
+function regrasTituloMusica(ano, info) {
+  const longoDeHora = (info.duracaoSeg || 0) >= 55 * 60;
+  return `ESTE VÍDEO É DE MÚSICA. Estas regras MANDAM sobre as regras do título acima (quando forem diferentes, vale esta):
+1. Formato: ESTILO + MOMENTO | FRASE EMOCIONAL. Comece pelo estilo do jeito que as pessoas procuram ("Sertanejo Gospel", "Pagode Gospel", "Louvores", "Modão Gospel"), depois o momento ou a ocasião ("De Madrugada", "Para Viajar", "Para Trabalhar Com Fé", "Na Roça"), e depois de " | " uma frase curta que toca o coração ("Oração Que Acalma a Alma", "Deus Te Levanta de Novo", "Louvores Que Marcaram Gerações").
+2. Português do Brasil correto e natural, com Maiúsculas Iniciais. PROIBIDO título que é lista de palavras-chave grudadas (ERRADO: "gospel animadas mais tocadas — Playlist Energética de Blues Gospel"; ERRADO: "musica gospel gospel animado — energia para treinar"). Leia em voz alta: tem que soar como nome de álbum.
+3. ${longoDeHora ? 'Pode dizer a duração arredondada em horas ("1 Hora de Louvores...").' : 'NÃO coloque minutagem ("25 Min", "26 Min", "40 Min"): isso não é buscado e deixa o título feio.'}
+4. Ano: se usar, só ${ano}. Nunca outro ano.
+5. Sem hashtag no título (o app cuida). No máximo 1 emoji. Entre 40 e 75 caracteres.
+6. Use o gênero que o vídeo realmente tem (o do PEDIDO DO DONO, o da pasta ou o das músicas). Não invente "blues", "rock" ou "eletrônico" se não for o caso.
+Exemplos da FORMA (os que mais deram views no canal): "Sertanejo Gospel De Madrugada | Oração Que Acalma A Alma", "Sertanejo Gospel ${ano} | Venha Dançar Com Nossos Louvores", "Graça Que Me Alcançou 🎶 Louvores em Pagode | Pagode Gospel", "Modão Gospel Saudade | Louvores Que Marcaram Gerações".`;
+}
+
+// Arruma o título de música depois da IA: ano certo, sem minutagem, maiúsculas iniciais
+function arrumarTituloMusica(t, ano, duracaoSeg) {
+  let x = String(t || '');
+  x = x.replace(/\b(20[1-3]\d)\b/g, (m) => (Number(m) === ano ? m : String(ano)));
+  if ((duracaoSeg || 0) < 55 * 60) x = x.replace(/\s*[-–—|]?\s*\b\d{1,3}\s*(min(utos)?|mins)\b\.?/gi, '');
+  const pequenas = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'as', 'os', 'em', 'no', 'na', 'nos', 'nas', 'com', 'pra', 'para', 'por', 'ao', 'à']);
+  x = x
+    .split(/(\s*[|—–]\s*)/)
+    .map((parte) =>
+      /^\s*[|—–]\s*$/.test(parte)
+        ? parte
+        : parte
+            .split(' ')
+            .map((w, i) => (i > 0 && pequenas.has(w.toLowerCase()) ? w.toLowerCase() : w.replace(/^(\p{Ll})/u, (c) => c.toUpperCase())))
+            .join(' ')
+    )
+    .join('');
+  return x.replace(/\s{2,}/g, ' ').replace(/\s*([|—–])\s*$/, '').trim();
+}
+
 // Título de história bíblica: nome claro do acontecimento + o que dá vontade de assistir.
 // (É o formato dos canais novos de histórias bíblicas que mais crescem; "Por Que...?" em todo vídeo não funciona.)
 const COMECO_FRACO = /^\s*(por ?que|descubra|voc[eê] sabia|conhe[cç]a|veja|saiba|entenda)\b/i;
@@ -429,7 +464,7 @@ TAGS
 - 15 a 25 tags: primeiro as buscas exatas da lista que combinam com o vídeo, depois variações e termos amplos. Sem "#". Total até 450 caracteres.${
     info.curto ? '\n\nÉ um YouTube Shorts: títulos de até 60 caracteres, com #Shorts no fim do título e nas hashtags. A DESCRIÇÃO do Short é CURTA: no máximo 3 frases (até 350 caracteres) — a 1ª com a palavra_principal, depois o convite para se inscrever — e as hashtags. Nada de vários parágrafos.' : ''
   }${
-    historia ? `\n\n${REGRAS_TITULO_HISTORIA}` : ''
+    historia ? `\n\n${REGRAS_TITULO_HISTORIA}` : `\n\n${regrasTituloMusica(ano, info)}`
   }`;
 
   const usuario = `${descreverVideo(info)}
@@ -507,7 +542,12 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   // Primeira letra maiúscula (as buscas do YouTube vêm em minúsculas)
   const maiuscula = (t) => String(t || '').replace(/^([^\p{L}]*)(\p{Ll})/u, (_, a, b) => a + b.toUpperCase());
   // História bíblica: sempre a mesma hashtag do assunto (a pessoa clica e cai nas outras histórias)
-  opcoes = opcoes.map((t) => comHashtags(maiuscula(t), historia ? ['histórias da bíblia'] : [principal, ...tags], !!info.curto));
+  // Música: título arrumado (ano certo, sem "25 Min", maiúsculas) e, no vídeo longo, sem hashtag no título
+  // (os títulos com hashtag foram os que menos deram views no canal de música)
+  if (!historia) opcoes = opcoes.map((t) => arrumarTituloMusica(t, ano, info.duracaoSeg));
+  opcoes = opcoes.map((t) =>
+    !historia && !info.curto ? maiuscula(t).replace(/\s*#[\p{L}\p{N}_]+/gu, '').trim().slice(0, 100) : comHashtags(maiuscula(t), historia ? ['histórias da bíblia'] : [principal, ...tags], !!info.curto)
+  );
   j.descricao = String(j?.descricao || '').split('\n').map(maiuscula).join('\n');
 
   return {

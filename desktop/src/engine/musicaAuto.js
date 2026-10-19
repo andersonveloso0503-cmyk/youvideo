@@ -167,7 +167,14 @@ class MusicaAuto {
     const p = this.prefs()[canal];
     const doGrupo = presets.filter((x) => (canal === 'gospel' ? x.gospel : !x.gospel && !FORA_DO_NORMAL.includes(x.id)));
     const marcados = doGrupo.filter((x) => (p.estilos || []).includes(x.id));
-    return marcados.length ? marcados : doGrupo;
+    if (marcados.length) return marcados;
+    // Gospel sem estilo marcado: só sertanejo e pagode gospel (foram os que deram views no Nova Frequência;
+    // misturar blues, rock e outros confundia o YouTube sobre para quem recomendar)
+    if (canal === 'gospel') {
+      const foco = doGrupo.filter((x) => ['sertanejo-gospel', 'pagode-gospel'].includes(x.id));
+      if (foco.length) return foco;
+    }
+    return doGrupo;
   }
 
   /** Chamado de tempos em tempos: começa o álbum do dia na hora marcada. */
