@@ -13,6 +13,7 @@ import {
   garantirReferenciasAmigos,
   thumbInfantil,
   falasDasCenas,
+  criarShortDaMusica,
   enviarLabios,
   linhaDoTempo,
   vozesDosPersonagens,
@@ -655,45 +656,7 @@ export default async function handler(req, res) {
           // Desenho infantil: o clipe da música vira um Short vertical, que sai no dia seguinte (mesmo horário)
           if (item.infantil && !item.shortMusica && !item.infantil.teste && item.infantil.shortsMusica !== false && item.vozInfantil?.musica?.audioUrl) {
             try {
-              const cenasMus = (item.arquivos || []).filter((a) => a.bloco === 'musica' && (a.videoUrl || a.imageUrl) && a.start != null);
-              const ini = cenasMus[0]?.start || 0;
-              const dur = Number(item.vozInfantil.musica.duracao) || 60;
-              if (!cenasMus.length) throw new Error('as cenas da música não ficaram prontas');
-              {
-                const base = item.fabrica.quandoYoutube || item.fabrica.quando;
-                const quando = new Date(new Date(base).getTime() + 24 * 3600e3).toISOString();
-                const nomeMus = item.roteiro.musica?.titulo || 'Música do episódio';
-                const quem = item.infantil.personagem?.nome || 'Pingo';
-                await db.collection('youvideo_fila').add({
-                  tema: `${nomeMus} (Short da música)`,
-                  infantil: { ...item.infantil, teste: false },
-                  shortMusica: true,
-                  estilo: 'infantil',
-                  formato: 'short',
-                  animar: false,
-                  roteiro: {
-                    titulo: `${nomeMus} 🎵 ${quem} | Música Infantil`.slice(0, 95),
-                    descricao: `Canta junto com o ${quem}! 🎵 "${nomeMus}", a música do episódio "${String(item.roteiro.titulo || '').split('|')[0].trim()}".\n\n${item.roteiro.musica?.letra || ''}\n\n#musicainfantil #${quem.replace(/\s+/g, '')} #PlanetaFofura #Shorts`.slice(0, 4500),
-                    tags: ['música infantil', 'musica para criança', quem, 'Planeta Fofura', 'cantar junto', ...(item.roteiro.tags || [])].slice(0, 18),
-                    musica: { titulo: nomeMus },
-                    licao: item.roteiro.licao || '',
-                  },
-                  narracao: { audioUrl: item.vozInfantil.musica.audioUrl, audioSegments: [{ url: item.vozInfantil.musica.audioUrl, start: 0, length: dur }], palavras: [] },
-                  arquivos: cenasMus.map((a) => ({ ...a, start: Number((a.start - ini).toFixed(2)), klingTaskId: null })),
-                  status: 'imagens_ok',
-                  origem: 'fabrica',
-                  criadoEm: new Date().toISOString(),
-                  fabrica: {
-                    ativo: true,
-                    lote: item.fabrica.lote,
-                    quando,
-                    quandoYoutube: quando,
-                    redes: { youtube: true, facebook: !!item.fabrica.redes?.facebook, instagram: false, tiktok: false, kwai: false },
-                    canalYoutube: item.fabrica.canalYoutube || null,
-                    ...(item.fabrica.conta ? { conta: item.fabrica.conta } : {}),
-                  },
-                });
-              }
+              await criarShortDaMusica(db, item, doc.id);
             } catch (e) {
               // O Short da música é um extra: se falhar, o episódio segue normal — mas avisa (antes falhava calado)
               await ref.update({ aviso: `O Short da música não foi criado: ${String(e?.message || e).slice(0, 160)}` }).catch(() => {});

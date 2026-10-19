@@ -21,7 +21,7 @@ import { testarConta } from '../../../lib/publicarSocial';
 import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS } from '../../../lib/documentarioEpisodios';
-import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora } from '../../../lib/infantil';
+import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora, criarShortDaMusica } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
 export const config = { maxDuration: 120 }; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
@@ -1148,6 +1148,17 @@ export default async function handler(req, res) {
       // Guarda o horário original: Facebook/Instagram/TikTok continuam postando no dia marcado
       await ref.update({ 'fabrica.quando': new Date().toISOString(), 'fabrica.quandoOriginal': d.fabrica?.quandoOriginal || d.fabrica?.quando || null });
       return res.status(200).json({ ok: true });
+    }
+    if (b.acao === 'criar-short') {
+      // Episódio infantil já pronto sem o Short da música (ex.: o erro antigo): cria agora (não duplica)
+      const d = (await ref.get()).data() || {};
+      if (d.status !== 'concluido') return res.status(400).json({ erro: 'O episódio ainda não ficou pronto.' });
+      try {
+        const r = await criarShortDaMusica(db, d, ref.id);
+        return res.status(200).json({ ok: true, ...r });
+      } catch (e) {
+        return res.status(400).json({ erro: `Não deu para criar o Short: ${e.message}` });
+      }
     }
     if (b.acao === 'destravar') {
       // Vídeo em produção que está repetindo um erro (ex.: esperando crédito): zera as tentativas e tenta já na próxima volta

@@ -819,6 +819,15 @@ const Fabrica = (() => {
           im.onclick = () => window.api.abrir.link(i.thumbnailUrl);
           l.querySelector('.txt').prepend(im);
         }
+        if (i.infantil && i.status === 'concluido' && !i.infantil.shortMusica && !i.infantil.teste) botao('🎵', 'Criar o Short da música deste episódio (se ainda não existe)', async () => {
+          try {
+            const r = await window.api.fabrica.acao({ id: i.id, acao: 'criar-short' });
+            avisar(r.jaExistia ? 'O Short da música deste episódio já existia' : `Short da música criado — sai ${new Date(r.quando).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`);
+          } catch (e) {
+            avisar(msgErro(e), true);
+          }
+          carregar();
+        });
         if (i.infantil && i.status === 'concluido' && !i.infantil.shortMusica) botao('🎨', 'Refazer a thumbnail com o título (se já subiu, troca no YouTube)', async () => {
           avisar('Fazendo a thumbnail nova… (até 1 minuto)');
           try {

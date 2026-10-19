@@ -85,6 +85,9 @@ function Item({ i, acao }) {
           {i.status !== 'erro' && i.status !== 'concluido' && !naEspera(i) && i.erro && <BotaoAcao acao={acao} id={i.id} tipo="destravar" texto="↻ Tentar agora" ok="Tenta de novo em até 5 min" />}
           {yt === 'erro' && <BotaoAcao acao={acao} id={i.id} tipo="youtube-repetir" texto="↻ Subir de novo no YouTube" ok="O PC tenta subir de novo em até 2 min" />}
           {naEspera(i) && <BotaoAcao acao={acao} id={i.id} tipo="produzir-agora" texto="⚡ Produzir agora" ok="Começa em até 5 min (a data no YouTube continua a mesma)" />}
+          {i.status === 'concluido' && i.infantil && !i.infantil.shortMusica && !i.infantil.teste && (
+            <BotaoAcao acao={acao} id={i.id} tipo="criar-short" texto="🎵 Short da música" ok="Short da música criado (ou já existia) — aparece em Na espera / Produzindo" />
+          )}
           {i.videoUrl && <a href={i.videoUrl} target="_blank" rel="noreferrer" style={botao}>▶ Assistir</a>}
           {i.youtube?.url && <a href={i.youtube.url} target="_blank" rel="noreferrer" style={botao}>Abrir no YouTube</a>}
         </div>
