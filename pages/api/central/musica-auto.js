@@ -92,6 +92,29 @@ async function imagemGemini(prompt, proporcao) {
   throw new Error(`Capa não gerada — ${ultimoErro}`);
 }
 
+// Flux (BFL): reserva quando o Gemini não consegue desenhar (sem crédito / fora do ar)
+async function imagemFlux(prompt, largura = 1344, altura = 768) {
+  const key = process.env.FLUX_API_KEY;
+  if (!key) throw new Error('FLUX_API_KEY não está configurada.');
+  const r = await fetch('https://api.bfl.ai/v1/flux-2-pro', {
+    method: 'POST',
+    headers: { accept: 'application/json', 'x-key': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: prompt.slice(0, 3000), width: largura, height: altura }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`Flux: ${d.detail || r.status}`);
+  for (let i = 0; i < 60; i++) {
+    await new Promise((ok) => setTimeout(ok, 1500));
+    const p = await (await fetch(d.polling_url, { headers: { 'x-key': key } })).json().catch(() => ({}));
+    if (p.status === 'Ready' && p.result?.sample) {
+      const img = await fetch(p.result.sample);
+      return { buffer: Buffer.from(await img.arrayBuffer()), mime: img.headers.get('content-type') || 'image/jpeg' };
+    }
+    if (['Error', 'Failed', 'Request Moderated', 'Content Moderated'].includes(p.status)) throw new Error(`Flux: ${p.status}`);
+  }
+  throw new Error('Flux: demorou demais');
+}
+
 async function salvar(img, nome) {
   const ext = /jpe?g/.test(img.mime) ? 'jpg' : 'png';
   const b = await put(`musica-auto/${nome}.${ext}`, img.buffer, {
@@ -143,10 +166,12 @@ ${evitar.length ? `Do not repeat these scenes: ${evitar.join(' | ')}\n` : ''}${g
       const cena = limparTexto(ideia.cena, 500) || `an original cartoon cat with big headphones relaxing on a rooftop at sunset with a record player, ${estilo} music vibe`;
       const movimento = limparTexto(ideia.movimento, 300) || 'the character gently nods its head, the vinyl record spins, steam rises from the cup, string lights sway softly';
       const placa = limparTexto(ideia.placa, 24).toUpperCase();
-      const img = await imagemGemini(`Create a 16:9 landscape illustration for a music video background.
+      const pedidoCena = `Create a 16:9 landscape illustration for a music video background.
 Style: cozy lo-fi cartoon illustration, hand-drawn with clean ink outlines, warm limited color palette, soft lighting, detailed but calm, like a lo-fi chill music video.
 Scene: ${cena}
-${placa ? `A small wooden sign in the scene says "${placa}" (spelled exactly). ` : ''}The character is original (not a known character, mascot or celebrity). No logos, no brand names, no watermarks, no other text. Keep the main character in the center-left with room around it.`, '16:9');
+${placa ? `A small wooden sign in the scene says "${placa}" (spelled exactly). ` : ''}The character is original (not a known character, mascot or celebrity). No logos, no brand names, no watermarks, no other text. Keep the main character in the center-left with room around it.`;
+      // Gemini sem crédito: desenha no Flux (sem a plaquinha escrita, que o Flux erra) — o fundo animado não some
+      const img = await imagemGemini(pedidoCena, '16:9').catch(() => imagemFlux(pedidoCena.replace(/A small wooden sign[^.]*\. /, '').replace('no other text', 'no text at all')));
       const imagemUrl = await salvar(img, `cena-${Date.now()}`);
       let anim = null;
       try {

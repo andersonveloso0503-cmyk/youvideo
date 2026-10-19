@@ -87,6 +87,7 @@ const FabMusica = (() => {
           <div class="nota">${NOME_CANAL[a.canal]} · ${esc(a.preset || '')} · ${nomeMotor(a.motor)} · ${new Date(`${a.dia}T12:00`).toLocaleDateString('pt-BR')}</div>
           <div class="fm-fase">${FASE[a.fase] || a.fase}${a.etapa && !['pronto', 'aprovado'].includes(a.fase) ? ` — ${esc(a.etapa)}` : ''}${progresso}</div>
           ${a.erro ? `<div class="erro">${esc(a.erro)}</div>` : ''}
+          ${a.fundo === 'animado' ? '<div class="nota">🎬 Vídeo com fundo animado (cena que se mexe)</div>' : a.fundo === 'parado' ? '<div class="nota">🖼 Fundo com a cena parada (a animação não ficou pronta a tempo)</div>' : a.fundo === 'erro' ? `<div class="nota" style="color:var(--terracota)">⚠ O fundo animado não saiu${a.fundoErro ? ` (${esc(a.fundoErro.slice(0, 100))})` : ''}: o vídeo usou a capa parada</div>` : ''}
           ${a.capaSimples ? `<div class="nota" style="color:var(--terracota)">⚠ Capa simples: o Gemini não conseguiu fazer a capa${a.capaErro ? ` (${esc(a.capaErro.slice(0, 120))})` : ''}. O álbum seguiu mesmo assim — depois use 🎨 Refazer capa, ou 📝 Prompt da capa para fazer no Gemini e 📥 Trazer capa.</div>` : ''}
           ${a.recusadas ? `<div class="nota">🎧 ${a.recusadas} música${a.recusadas > 1 ? 's foram refeitas' : ' foi refeita'} porque a letra não ficou clara</div>` : ''}
           ${a.musicas.length && ['pronto', 'aprovado', 'montando'].includes(a.fase) ? `<details><summary>${a.musicas.length} músicas</summary><ol>${a.musicas.map((t) => `<li>${esc(t)}</li>`).join('')}</ol></details>` : ''}

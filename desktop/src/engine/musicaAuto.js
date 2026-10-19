@@ -156,6 +156,7 @@ class MusicaAuto {
         id: a.id, canal: a.canal, dia: a.dia, preset: a.presetNome, motor: a.motor, fase: a.fase, etapa: a.etapa, erro: a.erro,
         titulo: a.capa?.titulo || '', subtitulo: a.capa?.subtitulo || '', capa: a.capa?.capaArquivo || null,
         capaSimples: !!a.capa?.simples, capaErro: a.capa?.simples ? a.capa.erro || '' : '',
+        fundo: a.cena?.arquivo ? (a.cena.animado ? 'animado' : 'parado') : a.cena?.erro ? 'erro' : '', fundoErro: a.cena?.erro || '',
         musicas: (a.musicas || []).filter(Boolean).map((m) => m.titulo), total: a.ideias?.length || 0,
         prontas: (a.musicas || []).filter((m) => m && (m.url || m.arquivo)).length,
         fonte: a.fonte || 'ia',
