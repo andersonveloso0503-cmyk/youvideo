@@ -134,6 +134,7 @@ export default async function handler(req, res) {
             tema: item.tema,
             personagem: item.infantil.personagem,
             duracaoSeg: Number(item.duracaoDesejada) || 270,
+            temporada: item.infantil.temporada || null, // série: lembra o episódio anterior e deixa gancho
           });
           await ref.update({ roteiro: roteiroIf, status: 'roteiro_ok' });
           break;

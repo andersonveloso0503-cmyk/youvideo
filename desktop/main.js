@@ -736,6 +736,12 @@ app.whenReady().then(() => {
                   titulo: `Músicas do ${it.infantil.personagem || 'Pingo'} — Canta Junto!`,
                   descricao: `As músicas dos episódios do ${it.infantil.personagem || 'Pingo'} para cantar e dançar junto. 🎵`,
                 }
+            : it.infantil?.temporada?.nome
+              ? {
+                  // Série: cada temporada tem a sua playlist, na ordem dos episódios
+                  titulo: `${it.infantil.personagem || 'Pingo'} — Temporada ${it.infantil.temporada.numero || 1}: ${it.infantil.temporada.nome}`.slice(0, 150),
+                  descricao: `Assista em ordem! ${it.infantil.temporada.total || ''} episódios da temporada "${it.infantil.temporada.nome}" do ${it.infantil.personagem || 'Pingo'}: uma aventura nova e uma música para cantar junto em cada episódio. 🎵`,
+                }
             : it.infantil
               ? {
                   titulo: `As Aventuras do ${it.infantil.personagem || 'Pingo'} — Historinhas e Músicas`,

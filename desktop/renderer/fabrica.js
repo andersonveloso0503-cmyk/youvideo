@@ -100,7 +100,8 @@ const Fabrica = (() => {
     }
     if (marca === 'infantil') {
       const teste = q('#fabIfSemanas').value === 'teste';
-      const qtd = teste ? 1 : Number(q('#fabIfSemanas').value) * q('#fabIfDias').value.split(',').length;
+      const temp = Number((q('#fabIfSemanas').value.match(/^temp(\d+)$/) || [])[1]) || 0;
+      const qtd = teste ? 1 : temp || Number(q('#fabIfSemanas').value) * q('#fabIfDias').value.split(',').length;
       // ~25 imagens (Flux) + narração + música (ElevenLabs) + animação (US$ 0,10 por cena na fal.ai)
       const fator = Number(q('#fabIfDuracao').value) >= 480 ? 1.9 : 1; // 8 min ≈ o dobro de cenas
       // uma imagem por fala (a imagem troca junto com quem fala): ~45 cenas num episódio de 4 min
@@ -302,7 +303,8 @@ const Fabrica = (() => {
     if (!nome || !descricao) return (erro.textContent = 'Escreva o nome e a aparência do personagem.');
     const diasSemana = q('#fabIfDias').value.split(',').map(Number);
     const teste = q('#fabIfSemanas').value === 'teste';
-    const qtd = teste ? 1 : Number(q('#fabIfSemanas').value) * diasSemana.length;
+    const temporada = Number((q('#fabIfSemanas').value.match(/^temp(\d+)$/) || [])[1]) || 0;
+    const qtd = teste ? 1 : temporada || Number(q('#fabIfSemanas').value) * diasSemana.length;
     const temas = q('#fabIfTemas').value.split('\n').map((t) => t.trim()).filter(Boolean);
     if (!confirm(`${teste ? `Criar 1 episódio de TESTE do ${nome}? Ele sobe no YouTube como PRIVADO (sem data para publicar): você assiste no YouTube Studio e publica se gostar.` : `Criar ${qtd} episódios do ${nome}, com uma música nova em cada um?`} ${q('#fabCusto').textContent.split('·')[1] || ''}\nEles sobem no YouTube às ${q('#fabIfHora').value}, marcados como conteúdo para crianças. Cada episódio começa a ser produzido 3 dias antes de ir ao ar.`)) return;
     const b = q('#btnFabCriar');
@@ -313,8 +315,9 @@ const Fabrica = (() => {
       const r = await window.api.fabrica.criar({
         tipo: 'infantil',
         personagem: { nome, descricao },
-        semanas: teste ? 1 : Number(q('#fabIfSemanas').value),
+        semanas: teste || temporada ? 1 : Number(q('#fabIfSemanas').value),
         teste,
+        temporada, // série: N episódios em ordem com uma missão que atravessa a temporada
         redes: { youtube: true, facebook: q('#fabFacebook').checked },
         diasSemana,
         horarios: [q('#fabIfHora').value],
@@ -327,7 +330,11 @@ const Fabrica = (() => {
         temas,
         canalYoutube: canal ? { id: canal.id, titulo: canal.titulo } : null,
       });
-      avisar(`${r.criados.length} episódios do ${nome} na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}`);
+      avisar(
+        r.temporada
+          ? `📺 Temporada ${r.temporada.numero} do ${nome}: "${r.temporada.nome}" — ${r.criados.length} episódios a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}. Missão: ${r.temporada.arco}`
+          : `${r.criados.length} episódios do ${nome} na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}`
+      );
       q('#fabIfTemas').value = '';
       carregar();
     } catch (e) {

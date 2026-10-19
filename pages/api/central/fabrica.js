@@ -21,7 +21,7 @@ import { testarConta } from '../../../lib/publicarSocial';
 import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS } from '../../../lib/documentarioEpisodios';
-import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil } from '../../../lib/infantil';
+import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
 export const config = { maxDuration: 120 }; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
@@ -316,7 +316,7 @@ export default async function handler(req, res) {
           formato: x.formato || 'short',
           longo: x.longo === true,
           documentario: x.documentario === true,
-          infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true, shortMusica: x.shortMusica === true } : null,
+          infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true, shortMusica: x.shortMusica === true, temporada: x.infantil.temporada ? { nome: x.infantil.temporada.nome, numero: x.infantil.temporada.numero, ep: x.infantil.temporada.ep, total: x.infantil.temporada.total } : null } : null,
           comBotao: x.comBotao === true,
           renderId: x.renderId || null, // pedido de montagem no PC: liga o cartão da Fila do Compilador a este vídeo
           corte: x.corte ? { tipo: x.corte.tipo === 'comico' ? 'comico' : 'filme' } : null,
@@ -584,7 +584,9 @@ export default async function handler(req, res) {
         if (ultimoIf && diaBrasilia(new Date(ultimoIf)) >= diaIf) diaIf = somarDias(diaBrasilia(new Date(ultimoIf)), 1);
         // Teste: 1 episódio só, que sobe PRIVADO (o dono assiste antes de publicar)
         const testeIf = b.teste === true;
-        const qtdIf = testeIf ? 1 : semanasIf * diasSemanaIf.length;
+        // Temporada: 6 a 10 episódios em ordem, com uma missão que atravessa todos (a criança acompanha a série)
+        const tempQtd = !testeIf && Number(b.temporada) >= 3 ? Math.min(12, Math.round(Number(b.temporada))) : 0;
+        const qtdIf = testeIf ? 1 : tempQtd || semanasIf * diasSemanaIf.length;
         const datasIf = [];
         for (let guarda = 0; datasIf.length < qtdIf && guarda < 400; guarda++) {
           if (diasSemanaIf.includes(new Date(`${diaIf}T12:00:00Z`).getUTCDay())) datasIf.push(diaIf);
@@ -594,7 +596,13 @@ export default async function handler(req, res) {
         const usadosIf = meusIf.map((d) => d.data().tema).filter(Boolean);
         const jaUsado = (t) => usadosIf.some((u) => u.toLowerCase().startsWith(t.split('—')[0].trim().toLowerCase()));
         let temasIf = (Array.isArray(b.temas) ? b.temas : []).map((t) => String(t).trim().slice(0, 200)).filter(Boolean).slice(0, 40);
-        if (slugInfantil(personagem.nome) === 'pingo') temasIf = [...temasIf, ...EPISODIOS_PINGO.filter((t) => !jaUsado(t))];
+        let temporadaIf = null;
+        if (tempQtd) {
+          temporadaIf = await planejarTemporada(tempQtd, personagem, usadosIf);
+          const jaTemporadas = new Set(meusIf.map((d) => d.data().infantil?.temporada?.nome).filter(Boolean));
+          temporadaIf.numero = jaTemporadas.size + 1;
+          temasIf = temporadaIf.episodios.map((e) => e.tema);
+        } else if (slugInfantil(personagem.nome) === 'pingo') temasIf = [...temasIf, ...EPISODIOS_PINGO.filter((t) => !jaUsado(t))];
         temasIf = temasIf.slice(0, qtdIf);
         for (let volta = 0; temasIf.length < qtdIf && volta < 2; volta++) {
           temasIf = [...temasIf, ...(await temasInfantisDaIa(qtdIf - temasIf.length, personagem, [...usadosIf, ...temasIf]))];
@@ -609,7 +617,25 @@ export default async function handler(req, res) {
           const ref = col.doc();
           batchIf.set(ref, {
             tema,
-            infantil: { personagem, ...(testeIf ? { teste: true } : {}), shortsMusica: b.shortsMusica !== false },
+            infantil: {
+              personagem,
+              ...(testeIf ? { teste: true } : {}),
+              shortsMusica: b.shortsMusica !== false,
+              ...(temporadaIf
+                ? {
+                    temporada: {
+                      nome: temporadaIf.nome,
+                      arco: temporadaIf.arco,
+                      numero: temporadaIf.numero,
+                      ep: i + 1,
+                      total: temporadaIf.episodios.length,
+                      resumo: temporadaIf.episodios[i]?.resumo || '',
+                      anterior: temporadaIf.episodios[i - 1]?.resumo || '',
+                      proximo: temporadaIf.episodios[i + 1]?.resumo || '',
+                    },
+                  }
+                : {}),
+            },
             estilo: 'infantil',
             formato: 'longo',
             duracaoDesejada: String(Math.max(180, Math.min(600, Number(b.duracao) || 270))), // 4–5 min ou ~8 min
@@ -634,7 +660,7 @@ export default async function handler(req, res) {
           criadosIf.push({ id: ref.id, tema, quando });
         });
         await batchIf.commit();
-        return res.status(200).json({ lote: loteIf, criados: criadosIf, primeiroDia: testeIf ? diaBrasilia() : datasIf[0] });
+        return res.status(200).json({ lote: loteIf, criados: criadosIf, primeiroDia: testeIf ? diaBrasilia() : datasIf[0], temporada: temporadaIf ? { nome: temporadaIf.nome, arco: temporadaIf.arco, numero: temporadaIf.numero } : null });
       }
 
       // ── Documentários para dormir: episódios já escritos, 1 por dia, só YouTube ──
