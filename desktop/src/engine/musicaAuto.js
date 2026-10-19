@@ -15,7 +15,9 @@ const CANAIS = {
 const PADRAO_CANAL = { ativo: false, canalId: '', estilos: [], fonte: 'pasta', pasta: '' }; // fonte: 'ia' (cria as músicas) | 'pasta' (usa as músicas que o dono fez)
 const EXT_AUDIO = ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus'];
 const USADAS = 'Usadas';
-const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 2, folgaDias: 3, fundoAnimado: true };
+// longoMin: o vídeo longo repete o álbum (em outra ordem) até chegar perto desse tempo — o público do canal
+// gospel deixa tocando na TV (assiste 2x mais que no celular). 0 = só o álbum, do tamanho que der.
+const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 1, folgaDias: 3, fundoAnimado: true, longoMin: 60 };
 const FORA_DO_NORMAL = ['infantil']; // estilos que não entram sozinhos no canal de música normal
 const MAX_TENTATIVAS_DIA = 2;
 // Quanto da letra precisa ser entendido ao ouvir a música (0 a 1). Abaixo disso a música é refeita.
@@ -101,7 +103,15 @@ class MusicaAuto {
   }
 
   prefs() {
-    const c = this.obterConfig().musicaAuto || {};
+    let c = this.obterConfig().musicaAuto || {};
+    // Ajuste de out/2026 (análise do Nova Frequência): Shorts quase não davam tempo assistido e o público
+    // fica mais nos vídeos longos — passa para 1 Short por álbum e vídeo longo de ~1 hora (uma vez só)
+    if (!c.ajusteOut26) {
+      c = { ...c, shorts: Math.min(Number(c.shorts ?? 1), 1), longoMin: 60, ajusteOut26: 1 };
+      try {
+        this.salvarConfig({ musicaAuto: c });
+      } catch {}
+    }
     return {
       ...PADRAO,
       ...c,
@@ -116,6 +126,7 @@ class MusicaAuto {
     m.qtd = Math.max(5, Math.min(20, Number(m.qtd) || 10));
     m.shorts = Math.max(0, Math.min(5, Number(m.shorts) || 0));
     m.folgaDias = Math.max(1, Math.min(30, Number(m.folgaDias) || 3));
+    m.longoMin = Math.max(0, Math.min(180, Number(m.longoMin) || 0));
     this.salvarConfig({ musicaAuto: m });
     this.avisarTela();
     return m;
@@ -445,10 +456,22 @@ class MusicaAuto {
       inscrever: { ativo: false },
       publicar: { ativo: false },
     };
+    // Vídeo longo de ~1 hora: repete as músicas do álbum em outra ordem (sem a mesma música duas vezes seguidas)
+    const alvoSeg = (Number(prefs.longoMin) || 0) * 60;
+    let musicasLongo = [...musicas];
+    const totalSeg = (l) => l.reduce((t, m) => t + (Number(m.duracao) || 180), 0);
+    for (let volta = 0; alvoSeg && totalSeg(musicasLongo) < alvoSeg - 120 && volta < 6; volta++) {
+      const outra = [...musicas].sort(() => Math.random() - 0.5);
+      if (outra.length > 1 && outra[0].arquivo === musicasLongo[musicasLongo.length - 1].arquivo) outra.push(outra.shift());
+      for (const m of outra) {
+        if (totalSeg(musicasLongo) >= alvoSeg) break;
+        musicasLongo.push(m);
+      }
+    }
     const longo = this.fila.adicionar({
       ...comum,
       nome,
-      musicas,
+      musicas: musicasLongo,
       fundos: [(a.cena?.arquivo && fs.existsSync(a.cena.arquivo)) ? a.cena.arquivo : a.capa.capaArquivo],
       legenda: { ...(base.legenda || {}), ativo: false, mostrarNome: false },
       formato: { tipo: 'longo', resolucao: base.formato?.resolucao || '1080', versoes: '', qtdVideos: '1', duracaoMaxMin: '', limiteMusicaSeg: '' },
