@@ -457,7 +457,7 @@ export default async function handler(req, res) {
           }
         }
         const emLoop = !!item.fabrica; // fábrica: animação em loop, sem imagem parada
-        const numCenas = item.roteiro.cenas.length || 1;
+        const numCenas = (item.roteiro.cenas || item.arquivos || []).length || 1;
         const ultimaPalavra = (item.narracao.palavras || []).filter((p) => p.end != null).pop();
         const duracaoAlvo = ultimaPalavra ? (ultimaPalavra.end + 0.4) / numCenas : undefined;
 
@@ -510,7 +510,7 @@ export default async function handler(req, res) {
           const arquivo = arquivosAnimados[i];
           if (i >= limiteAnimadas) break;
           if (!arquivo.imageUrl || arquivo.videoUrl || arquivo.klingTaskId || arquivo.avisoVideo) continue;
-          if (labios[i] && item.roteiro.cenas.length === arquivosAnimados.length) {
+          if (labios[i] && (item.roteiro.cenas || []).length === arquivosAnimados.length) {
             try {
               const { requestId, statusUrl, responseUrl } = await enviarLabios({ imageUrl: arquivo.imageUrl, fala: labios[i], cena: item.roteiro.cenas[i]?.descricao || '' });
               arquivosAnimados[i] = { ...arquivo, klingTaskId: requestId, statusUrl, responseUrl, labios: true };
