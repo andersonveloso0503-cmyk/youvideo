@@ -1,6 +1,7 @@
 // pages/api/orcamento.js
 import { getDb } from '../../lib/firebase-admin';
 import { buscarSaldoFal, buscarSaldoFlux, buscarSaldoElevenLabs } from '../../lib/orcamento';
+import { tudoNaFalAtivo } from '../../lib/tudoNaFal';
 
 const db = getDb();
 
@@ -12,9 +13,12 @@ const CUSTO_VIDEO_FIXO = 3; // R$ aproximado por vídeo só com imagem estática
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
+      // Com "Tudo na fal" ligado, imagens e texto também gastam o saldo da fal.ai:
+      // o saldo da Black Forest Labs (Flux) deixa de importar e não é mais mostrado.
+      const naFal = tudoNaFalAtivo();
       const [fal, flux, elevenlabs] = await Promise.all([
         buscarSaldoFal(),
-        buscarSaldoFlux(),
+        naFal ? Promise.resolve({ ok: true, saldo: null, viaFal: true }) : buscarSaldoFlux(),
         buscarSaldoElevenLabs(),
       ]);
 
@@ -39,8 +43,8 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         servicos: {
-          fal: { ...fal, papel: 'Vídeo animado (Wan 2.2 Turbo)' },
-          flux: { ...flux, papel: 'Geração de imagens' },
+          fal: { ...fal, papel: naFal ? 'Imagens, roteiros, transcrição e vídeo animado' : 'Vídeo animado (Wan 2.2 Turbo)' },
+          flux: { ...flux, papel: naFal ? 'Imagens — agora pelo saldo da fal.ai' : 'Geração de imagens' },
           elevenlabs: { ...elevenlabs, papel: 'Narração' },
           shotstack: {
             ok: true,
@@ -59,7 +63,7 @@ export default async function handler(req, res) {
             papel: 'Músicas (canal Nova Frequência)',
           },
           pexels: { ok: true, gratis: true, papel: 'Banco de imagens/vídeo de apoio' },
-          groq: { ok: true, gratis: true, papel: 'Roteiro (texto)' },
+          groq: { ok: true, gratis: true, papel: naFal ? 'Reserva (só se a fal falhar)' : 'Roteiro (texto)' },
         },
         orcamento: { mensal: orcamentoMensal, gasto_mes_atual: gastoAtual, restante },
         recomendacao,

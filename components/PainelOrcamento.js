@@ -25,6 +25,8 @@ function LinhaServico({ nome, dado }) {
         <div style={{ fontSize: 14, color: 'var(--text)' }}>{nome}</div>
         {dado.gratis ? (
           <div style={{ fontSize: 13, color: 'var(--teal)' }}>Grátis / sem custo direto</div>
+        ) : dado.viaFal ? (
+          <div style={{ fontSize: 13, color: 'var(--teal)' }}>Agora sai do saldo da fal.ai</div>
         ) : dado.ok === false ? (
           <div style={{ fontSize: 13, color: '#ff9d8c' }}>Sem saldo agora ({dado.erro})</div>
         ) : (
@@ -145,7 +147,7 @@ export default function PainelOrcamento() {
       </div>
 
       <div>
-        <LinhaServico nome="fal.ai (animação)" dado={dados.servicos.fal} />
+        <LinhaServico nome={dados.servicos.flux?.viaFal ? 'fal.ai (imagens, roteiro e animação)' : 'fal.ai (animação)'} dado={dados.servicos.fal} />
         <LinhaServico nome="Flux (imagens)" dado={dados.servicos.flux} />
         <LinhaServico nome="ElevenLabs (narração)" dado={dados.servicos.elevenlabs} />
         <LinhaServico nome="Shotstack (montagem)" dado={dados.servicos.shotstack} />
