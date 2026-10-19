@@ -199,6 +199,8 @@ const Fabrica = (() => {
     q('#fabOrPeriodo').addEventListener('change', () => (q('#fabOrHora').value = q('#fabOrPeriodo').value === 'noite' ? '21:00' : '06:00'));
     q('#btnFabCriar').onclick = criar;
     q('#btnFabIfPrevia').onclick = previaInfantil;
+    q('#btnFabIfPrompt').onclick = promptInfantil;
+    q('#btnFabIfTrazer').onclick = trazerRoteiro;
     q('#btnFabIfComparar').onclick = compararQualidades;
     q('#btnFabIfBoca').onclick = () => testarBoca();
     q('#btnFabIfBoca2').onclick = () => testarBoca('imagem');
@@ -393,6 +395,136 @@ const Fabrica = (() => {
       b.disabled = false;
       b.textContent = '👀 Prévia grátis do roteiro';
     }
+  }
+
+  // Janela simples reaproveitada pelos botões do roteiro de fora
+  function janela(id, html) {
+    let d = document.getElementById(id);
+    if (!d) {
+      d = document.createElement('dialog');
+      d.id = id;
+      d.style.cssText = 'max-width:760px;width:92vw;max-height:86vh;overflow:auto;border:none;border-radius:16px;padding:22px';
+      document.body.appendChild(d);
+    }
+    d.innerHTML = html;
+    if (!d.open) d.showModal();
+    return d;
+  }
+
+  // 📝 O pedido completo do roteiro, para escrever a história em outra IA (ChatGPT, Claude, Gemini...)
+  async function promptInfantil() {
+    const erro = q('#fabErro');
+    erro.textContent = '';
+    if (!config.temCentral) return (erro.textContent = 'Cadastre a senha da Central em Configurações.');
+    const nome = q('#fabIfNome').value.trim();
+    const descricao = q('#fabIfDesc').value.trim();
+    if (!nome || !descricao) return (erro.textContent = 'Escreva o nome e a aparência do personagem.');
+    const b = q('#btnFabIfPrompt');
+    b.disabled = true;
+    b.textContent = '📝 Montando o prompt...';
+    try {
+      const tema = q('#fabIfTemas').value.split('\n').map((t) => t.trim()).find(Boolean) || '';
+      const { tema: temaUsado, prompt } = await window.api.fabrica.criar({ tipo: 'prompt-infantil', personagem: { nome, descricao }, tema, duracao: Number(q('#fabIfDuracao').value) });
+      const d = janela(
+        'dlgPromptInfantil',
+        `<h3 style="margin-top:0">📝 Prompt da história</h3>` +
+          `<p class="nota">Episódio: <b>${esc(temaUsado)}</b> (para outro episódio, escreva o tema na 1ª linha de "Episódios que você quer").<br>` +
+          '1) Copie e cole numa IA (ChatGPT, Claude, Gemini…). 2) Salve a resposta dela num arquivo .txt (ou copie). 3) Volte aqui e clique em <b>📥 Trazer roteiro pronto</b>.</p>' +
+          `<textarea id="txtPromptIf" readonly style="width:100%;height:46vh;font-size:12px;font-family:monospace">${esc(prompt)}</textarea>` +
+          '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn-mini" id="btnPrCopiar">📋 Copiar</button><button type="button" class="btn-mini" id="btnPrSalvar">💾 Salvar .txt</button><button type="button" class="btn-mini" id="btnPrFechar">Fechar</button></div>'
+      );
+      d.querySelector('#btnPrFechar').onclick = () => d.close();
+      d.querySelector('#btnPrCopiar').onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(prompt);
+        } catch {
+          const t = d.querySelector('#txtPromptIf');
+          t.select();
+          document.execCommand('copy');
+        }
+        avisar('Prompt copiado. Cole na outra IA.');
+      };
+      d.querySelector('#btnPrSalvar').onclick = () => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([prompt], { type: 'text/plain;charset=utf-8' }));
+        a.download = `prompt-${temaUsado.split('—')[0].trim().replace(/[^\p{L}\p{N} ]/gu, '').slice(0, 50) || 'historia'}.txt`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      };
+    } catch (e) {
+      erro.textContent = msgErro(e);
+    } finally {
+      b.disabled = false;
+      b.textContent = '📝 Criar prompt da história';
+    }
+  }
+
+  // 📥 O roteiro que a outra IA escreveu: arquivo ou colado → vira um episódio (começa direto nas vozes)
+  async function trazerRoteiro() {
+    const erro = q('#fabErro');
+    erro.textContent = '';
+    if (!config.temCentral) return (erro.textContent = 'Cadastre a senha da Central em Configurações.');
+    const nome = q('#fabIfNome').value.trim();
+    const descricao = q('#fabIfDesc').value.trim();
+    if (!nome || !descricao) return (erro.textContent = 'Escreva o nome e a aparência do personagem.');
+    const canalId = q('#fabIfCanal').value;
+    if (!canalId) return (erro.textContent = 'Conecte o canal infantil em Contas YouTube primeiro.');
+    const canal = (typeof canais !== 'undefined' ? canais : []).find((c) => c.id === canalId);
+    const teste = q('#fabIfSemanas').value === 'teste';
+    const d = janela(
+      'dlgTrazerIf',
+      '<h3 style="margin-top:0">📥 Trazer roteiro pronto</h3>' +
+        '<p class="nota">Escolha o arquivo com a resposta da outra IA (.txt ou .json) <b>ou</b> cole o texto abaixo. ' +
+        `O episódio usa as opções da tela (canal, animação, duração…) e ${teste ? 'sobe como <b>TESTE privado</b>' : 'entra no próximo dia livre da agenda'}.</p>` +
+        '<input type="file" id="arqRoteiroIf" accept=".txt,.json,.md,text/plain,application/json" />' +
+        '<textarea id="txtRoteiroIf" placeholder="…ou cole aqui a resposta inteira da outra IA" style="width:100%;height:36vh;margin-top:10px;font-size:12px;font-family:monospace"></textarea>' +
+        '<p id="errRoteiroIf" class="erro"></p>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn-mini" id="btnTrUsar">🎬 Produzir este episódio</button><button type="button" class="btn-mini" id="btnTrFechar">Fechar</button></div>'
+    );
+    const txt = d.querySelector('#txtRoteiroIf');
+    d.querySelector('#btnTrFechar').onclick = () => d.close();
+    d.querySelector('#arqRoteiroIf').onchange = (ev) => {
+      const f = ev.target.files?.[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => (txt.value = String(r.result || ''));
+      r.readAsText(f, 'utf-8');
+    };
+    d.querySelector('#btnTrUsar').onclick = async () => {
+      const err = d.querySelector('#errRoteiroIf');
+      err.textContent = '';
+      if (!txt.value.trim()) return (err.textContent = 'Escolha o arquivo ou cole o roteiro.');
+      const bt = d.querySelector('#btnTrUsar');
+      bt.disabled = true;
+      bt.textContent = '⏳ Conferindo o roteiro...';
+      try {
+        const anim = q('#fabIfAnim').value;
+        const r = await window.api.fabrica.criar({
+          tipo: 'infantil-pronto',
+          roteiroTexto: txt.value,
+          personagem: { nome, descricao },
+          teste,
+          redes: { youtube: true, facebook: q('#fabFacebook').checked },
+          diasSemana: q('#fabIfDias').value.split(',').map(Number),
+          horarios: [q('#fabIfHora').value],
+          animacao: anim === 'nada' ? 'nada' : 'tudo',
+          animacaoCompleta: anim === 'todas',
+          duracao: Number(q('#fabIfDuracao').value),
+          shortsMusica: q('#fabIfShorts').value !== 'nao',
+          resolucaoAnim: q('#fabIfRes').value,
+          vozId: q('#fabIfVoz').value.trim(),
+          canalYoutube: canal ? { id: canal.id, titulo: canal.titulo } : { id: canalId, titulo: '' },
+        });
+        d.close();
+        avisar(`🎬 "${r.titulo}" na fábrica (${r.falas} falas, música "${r.musica}") — ${r.teste ? 'teste, começa agora' : `vai ao ar ${new Date(r.quando).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}`);
+        carregar();
+      } catch (e) {
+        err.textContent = msgErro(e);
+      } finally {
+        bt.disabled = false;
+        bt.textContent = '🎬 Produzir este episódio';
+      }
+    };
   }
 
   // Anima a mesma cena em 720p, 580p e 480p e mostra lado a lado (custa uns US$ 0,23)

@@ -21,7 +21,7 @@ import { testarConta } from '../../../lib/publicarSocial';
 import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS } from '../../../lib/documentarioEpisodios';
-import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada } from '../../../lib/infantil';
+import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
 export const config = { maxDuration: 120 }; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
@@ -561,6 +561,77 @@ export default async function handler(req, res) {
         }
         const roteiroPv = await gerarRoteiroInfantil({ tema: temaPv, personagem: personagemPv, duracaoSeg: Math.max(180, Math.min(600, Number(b.duracao) || 270)) });
         return res.status(200).json({ tema: temaPv, roteiro: roteiroPv });
+      }
+
+      // ── Infantil: o prompt do roteiro para o dono gerar em outra IA (ChatGPT, Claude, Gemini...) ──
+      if (b.tipo === 'prompt-infantil') {
+        const personagemPr = normalizarPersonagem(b.personagem);
+        let temaPr = String(b.tema || '').trim().slice(0, 200);
+        if (!temaPr) {
+          const todosPr = await col.where('fabrica.ativo', '==', true).get();
+          const usadosPr = todosPr.docs.filter((d) => d.data().infantil).map((d) => String(d.data().tema || '').toLowerCase());
+          const planejadosPr = slugInfantil(personagemPr.nome) === 'pingo' ? EPISODIOS_PINGO : [];
+          temaPr = planejadosPr.find((t) => !usadosPr.some((u) => u.startsWith(t.split('—')[0].trim().toLowerCase()))) ||
+            (await temasInfantisDaIa(1, personagemPr, usadosPr))[0] || `${personagemPr.nome} e um novo amigo — amizade`;
+        }
+        const prompt = await gerarRoteiroInfantil({ tema: temaPr, personagem: personagemPr, duracaoSeg: Math.max(180, Math.min(600, Number(b.duracao) || 270)), soPrompt: true });
+        return res.status(200).json({ tema: temaPr, prompt });
+      }
+
+      // ── Infantil: episódio com o roteiro trazido de fora (o JSON que a outra IA devolveu) ──
+      if (b.tipo === 'infantil-pronto') {
+        if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube do desenho infantil.' });
+        const personagemRp = normalizarPersonagem(b.personagem);
+        const j = lerRoteiroDeFora(b.roteiroTexto);
+        const temaRp = String(b.tema || j.titulo || '').split('|')[0].trim().slice(0, 200) || `${personagemRp.nome} — episódio`;
+        let roteiroRp;
+        try {
+          roteiroRp = await gerarRoteiroInfantil({ tema: temaRp, personagem: personagemRp, duracaoSeg: Math.max(180, Math.min(600, Number(b.duracao) || 270)), jPronto: j });
+        } catch (e) {
+          return res.status(400).json({ erro: e.message });
+        }
+        const testeRp = b.teste === true;
+        let quandoRp = new Date().toISOString();
+        if (!testeRp) {
+          // Próximo dia livre do personagem (nos dias da semana escolhidos), a partir de daqui a 2 dias
+          const diasRp = (Array.isArray(b.diasSemana) && b.diasSemana.length ? b.diasSemana : [2, 5]).map(Number);
+          const todosRp = await col.where('fabrica.ativo', '==', true).get();
+          const ultimoRp = todosRp.docs
+            .filter((d) => d.data().infantil && !d.data().shortMusica && slugInfantil(d.data().infantil.personagem?.nome) === slugInfantil(personagemRp.nome))
+            .map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
+          let dia = somarDias(diaBrasilia(), 2);
+          if (ultimoRp && diaBrasilia(new Date(ultimoRp)) >= dia) dia = somarDias(diaBrasilia(new Date(ultimoRp)), 1);
+          for (let g = 0; g < 14 && !diasRp.includes(new Date(`${dia}T12:00:00Z`).getUTCDay()); g++) dia = somarDias(dia, 1);
+          quandoRp = horarioBrasilia(dia, hora(b.horarios?.[0], '10:00'));
+        }
+        const facebookRp = !!b.redes?.facebook && !testeRp;
+        const refRp = col.doc();
+        await refRp.set({
+          tema: temaRp,
+          infantil: { personagem: personagemRp, ...(testeRp ? { teste: true } : {}), shortsMusica: b.shortsMusica !== false, roteiroDeFora: true },
+          estilo: 'infantil',
+          formato: 'longo',
+          duracaoDesejada: String(Math.max(180, Math.min(600, Number(b.duracao) || 270))),
+          animar: b.animacao !== 'nada',
+          animacaoCompleta: b.animacaoCompleta !== false,
+          resolucaoAnim: ['720p', '580p', '480p', 'kling', 'omnihuman'].includes(b.resolucaoAnim) ? b.resolucaoAnim : '720p',
+          ...(String(b.vozId || '').trim() ? { vozId: String(b.vozId).trim().slice(0, 60) } : {}),
+          roteiro: roteiroRp,
+          status: 'roteiro_ok', // o roteiro já veio pronto: começa direto nas vozes
+          origem: 'fabrica',
+          criadoEm: new Date().toISOString(),
+          fabrica: {
+            ativo: true,
+            lote: Date.now().toString(36),
+            quando: quandoRp,
+            quandoYoutube: testeRp ? null : quandoRp,
+            redes: { youtube: true, facebook: facebookRp, instagram: false, tiktok: false, kwai: false },
+            ...(facebookRp ? { conta: 'infantil' } : {}),
+            canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') },
+          },
+        });
+        const falas = [...roteiroRp.antes, ...roteiroRp.depois].reduce((t, c) => t + c.falas.length, 0);
+        return res.status(200).json({ id: refRp.id, titulo: roteiroRp.titulo, quando: quandoRp, teste: testeRp, falas, musica: roteiroRp.musica.titulo });
       }
 
       // ── Infantil: episódios animados (~4 a 5 min) com um personagem fixo e uma música chiclete, só YouTube ──
