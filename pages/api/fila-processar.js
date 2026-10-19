@@ -624,7 +624,11 @@ export default async function handler(req, res) {
               thumbnailUrl = primeiraImagem;
             }
           }
-          const agendaId = await agendarItemPronto(item, check.videoUrl, thumbnailUrl);
+          // Não agenda duas vezes (se algo der erro depois daqui e o ↻ repetir, o Facebook postaria em dobro)
+          const jaAgendado = item.fabrica.agendaId ||
+            (await db.collection('youvideo_agenda').where('videoUrl', '==', check.videoUrl).limit(1).get().then((q) => q.docs[0]?.id).catch(() => null));
+          const agendaId = jaAgendado || (await agendarItemPronto(item, check.videoUrl, thumbnailUrl));
+          if (agendaId && !item.fabrica.agendaId) await ref.update({ 'fabrica.agendaId': agendaId });
           await db.collection('youvideo_projects').add({
             origem: 'fabrica',
             categoria: item.marca ? 'empresa' : item.infantil ? 'infantil' : item.documentario ? 'documentarios' : item.corte ? 'cortes' : item.longo ? 'longos' : item.estilo === 'desenho' ? 'historias' : 'series',
@@ -634,7 +638,7 @@ export default async function handler(req, res) {
             formato: item.formato,
             titulo: item.roteiro.titulo,
             descricao: item.roteiro.descricao,
-            narracaoTexto: item.roteiro.narracao,
+            narracaoTexto: item.roteiro.narracao || '', // Short da música não tem narração (undefined o banco recusa)
             videoUrl: check.videoUrl,
             thumbnailUrl,
             criadoEm: new Date().toISOString(),
@@ -727,7 +731,7 @@ export default async function handler(req, res) {
             formato: item.formato,
             titulo: item.roteiro.titulo,
             descricao: item.roteiro.descricao,
-            narracaoTexto: item.roteiro.narracao,
+            narracaoTexto: item.roteiro.narracao || '', // Short da música não tem narração (undefined o banco recusa)
             videoUrl: check.videoUrl,
             thumbnailUrl: thumbnailUrl || null,
             youtubeVideoId: youtubeVideoId || null,
