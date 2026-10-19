@@ -201,6 +201,7 @@ Responda só JSON:
     const comum = `Scene: ${cena}
 Style: professional ${en ? 'American' : 'Brazilian'} ${gospel ? 'gospel ' : ''}${estilo} music album cover, cinematic lighting, rich vibrant colors, high contrast, sharp focus, photorealistic, premium look.
 The singer is a fictional person, not a celebrity or real person. No logos, no watermarks, no brand names, no extra words.`;
+    let erroIA = '';
     const [capa, fundo] = await Promise.all([
       imagemGemini(
         `Create a VERY eye-catching YouTube thumbnail for a music compilation, 16:9 landscape.
@@ -211,13 +212,19 @@ Text on the image (${en ? 'English' : 'Brazilian Portuguese, with the accents'},
 - "${subtitulo}" smaller, inside a ribbon/banner badge (white text on a red or purple banner) under the title
 Put the text on the side opposite to the singer's face, and keep the bottom-right corner free (YouTube shows the duration there). Must be readable as a tiny thumbnail on a phone. No other text.`,
         '16:9'
-      ),
+      ).catch(async (e) => {
+        // Gemini sem crédito / fora do ar: capa simples feita aqui (título dourado em degradê), para o álbum não parar.
+        // O dono refaz a capa depois com 🎨 na Fábrica de Música.
+        erroIA = String(e.message || e).slice(0, 200);
+        const { montarCapaMusica } = await import('../../../lib/capaMusica');
+        return { buffer: await montarCapaMusica({ titulo, subtitulo, estilo }), mime: 'image/jpeg' };
+      }),
       imagemGemini(`Create a vertical 9:16 background image for a music video.\n${comum}\nNo text at all on the image. Keep the singer centered.`, '9:16').catch(() => null),
     ]);
     const marca = `${Date.now()}`;
     const capaUrl = await salvar(capa, `capa-${marca}`);
     const fundoUrl = fundo ? await salvar(fundo, `fundo-${marca}`) : null;
-    return res.status(200).json({ titulo, subtitulo, cena, capaUrl, fundoUrl });
+    return res.status(200).json({ titulo, subtitulo, cena, capaUrl, fundoUrl, ...(erroIA ? { capaSimples: true, erroIA } : {}) });
   } catch (e) {
     return res.status(500).json({ erro: e.message });
   }

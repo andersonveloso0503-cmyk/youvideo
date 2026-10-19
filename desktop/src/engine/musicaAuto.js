@@ -155,6 +155,7 @@ class MusicaAuto {
       albuns: [...this.estado.albuns].reverse().slice(0, 20).map((a) => ({
         id: a.id, canal: a.canal, dia: a.dia, preset: a.presetNome, motor: a.motor, fase: a.fase, etapa: a.etapa, erro: a.erro,
         titulo: a.capa?.titulo || '', subtitulo: a.capa?.subtitulo || '', capa: a.capa?.capaArquivo || null,
+        capaSimples: !!a.capa?.simples, capaErro: a.capa?.simples ? a.capa.erro || '' : '',
         musicas: (a.musicas || []).filter(Boolean).map((m) => m.titulo), total: a.ideias?.length || 0,
         prontas: (a.musicas || []).filter((m) => m && (m.url || m.arquivo)).length,
         fonte: a.fonte || 'ia',
@@ -403,19 +404,17 @@ class MusicaAuto {
     // 4) Capa no Gemini (16:9 com o título, e um fundo em pé sem texto para os Shorts)
     if (!a.capa?.capaArquivo || !fs.existsSync(a.capa.capaArquivo)) {
       this.marcar(a, { etapa: 'Fazendo a capa no Gemini' });
-      if (!a.capa?.capaUrl) {
-        const evitar = this.estado.albuns.map((x) => x.capa?.titulo).filter(Boolean).slice(-30);
-        const c = await this.central.chamar(cfg(), '/api/central/musica-auto', {
-          metodo: 'POST',
-          corpo: { acao: 'capa', estilo: estilo.nome, gospel: estilo.gospel, idioma: a.idioma === 'en' ? 'en' : 'pt', titulos: a.musicas.filter(Boolean).map((m) => m.titulo), evitar },
-        });
-        a.capa = { titulo: c.titulo, subtitulo: c.subtitulo, capaUrl: c.capaUrl, fundoUrl: c.fundoUrl };
+      try {
+        await this.fazerCapa(a, estilo, pasta);
+      } catch (e) {
+        // Capa não saiu (Gemini/site fora): NÃO para o álbum. Faz um fundo simples aqui no PC e segue;
+        // o dono refaz a capa depois com 🎨 "Refazer capa".
+        const simples = path.join(pasta, '00 - Capa simples.jpg');
+        const { rodar } = require('./ffmpeg');
+        await rodar(['-f', 'lavfi', '-i', 'color=c=0x7a2e0b:s=1280x720', '-frames:v', '1', '-y', simples]).promise;
+        a.capa = { titulo: a.capa?.titulo || String(estilo.nome || 'Louvores').toUpperCase(), subtitulo: a.capa?.subtitulo || '', capaArquivo: simples, simples: true, erro: String(e.message || e).slice(0, 200) };
         this.salvar();
       }
-      const ext = (u) => (/\.jpe?g(\?|$)/i.test(u) ? 'jpg' : 'png');
-      a.capa.capaArquivo = await this.central.baixar(a.capa.capaUrl, path.join(pasta, `00 - Capa.${ext(a.capa.capaUrl)}`));
-      if (a.capa.fundoUrl) a.capa.fundoArquivo = await this.central.baixar(a.capa.fundoUrl, path.join(pasta, `00 - Fundo Shorts.${ext(a.capa.fundoUrl)}`)).catch(() => null);
-      this.salvar();
     }
 
     // 4b) Fundo animado do vídeo longo: cena desenhada que combina com o estilo, animada em loop
@@ -626,6 +625,47 @@ class MusicaAuto {
       : await this.central.baixar(a.cena.imagemUrl, path.join(pasta, `00 - Cena.${/\.jpe?g(\?|$)/i.test(a.cena.imagemUrl) ? 'jpg' : 'png'}`));
     a.cena.animado = !!videoUrl;
     this.salvar();
+  }
+
+  /** Capa no Gemini (ou a capa simples feita no site, se o Gemini falhar). */
+  async fazerCapa(a, estilo, pasta) {
+    const cfg = () => this.obterConfig();
+    if (!a.capa?.capaUrl) {
+      const evitar = this.estado.albuns.map((x) => x.capa?.titulo).filter(Boolean).slice(-30);
+      const c = await this.central.chamar(cfg(), '/api/central/musica-auto', {
+        metodo: 'POST',
+        corpo: { acao: 'capa', estilo: estilo.nome, gospel: estilo.gospel, idioma: a.idioma === 'en' ? 'en' : 'pt', titulos: a.musicas.filter(Boolean).map((m) => m.titulo), evitar },
+      });
+      a.capa = { titulo: c.titulo, subtitulo: c.subtitulo, capaUrl: c.capaUrl, fundoUrl: c.fundoUrl, ...(c.capaSimples ? { simples: true, erro: c.erroIA || '' } : {}) };
+      this.salvar();
+    }
+    const ext = (u) => (/\.jpe?g(\?|$)/i.test(u) ? 'jpg' : 'png');
+    a.capa.capaArquivo = await this.central.baixar(a.capa.capaUrl, path.join(pasta, `00 - Capa ${Date.now().toString(36)}.${ext(a.capa.capaUrl)}`));
+    if (a.capa.fundoUrl) a.capa.fundoArquivo = await this.central.baixar(a.capa.fundoUrl, path.join(pasta, `00 - Fundo Shorts.${ext(a.capa.fundoUrl)}`)).catch(() => null);
+    this.salvar();
+  }
+
+  /** 🎨 Refazer capa: tenta o Gemini de novo (ex.: depois de pôr crédito). Vale para a capa do vídeo longo no YouTube. */
+  async refazerCapa(id) {
+    const a = this.estado.albuns.find((x) => x.id === id);
+    if (!a) throw new Error('Álbum não encontrado.');
+    const pasta = a.capa?.capaArquivo ? path.dirname(a.capa.capaArquivo) : a.pastaAlbum || this.pastaMusicas;
+    const estilo = { nome: a.presetNome || 'Gospel', gospel: CANAIS[a.canal].gospel };
+    const antes = a.capa;
+    a.capa = { titulo: '', subtitulo: '' }; // pede capa nova (título novo também)
+    try {
+      await this.fazerCapa(a, estilo, pasta);
+    } catch (e) {
+      a.capa = antes;
+      this.salvar();
+      throw e;
+    }
+    if (a.capa.simples) {
+      this.avisarTela();
+      throw new Error(`O Gemini ainda não conseguiu fazer a capa (${a.capa.erro || 'erro'}). Ficou a capa simples.`);
+    }
+    this.avisarTela();
+    return a.capa;
   }
 
   /** Quando os vídeos de um álbum ficam prontos na fila, ele vira "pronto para aprovar". */

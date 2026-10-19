@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('api', {
     abrirPasta: chamar('musicaAuto:abrirPasta'),
     escolherPasta: chamar('musicaAuto:escolherPasta'),
     tentarDeNovo: chamar('musicaAuto:tentarDeNovo'),
+    refazerCapa: chamar('musicaAuto:refazerCapa'),
     paraSubir: chamar('musicaAuto:paraSubir'),
     aprovar: chamar('musicaAuto:aprovar'),
     descartar: chamar('musicaAuto:descartar'),

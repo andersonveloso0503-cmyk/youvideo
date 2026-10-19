@@ -68,6 +68,8 @@ const FabMusica = (() => {
     const acoes = [];
     if (a.fase === 'pronto') acoes.push(`<button class="btn-primario fm-subir" data-id="${a.id}">👀 Ver e subir</button>`);
     if (a.fase === 'erro') acoes.push(`<button class="btn-mini destaque fm-de-novo" data-id="${a.id}">↻ Tentar de novo</button>`);
+    // Capa simples (o Gemini não conseguiu): o álbum segue mesmo assim; dá para refazer a capa depois
+    if (a.capa && ['pronto', 'aprovado', 'montando', 'erro'].includes(a.fase)) acoes.push(`<button class="btn-mini ${a.capaSimples ? 'destaque' : ''} fm-refazer-capa" data-id="${a.id}" title="Faz a capa de novo no Gemini">🎨 ${a.capaSimples ? 'Refazer capa' : 'Outra capa'}</button>`);
     if (!['trabalhando', 'na vez'].includes(a.fase)) acoes.push(`<button class="btn-mini fm-descartar" data-id="${a.id}" title="Tira da lista (as músicas e os vídeos continuam na pasta)">✕</button>`);
     const nome = a.titulo ? `${esc(a.titulo)}${a.subtitulo ? ` <small>${esc(a.subtitulo)}</small>` : ''}` : esc(a.preset || 'Álbum');
     const progresso = a.total && a.prontas < a.total && ['trabalhando', 'parado', 'erro'].includes(a.fase) ? ` · ${a.prontas}/${a.total} músicas` : '';
@@ -79,6 +81,7 @@ const FabMusica = (() => {
           <div class="nota">${NOME_CANAL[a.canal]} · ${esc(a.preset || '')} · ${nomeMotor(a.motor)} · ${new Date(`${a.dia}T12:00`).toLocaleDateString('pt-BR')}</div>
           <div class="fm-fase">${FASE[a.fase] || a.fase}${a.etapa && !['pronto', 'aprovado'].includes(a.fase) ? ` — ${esc(a.etapa)}` : ''}${progresso}</div>
           ${a.erro ? `<div class="erro">${esc(a.erro)}</div>` : ''}
+          ${a.capaSimples ? `<div class="nota" style="color:var(--terracota)">⚠ Capa simples: o Gemini não conseguiu fazer a capa${a.capaErro ? ` (${esc(a.capaErro.slice(0, 120))})` : ''}. O álbum seguiu mesmo assim — clique em 🎨 Refazer capa quando quiser.</div>` : ''}
           ${a.recusadas ? `<div class="nota">🎧 ${a.recusadas} música${a.recusadas > 1 ? 's foram refeitas' : ' foi refeita'} porque a letra não ficou clara</div>` : ''}
           ${a.musicas.length && ['pronto', 'aprovado', 'montando'].includes(a.fase) ? `<details><summary>${a.musicas.length} músicas</summary><ol>${a.musicas.map((t) => `<li>${esc(t)}</li>`).join('')}</ol></details>` : ''}
         </div>
@@ -94,7 +97,7 @@ const FabMusica = (() => {
       <div class="fm-canais">${cartaoCanal('gospel')}${cartaoCanal('normal')}</div>
       <div class="fm-geral">
         <div class="campo-config"><label>Começar todo dia às</label><input type="time" id="fmHora" value="${esc(p.hora)}" /></div>
-        <div class="campo-config"><label>Músicas por álbum</label><select id="fmQtd">${[5, 8, 10, 12, 15].map((n) => `<option ${n === p.qtd ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+        <div class="campo-config"><label>Músicas por álbum</label><select id="fmQtd">${[5, 8, 10, 12, 15, 18, 20].map((n) => `<option ${n === p.qtd ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="campo-config"><label>Não fazer se já tiver vídeo longo agendado para</label><select id="fmFolga">${[2, 3, 5, 7, 14].map((n) => `<option value="${n}" ${n === p.folgaDias ? 'selected' : ''}>${n} dias ou mais</option>`).join('')}</select></div>
         <div class="campo-config"><label>Fundo do vídeo longo</label><select id="fmFundo"><option value="1" ${p.fundoAnimado !== false ? 'selected' : ''}>Cena desenhada que se mexe (~US$ 0,50)</option><option value="0" ${p.fundoAnimado === false ? 'selected' : ''}>Só a capa parada</option></select></div>
         <div class="campo-config"><label>Tamanho do vídeo longo</label><select id="fmLongo" title="Repete as músicas do álbum em outra ordem até chegar no tempo (quem assiste na TV deixa tocando)">${[[0, 'Só o álbum'], [60, '~1 hora'], [90, '~1h30'], [120, '~2 horas']].map(([v, t]) => `<option value="${v}" ${Number(p.longoMin || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
@@ -200,6 +203,16 @@ const FabMusica = (() => {
     q('#fmShorts').onchange = async (e) => { await salvar({ shorts: Number(e.target.value) }); custo(); };
     q('#fmLongo').onchange = async (e) => { await salvar({ longoMin: Number(e.target.value) }); custo(); };
     document.querySelectorAll('#fabMusica .fm-subir').forEach((b) => (b.onclick = () => verESubir(b.dataset.id)));
+    document.querySelectorAll('#fabMusica .fm-refazer-capa').forEach((b) => (b.onclick = async () => {
+      b.disabled = true;
+      b.textContent = '🎨 Fazendo...';
+      try {
+        const r = await window.api.musicaAuto.refazerCapa(b.dataset.id);
+        avisar(r?.noYoutube ? 'Capa nova pronta e trocada no YouTube' : 'Capa nova pronta — ela vai como thumbnail quando o álbum subir');
+      } catch (e) {
+        avisar(msgErro(e), true);
+      }
+    }));
     document.querySelectorAll('#fabMusica .fm-de-novo').forEach((b) => (b.onclick = () => window.api.musicaAuto.tentarDeNovo(b.dataset.id).catch((e) => avisar(msgErro(e), true))));
     document.querySelectorAll('#fabMusica .fm-descartar').forEach((b) => {
       b.onclick = () => confirm('Tirar este álbum da lista? (As músicas e os vídeos continuam na pasta.)') && window.api.musicaAuto.descartar(b.dataset.id);

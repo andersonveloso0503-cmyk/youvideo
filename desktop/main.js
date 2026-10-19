@@ -1144,6 +1144,24 @@ app.whenReady().then(() => {
     return r.filePaths[0];
   });
   ipcMain.handle('musicaAuto:tentarDeNovo', (_e, id) => musicaAuto.tentarDeNovo(id));
+  ipcMain.handle('musicaAuto:refazerCapa', async (_e, id) => {
+    const capa = await musicaAuto.refazerCapa(id);
+    // Álbum que já subiu: troca a thumbnail do vídeo longo lá no YouTube também
+    const a = musicaAuto.estado.albuns.find((x) => x.id === id);
+    const longo = (a?.jobs?.longo || []).map((jid) => fila.lista().find((j) => j.id === jid)).find(Boolean);
+    const envio = longo?.arquivoFinal && fila.lista().find((j) => j.tipo === 'envio' && j.envio?.arquivo === longo.arquivoFinal && j.youtube?.id);
+    if (envio && capa?.capaArquivo) {
+      const canal = store.canal(envio.envio.canalId);
+      if (canal) {
+        const cfg = store.ler();
+        const pronta = path.join(os.tmpdir(), `youvideo-capa-album-${id}-${Date.now()}.jpg`);
+        await gerarMiniatura(capa.capaArquivo, pronta, { vertical: false });
+        await YT.trocarCapa({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect, videoId: envio.youtube.id, arquivo: pronta });
+        return { ok: true, noYoutube: true };
+      }
+    }
+    return { ok: true, noYoutube: false };
+  });
   ipcMain.handle('musicaAuto:paraSubir', (_e, id) => musicaAuto.paraSubir(id));
   ipcMain.handle('musicaAuto:aprovar', (_e, id) => musicaAuto.aprovar(id));
   ipcMain.handle('musicaAuto:descartar', (_e, id) => musicaAuto.descartar(id));
