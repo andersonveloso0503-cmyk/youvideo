@@ -212,17 +212,34 @@ const FabMusica = (() => {
     document.querySelectorAll('#fabMusica .fm-prompt-capa').forEach((b) => (b.onclick = async () => {
       try {
         const texto = await window.api.musicaAuto.promptCapa(b.dataset.id);
-        try {
-          await navigator.clipboard.writeText(texto);
-        } catch {
-          const t = document.createElement('textarea');
-          t.value = texto;
-          document.body.appendChild(t);
-          t.select();
-          document.execCommand('copy');
-          t.remove();
+        // Mostra numa janela (antes só copiava em silêncio e parecia que nada acontecia)
+        let d = document.getElementById('dlgPromptCapa');
+        if (!d) {
+          d = document.createElement('dialog');
+          d.id = 'dlgPromptCapa';
+          d.style.cssText = 'max-width:760px;width:92vw;max-height:86vh;overflow:auto;border:none;border-radius:16px;padding:22px';
+          document.body.appendChild(d);
         }
-        avisar('Prompt copiado! Cole no Gemini, baixe a imagem e clique em 📥 Trazer capa');
+        d.innerHTML =
+          '<h3 style="margin-top:0">📝 Prompt da capa</h3>' +
+          '<p class="nota">1) Clique em <b>Copiar</b>. 2) Clique em <b>Abrir o Gemini</b> e cole lá (Ctrl+V). 3) Baixe a imagem. 4) Volte aqui e clique em <b>📥 Trazer capa</b> no álbum.</p>' +
+          `<textarea id="txtPromptCapa" readonly style="width:100%;height:44vh;font-size:12.5px">${esc(texto)}</textarea>` +
+          '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn-primario" id="btnPcCopiar">📋 Copiar</button><button type="button" class="btn-mini" id="btnPcGemini">🌐 Abrir o Gemini</button><button type="button" class="btn-mini" id="btnPcFechar">Fechar</button></div>';
+        const copiar = async () => {
+          try {
+            await navigator.clipboard.writeText(texto);
+          } catch {
+            const t = d.querySelector('#txtPromptCapa');
+            t.focus();
+            t.select();
+            document.execCommand('copy');
+          }
+          d.querySelector('#btnPcCopiar').textContent = '✓ Copiado';
+        };
+        d.querySelector('#btnPcCopiar').onclick = copiar;
+        d.querySelector('#btnPcGemini').onclick = () => window.api.abrir.link('https://gemini.google.com/app');
+        d.querySelector('#btnPcFechar').onclick = () => d.close();
+        if (!d.open) d.showModal();
       } catch (e) {
         avisar(msgErro(e), true);
       }
