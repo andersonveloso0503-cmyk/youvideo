@@ -69,11 +69,13 @@ const FabMusica = (() => {
     if (a.fase === 'pronto') acoes.push(`<button class="btn-primario fm-subir" data-id="${a.id}">👀 Ver e subir</button>`);
     if (a.fase === 'erro') acoes.push(`<button class="btn-mini destaque fm-de-novo" data-id="${a.id}">↻ Tentar de novo</button>`);
     // Capa simples (o Gemini não conseguiu): o álbum segue mesmo assim; dá para refazer a capa depois
-    if (a.capa && ['pronto', 'aprovado', 'montando', 'erro'].includes(a.fase)) {
+    // Aparecem em todo álbum que não está trabalhando agora (antes só com capa pronta — e o álbum que
+    // parou justamente na capa ficava sem os botões)
+    if (!['trabalhando', 'na vez'].includes(a.fase)) {
       acoes.push(`<button class="btn-mini fm-prompt-capa" data-id="${a.id}" title="Copia o pedido da capa para você fazer no Gemini (app ou gemini.google.com)">📝 Prompt da capa</button>`);
       acoes.push(`<button class="btn-mini fm-usar-capa" data-id="${a.id}" title="Escolhe a imagem que você fez no Gemini (ou no Canva) e usa como capa">📥 Trazer capa</button>`);
     }
-    if (a.capa && ['pronto', 'aprovado', 'montando', 'erro'].includes(a.fase)) acoes.push(`<button class="btn-mini ${a.capaSimples ? 'destaque' : ''} fm-refazer-capa" data-id="${a.id}" title="Faz a capa de novo no Gemini">🎨 ${a.capaSimples ? 'Refazer capa' : 'Outra capa'}</button>`);
+    if (!['trabalhando', 'na vez'].includes(a.fase)) acoes.push(`<button class="btn-mini ${a.capaSimples ? 'destaque' : ''} fm-refazer-capa" data-id="${a.id}" title="Faz a capa de novo no Gemini">🎨 ${a.capaSimples ? 'Refazer capa' : 'Outra capa'}</button>`);
     if (!['trabalhando', 'na vez'].includes(a.fase)) acoes.push(`<button class="btn-mini fm-descartar" data-id="${a.id}" title="Tira da lista (as músicas e os vídeos continuam na pasta)">✕</button>`);
     const nome = a.titulo ? `${esc(a.titulo)}${a.subtitulo ? ` <small>${esc(a.subtitulo)}</small>` : ''}` : esc(a.preset || 'Álbum');
     const progresso = a.total && a.prontas < a.total && ['trabalhando', 'parado', 'erro'].includes(a.fase) ? ` · ${a.prontas}/${a.total} músicas` : '';
