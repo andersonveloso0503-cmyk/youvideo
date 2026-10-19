@@ -290,13 +290,26 @@ function regrasTituloMusica(ano, info) {
 4. Ano: se usar, só ${ano}. Nunca outro ano.
 5. Sem hashtag no título (o app cuida). No máximo 1 emoji. Entre 40 e 75 caracteres.
 6. Use o gênero que o vídeo realmente tem (o do PEDIDO DO DONO, o da pasta ou o das músicas). Não invente "blues", "rock" ou "eletrônico" se não for o caso.
+7. NÃO repita o estilo nas duas partes (ERRADO: "Playlist Gospel Sertanejo | Louvor Sertanejo para Ouvir"). A parte depois do " | " é sempre uma FRASE DE SENTIMENTO ou de fé, não outra palavra-chave. Não comece com "Playlist". Nada de "Volume 2", "Vol. 2".
+8. Para Shorts: só o nome da música + " | " + o estilo ("Fidelidade Solar | Sertanejo Gospel Animado"), e no máximo 1 emoji.
 Exemplos da FORMA (os que mais deram views no canal): "Sertanejo Gospel De Madrugada | Oração Que Acalma A Alma", "Sertanejo Gospel ${ano} | Venha Dançar Com Nossos Louvores", "Graça Que Me Alcançou 🎶 Louvores em Pagode | Pagode Gospel", "Modão Gospel Saudade | Louvores Que Marcaram Gerações".`;
+}
+
+// Título de música com o mesmo estilo nas duas partes ("Gospel Sertanejo | Louvor Sertanejo...") ou sem frase depois do "|"
+function musicaRepetida(t) {
+  const partes = String(t || '').replace(/#[\p{L}\p{N}_]+/gu, '').split(/\s*[|—–]\s*/).filter(Boolean);
+  if (partes.length < 2) return false;
+  const chave = (p) => new Set(p.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter((w) => w.length >= 6));
+  const a = chave(partes[0]);
+  const b = chave(partes.slice(1).join(' '));
+  return [...b].some((w) => a.has(w)) || /^\s*playlist\b/i.test(t);
 }
 
 // Arruma o título de música depois da IA: ano certo, sem minutagem, maiúsculas iniciais
 function arrumarTituloMusica(t, ano, duracaoSeg) {
   let x = String(t || '');
   x = x.replace(/\b(20[1-3]\d)\b/g, (m) => (Number(m) === ano ? m : String(ano)));
+  x = x.replace(/\s*[-–—|]?\s*\b(vol\.?|volume)\s*\d+\b/gi, '').replace(/^\s*playlist\s+(de\s+)?/i, '');
   if ((duracaoSeg || 0) < 55 * 60) x = x.replace(/\s*[-–—|]?\s*\b\d{1,3}\s*(min(utos)?|mins)\b\.?/gi, '');
   const pequenas = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'as', 'os', 'em', 'no', 'na', 'nos', 'nas', 'com', 'pra', 'para', 'por', 'ao', 'à']);
   x = x
@@ -406,7 +419,8 @@ async function gerarTextosVideo(groqKey, info) {
   const aberturasUsadas = historia ? [] : [...new Set(evitar.map(abertura).filter(Boolean))];
   // Cada vídeo do lote ganha uma palavra-chave de abertura diferente
   let chaveObrigatoria = '';
-  if (evitar.length) {
+  // Música: NÃO obriga a começar pela busca da lista (era isso que gerava "Playlist Gospel Sertanejo | Louvor Sertanejo...")
+  if (evitar.length && historia) {
     const livres = pesquisados.filter((p) => !evitar.some((e) => mesmaAbertura(p, e)));
     const porAbertura = [];
     for (const p of livres) if (!porAbertura.some((x) => mesmaAbertura(x, p))) porAbertura.push(p);
@@ -473,7 +487,9 @@ ${
       ? `\nCOMEÇOS PROIBIDOS (outros vídeos desta leva já começam assim — o seu título NÃO pode começar com estas palavras, nem no singular/plural): ${aberturasUsadas.map((a) => `"${a}"`).join(', ')}\n${
           chaveObrigatoria
             ? `Escolha a palavra_principal entre estas buscas (que combine com o clima) e comece os títulos com ela: ${chaveObrigatoria}.`
-            : 'Comece com outra busca da lista ou com um gancho diferente (ex.: "1 Hora de...", "Para Orar...", "Hinos que...", "Música para...") e a palavra-chave logo depois.'
+            : historia
+              ? 'Comece com outra busca da lista ou com um gancho diferente (ex.: "1 Hora de...", "Para Orar...", "Hinos que...", "Música para...") e a palavra-chave logo depois.'
+              : 'Comece pelo estilo com outro momento ou outra frase (ex.: "Sertanejo Gospel Na Varanda | ...", "Modão Gospel De Domingo | ...", "Louvores Sertanejos Pra Viajar | ...").'
         }\n`
       : ''
   }
@@ -496,6 +512,7 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
     buscaSegura(t, { idioma: idiomaCodigo }) &&
     !(historia && DE_CRIANCA.some((w) => temPalavra(t, w))) &&
     !(historia && COMECO_FRACO.test(t)) &&
+    !(!historia && musicaRepetida(t)) &&
     !evitar.some((e) => parecido(t, e) >= 0.7 || (!historia && mesmaAbertura(t, e)));
 
   let j, opcoes = [], melhor = 0, sobras = [];
