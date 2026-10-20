@@ -649,8 +649,9 @@ class MusicaAuto {
   /** Fundo do vídeo longo: a cena (animada ou parada); sem cena, a capa — mas nunca a capa simples com texto. */
   async fundoDoLongo(a, pasta) {
     if (a.cena?.arquivo && fs.existsSync(a.cena.arquivo)) return a.cena.arquivo;
-    if (!a.capa?.simples) return a.capa.capaArquivo;
-    if (a.capa.fundoArquivo && fs.existsSync(a.capa.fundoArquivo)) return a.capa.fundoArquivo;
+    // Sem cena: NUNCA a capa (ela tem o título escrito e ficava parada a hora inteira atrás da onda de som).
+    // Usa o fundo em pé sem texto da capa, se houver; senão um degradê liso.
+    if (a.capa?.fundoArquivo && fs.existsSync(a.capa.fundoArquivo)) return a.capa.fundoArquivo;
     const liso = path.join(pasta, '00 - Fundo liso.jpg');
     const { rodar } = require('./ffmpeg');
     await rodar(['-f', 'lavfi', '-i', 'gradients=s=1920x1080:c0=0x3b1405:c1=0xa3410f:x0=0:y0=0:x1=1920:y1=1080:d=1', '-frames:v', '1', '-y', liso]).promise
