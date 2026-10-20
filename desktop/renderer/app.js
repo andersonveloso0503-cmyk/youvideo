@@ -1374,6 +1374,7 @@ async function iniciar() {
   $('#btnConfig').onclick = () => abrirConfig();
   $('#btnSubir').onclick = () => Subir.abrir();
   $('#btnCantor').onclick = () => Cantor.abrir();
+  $('#btnDormir').onclick = () => Dormir.abrir().catch((e) => avisar(msgErro(e), true));
   window.api.ao('estudio:musicas', receberDoEstudio);
   const puxarConfig = async () => {
     const res = $('#resSync');

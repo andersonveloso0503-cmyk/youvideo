@@ -1562,6 +1562,59 @@ app.whenReady().then(() => {
     return saida;
   });
 
+  // ---------- Sons para dormir ----------
+  // Vídeos longos (1 a 10 h): cenas lindas em loop + som ambiente e músicas calmas. Tudo montado aqui no PC.
+  const Dormir = require('./src/engine/dormir');
+  const pastaDormir = () => path.join(store.ler().pastaSaida || path.join(os.homedir(), 'Videos'), 'Sons para dormir');
+  let dormirTrabalho = null; // { cancelar, estado }
+  ipcMain.handle('dormir:cena', async (_e, { prompt, movimento, indice, animar, tema }) => {
+    return Dormir.gerarCena({
+      falKey: store.ler().falKey,
+      prompt,
+      movimento,
+      indice,
+      animar: animar !== false,
+      pasta: path.join(pastaDormir(), 'cenas', Dormir.slug(tema)),
+      onStatus: (texto) => enviar('dormir:progresso', { fase: 'cena', indice, texto }),
+    });
+  });
+  ipcMain.handle('dormir:escolherCenas', async () => {
+    const r = await dialog.showOpenDialog(janela, {
+      title: 'Escolher imagens ou vídeos para as cenas',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Imagens e vídeos', extensions: EXT_FUNDO }],
+    });
+    return r.canceled ? [] : r.filePaths.map((p) => (Dormir.ehImagem(p) ? { imagem: p, video: null, ia: false } : { imagem: null, video: p, ia: false }));
+  });
+  ipcMain.handle('dormir:estado', () => dormirTrabalho?.estado || null);
+  ipcMain.handle('dormir:cancelar', () => {
+    if (dormirTrabalho?.cancelar) dormirTrabalho.cancelar();
+  });
+  ipcMain.handle('dormir:gerar', async (_e, opcoes) => {
+    if (dormirTrabalho?.estado?.rodando) throw new Error('Já tem um vídeo de sons para dormir sendo gerado. Espere terminar.');
+    dormirTrabalho = { cancelar: null, estado: { rodando: true, fase: 'cenas', pct: 0, texto: 'Começando' } };
+    try {
+      const r = await Dormir.gerarVideo({
+        ...opcoes,
+        pasta: pastaDormir(),
+        registrarCancelar: (fn) => (dormirTrabalho.cancelar = fn),
+        onProgresso: (fase, pct, texto) => {
+          dormirTrabalho.estado = { rodando: true, fase, pct, texto };
+          enviar('dormir:progresso', dormirTrabalho.estado);
+        },
+      });
+      const info = (await infoVideos([r.arquivo]))[0] || { arquivo: r.arquivo, duracao: r.duracao };
+      dormirTrabalho.estado = { rodando: false, fase: 'pronto', pct: 1, texto: 'Pronto', video: { ...info, capa: r.capa } };
+      enviar('dormir:progresso', dormirTrabalho.estado);
+      return dormirTrabalho.estado.video;
+    } catch (e) {
+      const cancelado = String(e?.message || e) === 'CANCELADO';
+      dormirTrabalho.estado = { rodando: false, fase: cancelado ? 'cancelado' : 'erro', pct: 0, texto: cancelado ? 'Cancelado' : String(e?.message || e).slice(0, 400) };
+      enviar('dormir:progresso', dormirTrabalho.estado);
+      throw e;
+    }
+  });
+
   ipcMain.handle('envio:contador', () => ({ hoje: enviosHoje(), limite: 100, renova: horaRenovacao() }));
   // Antes de subir: quais títulos já estão no canal (para avisar e não duplicar)
   ipcMain.handle('envio:duplicados', async (_e, { canalId, titulos }) => {
