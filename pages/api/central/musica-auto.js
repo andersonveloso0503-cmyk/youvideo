@@ -216,11 +216,12 @@ Reply only JSON:
 Coletânea de músicas ${gospel ? 'GOSPEL ' : ''}no estilo ${estilo}. Algumas músicas: ${titulos.join('; ') || '(sem títulos)'}.
 ${evitar.length ? `Não repita estes títulos de capas que já fiz: ${evitar.join('; ')}.\n` : ''}
 Responda só JSON:
-{"titulo": "título da capa em MAIÚSCULAS, 2 a 5 palavras, português correto, chamativo, que diga o estilo e o clima (ex.: LOUVORES QUE ACALMAM)",
- "subtitulo": "linha menor em MAIÚSCULAS, até 4 palavras (ex.: AS MAIS TOCADAS ${ano} / VOL. 2 / PARA ORAR)",
+{"titulo": "título da capa em MAIÚSCULAS, 2 a 4 palavras, português correto, FORTE e chamativo como as capas dos canais gospel que mais crescem (ex.: OS MELHORES LOUVORES, LOUVORES PODEROSOS, HINOS QUE TOCAM A ALMA, SERTANEJO GOSPEL QUE EMOCIONA, LOUVORES PRA DANÇAR). PROIBIDO nome de álbum vago (ERRADO: GOSPEL DE LUZ, SONS DA FÉ)",
+ "subtitulo": "linha menor em MAIÚSCULAS, até 4 palavras que dão vontade de clicar (ex.: AS MAIS TOCADAS ${ano} / 1 HORA SEM PARAR / PARA OUVIR NA ESTRADA). Nunca VOL. 2",
  "cena": "em INGLÊS, 1 a 2 frases: a cena da capa com um(a) cantor(a) fictício(a) cantando ou tocando, o cenário e a luz que combinam com o estilo e o clima${gospel ? ' (louvor, fé, luz suave do céu, sem símbolos de outras religiões)' : ''}"}`);
-    const titulo = limparTexto(ideia.titulo, 40).toUpperCase() || `${estilo.toUpperCase()} ${gospel ? 'LOUVORES' : 'AS MELHORES'}`;
-    const subtitulo = limparTexto(ideia.subtitulo, 30).toUpperCase() || String(ano);
+    let titulo = limparTexto(ideia.titulo, 40).toUpperCase() || (gospel ? 'OS MELHORES LOUVORES' : `${estilo.toUpperCase()} AS MELHORES`);
+    if (/\bVOL\.?\s*\d/.test(titulo) || titulo.split(/\s+/).length > 5) titulo = gospel ? 'LOUVORES PODEROSOS' : `${estilo.toUpperCase()} AS MELHORES`;
+    let subtitulo = limparTexto(ideia.subtitulo, 30).toUpperCase().replace(/\bVOL\.?\s*\d+\b/g, '').trim() || `AS MAIS TOCADAS ${ano}`;
     const cena = limparTexto(ideia.cena, 500) || `a fictional ${gospel ? 'worship ' : ''}singer performing ${estilo} music on a warmly lit stage`;
 
     const comum = `Scene: ${cena}
@@ -233,7 +234,7 @@ The singer is a fictional person, not a celebrity or real person. No logos, no w
 ${comum}
 Make it bold and flashy: rich saturated colors, warm glow and light effects, dramatic sky (deep purple/blue night or golden sunset), the singer close to the camera on one side with a strong emotional expression.
 Text on the image (${en ? 'English' : 'Brazilian Portuguese, with the accents'}, spelled EXACTLY like this and nothing else):
-- the title "${titulo}" HUGE, filling about half of the image, in thick heavy bold 3D letters with a shiny metallic GOLD finish (rich gold gradient, bright highlights, beveled edges), thick dark outline and a warm golden glow; the most important word even bigger, the words can have different sizes (all in gold)
+- the title "${titulo}" GIGANTIC, filling about 60% of the image (it must be readable even on a tiny phone thumbnail), in thick heavy bold 3D letters with a shiny metallic GOLD finish (rich gold gradient, bright highlights, beveled edges), thick dark outline and a warm golden glow; the most important word even bigger, the words can have different sizes (all in gold)
 - "${subtitulo}" smaller, inside a ribbon/banner badge (white text on a red or purple banner) under the title
 Put the text on the side opposite to the singer's face, and keep the bottom-right corner free (YouTube shows the duration there). Must be readable as a tiny thumbnail on a phone. No other text.`,
         '16:9'

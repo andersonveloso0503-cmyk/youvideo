@@ -707,8 +707,11 @@ class MusicaAuto {
     const gospel = CANAIS[a.canal].gospel;
     const estilo = a.presetNome || (gospel ? 'Gospel' : 'Músicas');
     const ano = new Date().getFullYear();
-    const titulo = (a.capa?.titulo || `${estilo} ${gospel ? 'Louvores' : 'As Melhores'}`).toUpperCase();
-    const subtitulo = (a.capa?.subtitulo || `AS MELHORES ${ano}`).toUpperCase();
+    // Título FORTE (as capas que chamam atenção): "OS MELHORES LOUVORES", "LOUVORES PODEROSOS"…; nada de "GOSPEL DE LUZ - VOL. 2"
+    const fracos = /\bvol\.?\s*\d|\bde luz\b|^sons? d/i;
+    const forte = /sertanej|modão|modao|raiz/i.test(estilo) ? 'SERTANEJO GOSPEL QUE EMOCIONA' : /pagode|samba/i.test(estilo) ? 'PAGODE GOSPEL PRA LOUVAR' : gospel ? 'OS MELHORES LOUVORES' : `${estilo} AS MELHORES`;
+    const titulo = (a.capa?.titulo && !fracos.test(a.capa.titulo) ? a.capa.titulo : forte).toUpperCase();
+    const subtitulo = (a.capa?.subtitulo && !fracos.test(a.capa.subtitulo) ? a.capa.subtitulo : `AS MAIS TOCADAS ${ano}`).toUpperCase();
     const musicas = (a.musicas || []).filter(Boolean).map((m) => m.titulo).slice(0, 8).join('; ');
     return `Crie uma thumbnail de YouTube MUITO chamativa, formato 16:9 (paisagem, 1280x720), para uma coletânea de músicas ${gospel ? 'GOSPEL ' : ''}no estilo ${estilo}.
 Algumas músicas: ${musicas || '(sem títulos)'}.
@@ -717,9 +720,10 @@ Cena: um(a) cantor(a) fictício(a) (não é celebridade nem pessoa real) cantand
 Estilo: capa profissional de álbum ${en ? 'americano' : 'brasileiro'}, luz cinematográfica, cores vivas e saturadas, alto contraste, foto realista, visual premium. O cantor perto da câmera, de um lado, com expressão emocionante.
 
 Texto na imagem (${en ? 'em inglês' : 'em português do Brasil, com os acentos'}, escrito EXATAMENTE assim e nada mais):
-- "${titulo}" ENORME, ocupando metade da imagem, em letras 3D grossas e pesadas com acabamento DOURADO metálico brilhante, contorno escuro grosso e brilho dourado
+- "${titulo}" GIGANTE, ocupando uns 60% da imagem (tem que dar para ler numa miniatura pequena no celular), em letras 3D grossas e pesadas com acabamento DOURADO metálico brilhante, contorno escuro grosso e brilho dourado; a palavra mais forte ainda maior
 - "${subtitulo}" menor, dentro de uma faixa (texto branco numa faixa vermelha ou roxa) embaixo do título
 
+Se quiser trocar o título por outro ainda mais chamativo, use frases fortes como "OS MELHORES LOUVORES", "LOUVORES PODEROSOS", "HINOS QUE TOCAM A ALMA".
 Coloque o texto do lado oposto ao rosto do cantor e deixe o canto inferior direito livre (o YouTube mostra a duração ali). Tem que ser legível numa miniatura pequena no celular. Sem logos, sem marca d'água, sem outros textos.`;
   }
 
