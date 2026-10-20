@@ -210,6 +210,15 @@ async function prepararMusicas(arquivos, dir, cancelar) {
   return saida;
 }
 
+/** Lista que repete o mesmo arquivo de áudio até cobrir a duração (no lugar de -stream_loop, que trava em alguns PCs). */
+async function listaRepetida(arquivo, total, destino) {
+  const d = Math.max(1, (await probe(arquivo)).duracao || 1);
+  const vezes = Math.ceil(total / d) + 1;
+  const linha = `file '${barra(arquivo).replace(/'/g, "'\\''")}'`;
+  fs.writeFileSync(destino, Array(vezes).fill(linha).join('\n'));
+  return destino;
+}
+
 /** Monta a lista de clipes: cada cena fica `trocaSeg` na tela, em ciclo, até completar a duração. */
 function montarLista(clipes, transicoes, total, trocaSeg) {
   const n = clipes.length;
@@ -260,6 +269,35 @@ async function gerarVideo(op) {
     if (cancelado) throw new Error('CANCELADO');
   };
 
+  // Se o ffmpeg ficar 3 min sem avançar, para e avisa (em vez de ficar travado horas)
+  const vigia = {
+    ultimo: Date.now(),
+    mexeu() {
+      this.ultimo = Date.now();
+    },
+    esperar(r, oque) {
+      this.ultimo = Date.now();
+      return new Promise((ok, falha) => {
+        let parado = false;
+        const t = setInterval(() => {
+          if (Date.now() - this.ultimo > 3 * 60e3) {
+            parado = true;
+            clearInterval(t);
+            r.cancelar();
+          }
+        }, 10e3);
+        r.promise.then(
+          (v) => (clearInterval(t), ok(v)),
+          (e) => {
+            clearInterval(t);
+            if (parado && !cancelado) falha(new Error(`A geração de ${oque} parou de avançar. Tente de novo; se repetir, tire a última música ou som da lista (pode estar com defeito).`));
+            else falha(e);
+          }
+        );
+      });
+    },
+  };
+
   fs.mkdirSync(pasta, { recursive: true });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'youvideo-dormir-'));
   try {
@@ -295,35 +333,35 @@ async function gerarVideo(op) {
     const volM = (Number(op.volMusica ?? 35) / 100).toFixed(2);
     if (ambientes.length) {
       const amb = await prepararAmbiente(ambientes, tmp, cancelar);
-      ent.push('-stream_loop', '-1', '-i', amb);
+      ent.push('-f', 'concat', '-safe', '0', '-i', await listaRepetida(amb, duracao, path.join(tmp, 'ambiente.txt')));
       partes.push(`[${partes.length}:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=${volA}[s${partes.length}]`);
     }
     checar();
     if (musicas.length) {
       const mus = await prepararMusicas(musicas, tmp, cancelar);
-      ent.push('-stream_loop', '-1', '-i', mus);
+      ent.push('-f', 'concat', '-safe', '0', '-i', await listaRepetida(mus, duracao, path.join(tmp, 'musicas.txt')));
       partes.push(`[${partes.length}:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=${volM}[s${partes.length}]`);
     }
     const fadeOut = Math.max(0, duracao - 10).toFixed(2);
-    const juntar = partes.length > 1 ? `[s0][s1]amix=inputs=2:normalize=0:duration=first,` : `[s0]`;
+    const juntar = partes.length > 1 ? `[s0][s1]amix=inputs=2:normalize=0:duration=shortest,` : `[s0]`;
     const filtroAudio = `${partes.join(';')};${juntar}${partes.length > 1 ? '' : 'anull,'}afade=t=in:d=5,afade=t=out:st=${fadeOut}:d=10,alimiter=limit=0.95:level=0[sa]`;
     const audio = path.join(tmp, 'audio.m4a');
     let r = rodar([...ent, '-filter_complex', filtroAudio, '-map', '[sa]', '-t', duracao.toFixed(2), '-c:a', 'aac', '-b:a', '192k', audio], {
       duracaoTotal: duracao,
-      onProgresso: (x) => avisar('audio', 0.2 + x * 0.35, `Gerando o som (${Math.round(x * 100)}%)`),
+      onProgresso: (x) => (vigia.mexeu(), avisar('audio', 0.2 + x * 0.35, `Gerando o som (${Math.round(x * 100)}%)`)),
     });
     cancelar(r.cancelar);
-    await r.promise;
+    await vigia.esperar(r, 'o som');
 
     // 3) Junta tudo sem recodificar o vídeo (peso 45%)
     checar();
     const arquivo = nomeLivre(pasta, nome || 'sons-para-dormir', '.mp4');
     r = rodar(
       ['-f', 'concat', '-safe', '0', '-i', listaTxt, '-i', audio, '-map', '0:v:0', '-map', '1:a:0', '-c', 'copy', '-t', duracao.toFixed(2), '-movflags', '+faststart', arquivo],
-      { duracaoTotal: duracao, onProgresso: (x) => avisar('juntar', 0.55 + x * 0.43, `Montando o vídeo final (${Math.round(x * 100)}%)`) }
+      { duracaoTotal: duracao, onProgresso: (x) => (vigia.mexeu(), avisar('juntar', 0.55 + x * 0.43, `Montando o vídeo final (${Math.round(x * 100)}%)`)) }
     );
     cancelar(r.cancelar);
-    await r.promise;
+    await vigia.esperar(r, 'o vídeo final');
 
     // 4) Capa: a imagem da primeira cena, com o mesmo nome do vídeo (o "Subir p/ YouTube" encontra sozinho)
     avisar('capa', 0.99, 'Fazendo a capa');
