@@ -354,4 +354,47 @@ async function gerarVideo(op) {
   }
 }
 
-module.exports = { gerarCena, gerarVideo, montarLista, slug, ehImagem };
+// ---------- Som ambiente e música com IA (fal.ai) ----------
+const MODELO_SOM = 'fal-ai/elevenlabs/sound-effects/v2';
+const MODELO_MUSICA = 'fal-ai/elevenlabs/music/v2.5';
+
+/** Som ambiente (chuva, mar, fogo...): até 22 s, já emendável. Várias versões juntas evitam a cara de loop curto. */
+async function gerarSom({ falKey, texto, indice = 0, pasta, onStatus }) {
+  if (!falKey) throw new Error('Cadastre a chave da fal.ai em Configurações para gerar o som.');
+  if (!String(texto || '').trim()) throw new Error('Escreva como é o som ambiente.');
+  fal.config({ credentials: falKey });
+  fs.mkdirSync(pasta, { recursive: true });
+  onStatus && onStatus('Gerando o som');
+  const r = await fal.subscribe(MODELO_SOM, {
+    input: { text: `${String(texto).trim()}. Continuous, steady, no music, no voices.`, duration_seconds: 22, loop: true, prompt_influence: 0.45, output_format: 'mp3_44100_192' },
+    logs: false,
+  });
+  const url = r?.data?.audio?.url || r?.audio?.url;
+  if (!url) throw new Error('A fal.ai não devolveu o som.');
+  const arquivo = await Central.baixar(url, path.join(pasta, `som-${Date.now()}-${indice + 1}.mp3`));
+  return { arquivo, titulo: `Som ambiente ${indice + 1}`, duracao: (await probe(arquivo)).duracao };
+}
+
+/** Música instrumental calma (ElevenLabs Music). */
+async function gerarMusica({ falKey, prompt, segundos = 180, indice = 0, pasta, onStatus }) {
+  if (!falKey) throw new Error('Cadastre a chave da fal.ai em Configurações para gerar as músicas.');
+  if (!String(prompt || '').trim()) throw new Error('Escreva o estilo da música.');
+  fal.config({ credentials: falKey });
+  fs.mkdirSync(pasta, { recursive: true });
+  onStatus && onStatus('Compondo a música');
+  const r = await fal.subscribe(MODELO_MUSICA, {
+    input: {
+      prompt: `${String(prompt).trim()}. Instrumental only, no vocals, no drums, slow and soft from start to end, gentle fade in and fade out.`,
+      music_length_ms: Math.round(Math.min(600, Math.max(30, segundos)) * 1000),
+      force_instrumental: true,
+      output_format: 'mp3_44100_192',
+    },
+    logs: false,
+  });
+  const url = r?.data?.audio?.url || r?.audio?.url;
+  if (!url) throw new Error('A fal.ai não devolveu a música.');
+  const arquivo = await Central.baixar(url, path.join(pasta, `musica-${Date.now()}-${indice + 1}.mp3`));
+  return { arquivo, titulo: `Música calma ${indice + 1}`, duracao: (await probe(arquivo)).duracao };
+}
+
+module.exports = { gerarCena, gerarSom, gerarMusica, gerarVideo, montarLista, slug, ehImagem };

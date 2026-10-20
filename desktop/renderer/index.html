@@ -461,6 +461,22 @@
           <div id="drmMusicas" class="arr-lista"></div>
         </div>
       </div>
+      <div class="drm-ia">
+        <label class="drm-campo">Som ambiente com IA (em inglês) <input id="drmSomPrompt" /></label>
+        <div class="can-linha">
+          <label>Versões <select id="drmSomQtd"><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option></select></label>
+          <button class="btn-primario" id="drmGerarSom">✨ Gerar som ambiente</button>
+          <span class="nota">Cada versão tem 22 s. Juntas, viram um ciclo longo que não parece repetido.</span>
+        </div>
+        <label class="drm-campo">Música de fundo com IA (em inglês) <input id="drmMusPrompt" /></label>
+        <div class="can-linha">
+          <label>Quantas <select id="drmMusQtd"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option><option value="8">8</option></select></label>
+          <label>Cada uma com <select id="drmMusMin"><option value="2">2 min</option><option value="3" selected>3 min</option><option value="4">4 min</option></select></label>
+          <button class="btn-primario" id="drmGerarMus">✨ Gerar músicas</button>
+          <span class="nota" id="drmMusCusto"></span>
+        </div>
+        <p class="nota" id="drmSomNota"></p>
+      </div>
       <p class="nota">O som ambiente se repete emendado, sem clique. As músicas tocam em sequência com fade entre elas e voltam ao começo até o fim do vídeo.</p>
     </div>
 

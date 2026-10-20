@@ -1578,6 +1578,12 @@ app.whenReady().then(() => {
       onStatus: (texto) => enviar('dormir:progresso', { fase: 'cena', indice, texto }),
     });
   });
+  ipcMain.handle('dormir:som', async (_e, { texto, indice, tema }) =>
+    Dormir.gerarSom({ falKey: store.ler().falKey, texto, indice, pasta: path.join(pastaDormir(), 'sons', Dormir.slug(tema)) })
+  );
+  ipcMain.handle('dormir:musica', async (_e, { prompt, segundos, indice, tema }) =>
+    Dormir.gerarMusica({ falKey: store.ler().falKey, prompt, segundos, indice, pasta: path.join(pastaDormir(), 'musicas', Dormir.slug(tema)) })
+  );
   ipcMain.handle('dormir:escolherCenas', async () => {
     const r = await dialog.showOpenDialog(janela, {
       title: 'Escolher imagens ou vídeos para as cenas',

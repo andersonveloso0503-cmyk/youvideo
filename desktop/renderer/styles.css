@@ -855,3 +855,4 @@ span.chip-estilo { cursor: default; }
 .drm-barra { height: 8px; border-radius: 6px; background: var(--borda); overflow: hidden; }
 .drm-barra i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--terracota), var(--ouro)); transition: width 0.4s; }
 .drm-cenas > .nota { grid-column: 1 / -1; }
+.drm-ia { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed var(--borda-forte); border-radius: 10px; margin-top: 6px; }

@@ -43,6 +43,8 @@ const Dormir = (() => {
     q('#drmCapaDestaque').value = t.capaDestaque || '';
     q('#drmPrompt').value = t.prompt;
     q('#drmMovimento').value = t.movimento;
+    q('#drmSomPrompt').value = t.somPrompt || '';
+    q('#drmMusPrompt').value = t.musicaPrompt || '';
   }
 
   function renderCenas() {
@@ -161,6 +163,48 @@ const Dormir = (() => {
     window.api.creditos?.ler?.().catch?.(() => {});
   }
 
+  // Gera em lote (2 de cada vez) e vai colocando na lista de som
+  async function gerarAudios({ tipo, qtd, chamar, lista, botao }) {
+    if (!config.temFal) return avisar('Cadastre a chave da fal.ai em Configurações.', true);
+    const b = q(botao);
+    const textoBotao = b.textContent;
+    b.disabled = true;
+    const nota = q('#drmSomNota');
+    let feitos = 0;
+    let erros = 0;
+    const atualizar = () => (nota.textContent = `${tipo}: ${feitos} de ${qtd} prontos${erros ? ` (${erros} falharam)` : ''}...`);
+    atualizar();
+    let proximo = 0;
+    const base = lista.length;
+    const trabalhar = async () => {
+      while (proximo < qtd) {
+        const i = proximo++;
+        try {
+          const r = await chamar(base + i);
+          lista.push(r);
+          feitos++;
+        } catch (e) {
+          erros++;
+          nota.textContent = msgErro(e);
+        }
+        atualizar();
+        renderSons();
+      }
+    };
+    try {
+      await Promise.all([trabalhar(), trabalhar()]);
+      nota.textContent = `✓ ${tipo}: ${feitos} pronto${feitos === 1 ? '' : 's'}${erros ? `, ${erros} falharam` : ''}. Ouça na pasta "Sons para dormir" e tire os que não gostar.`;
+    } finally {
+      b.disabled = false;
+      b.textContent = textoBotao;
+    }
+  }
+
+  function pintarCusto() {
+    const total = Number(q('#drmMusQtd').value) * Number(q('#drmMusMin').value);
+    q('#drmMusCusto').textContent = `${total} min de música ≈ US$ ${(total * 0.6).toFixed(2).replace('.', ',')} na fal.ai`;
+  }
+
   async function gerar() {
     const cenas = D.cenas.filter((c) => !c.gerando && !c.erro).map(({ imagem, video, ia }) => ({ imagem, video, ia }));
     salvar();
@@ -246,6 +290,19 @@ const Dormir = (() => {
       renderCenas();
     };
     q('#drmAddAmbiente').onclick = () => escolherSons(D.ambientes);
+    q('#drmGerarSom').onclick = () => {
+      const texto = q('#drmSomPrompt').value.trim();
+      if (!texto) return avisar('Escreva como é o som ambiente.', true);
+      gerarAudios({ tipo: 'Som ambiente', qtd: Number(q('#drmSomQtd').value), lista: D.ambientes, botao: '#drmGerarSom', chamar: (indice) => window.api.dormir.som({ texto, indice, tema: tema()?.nome || 'personalizado' }) });
+    };
+    q('#drmGerarMus').onclick = () => {
+      const prompt = q('#drmMusPrompt').value.trim();
+      if (!prompt) return avisar('Escreva o estilo da música.', true);
+      const segundos = Number(q('#drmMusMin').value) * 60;
+      gerarAudios({ tipo: 'Músicas', qtd: Number(q('#drmMusQtd').value), lista: D.musicas, botao: '#drmGerarMus', chamar: (indice) => window.api.dormir.musica({ prompt, segundos, indice, tema: tema()?.nome || 'personalizado' }) });
+    };
+    q('#drmMusQtd').onchange = pintarCusto;
+    q('#drmMusMin').onchange = pintarCusto;
     q('#drmAddMusica').onclick = () => escolherSons(D.musicas);
     for (const id of ['#drmHoras', '#drmTroca', '#drmRes', '#drmAnimar', '#drmQtd']) q(id).onchange = () => (salvar(), pintar());
     for (const id of ['#drmVolAmb', '#drmVolMus']) {
@@ -281,6 +338,7 @@ const Dormir = (() => {
     q('#drmVolAmbTxt').textContent = `${q('#drmVolAmb').value}%`;
     q('#drmVolMusTxt').textContent = `${q('#drmVolMus').value}%`;
     if (!q('#drmTitulo').value) aplicarTema();
+    pintarCusto();
     // Se um vídeo está sendo gerado (ou ficou pronto) com a janela fechada, mostra o estado
     const est = await window.api.dormir.estado().catch(() => null);
     if (est?.rodando) {

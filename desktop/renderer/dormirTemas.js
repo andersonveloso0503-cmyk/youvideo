@@ -9,7 +9,9 @@ const DORMIR_TEMAS = [
     "prompt": "Cozy wooden cabin interior at night in the Brazilian rainforest, rain falling on a corrugated zinc roof visible through an open window, warm oil lamp glow, lush green jungle outside, raindrops dripping from the roof edge, cinematic, ultra detailed, 8k, peaceful mood.",
     "movimento": "rain falling softly, water drops dripping from the roof edge, oil lamp flame flickering gently",
     "capaFrase": "DURMA EM 5 MINUTOS",
-    "capaDestaque": "5"
+    "capaDestaque": "5",
+    "somPrompt": "steady rain on a corrugated metal roof, close, constant, no thunder, cozy night ambience",
+    "musicaPrompt": "soft felt piano, warm ambient pads, slow 55 bpm, cozy rainy night, melancholic and calm, lullaby"
   },
   {
     "id": "tema2",
@@ -20,7 +22,9 @@ const DORMIR_TEMAS = [
     "prompt": "Rustic stone and wood cabin in the mountains of southern Brazil, araucaria pine trees in the mist, rainy evening, view from inside next to a crackling fireplace, big window with rain streaks, warm orange light versus cool blue outside, cinematic, ultra detailed, 8k.",
     "movimento": "fireplace flames crackling, rain streaks running down the window, mist drifting slowly between the pine trees",
     "capaFrase": "CHUVA + LAREIRA",
-    "capaDestaque": "LAREIRA"
+    "capaDestaque": "LAREIRA",
+    "somPrompt": "crackling fireplace indoors with soft rain on the window, warm cozy cabin ambience",
+    "musicaPrompt": "acoustic guitar fingerpicking, soft cello, warm, cozy cabin, slow 60 bpm, peaceful, folk ambient"
   },
   {
     "id": "tema3",
@@ -31,7 +35,9 @@ const DORMIR_TEMAS = [
     "prompt": "Dramatic but calm thunderstorm over green rolling hills seen from a cozy porch, distant lightning illuminating the clouds, heavy rain, a lit window and rocking chair in the foreground, deep blue and purple tones, cinematic, ultra detailed, 8k.",
     "movimento": "heavy rain falling, distant soft lightning flashes in the clouds, clouds drifting slowly",
     "capaFrase": "DESLIGUE A MENTE",
-    "capaDestaque": "MENTE"
+    "capaDestaque": "MENTE",
+    "somPrompt": "heavy rain with distant soft rolling thunder, deep and calm, no sharp cracks",
+    "musicaPrompt": "deep ambient drones, soft synth pads, very slow, dark and calm, meditative, no melody peaks"
   },
   {
     "id": "tema4",
@@ -42,7 +48,9 @@ const DORMIR_TEMAS = [
     "prompt": "Deserted tropical beach at night under a full moon, gentle waves reaching white sand, moonlight reflecting on the ocean, palm tree silhouettes, starry sky, serene, cinematic, ultra detailed, 8k.",
     "movimento": "gentle waves rolling onto the sand and back, moonlight shimmering on the water, palm leaves swaying gently",
     "capaFrase": "SONO PROFUNDO",
-    "capaDestaque": "PROFUNDO"
+    "capaDestaque": "PROFUNDO",
+    "somPrompt": "gentle ocean waves on a sandy beach at night, slow rhythm, calm, soft breeze",
+    "musicaPrompt": "ocean ambient, soft piano and airy pads, floating, slow 50 bpm, dreamy, moonlight"
   },
   {
     "id": "tema5",
@@ -53,7 +61,9 @@ const DORMIR_TEMAS = [
     "prompt": "Hidden waterfall in the Brazilian Atlantic Forest, crystal clear water falling into an emerald pool, sunlight rays through the mist, ferns and moss covered rocks, colorful tropical birds, magical and peaceful, cinematic, ultra detailed, 8k.",
     "movimento": "water falling down the waterfall, mist rising, light rays shimmering, leaves moving softly",
     "capaFrase": "ACALME A MENTE",
-    "capaDestaque": "MENTE"
+    "capaDestaque": "MENTE",
+    "somPrompt": "waterfall flowing into a pool in a tropical forest, distant birds, constant water sound",
+    "musicaPrompt": "nature ambient, soft flute, harp, gentle piano, zen, slow, spa relaxation"
   },
   {
     "id": "tema6",
@@ -64,7 +74,9 @@ const DORMIR_TEMAS = [
     "prompt": "Cozy apartment by a large window on a rainy afternoon, steaming cup of coffee and an open book on the windowsill, blurred city lights outside, rain drops on the glass, soft warm lamp, a piano in the corner, lo-fi cinematic, ultra detailed, 8k.",
     "movimento": "raindrops running down the window glass, steam rising from the coffee cup, city lights twinkling softly",
     "capaFrase": "PARE DE PENSAR",
-    "capaDestaque": "PENSAR"
+    "capaDestaque": "PENSAR",
+    "somPrompt": "light rain tapping on a window glass, soft, steady, indoor perspective",
+    "musicaPrompt": "solo soft piano, intimate, slow 60 bpm, rainy afternoon, lo-fi calm, emotional and gentle"
   },
   {
     "id": "tema7",
@@ -75,7 +87,9 @@ const DORMIR_TEMAS = [
     "prompt": "Peaceful forest clearing at sunrise, golden light rays through tall trees, morning mist over a small stream, wildflowers, a wooden bench, soft pastel colors, calm and healing atmosphere, cinematic, ultra detailed, 8k.",
     "movimento": "morning mist drifting, sun rays shimmering through the trees, leaves swaying in the breeze, stream flowing",
     "capaFrase": "PAZ NO CORAÇÃO",
-    "capaDestaque": "PAZ"
+    "capaDestaque": "PAZ",
+    "somPrompt": "peaceful forest morning, gentle stream, soft birdsong, light breeze in leaves",
+    "musicaPrompt": "healing ambient, soft piano, warm strings, slow, hopeful, calming, meditation"
   },
   {
     "id": "tema8",
@@ -86,7 +100,9 @@ const DORMIR_TEMAS = [
     "prompt": "View from inside a parked car at night on a quiet road, heavy rain on the windshield, blurred warm street lights and red bokeh, dashboard softly lit, cozy and safe feeling, cinematic, ultra detailed, 8k.",
     "movimento": "raindrops running down the windshield, blurred street lights twinkling softly",
     "capaFrase": "99% DORMEM",
-    "capaDestaque": "99%"
+    "capaDestaque": "99%",
+    "somPrompt": "rain hitting a car roof and windshield from inside the car, muffled, steady, cozy",
+    "musicaPrompt": "soft felt piano, warm ambient pads, slow 55 bpm, cozy rainy night, melancholic and calm, lullaby"
   },
   {
     "id": "tema9",
@@ -97,7 +113,9 @@ const DORMIR_TEMAS = [
     "prompt": "Old Brazilian farmhouse porch at night, wooden railing, hammock, light drizzle, fireflies over the field, starry sky with the Milky Way, warm yellow light from the door, nostalgic and peaceful, cinematic, ultra detailed, 8k.",
     "movimento": "fireflies blinking, light drizzle falling, hammock swaying slowly",
     "capaFrase": "CASA DA VÓ",
-    "capaDestaque": "VÓ"
+    "capaDestaque": "VÓ",
+    "somPrompt": "night countryside ambience, crickets, distant frogs, light drizzle, calm",
+    "musicaPrompt": "brazilian acoustic guitar, soft viola caipira, slow, nostalgic, peaceful night, calm"
   },
   {
     "id": "tema10",
@@ -108,6 +126,8 @@ const DORMIR_TEMAS = [
     "prompt": "Acoustic guitar leaning against a wooden chair by a window on a rainy night, candlelight, plants and a warm blanket, rain on the glass, green garden outside, intimate and cozy Brazilian home, cinematic, ultra detailed, 8k.",
     "movimento": "candle flame flickering, rain running down the window glass, plants swaying gently",
     "capaFrase": "NOITE TODA",
-    "capaDestaque": "NOITE"
+    "capaDestaque": "NOITE",
+    "somPrompt": "soft gentle rain outside a window at night, quiet, constant, peaceful",
+    "musicaPrompt": "brazilian nylon guitar, bossa nova lullaby, very soft, slow 55 bpm, intimate, calm"
   }
 ];
