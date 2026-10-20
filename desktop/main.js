@@ -1597,6 +1597,7 @@ app.whenReady().then(() => {
       const r = await Dormir.gerarVideo({
         ...opcoes,
         pasta: pastaDormir(),
+        fontsDir: fontsDir(),
         registrarCancelar: (fn) => (dormirTrabalho.cancelar = fn),
         onProgresso: (fase, pct, texto) => {
           dormirTrabalho.estado = { rodando: true, fase, pct, texto };

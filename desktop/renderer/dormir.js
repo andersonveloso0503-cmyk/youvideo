@@ -39,6 +39,8 @@ const Dormir = (() => {
     q('#drmTitulo').value = t.titulo;
     q('#drmDescricao').value = t.descricao.replace(/\[NOME DO CANAL\]/g, q('#drmCanal').value.trim() || '[NOME DO CANAL]');
     q('#drmTags').value = t.tags;
+    q('#drmCapaFrase').value = t.capaFrase || '';
+    q('#drmCapaDestaque').value = t.capaDestaque || '';
     q('#drmPrompt').value = t.prompt;
     q('#drmMovimento').value = t.movimento;
   }
@@ -180,6 +182,8 @@ const Dormir = (() => {
         horas: Number(q('#drmHoras').value),
         trocaMin: Number(q('#drmTroca').value),
         resolucao: q('#drmRes').value,
+        capaFrase: q('#drmCapaFrase').value.trim(),
+        capaDestaque: q('#drmCapaDestaque').value.trim(),
         nome,
       });
       q('#drmDica').textContent = `✓ Vídeo pronto (${horasTxt(D.pronto.duracao)}). Agora é só subir.`;

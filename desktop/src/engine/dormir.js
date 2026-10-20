@@ -14,6 +14,7 @@ const { fal } = require('@fal-ai/client');
 const { rodar, probe } = require('./ffmpeg');
 const Central = require('./central');
 const { gerarMiniatura } = require('./miniatura');
+const { gerarCapaChamativa } = require('./capa');
 
 const FPS = 30;
 const MODELO_IMAGEM = 'fal-ai/flux-pro/v1.1-ultra';
@@ -327,10 +328,19 @@ async function gerarVideo(op) {
     // 4) Capa: a imagem da primeira cena, com o mesmo nome do vídeo (o "Subir p/ YouTube" encontra sozinho)
     avisar('capa', 0.99, 'Fazendo a capa');
     const capa = arquivo.slice(0, -4) + '.jpg';
+    const baseCapa = cenas[0].imagem || cenas[0].video;
     try {
-      await gerarMiniatura(cenas[0].imagem || cenas[0].video, capa);
+      if (op.capaFrase && op.fontsDir) {
+        await gerarCapaChamativa(baseCapa, { usarIa: false, frase: op.capaFrase, destaque: op.capaDestaque, suave: true, fontsDir: op.fontsDir, destino: capa });
+      } else {
+        await gerarMiniatura(baseCapa, capa);
+      }
     } catch {
-      /* sem capa: o YouTube escolhe um quadro */
+      try {
+        await gerarMiniatura(baseCapa, capa);
+      } catch {
+        /* sem capa: o YouTube escolhe um quadro */
+      }
     }
     avisar('pronto', 1, 'Pronto');
     return { arquivo, duracao, capa: fs.existsSync(capa) ? capa : null };

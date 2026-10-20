@@ -123,10 +123,12 @@ function montarAss({ W, H, frase, destaque, curto }) {
 
 /**
  * Gera a capa. base = imagem ou vídeo (pega um quadro). Devolve o caminho do JPG (até 2 MB).
- * opcoes: { groqKey, falKey, usarIa, titulo, descricao, curto, fontsDir, destino }
+ * opcoes: { groqKey, falKey, usarIa, titulo, descricao, curto, fontsDir, destino, frase?, destaque?, suave? }
+ * frase/destaque já prontos pulam a IA do texto; suave = cores naturais, sem vinheta (vídeos de dormir/relaxar).
  */
 async function gerarCapaChamativa(base, opcoes) {
-  const { groqKey, falKey, usarIa = true, titulo, descricao, curto = false, fontsDir, destino } = opcoes;
+  const { groqKey, falKey, usarIa = true, titulo, descricao, curto = false, fontsDir, destino, suave = false } = opcoes;
+  const fraseFixa = String(opcoes.frase || '').trim().toUpperCase();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'youvideo-capa-'));
   try {
     const [W, H] = curto ? [1080, 1920] : [1280, 720];
@@ -140,7 +142,9 @@ async function gerarCapaChamativa(base, opcoes) {
     // 2) Nano Banana (opcional) e a frase, ao mesmo tempo
     const [turbinada, { frase, destaque }] = await Promise.all([
       usarIa ? turbinarImagem(falKey, img, curto, path.join(dir, 'ia.jpg')) : Promise.resolve(null),
-      fraseDeEfeito(groqKey, { titulo, descricao }),
+      fraseFixa
+        ? Promise.resolve({ frase: fraseFixa, destaque: String(opcoes.destaque || '').trim().toUpperCase() || fraseFixa.split(' ').pop() })
+        : fraseDeEfeito(groqKey, { titulo, descricao }),
     ]);
     if (turbinada) img = turbinada;
 
@@ -149,7 +153,7 @@ async function gerarCapaChamativa(base, opcoes) {
     const fontes = path.join(dir, 'fonts');
     fs.mkdirSync(fontes);
     for (const f of fs.readdirSync(fontsDir)) fs.copyFileSync(path.join(fontsDir, f), path.join(fontes, f));
-    const filtro = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,eq=contrast=1.08:saturation=1.25,vignette=PI/5,ass=capa.ass:fontsdir=fonts`;
+    const filtro = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,${suave ? 'eq=contrast=1.04:saturation=1.12' : 'eq=contrast=1.08:saturation=1.25,vignette=PI/5'},ass=capa.ass:fontsdir=fonts`;
     for (const q of [2, 4, 7, 11]) {
       await rodar(['-loop', '1', '-t', '1', '-i', path.basename(img) === 'base.jpg' ? 'base.jpg' : img, '-vf', filtro, '-frames:v', '1', '-q:v', String(q), '-y', 'capa.jpg'], { cwd: dir }).promise;
       if (fs.statSync(path.join(dir, 'capa.jpg')).size <= LIMITE) break;
