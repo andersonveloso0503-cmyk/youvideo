@@ -263,7 +263,14 @@ const FabMusica = (() => {
         const arquivo = await window.api.envio.escolherCapa();
         if (!arquivo) return;
         const r = await window.api.musicaAuto.usarCapa({ id: b.dataset.id, arquivo });
-        avisar(r?.noYoutube ? 'Capa trocada — e já trocada no YouTube' : 'Capa trocada — ela vai como thumbnail quando o álbum subir');
+        avisar(
+          r?.noYoutube
+            ? 'Capa trocada — e já trocada no YouTube'
+            : r?.jaSubiu
+              ? 'Capa trocada aqui, mas não achei o envio deste álbum na Fila (foi limpa?). No YouTube Studio, abra o vídeo → Miniatura → Enviar arquivo e escolha a sua imagem.'
+              : 'Capa trocada — ela vai como thumbnail quando o álbum subir',
+          !r?.noYoutube && r?.jaSubiu
+        );
       } catch (e) {
         avisar(msgErro(e), true);
       }

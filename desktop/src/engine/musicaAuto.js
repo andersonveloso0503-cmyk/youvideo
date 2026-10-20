@@ -693,6 +693,12 @@ class MusicaAuto {
     return a.capa;
   }
 
+  /** Capa atual do álbum (para o envio usar a mais nova, mesmo que a janela de subir tenha aberto antes). */
+  capaAtual(id) {
+    const a = this.estado.albuns.find((x) => x.id === id);
+    return a?.capa?.capaArquivo && fs.existsSync(a.capa.capaArquivo) ? a.capa.capaArquivo : null;
+  }
+
   /** 📝 Prompt da capa para o dono gerar no Gemini (app/site) com a conta dele e trazer a imagem depois. */
   promptCapa(id) {
     const a = this.estado.albuns.find((x) => x.id === id);
@@ -769,6 +775,7 @@ Coloque o texto do lado oposto ao rosto do cantor e deixe o canto inferior direi
           // vídeo longo usa a capa do Gemini; o Short usa a miniatura dele (em pé)
           capa: curto ? j.capa || null : a.capa?.capaArquivo || j.capa || null,
           capaManual: !curto && !!a.capa?.capaArquivo,
+          albumId: curto ? undefined : a.id, // na hora de subir, pega a capa ATUAL do álbum (a que o dono trouxe)
           musicas: (j.timeline || []).map((t) => ({ titulo: t.titulo, inicio: t.inicio })),
           clima: j.clima || '',
           idioma: a.idioma === 'en' ? 'en' : undefined, // álbum em inglês: título e descrição do YouTube em inglês

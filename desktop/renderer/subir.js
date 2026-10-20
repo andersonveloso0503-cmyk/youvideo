@@ -298,6 +298,7 @@ const Subir = (() => {
       capa: v.capa || v.previa || null,
       capaManual: !!v.capaManual,
       curto: v.curto,
+      ...(v.albumId ? { albumId: v.albumId } : {}),
       // Vídeo feito fora (ex.: desenho infantil pronto): marca "para crianças" e entra na playlist escolhida
       ...(q('#cCriancas').checked ? { paraCriancas: true, semBotao: true } : {}),
       ...(q('#inPlaylistEnvio').value.trim() ? { playlist: { titulo: q('#inPlaylistEnvio').value.trim().slice(0, 150), descricao: '' } } : {}),

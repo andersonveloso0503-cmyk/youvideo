@@ -1163,7 +1163,7 @@ app.whenReady().then(() => {
         return { ok: true, noYoutube: true };
       }
     }
-    return { ok: true, noYoutube: false };
+    return { ok: true, noYoutube: false, jaSubiu: a?.fase === 'aprovado', arquivo: capa?.capaArquivo || null };
   }
   ipcMain.handle('musicaAuto:paraSubir', (_e, id) => musicaAuto.paraSubir(id));
   ipcMain.handle('musicaAuto:aprovar', (_e, id) => musicaAuto.aprovar(id));
@@ -1576,6 +1576,16 @@ app.whenReady().then(() => {
     if (!Array.isArray(lista) || !lista.length) throw new Error('Nenhum vídeo para subir.');
     const livres = 100 - enviosHoje();
     if (lista.length > livres) throw new Error(`Hoje só dá para subir mais ${Math.max(0, livres)} vídeo(s) (limite do YouTube: 100 por dia).`);
+    // Vídeo longo de álbum da Fábrica de Música: usa a capa ATUAL do álbum (📥 Trazer capa / 🎨 Refazer capa),
+    // e não a que estava na janela quando ela abriu
+    for (const e of lista) {
+      if (!e.albumId || !musicaAuto) continue;
+      const atual = musicaAuto.capaAtual(e.albumId);
+      if (atual) {
+        e.capa = atual;
+        e.capaManual = true;
+      }
+    }
     return fila.adicionarEnvios(lista).length;
   });
 
