@@ -292,6 +292,7 @@ function regrasTituloMusica(ano, info) {
 6. Use o gênero que o vídeo realmente tem (o do PEDIDO DO DONO, o da pasta ou o das músicas). Não invente "blues", "rock" ou "eletrônico" se não for o caso.
 7. NÃO repita o estilo nas duas partes (ERRADO: "Playlist Gospel Sertanejo | Louvor Sertanejo para Ouvir"). A parte depois do " | " é sempre uma FRASE DE SENTIMENTO ou de fé, não outra palavra-chave. Não comece com "Playlist". Nada de "Volume 2", "Vol. 2".
 8. Para Shorts: só o nome da música + " | " + o estilo ("Fidelidade Solar | Sertanejo Gospel Animado"), e no máximo 1 emoji.
+9. Frases que estão EM ALTA no YouTube agora (pesquisa de out/2026, vídeos com 300 mil a 900 mil views) — use como inspiração para a parte depois do " | " ou para o começo: "Louvores Que Trazem Paz Para a Alma", "Louvores Que Restauram o Coração", "Para Quem Precisa de Deus", "Adoração Que Cura e Liberta", "As Melhores Músicas Gospel Mais Tocadas", "Louvores de Adoração ${ano}", "Para Orar e Agradecer", "Deus Cuida de Você Enquanto Você Dorme", "Deus Restaura Sua Família Hoje". Se o vídeo é de música calma para a noite, comece com "Louvores Para Dormir". Números grandes chamam clique em vídeo longo ("100 Louvores Que Trazem Força e Paz", "3 Horas de Paz") — só use se for verdade.
 Exemplos da FORMA (os que mais deram views no canal): "Sertanejo Gospel De Madrugada | Oração Que Acalma A Alma", "Sertanejo Gospel ${ano} | Venha Dançar Com Nossos Louvores", "Graça Que Me Alcançou 🎶 Louvores em Pagode | Pagode Gospel", "Modão Gospel Saudade | Louvores Que Marcaram Gerações".`;
 }
 

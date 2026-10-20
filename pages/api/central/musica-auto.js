@@ -216,8 +216,8 @@ Reply only JSON:
 Coletânea de músicas ${gospel ? 'GOSPEL ' : ''}no estilo ${estilo}. Algumas músicas: ${titulos.join('; ') || '(sem títulos)'}.
 ${evitar.length ? `Não repita estes títulos de capas que já fiz: ${evitar.join('; ')}.\n` : ''}
 Responda só JSON:
-{"titulo": "título da capa em MAIÚSCULAS, 2 a 4 palavras, português correto, FORTE e chamativo como as capas dos canais gospel que mais crescem (ex.: OS MELHORES LOUVORES, LOUVORES PODEROSOS, HINOS QUE TOCAM A ALMA, SERTANEJO GOSPEL QUE EMOCIONA, LOUVORES PRA DANÇAR). PROIBIDO nome de álbum vago (ERRADO: GOSPEL DE LUZ, SONS DA FÉ)",
- "subtitulo": "linha menor em MAIÚSCULAS, até 4 palavras que dão vontade de clicar (ex.: AS MAIS TOCADAS ${ano} / 1 HORA SEM PARAR / PARA OUVIR NA ESTRADA). Nunca VOL. 2",
+{"titulo": "título da capa em MAIÚSCULAS, 2 a 4 palavras, português correto, FORTE e chamativo como as capas dos canais gospel que mais crescem (ex.: OS MELHORES LOUVORES, LOUVORES PODEROSOS, HINOS QUE TOCAM A ALMA, SERTANEJO GOSPEL QUE EMOCIONA, LOUVORES PRA DANÇAR, LOUVORES QUE CURAM, ADORAÇÃO QUE LIBERTA, PAZ PARA A ALMA, LOUVORES PARA DORMIR quando for música calma). PROIBIDO nome de álbum vago (ERRADO: GOSPEL DE LUZ, SONS DA FÉ)",
+ "subtitulo": "linha menor em MAIÚSCULAS, até 4 palavras que dão vontade de clicar (ex.: AS MAIS TOCADAS ${ano} / 1 HORA SEM PARAR / PARA OUVIR NA ESTRADA / PARA QUEM PRECISA DE DEUS / DEUS RESTAURA SUA FAMÍLIA). Nunca VOL. 2",
  "cena": "em INGLÊS, 1 a 2 frases: a cena da capa com um(a) cantor(a) fictício(a) cantando ou tocando, o cenário e a luz que combinam com o estilo e o clima${gospel ? ' (louvor, fé, luz suave do céu, sem símbolos de outras religiões)' : ''}"}`);
     let titulo = limparTexto(ideia.titulo, 40).toUpperCase() || (gospel ? 'OS MELHORES LOUVORES' : `${estilo.toUpperCase()} AS MELHORES`);
     if (/\bVOL\.?\s*\d/.test(titulo) || titulo.split(/\s+/).length > 5) titulo = gospel ? 'LOUVORES PODEROSOS' : `${estilo.toUpperCase()} AS MELHORES`;
