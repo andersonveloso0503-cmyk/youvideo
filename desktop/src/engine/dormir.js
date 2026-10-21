@@ -81,9 +81,12 @@ async function gerarCena({ falKey, prompt, movimento, indice = 0, animar = true,
   onStatus && onStatus('Animando a cena (leva uns minutos)');
   const textoMovimento =
     `${String(movimento || 'gentle natural motion: rain, water, leaves and light moving softly').trim()}. ` +
-    'Calm, slow, subtle and continuous motion, static camera, no people. The motion loops smoothly and ends exactly like the first frame.';
+    'Calm and slow but clearly visible, continuous motion in the whole scene, static camera, no people, no cuts. ' +
+    'The movement is steady and repetitive so it can be looped.';
+  // Sem end_image_url: pedir que o vídeo termine igual ao começo faz o modelo quase não mexer a cena.
+  // O loop sem pulo é feito depois, na montagem (fade entre o fim e o começo do clipe).
   const v = await fal.subscribe(MODELO_ANIMACAO, {
-    input: { prompt: textoMovimento, image_url: urlImg, end_image_url: urlImg, resolution: '720p', aspect_ratio: '16:9' },
+    input: { prompt: textoMovimento, image_url: urlImg, resolution: '720p', aspect_ratio: '16:9' },
     logs: false,
     onQueueUpdate: (u) => {
       if (u.status === 'IN_QUEUE') onStatus && onStatus('Na fila da fal.ai (animação)');
@@ -111,11 +114,8 @@ async function clipeDaCena(cena, destino, { W, H, cancelar }) {
   if (cena.video) {
     const info = await probe(cena.video);
     let d = Math.max(1, info.duracao || 5);
-    if (cena.ia) {
-      // A animação da IA já começa e termina no mesmo quadro: é só repetir
-      args = ['-i', cena.video, '-vf', ajustar, '-t', d.toFixed(3)];
-    } else {
-      // Vídeo do PC: emenda o fim no começo com um fade (sem pulo ao repetir). Usa no máximo 60 s.
+    {
+      // Vídeo (da IA ou do PC): emenda o fim no começo com um fade (sem pulo ao repetir). Usa no máximo 60 s.
       d = Math.min(d, 60);
       const X = Math.min(1.5, d / 4);
       args = [
@@ -130,12 +130,13 @@ async function clipeDaCena(cena, destino, { W, H, cancelar }) {
       ];
     }
   } else {
-    // Imagem parada: zoom bem suave que vai e volta (começa e termina igual), 20 s
+    // Imagem parada: zoom + deslize lento que vai e volta (começa e termina igual), 20 s.
+    // (antes era só 6% de zoom, que na tela parecia imagem parada)
     const quadros = FPS * 20;
     args = [
       '-loop', '1', '-framerate', String(FPS), '-t', '20', '-i', cena.imagem, '-vf',
       `scale=${W * 2}:${H * 2}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W * 2}:${H * 2},` +
-        `zoompan=z='1+0.06*(1-cos(2*PI*on/${quadros}))/2':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p`,
+        `zoompan=z='1+0.16*(1-cos(2*PI*on/${quadros}))/2':x='(iw-iw/zoom)/2*(1+0.9*sin(2*PI*on/${quadros}))':y='(ih-ih/zoom)/2*(1+0.5*sin(2*PI*on/${quadros}+1))':d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p`,
       '-frames:v', String(quadros),
     ];
   }
