@@ -453,6 +453,7 @@ const Dormir = (() => {
       q('#drsCriar').disabled = !n || !!estado?.rodando;
     }
 
+    const selecao = new Set();
     function render() {
       const box = q('#drsDias');
       box.innerHTML = '';
@@ -474,31 +475,6 @@ const Dormir = (() => {
         l.querySelector('.passo').textContent = ESTADOS[d.passo] || d.passo;
         l.querySelector('.etapa').textContent = d.erro ? `⚠ ${d.erro}` : d.etapa;
         box.appendChild(l);
-        // Dia já agendado com cena ruim: refaz só as cenas (som e músicas são reaproveitados)
-        if (d.passo === 'agendado' && !rodando) {
-          const r = document.createElement('div');
-          r.style.cssText = 'margin:-2px 0 6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
-          r.innerHTML = '<button class="btn-mini" data-refazer>🎬 Refazer só as cenas</button><small style="color:var(--mudo)">Reaproveita o som e as músicas. O vídeo antigo continua no YouTube até você apagar.</small>';
-          r.querySelector('[data-refazer]').onclick = async (ev) => {
-            if (!confirm(`Refazer só as cenas de "${d.tema.nome}"? Gasta crédito só nas cenas novas. O novo vídeo aparece aqui para você aprovar antes de ir para a fila.`)) return;
-            ev.target.disabled = true;
-            q('#drsErro').textContent = '';
-            try {
-              estado = await window.api.dormir.semanaRefazerCenas({ i, forcar: false });
-            } catch (e) {
-              const m = msgErro(e);
-              if (m.startsWith('FALTAM_SONS') && confirm(m.replace('FALTAM_SONS: ', '') + '\n\nRefazer mesmo assim?')) {
-                try {
-                  estado = await window.api.dormir.semanaRefazerCenas({ i, forcar: true });
-                } catch (e2) {
-                  q('#drsErro').textContent = msgErro(e2);
-                }
-              } else if (!m.startsWith('FALTAM_SONS')) q('#drsErro').textContent = m;
-            }
-            render();
-          };
-          box.appendChild(r);
-        }
         // Vídeo pronto esperando você: player para assistir + Aprovar / Tentar outro
         if (d.passo === 'aprovar' && !d.aprovado && d.video?.arquivo) {
           const p = document.createElement('div');
@@ -531,6 +507,85 @@ const Dormir = (() => {
           box.appendChild(p);
         }
       });
+      desenharCards(box, rodando);
+    }
+
+    // Cartões com mini-preview de cada vídeo pronto; marque os que quer refazer (só as cenas)
+    function desenharCards(box, rodando) {
+      const prontos = estado.dias.map((d, i) => ({ d, i })).filter(({ d }) => d.passo === 'agendado' && d.video?.arquivo);
+      if (!prontos.length || rodando) return;
+      for (const k of [...selecao]) if (!prontos.some((x) => x.i === k)) selecao.delete(k);
+      const bar = document.createElement('div');
+      bar.style.cssText = 'margin:12px 0 6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+      bar.innerHTML =
+        '<b>🎞 Seus vídeos prontos</b><button class="btn-mini" data-todos></button>' +
+        '<button class="btn-primario" data-refazer></button>' +
+        '<small style="color:var(--mudo)">Passe o mouse para ver o movimento. Refazer troca só as cenas; som e músicas ficam. O vídeo antigo continua no YouTube até você apagar.</small>';
+      const grade = document.createElement('div');
+      grade.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px';
+      const atualizarBarra = () => {
+        bar.querySelector('[data-todos]').textContent = selecao.size === prontos.length ? 'Desmarcar todos' : 'Marcar todos';
+        const b = bar.querySelector('[data-refazer]');
+        b.textContent = selecao.size ? `🎬 Refazer cenas selecionadas (${selecao.size})` : '🎬 Marque os vídeos';
+        b.disabled = !selecao.size;
+        grade.querySelectorAll('.drs-card').forEach((c) => {
+          const on = selecao.has(Number(c.dataset.i));
+          c.style.borderColor = on ? 'var(--primaria, #6c8cff)' : 'var(--borda)';
+          c.querySelector('input').checked = on;
+        });
+      };
+      for (const { d, i } of prontos) {
+        const c = document.createElement('div');
+        c.className = 'drs-card';
+        c.dataset.i = i;
+        c.style.cssText = 'border:1px solid var(--borda);border-radius:10px;overflow:hidden;display:flex;flex-direction:column';
+        c.innerHTML =
+          '<video muted loop playsinline preload="metadata" style="width:100%;aspect-ratio:16/9;object-fit:cover;background:#000;cursor:pointer"></video>' +
+          '<label style="display:flex;gap:8px;align-items:center;padding:8px 10px;cursor:pointer;font-size:12.5px"><input type="checkbox" /><span><b class="n"></b><br><small class="q" style="color:var(--mudo)"></small></span></label>';
+        const v = c.querySelector('video');
+        v.src = urlArquivo(d.video.arquivo) + '#t=4';
+        v.onmouseenter = () => v.play().catch(() => {});
+        v.onmouseleave = () => { if (!v.controls) { v.pause(); } };
+        v.onclick = () => { v.controls = true; v.muted = false; v.play().catch(() => {}); };
+        c.querySelector('.n').textContent = d.tema.nome;
+        c.querySelector('.q').textContent = dataBR(d.quando) + (d.tentativa ? ` · refeito ${d.tentativa}x` : '');
+        c.querySelector('input').onchange = (ev) => {
+          if (ev.target.checked) selecao.add(i); else selecao.delete(i);
+          atualizarBarra();
+        };
+        grade.appendChild(c);
+      }
+      bar.querySelector('[data-todos]').onclick = () => {
+        if (selecao.size === prontos.length) selecao.clear(); else prontos.forEach((x) => selecao.add(x.i));
+        atualizarBarra();
+      };
+      bar.querySelector('[data-refazer]').onclick = async (ev) => {
+        const idx = [...selecao].sort((a, b) => a - b);
+        const nomes = idx.map((i) => estado.dias[i].tema.nome).join(', ');
+        if (!confirm(`Refazer só as cenas de: ${nomes}?\nGasta crédito só nas cenas novas. Cada vídeo novo aparece aqui para você aprovar antes de ir para a fila.`)) return;
+        ev.target.disabled = true;
+        q('#drsErro').textContent = '';
+        try {
+          estado = await window.api.dormir.semanaRefazerCenas({ i: idx, forcar: false });
+          selecao.clear();
+        } catch (e) {
+          const m = msgErro(e);
+          if (m.startsWith('FALTAM_SONS')) {
+            if (confirm(m.replace('FALTAM_SONS: ', '') + '\n\nRefazer mesmo assim?')) {
+              try {
+                estado = await window.api.dormir.semanaRefazerCenas({ i: idx, forcar: true });
+                selecao.clear();
+              } catch (e2) {
+                q('#drsErro').textContent = msgErro(e2);
+              }
+            }
+          } else q('#drsErro').textContent = m;
+        }
+        render();
+      };
+      box.appendChild(bar);
+      box.appendChild(grade);
+      atualizarBarra();
     }
 
     async function criar() {

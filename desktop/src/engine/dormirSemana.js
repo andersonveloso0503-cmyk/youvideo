@@ -180,32 +180,35 @@ class DormirSemana {
    * O vídeo novo passa pela prévia (você aprova) e entra na fila no mesmo dia e hora.
    * Se o vídeo antigo já foi para a fila de envio, o arquivo dele não é apagado.
    */
-  refazerCenas(i, { forcar = false } = {}) {
-    const dia = this.estado?.dias?.[i];
-    if (!dia) throw new Error('Dia não encontrado.');
+  refazerCenas(indices, { forcar = false } = {}) {
+    const lista = [...new Set((Array.isArray(indices) ? indices : [indices]).map(Number))];
+    const dias = lista.map((i) => this.estado?.dias?.[i]);
+    if (!lista.length || dias.some((d) => !d)) throw new Error('Dia não encontrado.');
     if (this.rodando) throw new Error('Espere o que está sendo feito terminar (ou cancele) para refazer as cenas.');
     const existe = (l) => (l || []).filter((x) => x?.arquivo && fs.existsSync(x.arquivo)).length;
-    const faltaSom = (dia.sons || []).length > existe(dia.sons) || (dia.musicas || []).length > existe(dia.musicas) || existe(dia.sons) + existe(dia.musicas) === 0;
-    if (faltaSom && !forcar) throw new Error('FALTAM_SONS: o som ambiente ou as músicas deste dia não estão mais no PC. Refazer vai gastar crédito deles também.');
+    const semSom = dias.filter((dia) => (dia.sons || []).length > existe(dia.sons) || (dia.musicas || []).length > existe(dia.musicas) || existe(dia.sons) + existe(dia.musicas) === 0);
+    if (semSom.length && !forcar) throw new Error(`FALTAM_SONS: o som ambiente ou as músicas de ${semSom.map((d) => `"${d.tema.nome}"`).join(', ')} não estão mais no PC. Refazer vai gastar crédito deles também.`);
     const base = path.resolve(this.pastaBase());
     const apagar = (f) => {
       try {
         if (f && path.resolve(f).startsWith(base + path.sep)) fs.rmSync(f, { force: true });
       } catch {}
     };
-    for (const c of dia.cenas || []) [c.imagem, c.video].forEach(apagar);
-    if (dia.passo !== 'agendado') [dia.video?.arquivo, dia.video?.capa].forEach(apagar); // o já enviado fica
-    this.marcar(dia, {
-      passo: 'cenas',
-      cenas: [],
-      video: null,
-      aprovado: false,
-      exigeAprovar: true,
-      fila: true,
-      tentativa: (dia.tentativa || 0) + 1,
-      erro: '',
-      etapa: 'Refazendo só as cenas (o som e as músicas ficam)',
-    });
+    for (const dia of dias) {
+      for (const c of dia.cenas || []) [c.imagem, c.video].forEach(apagar);
+      if (dia.passo !== 'agendado') [dia.video?.arquivo, dia.video?.capa].forEach(apagar); // o já enviado fica
+      this.marcar(dia, {
+        passo: 'cenas',
+        cenas: [],
+        video: null,
+        aprovado: false,
+        exigeAprovar: true,
+        fila: true,
+        tentativa: (dia.tentativa || 0) + 1,
+        erro: '',
+        etapa: 'Na fila para refazer só as cenas (o som e as músicas ficam)',
+      });
+    }
     this.refazer = true;
     return this.rodar({ soFila: true });
   }
