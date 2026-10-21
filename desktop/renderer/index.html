@@ -431,6 +431,7 @@
         <label>Qualidade <select id="drsRes"><option value="720">720p</option><option value="1080" selected>1080p</option></select></label>
         <label>Cenas por vídeo <select id="drsCenas"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
         <label class="interruptor"><input type="checkbox" id="drsAnimar" checked /><span></span> Animar cenas</label>
+        <label class="interruptor" title="Cada vídeo pronto aparece aqui com um player. Você assiste e aprova (aí ele vai para a fila de envio) ou pede outro (ele refaz as cenas)."><input type="checkbox" id="drsAprovar" checked /><span></span> Eu aprovo cada vídeo antes de agendar</label>
       </div>
       <div class="can-linha">
         <label>Músicas por vídeo <select id="drsMusicas"><option value="0">Nenhuma (só som ambiente)</option><option value="4">4</option><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option></select></label>
@@ -531,6 +532,7 @@
       </div>
       <div class="drm-barra" id="drmBarra" hidden><i></i></div>
       <p class="nota" id="drmDica"></p>
+      <video id="drmPrevia" controls preload="metadata" hidden style="width:100%;max-width:760px;border-radius:10px;margin-top:8px;background:#000"></video>
       <p class="modal-erro" id="drmErro"></p>
       <div class="can-linha">
         <button class="btn-primario" id="drmGerar" disabled>🌙 Gerar o vídeo</button>

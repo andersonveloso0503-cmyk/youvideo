@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const Dormir = require('./dormir');
 
-const PASSOS = ['cenas', 'som', 'musicas', 'video', 'agendado'];
+const PASSOS = ['cenas', 'som', 'musicas', 'video', 'aprovar', 'agendado'];
 
 async function emLotes(n, total, fn) {
   let i = 0;
@@ -96,32 +96,82 @@ class DormirSemana {
     if (this.cancelado) throw new Error('CANCELADO');
   }
 
-  async rodar() {
+  async rodar({ soFila = false } = {}) {
     if (this.rodando || !this.estado) return this.paraTela();
     this.rodando = true;
     this.cancelado = false;
     this.salvar();
     try {
-      for (const dia of this.estado.dias) {
-        if (dia.passo === 'agendado') continue;
-        if (this.cancelado) break;
-        try {
-          await this.fazerDia(dia);
-        } catch (e) {
-          if (String(e?.message || e) === 'CANCELADO') {
-            this.marcar(dia, { etapa: 'Cancelado (clique em Continuar para seguir)', erro: '' });
-            break;
-          }
-          // Um dia com problema não segura a semana: marca e segue para o próximo
-          this.marcar(dia, { etapa: 'Deu erro', erro: String(e?.message || e).slice(0, 300) });
-        }
-      }
+      // 1ª passada: tudo que falta. Se você aprovar ou recusar um vídeo enquanto o app ainda trabalha,
+      // ele faz mais uma passada, só com os dias que você mexeu (sem tentar de novo os que deram erro).
+      let primeira = !soFila;
+      do {
+        this.refazer = false;
+        await this.passar(primeira);
+        primeira = false;
+      } while (this.refazer && !this.cancelado);
     } finally {
       this.rodando = false;
       this.cancelarAtual = null;
       this.salvar();
     }
     return this.paraTela();
+  }
+
+  async passar(primeira) {
+    for (const dia of this.estado.dias) {
+      if (dia.passo === 'agendado') continue;
+      if (dia.passo === 'aprovar' && !dia.aprovado) continue; // esperando a sua decisão
+      if (!primeira && !dia.fila) continue;
+      if (this.cancelado) break;
+      dia.fila = false;
+      try {
+        await this.fazerDia(dia);
+      } catch (e) {
+        if (String(e?.message || e) === 'CANCELADO') {
+          this.marcar(dia, { etapa: 'Cancelado (clique em Continuar para seguir)', erro: '' });
+          break;
+        }
+        // Um dia com problema não segura a semana: marca e segue para o próximo
+        this.marcar(dia, { etapa: 'Deu erro', erro: String(e?.message || e).slice(0, 300) });
+      }
+    }
+  }
+
+  /** Você viu a prévia e gostou: agora sim vai para a fila de envio agendado. */
+  aprovar(i) {
+    const dia = this.estado?.dias?.[i];
+    if (!dia || dia.passo !== 'aprovar') throw new Error('Esse vídeo não está esperando aprovação.');
+    this.marcar(dia, { aprovado: true, passo: 'video', fila: true, etapa: 'Aprovado: indo para a fila de envio' });
+    this.refazer = true;
+    return this.rodar({ soFila: true });
+  }
+
+  /** Não gostou: apaga as cenas e o vídeo deste dia e faz tudo de novo com cenas novas (o som e as músicas ficam). */
+  recusar(i) {
+    const dia = this.estado?.dias?.[i];
+    if (!dia || dia.passo !== 'aprovar') throw new Error('Esse vídeo não está esperando aprovação.');
+    const base = path.resolve(this.pastaBase());
+    const apagar = (f) => {
+      try {
+        // só apaga arquivos que o próprio app criou, dentro da pasta dele
+        if (f && path.resolve(f).startsWith(base + path.sep)) fs.rmSync(f, { force: true });
+      } catch {}
+    };
+    for (const c of dia.cenas || []) [c.imagem, c.video].forEach(apagar);
+    [dia.video?.arquivo, dia.video?.capa].forEach(apagar);
+    this.marcar(dia, {
+      passo: 'cenas',
+      cenas: [],
+      video: null,
+      aprovado: false,
+      fila: true,
+      tentativa: (dia.tentativa || 0) + 1,
+      erro: '',
+      etapa: 'Você pediu outro: criando novas cenas',
+    });
+    this.refazer = true;
+    return this.rodar({ soFila: true });
   }
 
   async fazerDia(dia) {
@@ -142,7 +192,8 @@ class DormirSemana {
       let erro = '';
       await emLotes(2, faltam, async (k) => {
         if (this.cancelado) return;
-        const indice = baseCenas + k;
+        // Cada "tentar outro" muda o ângulo da cena (as variações andam de 2 em 2), então vem algo diferente
+        const indice = baseCenas + k + (dia.tentativa || 0) * 2;
         for (let tent = 0; tent < 2 && !this.cancelado; tent++) {
           try {
             const c = await Dormir.gerarCena({ falKey: cfg.falKey, prompt: t.prompt, movimento: t.movimento, indice, animar: p.animar !== false, pasta: path.join(pasta, 'cenas') });
@@ -235,6 +286,12 @@ class DormirSemana {
       });
       this.cancelarAtual = null;
       this.marcar(dia, { video: r, etapa: 'Vídeo pronto' });
+    }
+
+    // 4b) Prévia: o vídeo só vai para o YouTube depois que você assistir e aprovar
+    if (p.aprovar !== false && !dia.aprovado) {
+      this.marcar(dia, { passo: 'aprovar', etapa: 'Pronto! Assista a prévia e aprove, ou peça outro' });
+      return;
     }
 
     // 5) Agendar no YouTube (sobe agora como privado e publica sozinho no dia/hora)

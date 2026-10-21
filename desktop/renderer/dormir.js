@@ -202,11 +202,28 @@ const Dormir = (() => {
   }
 
 
+  // Prévia do vídeo pronto (modo manual): assista antes de clicar em "Subir"
+  function previa() {
+    const v = q('#drmPrevia');
+    if (!v) return;
+    if (D.pronto?.arquivo && !D.rodando) {
+      if (v.dataset.src !== D.pronto.arquivo) {
+        v.src = urlArquivo(D.pronto.arquivo);
+        v.dataset.src = D.pronto.arquivo;
+      }
+      v.hidden = false;
+    } else {
+      try { v.pause(); } catch {}
+      v.hidden = true;
+    }
+  }
+
   async function gerar() {
     const cenas = D.cenas.filter((c) => !c.gerando && !c.erro).map(({ imagem, video, ia }) => ({ imagem, video, ia }));
     salvar();
     D.rodando = true;
     D.pronto = null;
+    previa();
     q('#drmErro').textContent = '';
     q('#drmBarra').hidden = false;
     q('#drmBarra i').style.width = '0%';
@@ -228,13 +245,14 @@ const Dormir = (() => {
         capaDestaque: q('#drmCapaDestaque').value.trim(),
         nome,
       });
-      q('#drmDica').textContent = `✓ Vídeo pronto (${horasTxt(D.pronto.duracao)}). Agora é só subir.`;
+      q('#drmDica').textContent = `✓ Vídeo pronto (${horasTxt(D.pronto.duracao)}). Agora é só subir.`; previa();
     } catch (e) {
       const m = msgErro(e);
       q('#drmDica').textContent = m === 'CANCELADO' ? 'Cancelado.' : '';
       if (m !== 'CANCELADO') q('#drmErro').textContent = m;
     } finally {
       D.rodando = false;
+      previa();
       q('#drmBarra').hidden = !D.pronto;
       pintar();
     }
@@ -349,7 +367,7 @@ const Dormir = (() => {
     }
     renderCenas();
     renderSons();
-    if (D.pronto && !D.rodando) q('#drmDica').textContent = `✓ Vídeo pronto (${horasTxt(D.pronto.duracao)}). Agora é só subir.`;
+    if (D.pronto && !D.rodando) q('#drmDica').textContent = `✓ Vídeo pronto (${horasTxt(D.pronto.duracao)}). Agora é só subir.`; previa();
     if (!q('#modalDormir').open) q('#modalDormir').showModal();
   }
 
@@ -362,7 +380,7 @@ const Dormir = (() => {
       D.rodando = false;
       if (est?.fase === 'pronto') {
         D.pronto = est.video;
-        q('#drmDica').textContent = `✓ Vídeo pronto (${horasTxt(D.pronto.duracao)}). Agora é só subir.`;
+        q('#drmDica').textContent = `✓ Vídeo pronto (${horasTxt(D.pronto.duracao)}). Agora é só subir.`; previa();
       } else if (est?.fase === 'erro') {
         q('#drmErro').textContent = est.texto;
         q('#drmBarra').hidden = true;
@@ -375,7 +393,7 @@ const Dormir = (() => {
   const Semana = (() => {
     let ligadoS = false;
     let estado = null;
-    const ESTADOS = { cenas: '🖼 Cenas', som: '🌧 Som', musicas: '🎵 Músicas', video: '🎬 Vídeo', agendado: '✅ Agendado' };
+    const ESTADOS = { cenas: '🖼 Cenas', som: '🌧 Som', musicas: '🎵 Músicas', video: '🎬 Vídeo', aprovar: '👀 Aprovar', agendado: '✅ Agendado' };
     const amanha = () => {
       const d = new Date();
       d.setDate(d.getDate() + 1);
@@ -394,6 +412,7 @@ const Dormir = (() => {
         res: q('#drsRes').value,
         cenas: q('#drsCenas').value,
         animar: q('#drsAnimar').checked,
+        aprovar: q('#drsAprovar').checked,
         musicas: q('#drsMusicas').value,
         motor: q('#drsMotor').value,
         volAmb: q('#drsVolAmb').value,
@@ -439,13 +458,14 @@ const Dormir = (() => {
       box.innerHTML = '';
       const rodando = !!estado?.rodando;
       const pendentes = estado?.dias?.some((d) => d.passo !== 'agendado');
+      const podeAndar = estado?.dias?.some((d) => d.passo !== 'agendado' && !(d.passo === 'aprovar' && !d.aprovado));
       q('#drsCriar').hidden = !!estado && (rodando || pendentes);
-      q('#drsContinuar').hidden = !estado || rodando || !pendentes;
+      q('#drsContinuar').hidden = !estado || rodando || !podeAndar;
       q('#drsCancelar').hidden = !rodando;
       q('#drsLimpar').hidden = !estado || rodando;
       contar();
       if (!estado) return;
-      estado.dias.forEach((d) => {
+      estado.dias.forEach((d, i) => {
         const l = document.createElement('div');
         l.className = 'drs-dia' + (d.passo === 'agendado' ? ' ok' : d.erro ? ' erro' : '');
         l.innerHTML = '<b class="quando"></b><span class="nome"></span><span class="passo"></span><span class="etapa"></span>';
@@ -454,6 +474,37 @@ const Dormir = (() => {
         l.querySelector('.passo').textContent = ESTADOS[d.passo] || d.passo;
         l.querySelector('.etapa').textContent = d.erro ? `⚠ ${d.erro}` : d.etapa;
         box.appendChild(l);
+        // Vídeo pronto esperando você: player para assistir + Aprovar / Tentar outro
+        if (d.passo === 'aprovar' && !d.aprovado && d.video?.arquivo) {
+          const p = document.createElement('div');
+          p.className = 'drs-previa';
+          p.style.cssText = 'margin:-2px 0 6px;padding:10px 12px;border:1px solid var(--borda);border-radius:9px;display:flex;flex-direction:column;gap:8px';
+          p.innerHTML =
+            '<video controls preload="metadata" style="width:100%;max-width:760px;border-radius:8px;background:#000"></video>' +
+            '<small style="color:var(--mudo)">Assista um pedaço (pode pular pela barra). Repare se o fundo se mexe de verdade e se a troca de cena fica suave.</small>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-primario" data-ok>✓ Aprovar e agendar</button><button class="btn-mini perigo" data-outro>✗ Não gostei, tentar outro</button></div>';
+          p.querySelector('video').src = urlArquivo(d.video.arquivo);
+          p.querySelector('[data-ok]').onclick = async (ev) => {
+            ev.target.disabled = true;
+            try {
+              estado = await window.api.dormir.semanaAprovar(i);
+            } catch (e) {
+              q('#drsErro').textContent = msgErro(e);
+            }
+            render();
+          };
+          p.querySelector('[data-outro]').onclick = async (ev) => {
+            if (!confirm('Apagar este vídeo e as cenas dele e criar cenas novas? O som e as músicas ficam. (Gasta crédito de novo nas cenas.)')) return;
+            ev.target.disabled = true;
+            try {
+              estado = await window.api.dormir.semanaRecusar(i);
+            } catch (e) {
+              q('#drsErro').textContent = msgErro(e);
+            }
+            render();
+          };
+          box.appendChild(p);
+        }
       });
     }
 
@@ -473,6 +524,7 @@ const Dormir = (() => {
           resolucao: q('#drsRes').value,
           trocaMin: 25,
           animar: q('#drsAnimar').checked,
+          aprovar: q('#drsAprovar').checked,
           qtdCenas: Number(q('#drsCenas').value),
           qtdSons: 5,
           qtdMusicas: Number(q('#drsMusicas').value),
@@ -490,7 +542,7 @@ const Dormir = (() => {
     function ligarS() {
       if (ligadoS) return;
       ligadoS = true;
-      for (const id of ['#drsCanal', '#drsHora', '#drsHoras', '#drsRes', '#drsCenas', '#drsAnimar', '#drsMusicas', '#drsMotor']) q(id).onchange = guardar;
+      for (const id of ['#drsCanal', '#drsHora', '#drsHoras', '#drsRes', '#drsCenas', '#drsAnimar', '#drsAprovar', '#drsMusicas', '#drsMotor']) q(id).onchange = guardar;
       q('#drsInicio').onchange = contar;
       for (const id of ['#drsVolAmb', '#drsVolMus']) {
         q(id).oninput = () => (q(id + 'Txt').textContent = `${q(id).value}%`);
@@ -512,7 +564,8 @@ const Dormir = (() => {
       };
       window.api.ao('dormir:semana', (e) => {
         estado = e;
-        if (q('#modalDormir').open) render();
+        const assistindo = [...document.querySelectorAll('#drsDias video')].some((v) => !v.paused && !v.ended);
+        if (q('#modalDormir').open && !assistindo) render();
       });
       document.querySelectorAll('#drmModos button').forEach((b) => (b.onclick = () => modo(b.dataset.v)));
     }
@@ -545,6 +598,7 @@ const Dormir = (() => {
       if (p.res) q('#drsRes').value = p.res;
       if (p.cenas) q('#drsCenas').value = p.cenas;
       q('#drsAnimar').checked = p.animar !== false;
+      q('#drsAprovar').checked = p.aprovar !== false;
       if (p.musicas != null) q('#drsMusicas').value = p.musicas;
       if (p.motor) q('#drsMotor').value = p.motor;
       q('#drsVolAmb').value = p.volAmb ?? 45;

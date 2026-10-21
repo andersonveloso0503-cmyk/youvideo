@@ -1604,6 +1604,15 @@ app.whenReady().then(() => {
     semana.rodar().catch(() => {});
     return semana.paraTela();
   });
+  // Prévia: você assiste e aprova (vai para a fila de envio) ou pede outro (refaz as cenas)
+  ipcMain.handle('dormir:semanaAprovar', (_e, i) => {
+    semana.aprovar(Number(i)).catch(() => {});
+    return semana.paraTela();
+  });
+  ipcMain.handle('dormir:semanaRecusar', (_e, i) => {
+    semana.recusar(Number(i)).catch(() => {});
+    return semana.paraTela();
+  });
   ipcMain.handle('dormir:semanaCancelar', () => semana.cancelar());
   ipcMain.handle('dormir:semanaLimpar', () => semana.limpar());
   ipcMain.handle('dormir:escolherCenas', async () => {
