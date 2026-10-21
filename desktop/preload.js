@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld('api', {
     semanaAprovar: chamar('dormir:semanaAprovar'),
     semanaRecusar: chamar('dormir:semanaRecusar'),
     semanaRefazerCenas: chamar('dormir:semanaRefazerCenas'),
+    semanaCancelarEnvio: chamar('dormir:semanaCancelarEnvio'),
+    semanaEnviarAgora: chamar('dormir:semanaEnviarAgora'),
     semanaCancelar: chamar('dormir:semanaCancelar'),
     semanaLimpar: chamar('dormir:semanaLimpar'),
     gerar: chamar('dormir:gerar'),

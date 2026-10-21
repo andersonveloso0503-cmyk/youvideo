@@ -663,7 +663,32 @@ async function desprogramarVideos({ credenciais, refreshToken, redirectOriginal,
   return { feitos, falhas, parou };
 }
 
+/** Publica AGORA um vídeo que está privado/agendado: tira a data e deixa público. */
+async function publicarAgora({ credenciais, refreshToken, redirectOriginal, id }) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const v = await yt.videos.list({ part: ['status'], id: [id] });
+  const st = v.data.items?.[0]?.status;
+  if (!st) throw new Error('Vídeo não encontrado no canal');
+  if (st.privacyStatus === 'public') return { jaPublico: true };
+  await yt.videos.update({
+    part: ['status'],
+    requestBody: {
+      id,
+      status: {
+        privacyStatus: 'public',
+        selfDeclaredMadeForKids: st.selfDeclaredMadeForKids ?? st.madeForKids ?? false,
+        ...(st.embeddable != null ? { embeddable: st.embeddable } : {}),
+        ...(st.license ? { license: st.license } : {}),
+        ...(st.publicStatsViewable != null ? { publicStatsViewable: st.publicStatsViewable } : {}),
+        ...(st.containsSyntheticMedia != null ? { containsSyntheticMedia: st.containsSyntheticMedia } : {}),
+      },
+    },
+  });
+  return { jaPublico: false };
+}
+
 module.exports = {
+  publicarAgora,
   agendados,
   trocarCapa,
   ultimosDoCanal,

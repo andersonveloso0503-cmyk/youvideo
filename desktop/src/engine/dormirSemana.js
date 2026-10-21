@@ -213,6 +213,36 @@ class DormirSemana {
     return this.rodar({ soFila: true });
   }
 
+  /** Dados do envio ao YouTube deste dia (agendado para a data e hora dele). */
+  montarEnvio(dia) {
+    const p = this.estado.plano;
+    const t = dia.tema;
+    const descricao = String(t.descricao || '').replace(/\[NOME DO CANAL\]/g, p.canalNome || 'nosso canal');
+    return {
+      arquivo: dia.video.arquivo,
+      titulo: String(t.titulo || t.nome).slice(0, 100),
+      descricao,
+      tags: String(t.tags || '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+      canalId: p.canalId,
+      privacidade: 'private',
+      agendarPara: dia.quando,
+      capa: dia.video.capa || null,
+      capaManual: !!dia.video.capa,
+      curto: false,
+      playlist: { titulo: 'Sons para Dormir', descricao: '' },
+    };
+  }
+
+  /** Guarda no dia o que aconteceu com o envio (cancelado, publicado agora...). */
+  anotarEnvio(i, campos) {
+    const dia = this.estado?.dias?.[i];
+    if (!dia) throw new Error('Dia não encontrado.');
+    this.marcar(dia, campos);
+  }
+
   async fazerDia(dia) {
     const p = this.estado.plano;
     const t = dia.tema;
@@ -335,25 +365,7 @@ class DormirSemana {
 
     // 5) Agendar no YouTube (sobe agora como privado e publica sozinho no dia/hora)
     this.checar();
-    const descricao = String(t.descricao || '').replace(/\[NOME DO CANAL\]/g, p.canalNome || 'nosso canal');
-    this.adicionarEnvios([
-      {
-        arquivo: dia.video.arquivo,
-        titulo: String(t.titulo || t.nome).slice(0, 100),
-        descricao,
-        tags: String(t.tags || '')
-          .split(',')
-          .map((x) => x.trim())
-          .filter(Boolean),
-        canalId: p.canalId,
-        privacidade: 'private',
-        agendarPara: dia.quando,
-        capa: dia.video.capa || null,
-        capaManual: !!dia.video.capa,
-        curto: false,
-        playlist: { titulo: 'Sons para Dormir', descricao: '' },
-      },
-    ]);
+    this.adicionarEnvios([this.montarEnvio(dia)]);
     this.marcar(dia, { passo: 'agendado', etapa: `Na fila de envio: publica em ${new Date(dia.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}` });
   }
 }

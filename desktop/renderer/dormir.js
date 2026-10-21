@@ -472,7 +472,7 @@ const Dormir = (() => {
         l.innerHTML = '<b class="quando"></b><span class="nome"></span><span class="passo"></span><span class="etapa"></span>';
         l.querySelector('.quando').textContent = dataBR(d.quando);
         l.querySelector('.nome').textContent = d.tema.nome;
-        l.querySelector('.passo').textContent = ESTADOS[d.passo] || d.passo;
+        l.querySelector('.passo').textContent = d.semEnvio ? '🚫 Sem envio' : ESTADOS[d.passo] || d.passo;
         l.querySelector('.etapa').textContent = d.erro ? `⚠ ${d.erro}` : d.etapa;
         box.appendChild(l);
         // Vídeo pronto esperando você: player para assistir + Aprovar / Tentar outro
@@ -547,6 +547,27 @@ const Dormir = (() => {
         v.onmouseenter = () => v.play().catch(() => {});
         v.onmouseleave = () => { if (!v.controls) { v.pause(); } };
         v.onclick = () => { v.controls = true; v.muted = false; v.play().catch(() => {}); };
+        const bt = document.createElement('div');
+        bt.style.cssText = 'display:flex;gap:6px;padding:0 10px 10px;flex-wrap:wrap';
+        bt.innerHTML = '<button class="btn-mini perigo" data-cancelarenvio></button><button class="btn-mini" data-agora>⚡ Enviar agora</button>';
+        bt.querySelector('[data-cancelarenvio]').textContent = d.semEnvio ? '🚫 Envio cancelado' : '🚫 Cancelar envio';
+        bt.querySelector('[data-cancelarenvio]').disabled = !!d.semEnvio;
+        const acao = async (ev, canal, pergunta) => {
+          if (!confirm(pergunta)) return;
+          ev.target.disabled = true;
+          q('#drsErro').textContent = '';
+          try {
+            estado = await window.api.dormir[canal](i);
+          } catch (e) {
+            q('#drsErro').textContent = msgErro(e);
+          }
+          render();
+        };
+        bt.querySelector('[data-cancelarenvio]').onclick = (ev) =>
+          acao(ev, 'semanaCancelarEnvio', `Cancelar o envio de "${d.tema.nome}" (${dataBR(d.quando)})?\nSe esse vídeo ainda não subiu, ele não sobe. Se já subiu, fica no YouTube e você apaga no Studio. O vídeo que já está bom no YouTube não é mexido.`);
+        bt.querySelector('[data-agora]').onclick = (ev) =>
+          acao(ev, 'semanaEnviarAgora', `Enviar "${d.tema.nome}" agora, sem esperar ${dataBR(d.quando)}?\nEle fica PÚBLICO na hora no canal.`);
+        c.appendChild(bt);
         c.querySelector('.n').textContent = d.tema.nome;
         c.querySelector('.q').textContent = dataBR(d.quando) + (d.tentativa ? ` · refeito ${d.tentativa}x` : '');
         c.querySelector('input').onchange = (ev) => {

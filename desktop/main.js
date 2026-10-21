@@ -1617,6 +1617,42 @@ app.whenReady().then(() => {
     semana.refazerCenas(Array.isArray(i) ? i.map(Number) : Number(i), { forcar: !!forcar }).catch(() => {});
     return semana.paraTela();
   });
+  // Cartão do vídeo: cancelar o envio (ex.: o que já está no YouTube está bom) ou publicar agora
+  const jobsDoVideo = (arquivo) => fila.jobs.filter((j) => j.tipo === 'envio' && j.envio?.arquivo === arquivo && !['erro', 'cancelado'].includes(j.status));
+  ipcMain.handle('dormir:semanaCancelarEnvio', (_e, i) => {
+    const dia = semana.estado?.dias?.[Number(i)];
+    if (!dia?.video?.arquivo) throw new Error('Este dia não tem vídeo pronto.');
+    const jobs = jobsDoVideo(dia.video.arquivo);
+    const noYoutube = jobs.some((j) => j.status === 'concluido' && j.youtube?.id);
+    for (const j of jobs) if (!(j.status === 'concluido' && j.youtube?.id)) fila.remover(j.id);
+    semana.anotarEnvio(Number(i), { passo: 'agendado', semEnvio: true, etapa: noYoutube ? 'Envio cancelado (este vídeo novo já tinha subido: apague-o no YouTube Studio se não quiser)' : 'Envio cancelado: este vídeo não vai para o YouTube' });
+    return semana.paraTela();
+  });
+  ipcMain.handle('dormir:semanaEnviarAgora', async (_e, i) => {
+    const dia = semana.estado?.dias?.[Number(i)];
+    if (!dia?.video?.arquivo) throw new Error('Este dia não tem vídeo pronto.');
+    const jobs = jobsDoVideo(dia.video.arquivo);
+    const noAr = jobs.find((j) => j.status === 'concluido' && j.youtube?.id);
+    if (noAr) {
+      // Já está no YouTube (privado e agendado): tira a data e publica agora
+      const canal = fila.obterCanal(noAr.envio.canalId);
+      if (!canal) throw new Error('Canal não encontrado. Conecte de novo em Contas YouTube.');
+      const cfg = store.ler();
+      await YT.publicarAgora({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect, id: noAr.youtube.id });
+      fila.atualizar(noAr, { etapa: 'Publicado agora', youtube: { ...noAr.youtube, agendadoPara: null } });
+    } else {
+      // Ainda na fila ou nunca enviado: sobe já como público, sem esperar a data
+      const antigos = jobs.filter((j) => j.status === 'aguardando');
+      for (const j of antigos) fila.remover(j.id);
+      if (!jobs.some((j) => j.status === 'publicando')) {
+        const envio = { ...semana.montarEnvio(dia), privacidade: 'public' };
+        delete envio.agendarPara;
+        fila.adicionarEnvios([envio]);
+      }
+    }
+    semana.anotarEnvio(Number(i), { passo: 'agendado', semEnvio: false, etapa: 'Publicado agora (sem esperar a data)' });
+    return semana.paraTela();
+  });
   ipcMain.handle('dormir:semanaCancelar', () => semana.cancelar());
   ipcMain.handle('dormir:semanaLimpar', () => semana.limpar());
   ipcMain.handle('dormir:escolherCenas', async () => {
