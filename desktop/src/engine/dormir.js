@@ -13,6 +13,7 @@ const path = require('path');
 const { fal } = require('@fal-ai/client');
 const { rodar, probe } = require('./ffmpeg');
 const Central = require('./central');
+const { filtroEfeitos } = require('./efeitos');
 const { gerarMiniatura } = require('./miniatura');
 const { gerarCapaChamativa } = require('./capa');
 
@@ -108,7 +109,7 @@ const ARGS_X264 = (W, H) => [
 ];
 
 /** Transforma a cena (vídeo ou imagem) num clipe que emenda nele mesmo, sempre no mesmo formato. */
-async function clipeDaCena(cena, destino, { W, H, cancelar }) {
+async function clipeDaCena(cena, destino, { W, H, cancelar, movimento }) {
   const ajustar = `fps=${FPS},scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,format=yuv420p`;
   let args;
   if (cena.video) {
@@ -130,15 +131,26 @@ async function clipeDaCena(cena, destino, { W, H, cancelar }) {
       ];
     }
   } else {
-    // Imagem parada: zoom + deslize lento que vai e volta (começa e termina igual), 20 s.
-    // (antes era só 6% de zoom, que na tela parecia imagem parada)
+    // Imagem parada, 20 s que emendam nelas mesmas.
+    // Com efeitos (chuva, relâmpago, névoa, fogo, brilho na água, escolhidos pelo texto de movimento do tema):
+    // movimento de verdade por cima da cena, com só um zoom leve. Sem efeito: zoom + deslize lento.
     const quadros = FPS * 20;
-    args = [
-      '-loop', '1', '-framerate', String(FPS), '-t', '20', '-i', cena.imagem, '-vf',
-      `scale=${W * 2}:${H * 2}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W * 2}:${H * 2},` +
-        `zoompan=z='1+0.16*(1-cos(2*PI*on/${quadros}))/2':x='(iw-iw/zoom)/2*(1+0.9*sin(2*PI*on/${quadros}))':y='(ih-ih/zoom)/2*(1+0.5*sin(2*PI*on/${quadros}+1))':d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p`,
-      '-frames:v', String(quadros),
-    ];
+    const efeitos = filtroEfeitos({ W, H, fps: FPS, movimento });
+    const ampliar = `scale=${W * 2}:${H * 2}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W * 2}:${H * 2}`;
+    if (efeitos) {
+      args = [
+        '-loop', '1', '-framerate', String(FPS), '-t', '20', '-i', cena.imagem, '-filter_complex',
+        `[0:v]${ampliar},zoompan=z='1+0.05*(1-cos(2*PI*on/${quadros}))/2':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p[base];${efeitos}`,
+        '-map', '[saida]', '-frames:v', String(quadros),
+      ];
+    } else {
+      args = [
+        '-loop', '1', '-framerate', String(FPS), '-t', '20', '-i', cena.imagem, '-vf',
+        `${ampliar},` +
+          `zoompan=z='1+0.16*(1-cos(2*PI*on/${quadros}))/2':x='(iw-iw/zoom)/2*(1+0.9*sin(2*PI*on/${quadros}))':y='(ih-ih/zoom)/2*(1+0.5*sin(2*PI*on/${quadros}+1))':d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p`,
+        '-frames:v', String(quadros),
+      ];
+    }
   }
   const r = rodar([...args, ...ARGS_X264(W, H), destino], { modo: 'normal' });
   cancelar(r.cancelar);
@@ -312,7 +324,7 @@ async function gerarVideo(op) {
       checar();
       avisar('cenas', (i / cenas.length) * 0.15, `Preparando a cena ${i + 1} de ${cenas.length}`);
       const arquivo = path.join(tmp, `cena-${i}.mp4`);
-      clipes.push({ arquivo, duracao: await clipeDaCena(cena, arquivo, { W, H, cancelar }) });
+      clipes.push({ arquivo, duracao: await clipeDaCena(cena, arquivo, { W, H, cancelar, movimento: cena.movimento || op.movimento }) });
     }
     const transicoes = [];
     if (clipes.length > 1) {

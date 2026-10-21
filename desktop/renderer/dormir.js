@@ -216,6 +216,7 @@ const Dormir = (() => {
       const nome = (q('#drmTitulo').value || 'sons para dormir').replace(/[\\/:*?"<>|#]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
       D.pronto = await window.api.dormir.gerar({
         cenas,
+        movimento: q('#drmMovimento').value.trim(),
         ambientes: D.ambientes.map((m) => m.arquivo),
         musicas: D.musicas.map((m) => m.arquivo),
         volAmbiente: Number(q('#drmVolAmb').value),

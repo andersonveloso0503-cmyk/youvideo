@@ -214,6 +214,7 @@ class DormirSemana {
       const nomeCanal = p.canalNome || '';
       const r = await Dormir.gerarVideo({
         cenas: dia.cenas,
+        movimento: t.movimento,
         ambientes: dia.sons.map((s) => s.arquivo),
         musicas: dia.musicas.map((m) => m.arquivo),
         volAmbiente: p.volAmbiente,
