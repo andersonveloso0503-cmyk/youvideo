@@ -161,11 +161,15 @@ async function clipeTransicao(clipeA, clipeB, durB, destino, { W, H, cancelar })
   return (await probe(destino)).duracao;
 }
 
+// Deixa cada som e cada música no MESMO volume percebido (-23 LUFS) antes de misturar.
+// Assim 100% no controle é sempre o mesmo nível, venha o som de onde vier (IA, Suno, banco de sons).
+const NORMALIZAR = 'loudnorm=I=-23:TP=-2:LRA=11,aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo';
+
 /** Junta os sons ambientes num só e emenda o fim no começo, para repetir sem clique. */
 async function prepararAmbiente(arquivos, dir, cancelar) {
   const unido = path.join(dir, 'ambiente-unido.flac');
   const ent = arquivos.flatMap((a) => ['-i', a]);
-  let filtro = arquivos.map((_, i) => `[${i}:a]aformat=sample_rates=48000:channel_layouts=stereo[a${i}]`).join(';');
+  let filtro = arquivos.map((_, i) => `[${i}:a]${NORMALIZAR}[a${i}]`).join(';');
   let ultimo = 'a0';
   for (let i = 1; i < arquivos.length; i++) {
     filtro += `;[${ultimo}][a${i}]acrossfade=d=3:c1=tri:c2=tri[x${i}]`;
@@ -198,7 +202,7 @@ async function prepararAmbiente(arquivos, dir, cancelar) {
 async function prepararMusicas(arquivos, dir, cancelar) {
   const saida = path.join(dir, 'musicas.flac');
   const ent = arquivos.flatMap((a) => ['-i', a]);
-  let filtro = arquivos.map((_, i) => `[${i}:a]aformat=sample_rates=48000:channel_layouts=stereo[m${i}]`).join(';');
+  let filtro = arquivos.map((_, i) => `[${i}:a]${NORMALIZAR}[m${i}]`).join(';');
   let ultimo = 'm0';
   for (let i = 1; i < arquivos.length; i++) {
     filtro += `;[${ultimo}][m${i}]acrossfade=d=3:c1=tri:c2=tri[y${i}]`;
@@ -329,8 +333,8 @@ async function gerarVideo(op) {
     avisar('audio', 0.2, 'Preparando o som');
     const ent = [];
     const partes = [];
-    const volA = (Number(op.volAmbiente ?? 100) / 100).toFixed(2);
-    const volM = (Number(op.volMusica ?? 35) / 100).toFixed(2);
+    const volA = (Number(op.volAmbiente ?? 45) / 100).toFixed(2);
+    const volM = (Number(op.volMusica ?? 80) / 100).toFixed(2);
     if (ambientes.length) {
       const amb = await prepararAmbiente(ambientes, tmp, cancelar);
       ent.push('-f', 'concat', '-safe', '0', '-i', await listaRepetida(amb, duracao, path.join(tmp, 'ambiente.txt')));
@@ -342,9 +346,18 @@ async function gerarVideo(op) {
       ent.push('-f', 'concat', '-safe', '0', '-i', await listaRepetida(mus, duracao, path.join(tmp, 'musicas.txt')));
       partes.push(`[${partes.length}:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=${volM}[s${partes.length}]`);
     }
+    // Volume final igual em todos os vídeos (-20 LUFS, bom para dormir): cada parte já está em -23 LUFS,
+    // então dá para calcular o ganho da mistura sem ler as 10 horas de novo. Os controles viram o EQUILÍBRIO
+    // entre chuva e música, e o vídeo nunca sai estourado nem baixinho.
+    const ALVO = -20;
+    const niveis = [];
+    if (ambientes.length && Number(volA) > 0) niveis.push(-23 + 20 * Math.log10(Number(volA)));
+    if (musicas.length && Number(volM) > 0) niveis.push(-23 + 20 * Math.log10(Number(volM)));
+    const mistura = niveis.length ? 10 * Math.log10(niveis.reduce((t, l) => t + 10 ** (l / 10), 0)) : ALVO;
+    const ganho = Math.max(-12, Math.min(12, ALVO - mistura)).toFixed(2);
     const fadeOut = Math.max(0, duracao - 10).toFixed(2);
     const juntar = partes.length > 1 ? `[s0][s1]amix=inputs=2:normalize=0:duration=shortest,` : `[s0]`;
-    const filtroAudio = `${partes.join(';')};${juntar}${partes.length > 1 ? '' : 'anull,'}afade=t=in:d=5,afade=t=out:st=${fadeOut}:d=10,alimiter=limit=0.95:level=0[sa]`;
+    const filtroAudio = `${partes.join(';')};${juntar}${partes.length > 1 ? '' : 'anull,'}volume=${ganho}dB,afade=t=in:d=5,afade=t=out:st=${fadeOut}:d=10,alimiter=limit=0.89:level=0[sa]`;
     const audio = path.join(tmp, 'audio.m4a');
     let r = rodar([...ent, '-filter_complex', filtroAudio, '-map', '[sa]', '-t', duracao.toFixed(2), '-c:a', 'aac', '-b:a', '192k', audio], {
       duracaoTotal: duracao,
@@ -435,4 +448,27 @@ async function gerarMusica({ falKey, prompt, segundos = 180, indice = 0, pasta, 
   return { arquivo, titulo: `Música calma ${indice + 1}`, duracao: (await probe(arquivo)).duracao };
 }
 
-module.exports = { gerarCena, gerarSom, gerarMusica, gerarVideo, montarLista, slug, ehImagem };
+/** Música instrumental pelo Estúdio de música do Youvideo (Google Lyria ou ElevenLabs). Fica salva também na biblioteca do Estúdio. */
+async function gerarMusicaEstudio({ cfg, prompt, segundos = 180, indice = 0, motor = 'lyria', titulo, pasta }) {
+  if (!String(prompt || '').trim()) throw new Error('Escreva o estilo da música.');
+  const estilo = `${String(prompt).trim()}, calm instrumental sleep music, slow and soft from start to end, no drums, no vocals`;
+  const d = await Central.chamar(cfg, '/api/estudio/gerar', {
+    metodo: 'POST',
+    corpo: {
+      motor: motor === 'elevenlabs' ? 'elevenlabs' : 'lyria',
+      modo: 'simples',
+      descricao: `Calm instrumental music for sleeping and relaxing: ${String(prompt).trim()}`,
+      estilo,
+      titulo: titulo || `Sons para dormir ${indice + 1}`,
+      instrumental: true,
+      duracaoSeg: Math.round(Math.min(300, Math.max(60, segundos))),
+    },
+  });
+  if (!d?.musica?.audioUrl) throw new Error('O Estúdio não devolveu a música.');
+  fs.mkdirSync(pasta, { recursive: true });
+  const ext = /\.wav(\?|$)/i.test(d.musica.audioUrl) ? '.wav' : '.mp3';
+  const arquivo = await Central.baixar(d.musica.audioUrl, path.join(pasta, `musica-${Date.now()}-${indice + 1}${ext}`));
+  return { arquivo, titulo: d.musica.titulo || `Música ${indice + 1}`, duracao: (await probe(arquivo)).duracao };
+}
+
+module.exports = { gerarCena, gerarSom, gerarMusica, gerarMusicaEstudio, gerarVideo, montarLista, slug, ehImagem };

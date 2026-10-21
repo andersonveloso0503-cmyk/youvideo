@@ -412,6 +412,41 @@
   <dialog class="modal largo modal-dormir" id="modalDormir">
     <div class="modal-topo"><h2>🌙 Sons para dormir</h2><button class="fechar" data-fechar>×</button></div>
     <p class="modal-texto">Vídeos longos com cenas lindas em movimento, som ambiente e, se quiser, música calma. O vídeo é montado aqui no PC, sem custo de montagem e sem limite de duração.</p>
+    <div class="segmentado drm-modos" id="drmModos">
+      <button data-v="um" class="ativo">🎬 Um vídeo</button>
+      <button data-v="semana">📅 Semana inteira (1 por dia, agendado)</button>
+    </div>
+
+    <div class="cartao" id="drmSemana" hidden>
+      <h3>Criar a semana</h3>
+      <p class="nota">O Compilador cria sozinho, um depois do outro: as cenas, o som ambiente, as músicas no Estúdio e o vídeo. Cada vídeo pronto já vai para a fila de envio, <b>agendado no YouTube</b> para o seu dia e horário. Pode deixar rodando; se fechar o app, clique em Continuar que ele segue de onde parou.</p>
+      <div class="can-linha">
+        <label>Canal <select id="drsCanal"></select></label>
+        <label>Primeiro dia <input type="date" id="drsInicio" /></label>
+        <label>Horário <input type="time" id="drsHora" value="20:00" /></label>
+      </div>
+      <div class="drs-temas" id="drsTemas"></div>
+      <div class="can-linha">
+        <label>Duração <select id="drsHoras"><option value="1">1 hora</option><option value="2" selected>2 horas</option><option value="3">3 horas</option><option value="8">8 horas</option><option value="10">10 horas</option></select></label>
+        <label>Qualidade <select id="drsRes"><option value="720">720p</option><option value="1080" selected>1080p</option></select></label>
+        <label>Cenas por vídeo <select id="drsCenas"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
+        <label class="interruptor"><input type="checkbox" id="drsAnimar" checked /><span></span> Animar cenas</label>
+      </div>
+      <div class="can-linha">
+        <label>Músicas por vídeo <select id="drsMusicas"><option value="0">Nenhuma (só som ambiente)</option><option value="4">4</option><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option></select></label>
+        <label>Motor <select id="drsMotor"><option value="lyria" selected>Google Lyria (Estúdio)</option><option value="elevenlabs">ElevenLabs (Estúdio)</option></select></label>
+        <label>Volume do som <input type="range" id="drsVolAmb" min="0" max="150" value="45" /> <span id="drsVolAmbTxt">45%</span></label>
+        <label>Volume da música <input type="range" id="drsVolMus" min="0" max="150" value="80" /> <span id="drsVolMusTxt">80%</span></label>
+      </div>
+      <p class="modal-erro" id="drsErro"></p>
+      <div class="can-linha">
+        <button class="btn-primario" id="drsCriar">📅 Criar a semana</button>
+        <button class="btn-primario" id="drsContinuar" hidden>▶ Continuar</button>
+        <button class="btn-mini perigo" id="drsCancelar" hidden>Cancelar</button>
+        <button class="btn-mini" id="drsLimpar" hidden>Começar outra semana</button>
+      </div>
+      <div class="drs-dias" id="drsDias"></div>
+    </div>
 
     <div class="cartao">
       <h3>1. Tema do vídeo</h3>
@@ -452,12 +487,12 @@
       <div class="drm-sons">
         <div>
           <div class="can-linha"><b class="drm-rot">Som ambiente</b><button class="btn-mini" id="drmAddAmbiente">+ Escolher som</button>
-            <label>Volume <input type="range" id="drmVolAmb" min="0" max="150" value="100" /> <span id="drmVolAmbTxt">100%</span></label></div>
+            <label>Volume <input type="range" id="drmVolAmb" min="0" max="150" value="45" /> <span id="drmVolAmbTxt">45%</span></label></div>
           <div id="drmAmbientes" class="arr-lista"></div>
         </div>
         <div>
           <div class="can-linha"><b class="drm-rot">Músicas</b><button class="btn-mini" id="drmAddMusica">+ Escolher músicas</button>
-            <label>Volume <input type="range" id="drmVolMus" min="0" max="150" value="35" /> <span id="drmVolMusTxt">35%</span></label></div>
+            <label>Volume <input type="range" id="drmVolMus" min="0" max="150" value="80" /> <span id="drmVolMusTxt">80%</span></label></div>
           <div id="drmMusicas" class="arr-lista"></div>
         </div>
       </div>
@@ -472,8 +507,9 @@
         <div class="can-linha">
           <label>Quantas <select id="drmMusQtd"><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option><option value="8">8</option></select></label>
           <label>Cada uma com <select id="drmMusMin"><option value="2">2 min</option><option value="3" selected>3 min</option><option value="4">4 min</option></select></label>
-          <button class="btn-primario" id="drmGerarMus">✨ Gerar músicas</button>
-          <span class="nota" id="drmMusCusto"></span>
+          <label>Motor <select id="drmMusMotor"><option value="lyria" selected>Google Lyria</option><option value="elevenlabs">ElevenLabs</option></select></label>
+          <button class="btn-primario" id="drmGerarMus">✨ Gerar no Estúdio</button>
+          <span class="nota" id="drmMusCusto">Instrumentais, pelo Estúdio de música (ficam também na biblioteca do Estúdio).</span>
         </div>
         <p class="nota" id="drmSomNota"></p>
       </div>

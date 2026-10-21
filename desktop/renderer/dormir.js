@@ -29,6 +29,7 @@ const Dormir = (() => {
       qtd: q('#drmQtd').value,
       volAmb: q('#drmVolAmb').value,
       volMus: q('#drmVolMus').value,
+      v: 2, // v2: som e música normalizados (volumes antigos não valem mais)
     };
     window.api.config.salvar({ dormir: config.dormir }).catch(() => {});
   }
@@ -200,10 +201,6 @@ const Dormir = (() => {
     }
   }
 
-  function pintarCusto() {
-    const total = Number(q('#drmMusQtd').value) * Number(q('#drmMusMin').value);
-    q('#drmMusCusto').textContent = `${total} min de música ≈ US$ ${(total * 0.6).toFixed(2).replace('.', ',')} na fal.ai`;
-  }
 
   async function gerar() {
     const cenas = D.cenas.filter((c) => !c.gerando && !c.erro).map(({ imagem, video, ia }) => ({ imagem, video, ia }));
@@ -299,10 +296,8 @@ const Dormir = (() => {
       const prompt = q('#drmMusPrompt').value.trim();
       if (!prompt) return avisar('Escreva o estilo da música.', true);
       const segundos = Number(q('#drmMusMin').value) * 60;
-      gerarAudios({ tipo: 'Músicas', qtd: Number(q('#drmMusQtd').value), lista: D.musicas, botao: '#drmGerarMus', chamar: (indice) => window.api.dormir.musica({ prompt, segundos, indice, tema: tema()?.nome || 'personalizado' }) });
+      gerarAudios({ tipo: 'Músicas', qtd: Number(q('#drmMusQtd').value), lista: D.musicas, botao: '#drmGerarMus', chamar: (indice) => window.api.dormir.musica({ prompt, segundos, indice, tema: tema()?.nome || 'personalizado', motor: q('#drmMusMotor').value }) });
     };
-    q('#drmMusQtd').onchange = pintarCusto;
-    q('#drmMusMin').onchange = pintarCusto;
     q('#drmAddMusica').onclick = () => escolherSons(D.musicas);
     for (const id of ['#drmHoras', '#drmTroca', '#drmRes', '#drmAnimar', '#drmQtd']) q(id).onchange = () => (salvar(), pintar());
     for (const id of ['#drmVolAmb', '#drmVolMus']) {
@@ -333,12 +328,13 @@ const Dormir = (() => {
     if (p.resolucao) q('#drmRes').value = p.resolucao;
     if (p.qtd) q('#drmQtd').value = p.qtd;
     q('#drmAnimar').checked = p.animar !== false;
-    q('#drmVolAmb').value = p.volAmb ?? 100;
-    q('#drmVolMus').value = p.volMus ?? 35;
+    const novo = p.v === 2;
+    q('#drmVolAmb').value = novo ? p.volAmb ?? 45 : 45;
+    q('#drmVolMus').value = novo ? p.volMus ?? 80 : 80;
     q('#drmVolAmbTxt').textContent = `${q('#drmVolAmb').value}%`;
     q('#drmVolMusTxt').textContent = `${q('#drmVolMus').value}%`;
     if (!q('#drmTitulo').value) aplicarTema();
-    pintarCusto();
+    await Semana.abrir();
     // Se um vídeo está sendo gerado (ou ficou pronto) com a janela fechada, mostra o estado
     const est = await window.api.dormir.estado().catch(() => null);
     if (est?.rodando) {
@@ -373,6 +369,195 @@ const Dormir = (() => {
       pintar();
     }, 2000);
   }
+
+  // ---------- Semana inteira ----------
+  const Semana = (() => {
+    let ligadoS = false;
+    let estado = null;
+    const ESTADOS = { cenas: '🖼 Cenas', som: '🌧 Som', musicas: '🎵 Músicas', video: '🎬 Vídeo', agendado: '✅ Agendado' };
+    const amanha = () => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const dataBR = (iso) => new Date(iso).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+    function prefs() {
+      return config.dormirSemana || {};
+    }
+    function guardar() {
+      config.dormirSemana = {
+        canalId: q('#drsCanal').value,
+        hora: q('#drsHora').value,
+        horas: q('#drsHoras').value,
+        res: q('#drsRes').value,
+        cenas: q('#drsCenas').value,
+        animar: q('#drsAnimar').checked,
+        musicas: q('#drsMusicas').value,
+        motor: q('#drsMotor').value,
+        volAmb: q('#drsVolAmb').value,
+        volMus: q('#drsVolMus').value,
+        temas: [...document.querySelectorAll('#drsTemas input:checked')].map((c) => c.value),
+      };
+      window.api.config.salvar({ dormirSemana: config.dormirSemana }).catch(() => {});
+    }
+
+    function renderTemas() {
+      const box = q('#drsTemas');
+      const marcados = new Set(prefs().temas || DORMIR_TEMAS.slice(0, 7).map((t) => t.id));
+      box.innerHTML = '';
+      DORMIR_TEMAS.forEach((t, i) => {
+        const l = document.createElement('label');
+        l.className = 'drs-tema';
+        l.innerHTML = '<input type="checkbox" /><span></span>';
+        const c = l.querySelector('input');
+        c.value = t.id;
+        c.checked = marcados.has(t.id);
+        c.onchange = () => (guardar(), contar());
+        l.querySelector('span').textContent = `${i + 1}. ${t.nome}`;
+        box.appendChild(l);
+      });
+      contar();
+    }
+    function contar() {
+      const n = document.querySelectorAll('#drsTemas input:checked').length;
+      let periodo = '';
+      const ini = q('#drsInicio').value;
+      if (n && ini) {
+        const [a, m, d] = ini.split('-').map(Number);
+        const fim = new Date(a, m - 1, d + n - 1);
+        const fmt = (x) => x.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        periodo = n > 1 ? `, de ${fmt(new Date(a, m - 1, d))} a ${fmt(fim)}` : ` em ${fmt(fim)}`;
+      }
+      q('#drsCriar').textContent = n ? `📅 Criar: 1 vídeo por dia${periodo} (${n} no total)` : '📅 Marque os temas';
+      q('#drsCriar').disabled = !n || !!estado?.rodando;
+    }
+
+    function render() {
+      const box = q('#drsDias');
+      box.innerHTML = '';
+      const rodando = !!estado?.rodando;
+      const pendentes = estado?.dias?.some((d) => d.passo !== 'agendado');
+      q('#drsCriar').hidden = !!estado && (rodando || pendentes);
+      q('#drsContinuar').hidden = !estado || rodando || !pendentes;
+      q('#drsCancelar').hidden = !rodando;
+      q('#drsLimpar').hidden = !estado || rodando;
+      contar();
+      if (!estado) return;
+      estado.dias.forEach((d) => {
+        const l = document.createElement('div');
+        l.className = 'drs-dia' + (d.passo === 'agendado' ? ' ok' : d.erro ? ' erro' : '');
+        l.innerHTML = '<b class="quando"></b><span class="nome"></span><span class="passo"></span><span class="etapa"></span>';
+        l.querySelector('.quando').textContent = dataBR(d.quando);
+        l.querySelector('.nome').textContent = d.tema.nome;
+        l.querySelector('.passo').textContent = ESTADOS[d.passo] || d.passo;
+        l.querySelector('.etapa').textContent = d.erro ? `⚠ ${d.erro}` : d.etapa;
+        box.appendChild(l);
+      });
+    }
+
+    async function criar() {
+      q('#drsErro').textContent = '';
+      guardar();
+      const ids = new Set(prefs().temas || []);
+      const canal = q('#drsCanal');
+      const temas = DORMIR_TEMAS.filter((t) => ids.has(t.id));
+      try {
+        estado = await window.api.dormir.semanaCriar({
+          canalId: canal.value,
+          canalNome: canal.selectedOptions[0]?.textContent || '',
+          inicio: q('#drsInicio').value,
+          hora: q('#drsHora').value,
+          horas: Number(q('#drsHoras').value),
+          resolucao: q('#drsRes').value,
+          trocaMin: 25,
+          animar: q('#drsAnimar').checked,
+          qtdCenas: Number(q('#drsCenas').value),
+          qtdSons: 5,
+          qtdMusicas: Number(q('#drsMusicas').value),
+          motorMusica: q('#drsMotor').value,
+          volAmbiente: Number(q('#drsVolAmb').value),
+          volMusica: Number(q('#drsVolMus').value),
+          temas,
+        });
+        render();
+      } catch (e) {
+        q('#drsErro').textContent = msgErro(e);
+      }
+    }
+
+    function ligarS() {
+      if (ligadoS) return;
+      ligadoS = true;
+      for (const id of ['#drsCanal', '#drsHora', '#drsHoras', '#drsRes', '#drsCenas', '#drsAnimar', '#drsMusicas', '#drsMotor']) q(id).onchange = guardar;
+      q('#drsInicio').onchange = contar;
+      for (const id of ['#drsVolAmb', '#drsVolMus']) {
+        q(id).oninput = () => (q(id + 'Txt').textContent = `${q(id).value}%`);
+        q(id).onchange = guardar;
+      }
+      q('#drsCriar').onclick = criar;
+      q('#drsContinuar').onclick = async () => {
+        q('#drsErro').textContent = '';
+        estado = await window.api.dormir.semanaContinuar();
+        render();
+      };
+      q('#drsCancelar').onclick = () => window.api.dormir.semanaCancelar();
+      q('#drsLimpar').onclick = async () => {
+        if (estado?.dias?.some((d) => d.passo !== 'agendado') && !confirm('Ainda tem vídeos desta semana sem terminar. Começar outra semana mesmo assim?')) return;
+        await window.api.dormir.semanaLimpar();
+        estado = null;
+        q('#drsInicio').value = amanha();
+        render();
+      };
+      window.api.ao('dormir:semana', (e) => {
+        estado = e;
+        if (q('#modalDormir').open) render();
+      });
+      document.querySelectorAll('#drmModos button').forEach((b) => (b.onclick = () => modo(b.dataset.v)));
+    }
+
+    function modo(v) {
+      config.dormirModo = v;
+      window.api.config.salvar({ dormirModo: v }).catch(() => {});
+      document.querySelectorAll('#drmModos button').forEach((b) => b.classList.toggle('ativo', b.dataset.v === v));
+      document.querySelectorAll('#modalDormir > .cartao').forEach((c) => (c.hidden = (c.id === 'drmSemana') !== (v === 'semana')));
+    }
+
+    async function abrirS() {
+      ligarS();
+      const p = prefs();
+      const canais = await window.api.canais.listar().catch(() => []);
+      const sel = q('#drsCanal');
+      sel.innerHTML = canais.length ? '' : '<option value="">Conecte o canal em "Contas YouTube"</option>';
+      canais.forEach((c) => {
+        const o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = c.titulo;
+        sel.appendChild(o);
+      });
+      const doSono = canais.find((c) => /sono|dormir|sleep|tranquil/i.test(c.titulo || ''));
+      sel.value = canais.find((c) => c.id === p.canalId)?.id || doSono?.id || canais[0]?.id || '';
+      if (!q('#drsInicio').value || q('#drsInicio').value < amanha()) q('#drsInicio').value = amanha();
+      q('#drsInicio').min = amanha();
+      if (p.hora) q('#drsHora').value = p.hora;
+      if (p.horas) q('#drsHoras').value = p.horas;
+      if (p.res) q('#drsRes').value = p.res;
+      if (p.cenas) q('#drsCenas').value = p.cenas;
+      q('#drsAnimar').checked = p.animar !== false;
+      if (p.musicas != null) q('#drsMusicas').value = p.musicas;
+      if (p.motor) q('#drsMotor').value = p.motor;
+      q('#drsVolAmb').value = p.volAmb ?? 45;
+      q('#drsVolMus').value = p.volMus ?? 80;
+      q('#drsVolAmbTxt').textContent = `${q('#drsVolAmb').value}%`;
+      q('#drsVolMusTxt').textContent = `${q('#drsVolMus').value}%`;
+      renderTemas();
+      estado = await window.api.dormir.semanaEstado().catch(() => null);
+      render();
+      modo(estado?.rodando ? 'semana' : config.dormirModo || 'um');
+    }
+
+    return { abrir: abrirS };
+  })();
 
   return { abrir };
 })();

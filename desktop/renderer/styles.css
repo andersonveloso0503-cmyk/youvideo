@@ -856,3 +856,15 @@ span.chip-estilo { cursor: default; }
 .drm-barra i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--terracota), var(--ouro)); transition: width 0.4s; }
 .drm-cenas > .nota { grid-column: 1 / -1; }
 .drm-ia { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed var(--borda-forte); border-radius: 10px; margin-top: 6px; }
+.drm-modos { margin: 10px 0 2px; }
+.drs-temas { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 12px; }
+.drs-tema { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--texto-2); cursor: pointer; }
+.drs-dias { display: flex; flex-direction: column; gap: 6px; }
+.drs-dia { display: grid; grid-template-columns: 150px 170px 110px 1fr; gap: 10px; align-items: center; padding: 8px 12px; border: 1px solid var(--borda); border-radius: 9px; font-size: 12.5px; }
+.drs-dia .etapa { color: var(--mudo); overflow-wrap: anywhere; }
+.drs-dia.ok { border-color: rgba(74, 222, 128, 0.4); }
+.drs-dia.ok .etapa { color: #8fd9a8; }
+.drs-dia.erro .etapa { color: #e89a88; }
+.drs-tema { justify-content: flex-start; }
+.drs-tema input { width: auto; flex: none; margin: 0; accent-color: var(--terracota); }
+.drs-tema span { text-align: left; }

@@ -76,7 +76,7 @@ const DORMIR_TEMAS = [
     "capaFrase": "PARE DE PENSAR",
     "capaDestaque": "PENSAR",
     "somPrompt": "light rain tapping on a window glass, soft, steady, indoor perspective",
-    "musicaPrompt": "solo soft piano, intimate, slow 60 bpm, rainy afternoon, lo-fi calm, emotional and gentle"
+    "musicaPrompt": "solo soft piano, intimate, slow 60 bpm, rainy afternoon, calm, emotional and gentle"
   },
   {
     "id": "tema7",
@@ -115,7 +115,7 @@ const DORMIR_TEMAS = [
     "capaFrase": "CASA DA VÓ",
     "capaDestaque": "VÓ",
     "somPrompt": "night countryside ambience, crickets, distant frogs, light drizzle, calm",
-    "musicaPrompt": "brazilian acoustic guitar, soft viola caipira, slow, nostalgic, peaceful night, calm"
+    "musicaPrompt": "soft fingerpicked acoustic guitar, slow, nostalgic, peaceful night, calm"
   },
   {
     "id": "tema10",
@@ -128,6 +128,6 @@ const DORMIR_TEMAS = [
     "capaFrase": "NOITE TODA",
     "capaDestaque": "NOITE",
     "somPrompt": "soft gentle rain outside a window at night, quiet, constant, peaceful",
-    "musicaPrompt": "brazilian nylon guitar, bossa nova lullaby, very soft, slow 55 bpm, intimate, calm"
+    "musicaPrompt": "gentle nylon guitar lullaby, very soft, slow 55 bpm, intimate, calm"
   }
 ];

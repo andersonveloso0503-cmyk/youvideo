@@ -1581,9 +1581,31 @@ app.whenReady().then(() => {
   ipcMain.handle('dormir:som', async (_e, { texto, indice, tema }) =>
     Dormir.gerarSom({ falKey: store.ler().falKey, texto, indice, pasta: path.join(pastaDormir(), 'sons', Dormir.slug(tema)) })
   );
-  ipcMain.handle('dormir:musica', async (_e, { prompt, segundos, indice, tema }) =>
-    Dormir.gerarMusica({ falKey: store.ler().falKey, prompt, segundos, indice, pasta: path.join(pastaDormir(), 'musicas', Dormir.slug(tema)) })
+  // Músicas instrumentais pelo Estúdio de música do Youvideo (ficam também na biblioteca do Estúdio)
+  ipcMain.handle('dormir:musica', async (_e, { prompt, segundos, indice, tema, motor }) =>
+    Dormir.gerarMusicaEstudio({ cfg: store.ler(), prompt, segundos, indice, motor, titulo: `${tema || 'Sons para dormir'} ${indice + 1} (Sons para dormir)`, pasta: path.join(pastaDormir(), 'musicas', Dormir.slug(tema)) })
   );
+  // Criar a semana: 1 vídeo por tema, agendado 1 por dia
+  const { DormirSemana } = require('./src/engine/dormirSemana');
+  const semana = new DormirSemana({
+    arquivo: path.join(app.getPath('userData'), 'dormir-semana.json'),
+    pastaBase: pastaDormir,
+    fontsDir: fontsDir(),
+    obterConfig: () => store.ler(),
+    adicionarEnvios: (lista) => fila.adicionarEnvios(lista),
+    aoMudar: (estado) => enviar('dormir:semana', estado),
+  });
+  ipcMain.handle('dormir:semanaEstado', () => semana.paraTela());
+  ipcMain.handle('dormir:semanaCriar', (_e, plano) => {
+    semana.novo(plano).catch(() => {});
+    return semana.paraTela();
+  });
+  ipcMain.handle('dormir:semanaContinuar', () => {
+    semana.rodar().catch(() => {});
+    return semana.paraTela();
+  });
+  ipcMain.handle('dormir:semanaCancelar', () => semana.cancelar());
+  ipcMain.handle('dormir:semanaLimpar', () => semana.limpar());
   ipcMain.handle('dormir:escolherCenas', async () => {
     const r = await dialog.showOpenDialog(janela, {
       title: 'Escolher imagens ou vídeos para as cenas',
