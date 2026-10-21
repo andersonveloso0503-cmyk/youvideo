@@ -1613,6 +1613,10 @@ app.whenReady().then(() => {
     semana.recusar(Number(i)).catch(() => {});
     return semana.paraTela();
   });
+  ipcMain.handle('dormir:semanaRefazerCenas', (_e, { i, forcar }) => {
+    semana.refazerCenas(Number(i), { forcar: !!forcar }).catch(() => {});
+    return semana.paraTela();
+  });
   ipcMain.handle('dormir:semanaCancelar', () => semana.cancelar());
   ipcMain.handle('dormir:semanaLimpar', () => semana.limpar());
   ipcMain.handle('dormir:escolherCenas', async () => {

@@ -174,6 +174,42 @@ class DormirSemana {
     return this.rodar({ soFila: true });
   }
 
+  /**
+   * Dia que já ficou pronto ou já foi agendado: refaz SÓ as cenas e a montagem do vídeo.
+   * O som ambiente e as músicas que já estão no PC são reaproveitados (não gasta crédito deles de novo).
+   * O vídeo novo passa pela prévia (você aprova) e entra na fila no mesmo dia e hora.
+   * Se o vídeo antigo já foi para a fila de envio, o arquivo dele não é apagado.
+   */
+  refazerCenas(i, { forcar = false } = {}) {
+    const dia = this.estado?.dias?.[i];
+    if (!dia) throw new Error('Dia não encontrado.');
+    if (this.rodando) throw new Error('Espere o que está sendo feito terminar (ou cancele) para refazer as cenas.');
+    const existe = (l) => (l || []).filter((x) => x?.arquivo && fs.existsSync(x.arquivo)).length;
+    const faltaSom = (dia.sons || []).length > existe(dia.sons) || (dia.musicas || []).length > existe(dia.musicas) || existe(dia.sons) + existe(dia.musicas) === 0;
+    if (faltaSom && !forcar) throw new Error('FALTAM_SONS: o som ambiente ou as músicas deste dia não estão mais no PC. Refazer vai gastar crédito deles também.');
+    const base = path.resolve(this.pastaBase());
+    const apagar = (f) => {
+      try {
+        if (f && path.resolve(f).startsWith(base + path.sep)) fs.rmSync(f, { force: true });
+      } catch {}
+    };
+    for (const c of dia.cenas || []) [c.imagem, c.video].forEach(apagar);
+    if (dia.passo !== 'agendado') [dia.video?.arquivo, dia.video?.capa].forEach(apagar); // o já enviado fica
+    this.marcar(dia, {
+      passo: 'cenas',
+      cenas: [],
+      video: null,
+      aprovado: false,
+      exigeAprovar: true,
+      fila: true,
+      tentativa: (dia.tentativa || 0) + 1,
+      erro: '',
+      etapa: 'Refazendo só as cenas (o som e as músicas ficam)',
+    });
+    this.refazer = true;
+    return this.rodar({ soFila: true });
+  }
+
   async fazerDia(dia) {
     const p = this.estado.plano;
     const t = dia.tema;
@@ -289,7 +325,7 @@ class DormirSemana {
     }
 
     // 4b) Prévia: o vídeo só vai para o YouTube depois que você assistir e aprovar
-    if (p.aprovar !== false && !dia.aprovado) {
+    if ((p.aprovar !== false || dia.exigeAprovar) && !dia.aprovado) {
       this.marcar(dia, { passo: 'aprovar', etapa: 'Pronto! Assista a prévia e aprove, ou peça outro' });
       return;
     }

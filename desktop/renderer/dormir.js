@@ -474,6 +474,31 @@ const Dormir = (() => {
         l.querySelector('.passo').textContent = ESTADOS[d.passo] || d.passo;
         l.querySelector('.etapa').textContent = d.erro ? `⚠ ${d.erro}` : d.etapa;
         box.appendChild(l);
+        // Dia já agendado com cena ruim: refaz só as cenas (som e músicas são reaproveitados)
+        if (d.passo === 'agendado' && !rodando) {
+          const r = document.createElement('div');
+          r.style.cssText = 'margin:-2px 0 6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap';
+          r.innerHTML = '<button class="btn-mini" data-refazer>🎬 Refazer só as cenas</button><small style="color:var(--mudo)">Reaproveita o som e as músicas. O vídeo antigo continua no YouTube até você apagar.</small>';
+          r.querySelector('[data-refazer]').onclick = async (ev) => {
+            if (!confirm(`Refazer só as cenas de "${d.tema.nome}"? Gasta crédito só nas cenas novas. O novo vídeo aparece aqui para você aprovar antes de ir para a fila.`)) return;
+            ev.target.disabled = true;
+            q('#drsErro').textContent = '';
+            try {
+              estado = await window.api.dormir.semanaRefazerCenas({ i, forcar: false });
+            } catch (e) {
+              const m = msgErro(e);
+              if (m.startsWith('FALTAM_SONS') && confirm(m.replace('FALTAM_SONS: ', '') + '\n\nRefazer mesmo assim?')) {
+                try {
+                  estado = await window.api.dormir.semanaRefazerCenas({ i, forcar: true });
+                } catch (e2) {
+                  q('#drsErro').textContent = msgErro(e2);
+                }
+              } else if (!m.startsWith('FALTAM_SONS')) q('#drsErro').textContent = m;
+            }
+            render();
+          };
+          box.appendChild(r);
+        }
         // Vídeo pronto esperando você: player para assistir + Aprovar / Tentar outro
         if (d.passo === 'aprovar' && !d.aprovado && d.video?.arquivo) {
           const p = document.createElement('div');
