@@ -1591,10 +1591,12 @@ app.whenReady().then(() => {
     arquivo: path.join(app.getPath('userData'), 'dormir-semana.json'),
     pastaBase: pastaDormir,
     fontsDir: fontsDir(),
-    obterConfig: () => store.ler(),
+    obterConfig: () => ({ ...store.ler(), _canais: store.canaisParaTela() }),
     adicionarEnvios: (lista) => fila.adicionarEnvios(lista),
+    listarEnvios: () => fila.lista(),
     aoMudar: (estado) => enviar('dormir:semana', estado),
   });
+  ipcMain.handle('dormir:semanaRecuperar', () => semana.recuperarDaPasta());
   ipcMain.handle('dormir:semanaEstado', () => semana.paraTela());
   ipcMain.handle('dormir:semanaCriar', (_e, plano) => {
     semana.novo(plano).catch(() => {});

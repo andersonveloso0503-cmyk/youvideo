@@ -18,6 +18,27 @@ const PADRAO = {
 
 const SECRETOS = ['falKey', 'groqKey', 'centralToken'];
 
+// Grava num arquivo novo e troca de uma vez: se o PC desligar no meio, o arquivo antigo fica inteiro
+function gravarSeguro(arquivo, texto) {
+  const tmp = arquivo + '.tmp';
+  fs.writeFileSync(tmp, texto);
+  try {
+    if (fs.existsSync(arquivo) && fs.statSync(arquivo).size > 2) fs.copyFileSync(arquivo, arquivo + '.bak');
+  } catch {}
+  fs.renameSync(tmp, arquivo);
+}
+
+// Lê o arquivo; se estiver estragado (PC travou gravando), usa a cópia de segurança
+function lerComReserva(arquivo, valido) {
+  for (const a of [arquivo, arquivo + '.bak']) {
+    try {
+      const j = JSON.parse(fs.readFileSync(a, 'utf8').replace(/\u0000/g, '').trim());
+      if (valido(j)) return j;
+    } catch {}
+  }
+  return null;
+}
+
 class Store {
   constructor(dir, safeStorage) {
     this.arquivo = path.join(dir, 'config.json');
@@ -44,10 +65,7 @@ class Store {
   }
 
   ler() {
-    let bruto = {};
-    try {
-      bruto = JSON.parse(fs.readFileSync(this.arquivo, 'utf8'));
-    } catch {}
+    const bruto = lerComReserva(this.arquivo, (j) => j && typeof j === 'object' && !Array.isArray(j)) || {};
     const cfg = { ...PADRAO, ...bruto, google: { ...PADRAO.google, ...(bruto.google || {}) } };
     for (const k of SECRETOS) cfg[k] = this.decifrar(cfg[k]);
     cfg.google.clientSecret = this.decifrar(cfg.google.clientSecret);
@@ -60,7 +78,7 @@ class Store {
     const gravar = { ...cfg, google: { ...cfg.google } };
     for (const k of SECRETOS) gravar[k] = this.cifrar(cfg[k]);
     gravar.google.clientSecret = this.cifrar(cfg.google.clientSecret);
-    fs.writeFileSync(this.arquivo, JSON.stringify(gravar, null, 1));
+    gravarSeguro(this.arquivo, JSON.stringify(gravar, null, 1));
     return cfg;
   }
 
@@ -82,11 +100,7 @@ class Store {
   }
 
   canais() {
-    try {
-      return JSON.parse(fs.readFileSync(this.arquivoCanais, 'utf8'));
-    } catch {
-      return [];
-    }
+    return lerComReserva(this.arquivoCanais, Array.isArray) || [];
   }
 
   canaisParaTela() {
@@ -101,11 +115,11 @@ class Store {
   salvarCanal({ canal, refreshToken, redirect }) {
     const lista = this.canais().filter((c) => c.id !== canal.id);
     lista.push({ ...canal, redirect: redirect || '', refreshToken: this.cifrar(refreshToken), conectadoEm: new Date().toISOString() });
-    fs.writeFileSync(this.arquivoCanais, JSON.stringify(lista, null, 1));
+    gravarSeguro(this.arquivoCanais, JSON.stringify(lista, null, 1));
   }
 
   removerCanal(id) {
-    fs.writeFileSync(this.arquivoCanais, JSON.stringify(this.canais().filter((c) => c.id !== id), null, 1));
+    gravarSeguro(this.arquivoCanais, JSON.stringify(this.canais().filter((c) => c.id !== id), null, 1));
   }
 }
 

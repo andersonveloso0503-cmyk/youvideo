@@ -464,6 +464,8 @@ const Dormir = (() => {
       q('#drsContinuar').hidden = !estado || rodando || !podeAndar;
       q('#drsCancelar').hidden = !rodando;
       q('#drsLimpar').hidden = !estado || rodando;
+      q('#drsRecuperar').hidden = rodando;
+      q('#drsRecuperadoNota').hidden = !estado?.recuperado;
       contar();
       if (!estado) return;
       estado.dias.forEach((d, i) => {
@@ -650,6 +652,16 @@ const Dormir = (() => {
         q(id).onchange = guardar;
       }
       q('#drsCriar').onclick = criar;
+      q('#drsRecuperar').onclick = async () => {
+        q('#drsErro').textContent = '';
+        if (estado?.dias?.length && !confirm('Montar a lista de novo a partir das pastas? A lista atual será trocada (nenhum arquivo é apagado).')) return;
+        try {
+          estado = await window.api.dormir.semanaRecuperar();
+          render();
+        } catch (e) {
+          q('#drsErro').textContent = msgErro(e);
+        }
+      };
       q('#drsContinuar').onclick = async () => {
         q('#drsErro').textContent = '';
         estado = await window.api.dormir.semanaContinuar();

@@ -22,6 +22,27 @@ async function emLotes(n, total, fn) {
   );
 }
 
+function lerJson(arquivo) {
+  try {
+    const t = fs.readFileSync(arquivo, 'utf8').replace(/\u0000/g, '').trim();
+    if (!t) return null;
+    const j = JSON.parse(t);
+    return j && Array.isArray(j.dias) ? j : null;
+  } catch {
+    return null;
+  }
+}
+
+// Os temas ficam no arquivo da tela (dormirTemas.js); aqui só precisamos ler a lista
+function carregarTemas() {
+  try {
+    const t = fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'dormirTemas.js'), 'utf8');
+    return JSON.parse(t.slice(t.indexOf('['), t.lastIndexOf(']') + 1));
+  } catch {
+    return [];
+  }
+}
+
 class DormirSemana {
   /** opcoes: { arquivo, pastaBase, fontsDir, obterConfig, adicionarEnvios, aoMudar } */
   constructor(op) {
@@ -29,22 +50,130 @@ class DormirSemana {
     this.rodando = false;
     this.cancelado = false;
     this.cancelarAtual = null;
-    try {
-      this.estado = JSON.parse(fs.readFileSync(this.arquivo, 'utf8'));
-    } catch {
-      this.estado = null;
+    // Lê a semana salva. Se o arquivo estragou (PC desligou/travou no meio da gravação), usa a cópia
+    // de segurança; se nem ela existir, remonta a semana a partir das pastas (nada que já ficou pronto se perde).
+    this.estado = lerJson(this.arquivo) || lerJson(this.arquivo + '.bak');
+    this.recuperado = false;
+    if (!this.estado) {
+      try {
+        const r = this.montarDaPasta();
+        if (r) {
+          this.estado = r;
+          this.recuperado = true;
+          this.salvar();
+        }
+      } catch {
+        /* sem pasta da semana: começa vazio */
+      }
     }
   }
 
+  // Grava sem risco de estragar: escreve num arquivo novo e troca de uma vez (e guarda a versão anterior)
   salvar() {
     fs.mkdirSync(path.dirname(this.arquivo), { recursive: true });
-    fs.writeFileSync(this.arquivo, JSON.stringify(this.estado, null, 1));
+    const tmp = this.arquivo + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(this.estado, null, 1));
+    try {
+      if (lerJson(this.arquivo)) fs.copyFileSync(this.arquivo, this.arquivo + '.bak');
+    } catch {}
+    fs.renameSync(tmp, this.arquivo);
     this.aoMudar && this.aoMudar(this.paraTela());
+  }
+
+  /**
+   * Remonta a semana olhando a pasta "Sons para dormir/Semana": cada dia tem uma pasta "<tema>-AAAA-MM-DD"
+   * com as cenas, sons e músicas, e o vídeo "AAAA-MM-DD - <tema>.mp4". O que já foi para a fila de envio
+   * volta como agendado; o resto volta para você aprovar ou para continuar de onde parou.
+   */
+  montarDaPasta() {
+    const base = path.join(this.pastaBase(), 'Semana');
+    if (!fs.existsSync(base)) return null;
+    const temas = carregarTemas();
+    const cfg = (this.obterConfig && this.obterConfig()) || {};
+    const pref = cfg.dormirSemana || {};
+    const [hh, mm] = String(pref.hora || '20:00').split(':').map(Number);
+    const envios = (this.listarEnvios && this.listarEnvios()) || [];
+    const naFila = (arq) => envios.find((j) => j.tipo === 'envio' && j.envio?.arquivo && path.resolve(j.envio.arquivo) === path.resolve(arq) && j.status !== 'cancelado');
+    const arquivos = (dir, exts) => {
+      try {
+        return fs.readdirSync(dir).filter((f) => exts.includes(path.extname(f).toLowerCase()) && !f.endsWith('.parcial')).map((f) => path.join(dir, f)).sort();
+      } catch {
+        return [];
+      }
+    };
+    const dias = [];
+    for (const nome of fs.readdirSync(base)) {
+      const m = /^(.+)-(\d{4})-(\d{2})-(\d{2})$/.exec(nome);
+      const pasta = path.join(base, nome);
+      if (!m || !fs.statSync(pasta).isDirectory()) continue;
+      const tema = temas.find((t) => Dormir.slug(t.nome) === m[1]) || { id: m[1], nome: m[1].replace(/-/g, ' '), titulo: m[1].replace(/-/g, ' '), descricao: '', tags: '', prompt: '', movimento: '', somPrompt: '', musicaPrompt: '' };
+      const data = `${m[2]}-${m[3]}-${m[4]}`;
+      const quando = new Date(Number(m[2]), Number(m[3]) - 1, Number(m[4]), hh || 20, mm || 0, 0);
+      // Cenas: a imagem e, se tiver, a animação com o mesmo nome
+      const cenas = arquivos(path.join(pasta, 'cenas'), ['.jpg', '.jpeg', '.png', '.webp']).map((img) => {
+        const vid = img.replace(/\.[^.]+$/, '.mp4');
+        return { imagem: img, video: fs.existsSync(vid) ? vid : null, ia: true };
+      });
+      const sons = arquivos(path.join(pasta, 'sons'), ['.mp3', '.wav', '.m4a', '.flac']).map((a, i) => ({ arquivo: a, titulo: `Som ambiente ${i + 1}`, duracao: 0 }));
+      const musicas = arquivos(path.join(pasta, 'musicas'), ['.mp3', '.wav', '.m4a', '.flac']).map((a, i) => ({ arquivo: a, titulo: `Música ${i + 1}`, duracao: 0 }));
+      const nomeVideo = path.join(base, `${data} - ${tema.nome}`.replace(/[\\/:*?"<>|#]+/g, ' ') + '.mp4');
+      const temVideo = fs.existsSync(nomeVideo) && fs.statSync(nomeVideo).size > 1e6;
+      const capa = nomeVideo.slice(0, -4) + '.jpg';
+      const video = temVideo ? { arquivo: nomeVideo, capa: fs.existsSync(capa) ? capa : null, duracao: 0 } : null;
+      const job = temVideo ? naFila(nomeVideo) : null;
+      let passo = 'cenas';
+      let etapa = 'Recuperado: clique em Continuar para terminar este dia (o que já estava pronto não é refeito)';
+      if (job) {
+        passo = 'agendado';
+        etapa = job.status === 'concluido' ? 'Recuperado: já enviado para o YouTube' : 'Recuperado: já está na fila de envio';
+      } else if (temVideo) {
+        passo = 'aprovar';
+        etapa = quando.getTime() < Date.now() ? 'Recuperado: vídeo pronto, mas a data já passou. Se aprovar, ele publica logo depois de subir' : 'Recuperado: vídeo pronto. Assista a prévia e aprove';
+      }
+      dias.push({ tema, quando: quando.toISOString(), passo, etapa, erro: '', cenas, sons, musicas, video, aprovado: false, exigeAprovar: true, recuperado: true });
+    }
+    if (!dias.length) return null;
+    dias.sort((a, b) => a.quando.localeCompare(b.quando));
+    const canal = (cfg._canais || []).find((c) => c.id === pref.canalId);
+    return {
+      id: Date.now().toString(36),
+      criadoEm: new Date().toISOString(),
+      recuperadoEm: new Date().toISOString(),
+      plano: {
+        canalId: pref.canalId || '',
+        canalNome: canal?.titulo || '',
+        inicio: dias[0].quando.slice(0, 10),
+        hora: pref.hora || '20:00',
+        horas: Number(pref.horas) || 2,
+        resolucao: pref.res || '1080',
+        trocaMin: 25,
+        animar: pref.animar !== false,
+        aprovar: true,
+        qtdCenas: Number(pref.cenas) || 3,
+        qtdSons: 5,
+        qtdMusicas: pref.musicas != null ? Number(pref.musicas) : 8,
+        motorMusica: pref.motor || 'lyria',
+        volAmbiente: Number(pref.volAmb ?? 45),
+        volMusica: Number(pref.volMus ?? 80),
+      },
+      dias,
+    };
+  }
+
+  /** Botão "Procurar na pasta": refaz a lista a partir das pastas (não apaga nada). */
+  recuperarDaPasta() {
+    if (this.rodando) throw new Error('Espere terminar (ou cancele) antes de procurar na pasta.');
+    const r = this.montarDaPasta();
+    if (!r) throw new Error('Não achei nenhum vídeo da semana na pasta "Sons para dormir\\Semana".');
+    this.estado = r;
+    this.recuperado = true;
+    this.salvar();
+    return this.paraTela();
   }
 
   paraTela() {
     if (!this.estado) return null;
-    return { ...this.estado, rodando: this.rodando };
+    return { ...this.estado, rodando: this.rodando, recuperado: this.recuperado };
   }
 
   /**
@@ -81,9 +210,12 @@ class DormirSemana {
   limpar() {
     if (this.rodando) throw new Error('Cancele antes de limpar.');
     this.estado = null;
-    try {
-      fs.rmSync(this.arquivo, { force: true });
-    } catch {}
+    for (const f of [this.arquivo, this.arquivo + '.bak', this.arquivo + '.tmp']) {
+      try {
+        fs.rmSync(f, { force: true });
+      } catch {}
+    }
+    this.recuperado = false;
     this.aoMudar && this.aoMudar(null);
   }
 
