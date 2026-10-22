@@ -1582,9 +1582,8 @@ app.whenReady().then(() => {
     Dormir.gerarSom({ falKey: store.ler().falKey, texto, indice, pasta: path.join(pastaDormir(), 'sons', Dormir.slug(tema)) })
   );
   // Músicas instrumentais pelo Estúdio de música do Youvideo (ficam também na biblioteca do Estúdio)
-  ipcMain.handle('dormir:combinar', (_e, { musicas, tema }) => Dormir.cenaDasMusicas({ groqKey: store.ler().groqKey, musicas, tema }));
-  ipcMain.handle('dormir:musica', async (_e, { prompt, segundos, indice, tema, motor, cena }) =>
-    Dormir.gerarMusicaEstudio({ cfg: store.ler(), prompt, segundos, indice, motor, cena, titulo: `${tema || 'Sons para dormir'} ${indice + 1} (Sons para dormir)`, pasta: path.join(pastaDormir(), 'musicas', Dormir.slug(tema)) })
+  ipcMain.handle('dormir:musica', async (_e, { prompt, segundos, indice, tema, motor }) =>
+    Dormir.gerarMusicaEstudio({ cfg: store.ler(), prompt, segundos, indice, motor, titulo: `${tema || 'Sons para dormir'} ${indice + 1} (Sons para dormir)`, pasta: path.join(pastaDormir(), 'musicas', Dormir.slug(tema)) })
   );
   // Criar a semana: 1 vídeo por tema, agendado 1 por dia
   const { DormirSemana } = require('./src/engine/dormirSemana');

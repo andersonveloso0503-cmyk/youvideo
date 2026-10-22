@@ -102,7 +102,6 @@ const Dormir = (() => {
         l.querySelector('button').onclick = () => {
           itens.splice(i, 1);
           renderSons();
-          pintarCombinar();
         };
         box.appendChild(l);
       });
@@ -132,46 +131,7 @@ const Dormir = (() => {
     if (!D.rodando) q('#drmDica').textContent = dica;
   }
 
-  // ---------- Cena que combina com as músicas ----------
-  const chaveMusicas = () => D.musicas.map((m) => m.arquivo).sort().join('|');
-  const temMusicaDeFora = () => D.musicas.some((m) => m.origem === 'pc');
-  function pintarCombinar() {
-    const b = q('#drmCombinar');
-    b.disabled = !D.musicas.length;
-    const nota = q('#drmCombinarNota');
-    if (!D.musicas.length) nota.textContent = 'Com as músicas escolhidas (passo 3), a IA escreve uma cena do mesmo clima delas.';
-    else if (D.combinadoCom === chaveMusicas()) nota.textContent = `✓ Cena combinando com as ${D.musicas.length} músicas. ${D.combinadoResumo || ''}`;
-    else if (temMusicaDeFora()) nota.textContent = '⚠ Você trouxe músicas suas: clique em "Combinar" para a cena ficar no mesmo clima delas (ou ela será combinada sozinha ao gerar as cenas).';
-    else nota.textContent = 'As músicas geradas aqui já nascem da cena do tema.';
-  }
-
-  async function combinar() {
-    if (!D.musicas.length) return avisar('Coloque as músicas primeiro (passo 3).', true);
-    const b = q('#drmCombinar');
-    const texto = b.textContent;
-    b.disabled = true;
-    b.textContent = '🎵 Combinando...';
-    try {
-      const t = tema();
-      const r = await window.api.dormir.combinar({ musicas: D.musicas.map((m) => ({ titulo: m.titulo })), tema: t ? { nome: t.nome, prompt: t.prompt, movimento: t.movimento, somPrompt: t.somPrompt } : null });
-      q('#drmPrompt').value = r.prompt;
-      if (r.movimento) q('#drmMovimento').value = r.movimento;
-      if (r.somPrompt) q('#drmSomPrompt').value = r.somPrompt;
-      D.combinadoCom = chaveMusicas();
-      D.combinadoResumo = r.resumo || '';
-      return true;
-    } catch (e) {
-      avisar(msgErro(e), true);
-      return false;
-    } finally {
-      b.textContent = texto;
-      pintarCombinar();
-    }
-  }
-
   async function gerarCenas() {
-    // Músicas trazidas de fora e cena ainda não combinada: combina antes, para a imagem não ficar aleatória
-    if (temMusicaDeFora() && D.combinadoCom !== chaveMusicas()) await combinar();
     const prompt = q('#drmPrompt').value.trim();
     if (!prompt) return avisar('Escreva a descrição da cena (ou escolha um tema).', true);
     if (!config.temFal) return avisar('Cadastre a chave da fal.ai em Configurações para gerar as cenas.', true);
@@ -319,9 +279,8 @@ const Dormir = (() => {
   async function escolherSons(lista) {
     const novas = await window.api.dialogo.musicas();
     const ja = new Set(lista.map((m) => m.arquivo));
-    (novas || []).filter((m) => !ja.has(m.arquivo)).forEach((m) => lista.push({ arquivo: m.arquivo, titulo: m.titulo, duracao: m.duracao, origem: 'pc' }));
+    (novas || []).filter((m) => !ja.has(m.arquivo)).forEach((m) => lista.push({ arquivo: m.arquivo, titulo: m.titulo, duracao: m.duracao }));
     renderSons();
-    if (lista === D.musicas) pintarCombinar();
   }
 
   function ligar() {
@@ -341,7 +300,6 @@ const Dormir = (() => {
       d.value = d.value.replace(/\[NOME DO CANAL\]/g, config.dormirCanal || '[NOME DO CANAL]');
     };
     q('#drmGerarCenas').onclick = gerarCenas;
-    q('#drmCombinar').onclick = combinar;
     q('#drmTrazerCenas').onclick = async () => {
       const novas = await window.api.dormir.escolherCenas();
       D.cenas.push(...(novas || []));
@@ -357,7 +315,7 @@ const Dormir = (() => {
       const prompt = q('#drmMusPrompt').value.trim();
       if (!prompt) return avisar('Escreva o estilo da música.', true);
       const segundos = Number(q('#drmMusMin').value) * 60;
-      gerarAudios({ tipo: 'Músicas', qtd: Number(q('#drmMusQtd').value), lista: D.musicas, botao: '#drmGerarMus', chamar: (indice) => window.api.dormir.musica({ prompt, segundos, indice, tema: tema()?.nome || 'personalizado', motor: q('#drmMusMotor').value, cena: `${q('#drmPrompt').value.trim()}. Ambient sound: ${q('#drmSomPrompt').value.trim()}` }) });
+      gerarAudios({ tipo: 'Músicas', qtd: Number(q('#drmMusQtd').value), lista: D.musicas, botao: '#drmGerarMus', chamar: (indice) => window.api.dormir.musica({ prompt, segundos, indice, tema: tema()?.nome || 'personalizado', motor: q('#drmMusMotor').value }) });
     };
     q('#drmAddMusica').onclick = () => escolherSons(D.musicas);
     for (const id of ['#drmHoras', '#drmTroca', '#drmRes', '#drmAnimar', '#drmQtd']) q(id).onchange = () => (salvar(), pintar());
@@ -409,7 +367,6 @@ const Dormir = (() => {
     }
     renderCenas();
     renderSons();
-    pintarCombinar();
     if (D.pronto && !D.rodando) q('#drmDica').textContent = `✓ Vídeo pronto (${horasTxt(D.pronto.duracao)}). Agora é só subir.`; previa();
     if (!q('#modalDormir').open) q('#modalDormir').showModal();
   }
