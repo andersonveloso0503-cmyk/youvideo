@@ -82,6 +82,7 @@ contextBridge.exposeInMainWorld('api', {
     cancelar: chamar('fila:cancelar'),
     remover: chamar('fila:remover'),
     retentar: chamar('fila:retentar'),
+    subirMesmoAssim: chamar('fila:subirMesmoAssim'),
     limpar: chamar('fila:limpar'),
     abrirReceita: chamar('fila:abrirReceita'),
     outrosPcs: chamar('fila:outrosPcs'),

@@ -1017,6 +1017,9 @@ function renderFila() {
     const botao = (txt, titulo, fn, cls) => { const b = document.createElement('button'); b.textContent = txt; b.title = titulo; if (cls) b.className = cls; b.onclick = fn; acoes.appendChild(b); };
     if (rodando) botao('■', 'Parar', () => window.api.fila.cancelar(j.id));
     if (['erro', 'cancelado', 'interrompido'].includes(j.status)) botao('↻', 'Tentar de novo', () => window.api.fila.retentar(j.id));
+    if (j.youtube?.jaExistia) botao('⬆ Subir mesmo assim', 'O vídeo NÃO está no canal? Sobe agora, sem olhar se já existe', () => {
+      if (confirm(`Subir "${j.nome}" agora mesmo assim?\n\nAntes, abra o link "Ver no YouTube": se o vídeo estiver lá (em qualquer canal seu), não precisa subir.`)) window.api.fila.subirMesmoAssim(j.id);
+    });
     botao('🗑', rodando ? 'Parar e tirar da fila' : 'Tirar da fila', () => {
       if (rodando && !confirm(`Parar "${j.nome}" e tirar da fila?`)) return;
       window.api.fila.remover(j.id);

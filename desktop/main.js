@@ -1175,6 +1175,7 @@ app.whenReady().then(() => {
   ipcMain.handle('fila:cancelar', (_e, id) => fila.cancelar(id));
   ipcMain.handle('fila:remover', (_e, id) => fila.remover(id));
   ipcMain.handle('fila:retentar', (_e, id) => fila.retentar(id));
+  ipcMain.handle('fila:subirMesmoAssim', (_e, id) => fila.subirMesmoAssim(id));
   ipcMain.handle('fila:limpar', (_e, tudo) => fila.limpar(!!tudo));
   // Receita baixada do site fora do app: escolhe o arquivo e manda montar
   ipcMain.handle('fila:abrirReceita', async () => {

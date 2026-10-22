@@ -716,6 +716,17 @@ class Fila extends EventEmitter {
     this.proximo();
   }
 
+  // O aviso "Já estava no canal" estava errado (o vídeo de lá foi apagado, é de outro canal...): sobe de verdade agora
+  subirMesmoAssim(id) {
+    const j = this.jobs.find((x) => x.id === id);
+    if (!j || !j.envio || EM_ANDAMENTO.includes(j.status)) return false;
+    j.envio.forcarDuplicado = true;
+    if (this.cacheCanal) delete this.cacheCanal[j.envio.canalId];
+    this.atualizar(j, { status: 'aguardando', etapa: 'Aguardando na fila', progresso: 0, erro: null, aviso: null, youtube: null, concluidoEm: null });
+    this.proximo();
+    return true;
+  }
+
   cancelar(id) {
     const j = this.jobs.find((x) => x.id === id);
     if (!j) return;

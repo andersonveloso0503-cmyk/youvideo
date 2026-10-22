@@ -396,7 +396,20 @@ async function ultimosDoCanal({ credenciais, refreshToken, redirectOriginal }, m
     }
     pageToken = r.data.nextPageToken;
   } while (pageToken && saida.length < maximo);
-  return saida;
+  // A lista de "uploads" ainda traz vídeo apagado, recusado pelo YouTube (ex.: "envio duplicado") ou que falhou no
+  // processamento — esses NÃO contam como "já está no canal". Confere o estado real de cada um.
+  const validos = new Set();
+  try {
+    for (let i = 0; i < saida.length; i += 50) {
+      const r = await yt.videos.list({ part: ['status'], id: saida.slice(i, i + 50).map((v) => v.id), maxResults: 50 });
+      for (const v of r.data.items || []) {
+        if (!['rejected', 'failed', 'deleted'].includes(v.status?.uploadStatus)) validos.add(v.id);
+      }
+    }
+  } catch {
+    return saida; // sem conseguir conferir: fica com a lista como veio
+  }
+  return saida.filter((v) => validos.has(v.id));
 }
 
 /** O vídeo com o mesmo título que já está no canal (ou null). */
