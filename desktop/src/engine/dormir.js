@@ -462,7 +462,7 @@ async function gerarMusica({ falKey, prompt, segundos = 180, indice = 0, pasta, 
 }
 
 /** Música instrumental pelo Estúdio de música do Youvideo (Google Lyria ou ElevenLabs). Fica salva também na biblioteca do Estúdio. */
-async function gerarMusicaEstudio({ cfg, prompt, segundos = 180, indice = 0, motor = 'lyria', titulo, pasta }) {
+async function gerarMusicaEstudio({ cfg, prompt, segundos = 180, indice = 0, motor = 'lyria', titulo, pasta, cena = '' }) {
   if (!String(prompt || '').trim()) throw new Error('Escreva o estilo da música.');
   const estilo = `${String(prompt).trim()}, calm instrumental sleep music, slow and soft from start to end, no drums, no vocals`;
   const d = await Central.chamar(cfg, '/api/estudio/gerar', {
@@ -470,7 +470,8 @@ async function gerarMusicaEstudio({ cfg, prompt, segundos = 180, indice = 0, mot
     corpo: {
       motor: motor === 'elevenlabs' ? 'elevenlabs' : 'lyria',
       modo: 'simples',
-      descricao: `Calm instrumental music for sleeping and relaxing: ${String(prompt).trim()}`,
+      // A música nasce da cena: o mesmo lugar, a mesma hora e o mesmo clima que aparecem na tela
+      descricao: `Calm instrumental music for sleeping and relaxing: ${String(prompt).trim()}${cena ? `. It is the soundtrack of this exact scene and must feel like it: ${String(cena).trim().slice(0, 400)}` : ''}`,
       estilo,
       titulo: titulo || `Sons para dormir ${indice + 1}`,
       instrumental: true,
@@ -484,4 +485,63 @@ async function gerarMusicaEstudio({ cfg, prompt, segundos = 180, indice = 0, mot
   return { arquivo, titulo: d.musica.titulo || `Música ${indice + 1}`, duracao: (await probe(arquivo)).duracao };
 }
 
-module.exports = { gerarCena, gerarSom, gerarMusica, gerarMusicaEstudio, gerarVideo, montarLista, slug, ehImagem };
+// ---------- Cena que combina com as músicas ----------
+// Quando as músicas vêm de fora (Suno, Estúdio, PC), a IA lê o nome/estilo delas e escreve a cena,
+// o movimento e o som ambiente do MESMO clima — para a imagem nunca ficar aleatória em relação à música.
+const PISTAS = [
+  [/ocean|sea|wave|mar\b|onda|praia|beach|tide/i, 'Deserted beach at night under the moon, gentle waves on the sand, palm silhouettes, starry sky', 'gentle waves rolling onto the sand, moonlight shimmering on the water', 'gentle ocean waves on a sandy beach at night, calm'],
+  [/water|[aá]gua|river|rio\b|stream|riacho|tranquil waters|lake|lago/i, 'Calm crystal lake in a misty forest at dawn, soft light, still water reflecting the trees', 'soft ripples on the water, mist drifting slowly, leaves moving gently', 'calm lake shore, soft lapping water, distant birds'],
+  [/waterfall|cachoeira|cascata/i, 'Hidden waterfall in a lush green tropical forest, emerald pool, mist and light rays', 'water falling, mist rising, light rays shimmering', 'waterfall flowing into a pool in a tropical forest'],
+  [/rain|chuva|storm|tempest|thunder|trov/i, 'Cozy wooden cabin interior at night, rain on the window, warm lamp glow, green forest outside', 'raindrops running down the window, lamp flame flickering gently', 'steady soft rain on a window at night, cozy'],
+  [/forest|floresta|mata|wood|bosque|nature|natureza|bird|p[aá]ssaro/i, 'Peaceful forest clearing with golden light rays through tall trees, morning mist over a small stream', 'mist drifting, sun rays shimmering, leaves swaying in the breeze', 'peaceful forest, gentle stream, soft birdsong'],
+  [/night|noite|moon|lua|star|estrela|dream|sonho|sleep|dormir|lullaby|ninar/i, 'Quiet countryside at night under a starry sky and full moon, soft blue light, distant hills', 'stars twinkling, soft clouds drifting past the moon, grass swaying gently', 'night countryside ambience, crickets, light breeze'],
+  [/snow|neve|winter|inverno|fire|lareira|cozy|aconcheg/i, 'Cozy cabin by a crackling fireplace, snowy pine forest outside the window, warm orange light', 'fireplace flames crackling, snow falling softly outside', 'crackling fireplace indoors, soft wind outside'],
+  [/piano/i, 'Cozy room by a large window on a rainy evening, a piano in warm lamp light, city lights blurred outside', 'raindrops running down the glass, lamp light flickering softly', 'light rain tapping on a window glass, soft'],
+  [/guitar|viol[aã]o/i, 'Acoustic guitar by a window on a calm night, candlelight, plants, rain on the glass', 'candle flame flickering, rain running down the window', 'soft gentle rain outside a window at night'],
+];
+
+function pistaDasMusicas(texto) {
+  const p = PISTAS.find(([re]) => re.test(texto));
+  return p ? { prompt: `${p[1]}, cinematic, ultra detailed, 8k, peaceful mood`, movimento: p[2], somPrompt: p[3] } : null;
+}
+
+/** musicas: [{ titulo, estilo? }]; tema: { nome, prompt } (opcional). Devolve { prompt, movimento, somPrompt, resumo }. */
+async function cenaDasMusicas({ groqKey, musicas = [], tema = null }) {
+  const lista = musicas.map((m) => [m.titulo, m.estilo].filter(Boolean).join(' — ')).filter(Boolean).slice(0, 15);
+  if (!lista.length) throw new Error('Coloque as músicas primeiro.');
+  const reserva = pistaDasMusicas(lista.join(' ')) || (tema?.prompt ? { prompt: tema.prompt, movimento: tema.movimento || '', somPrompt: tema.somPrompt || '' } : null);
+  if (!groqKey) {
+    if (reserva) return { ...reserva, resumo: 'Cena escolhida pelo nome das músicas.' };
+    throw new Error('Cadastre a chave da Groq em Configurações para a IA combinar a cena com as músicas.');
+  }
+  const { chamarGroq } = require('./ia');
+  try {
+    const j = await chamarGroq(
+      groqKey,
+      [
+        {
+          role: 'system',
+          content:
+            'You design the background scene of a long YouTube video of calm music for sleeping and relaxing. ' +
+            'The scene MUST match the music: same place, time of day, season, weather and mood that the song titles and styles suggest ' +
+            '(ex.: "Tranquil Waters" -> calm lake or gentle sea; "Rainy Night Piano" -> cozy room with a piano and rain on the window; ' +
+            'a lullaby -> soft moonlit night; a guitar song -> a guitar in a cozy setting). Never pick something random. ' +
+            'If the songs suggest an instrument, it may appear in the scene. No people, no text. ' +
+            'Answer ONLY JSON: {"prompt": "image prompt in English, 25-45 words, ends with: cinematic, ultra detailed, 8k, peaceful mood", ' +
+            '"movimento": "what moves softly in the scene, English, max 20 words", ' +
+            '"somPrompt": "matching ambient nature sound in English, max 15 words, calm and continuous (rain, waves, stream, fire, crickets...)", ' +
+            '"resumo": "one short sentence in Brazilian Portuguese explaining why this scene matches the songs"}',
+        },
+        { role: 'user', content: `Songs in the video:\n- ${lista.join('\n- ')}${tema?.nome ? `\nChosen theme (only a hint, the songs come first): ${tema.nome}` : ''}` },
+      ],
+      { temperatura: 0.6, tokens: 700 }
+    );
+    if (!j?.prompt) throw new Error('vazio');
+    return { prompt: String(j.prompt).trim(), movimento: String(j.movimento || reserva?.movimento || '').trim(), somPrompt: String(j.somPrompt || reserva?.somPrompt || '').trim(), resumo: String(j.resumo || '').trim() };
+  } catch (e) {
+    if (reserva) return { ...reserva, resumo: 'Cena escolhida pelo nome das músicas (a IA não respondeu).' };
+    throw e;
+  }
+}
+
+module.exports = { gerarCena, gerarSom, gerarMusica, gerarMusicaEstudio, cenaDasMusicas, gerarVideo, montarLista, slug, ehImagem };

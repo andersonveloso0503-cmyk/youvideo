@@ -315,6 +315,7 @@ class DormirSemana {
             motor: p.motorMusica,
             titulo: `${t.nome} ${indice + 1} (Sons para dormir)`,
             pasta: path.join(pasta, 'musicas'),
+            cena: `${t.prompt}. Ambient sound: ${t.somPrompt || ''}`,
           });
           dia.musicas.push(m);
           this.marcar(dia, { etapa: `Criando as músicas no Estúdio (${dia.musicas.length} de ${p.qtdMusicas})` });

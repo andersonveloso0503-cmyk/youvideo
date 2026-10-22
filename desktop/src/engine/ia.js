@@ -578,4 +578,4 @@ ${pesquisados.length ? pesquisados.map((p) => `- ${p}`).join('\n') : '(não foi 
   };
 }
 
-module.exports = { buscaSegura, gerarTextosVideo, limparNome, sugestoesYoutube, comHashtags, titulosHistoria, GENEROS, temPalavra, gruposDe };
+module.exports = { chamarGroq, buscaSegura, gerarTextosVideo, limparNome, sugestoesYoutube, comHashtags, titulosHistoria, GENEROS, temPalavra, gruposDe };

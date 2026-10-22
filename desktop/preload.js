@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('api', {
     cena: chamar('dormir:cena'),
     som: chamar('dormir:som'),
     musica: chamar('dormir:musica'),
+    combinar: chamar('dormir:combinar'),
     escolherCenas: chamar('dormir:escolherCenas'),
     semanaEstado: chamar('dormir:semanaEstado'),
     semanaCriar: chamar('dormir:semanaCriar'),
