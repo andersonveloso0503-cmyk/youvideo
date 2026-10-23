@@ -66,6 +66,9 @@ class DormirSemana {
         /* sem pasta da semana: começa vazio */
       }
     }
+    try {
+      this.consertarSemMusica();
+    } catch {}
   }
 
   // Grava sem risco de estragar: escreve num arquivo novo e troca de uma vez (e guarda a versão anterior)
@@ -250,7 +253,25 @@ class DormirSemana {
     return this.paraTela();
   }
 
+  /** Vídeos montados sem música (o Estúdio falhou) e ainda não enviados: volta para o passo das músicas. */
+  consertarSemMusica() {
+    const p = this.estado?.plano;
+    if (!p || !(p.qtdMusicas > 0)) return 0;
+    let n = 0;
+    for (const dia of this.estado.dias) {
+      if (dia.passo === 'agendado' || !dia.video) continue;
+      const musicas = (dia.musicas || []).filter((m) => m?.arquivo && fs.existsSync(m.arquivo));
+      if (musicas.length) continue;
+      // o arquivo antigo (sem música) fica na pasta; o novo sai com outro nome
+      Object.assign(dia, { video: null, passo: 'musicas', aprovado: false, fila: true, erro: '', etapa: 'Estava sem música: criando as músicas e montando de novo' });
+      n++;
+    }
+    if (n) this.salvar();
+    return n;
+  }
+
   async passar(primeira) {
+    if (primeira) this.consertarSemMusica();
     for (const dia of this.estado.dias) {
       if (dia.passo === 'agendado') continue;
       if (dia.passo === 'aprovar' && !dia.aprovado) continue; // esperando a sua decisão
@@ -438,25 +459,29 @@ class DormirSemana {
       await emLotes(2, p.qtdMusicas - dia.musicas.length, async (k) => {
         if (this.cancelado) return;
         const indice = baseMusicas + k;
-        try {
-          const m = await Dormir.gerarMusicaEstudio({
-            cfg,
-            prompt: t.musicaPrompt,
-            segundos: 180,
-            indice,
-            motor: p.motorMusica,
-            titulo: `${t.nome} ${indice + 1} (Sons para dormir)`,
-            pasta: path.join(pasta, 'musicas'),
-          });
-          dia.musicas.push(m);
-          this.marcar(dia, { etapa: `Criando as músicas no Estúdio (${dia.musicas.length} de ${p.qtdMusicas})` });
-        } catch (e) {
-          erro = e.message;
+        for (let tent = 0; tent < 2 && !this.cancelado; tent++) {
+          try {
+            const m = await Dormir.gerarMusicaEstudio({
+              cfg,
+              prompt: t.musicaPrompt,
+              segundos: 180,
+              indice,
+              motor: p.motorMusica,
+              titulo: `${t.nome} ${indice + 1} (Sons para dormir)`,
+              pasta: path.join(pasta, 'musicas'),
+            });
+            dia.musicas.push(m);
+            this.marcar(dia, { etapa: `Criando as músicas no Estúdio (${dia.musicas.length} de ${p.qtdMusicas})` });
+            return;
+          } catch (e) {
+            erro = e.message;
+          }
         }
       });
       this.checar();
-      // Música é opcional: com pelo menos 3 já dá um bom ciclo; sem nenhuma, o vídeo sai só com o som ambiente
-      if (!dia.musicas.length && !dia.sons.length) throw new Error(`As músicas não saíram: ${erro}`);
+      // Você pediu música: sem nenhuma, NÃO monta o vídeo só com o som ambiente — para e mostra o motivo
+      // (clique em Continuar depois de resolver; as cenas e o som já feitos são aproveitados)
+      if (!dia.musicas.length) throw new Error(`As músicas não saíram do Estúdio, por isso o vídeo não foi montado (só teria a chuva). Motivo: ${erro || 'desconhecido'}`);
     }
 
     // 4) Vídeo
@@ -486,7 +511,7 @@ class DormirSemana {
         },
       });
       this.cancelarAtual = null;
-      this.marcar(dia, { video: r, etapa: 'Vídeo pronto' });
+      this.marcar(dia, { video: { ...r, qtdMusicas: dia.musicas.length, qtdSons: dia.sons.length }, etapa: `Vídeo pronto (${dia.musicas.length} música${dia.musicas.length === 1 ? '' : 's'} + som ambiente)` });
     }
 
     // 4b) Prévia: o vídeo só vai para o YouTube depois que você assistir e aprovar
