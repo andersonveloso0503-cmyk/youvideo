@@ -458,8 +458,8 @@ const Dormir = (() => {
       const box = q('#drsDias');
       box.innerHTML = '';
       const rodando = !!estado?.rodando;
-      const pendentes = estado?.dias?.some((d) => d.passo !== 'agendado');
-      const podeAndar = estado?.dias?.some((d) => d.passo !== 'agendado' && !(d.passo === 'aprovar' && !d.aprovado));
+      const pendentes = estado?.dias?.some((d) => d.passo !== 'agendado' && !d.tirado);
+      const podeAndar = estado?.dias?.some((d) => d.passo !== 'agendado' && !d.tirado && !(d.passo === 'aprovar' && !d.aprovado));
       q('#drsCriar').hidden = !!estado && (rodando || pendentes);
       q('#drsContinuar').hidden = !estado || rodando || !podeAndar;
       q('#drsCancelar').hidden = !rodando;
@@ -474,9 +474,43 @@ const Dormir = (() => {
         l.innerHTML = '<b class="quando"></b><span class="nome"></span><span class="passo"></span><span class="etapa"></span>';
         l.querySelector('.quando').textContent = dataBR(d.quando);
         l.querySelector('.nome').textContent = d.tema.nome;
-        l.querySelector('.passo').textContent = d.semEnvio ? '🚫 Sem envio' : ESTADOS[d.passo] || d.passo;
+        l.querySelector('.passo').textContent = d.tirado ? '⏭ Tirado' : d.semEnvio ? '🚫 Sem envio' : ESTADOS[d.passo] || d.passo;
         l.querySelector('.etapa').textContent = d.erro ? `⚠ ${d.erro}` : d.etapa;
+        if (d.tirado) l.style.opacity = '0.55';
         box.appendChild(l);
+        // Dias que ainda não foram agendados: tirar da semana / voltar, e trocar o motor se faltou crédito
+        if (d.passo !== 'agendado' && !(rodando && !d.tirado && !d.erro)) {
+          const a = document.createElement('div');
+          a.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin:-2px 0 6px 12px';
+          const botao = (txt, cls, fn) => {
+            const b = document.createElement('button');
+            b.className = cls;
+            b.textContent = txt;
+            b.onclick = async () => {
+              b.disabled = true;
+              q('#drsErro').textContent = '';
+              try {
+                estado = await fn();
+              } catch (e) {
+                q('#drsErro').textContent = msgErro(e);
+              }
+              render();
+            };
+            a.appendChild(b);
+          };
+          if (d.tirado) botao('↩ Voltar para a semana', 'btn-mini', () => window.api.dormir.semanaVoltarDia(i));
+          else {
+            botao('⏭ Tirar este dia da semana', 'btn-mini perigo', () => (confirm(`Tirar "${d.tema.nome}" (${dataBR(d.quando)}) da semana? Ele não será criado nem enviado. Os arquivos já feitos ficam na pasta.`) ? window.api.dormir.semanaTirarDia(i) : Promise.resolve(estado)));
+            if (/m[uú]sica|lyria|elevenlabs|cr[eé]dito|credit|billing/i.test(d.erro || '')) {
+              const outro = estado.plano?.motorMusica === 'elevenlabs' ? 'lyria' : 'elevenlabs';
+              botao(`🎵 Usar ${outro === 'lyria' ? 'Google Lyria' : 'ElevenLabs'} nas músicas e continuar`, 'btn-primario', async () => {
+                await window.api.dormir.semanaMotor(outro);
+                return window.api.dormir.semanaContinuar();
+              });
+            }
+          }
+          box.appendChild(a);
+        }
         // Vídeo pronto esperando você: player para assistir + Aprovar / Tentar outro
         if (d.passo === 'aprovar' && !d.aprovado && d.video?.arquivo) {
           const p = document.createElement('div');
@@ -667,7 +701,12 @@ const Dormir = (() => {
         estado = await window.api.dormir.semanaContinuar();
         render();
       };
-      q('#drsCancelar').onclick = () => window.api.dormir.semanaCancelar();
+      q('#drsCancelar').onclick = async () => {
+        if (!confirm('Parar a criação da semana agora? O que já ficou pronto é guardado; depois é só clicar em Continuar.')) return;
+        q('#drsCancelar').disabled = true;
+        await window.api.dormir.semanaCancelar().catch(() => {});
+        q('#drsCancelar').disabled = false;
+      };
       q('#drsLimpar').onclick = async () => {
         if (estado?.dias?.some((d) => d.passo !== 'agendado') && !confirm('Ainda tem vídeos desta semana sem terminar. Começar outra semana mesmo assim?')) return;
         await window.api.dormir.semanaLimpar();

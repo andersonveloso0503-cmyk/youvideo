@@ -1657,6 +1657,9 @@ app.whenReady().then(() => {
     return semana.paraTela();
   });
   ipcMain.handle('dormir:semanaCancelar', () => semana.cancelar());
+  ipcMain.handle('dormir:semanaTirarDia', (_e, i) => semana.tirarDia(i));
+  ipcMain.handle('dormir:semanaVoltarDia', (_e, i) => semana.voltarDia(i));
+  ipcMain.handle('dormir:semanaMotor', (_e, motor) => semana.trocarMotor(motor));
   ipcMain.handle('dormir:semanaLimpar', () => semana.limpar());
   ipcMain.handle('dormir:escolherCenas', async () => {
     const r = await dialog.showOpenDialog(janela, {

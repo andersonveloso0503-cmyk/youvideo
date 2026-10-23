@@ -462,7 +462,32 @@ async function gerarMusica({ falKey, prompt, segundos = 180, indice = 0, pasta, 
 }
 
 /** Música instrumental pelo Estúdio de música do Youvideo (Google Lyria ou ElevenLabs). Fica salva também na biblioteca do Estúdio. */
-async function gerarMusicaEstudio({ cfg, prompt, segundos = 180, indice = 0, motor = 'lyria', titulo, pasta }) {
+// Motor de música sem crédito (Lyria/ElevenLabs): troca sozinho para o outro e lembra por 1 hora
+const semCredito = new Map();
+const ehFaltaDeCredito = (m) => /credit|billing|prepay|depleted|quota|insufficient|RESOURCE_EXHAUSTED|payment|saldo|cr[eé]dito/i.test(String(m || ''));
+
+async function gerarMusicaEstudio(op) {
+  const pedido = op.motor === 'elevenlabs' ? 'elevenlabs' : 'lyria';
+  const outro = pedido === 'lyria' ? 'elevenlabs' : 'lyria';
+  const livre = (m) => !(semCredito.get(m) > Date.now());
+  const ordem = [pedido, outro].filter(livre);
+  if (!ordem.length) ordem.push(pedido, outro); // os dois marcados: tenta de novo mesmo assim
+  let ultimo;
+  for (const motor of ordem) {
+    try {
+      const r = await gerarMusicaEstudioCom({ ...op, motor });
+      return { ...r, motor };
+    } catch (e) {
+      ultimo = e;
+      if (!ehFaltaDeCredito(e.message)) throw e;
+      semCredito.set(motor, Date.now() + 60 * 60e3);
+    }
+  }
+  const nome = { lyria: 'Google Lyria', elevenlabs: 'ElevenLabs' };
+  throw new Error(`Os dois motores de música (Google Lyria e ElevenLabs) estão sem crédito. Coloque crédito em um deles e clique em Continuar. Detalhe: ${ultimo?.message || ''}`);
+}
+
+async function gerarMusicaEstudioCom({ cfg, prompt, segundos = 180, indice = 0, motor = 'lyria', titulo, pasta }) {
   if (!String(prompt || '').trim()) throw new Error('Escreva o estilo da música.');
   const estilo = `${String(prompt).trim()}, calm instrumental sleep music, slow and soft from start to end, no drums, no vocals`;
   const d = await Central.chamar(cfg, '/api/estudio/gerar', {

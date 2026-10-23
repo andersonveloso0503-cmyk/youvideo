@@ -205,9 +205,12 @@ class DormirSemana {
     return this.rodar();
   }
 
+  // Parar NA HORA: a tela já fica livre; o pedido que estava no meio (uma música ou cena na internet)
+  // termina sozinho por trás e é guardado, mas nada novo começa
   cancelar() {
     this.cancelado = true;
     this.cancelarAtual && this.cancelarAtual();
+    if (this.aoCancelar) this.aoCancelar();
   }
 
   limpar() {
@@ -234,6 +237,11 @@ class DormirSemana {
   async rodar({ soFila = false } = {}) {
     if (this.rodando || !this.estado) return this.paraTela();
     this.rodando = true;
+    // Se você parou e já clicou em Continuar, espera o pedido que ficou no meio acabar (sem fazer nada duas vezes)
+    if (this.trabalhoAtual) {
+      await this.trabalhoAtual;
+      this.trabalhoAtual = null;
+    }
     this.cancelado = false;
     this.salvar();
     try {
@@ -274,21 +282,54 @@ class DormirSemana {
     if (primeira) this.consertarSemMusica();
     for (const dia of this.estado.dias) {
       if (dia.passo === 'agendado') continue;
+      if (dia.tirado) continue; // você tirou este dia da semana
       if (dia.passo === 'aprovar' && !dia.aprovado) continue; // esperando a sua decisão
       if (!primeira && !dia.fila) continue;
       if (this.cancelado) break;
       dia.fila = false;
+      this.diaAtual = dia;
       try {
-        await this.fazerDia(dia);
+        const trabalho = this.fazerDia(dia);
+        this.trabalhoAtual = trabalho.catch(() => {});
+        await Promise.race([trabalho, new Promise((_, falha) => (this.aoCancelar = () => falha(new Error('CANCELADO'))))]);
+        this.aoCancelar = null;
       } catch (e) {
-        if (String(e?.message || e) === 'CANCELADO') {
-          this.marcar(dia, { etapa: 'Cancelado (clique em Continuar para seguir)', erro: '' });
+        this.aoCancelar = null;
+        if (String(e?.message || e) === 'CANCELADO' || this.cancelado) {
+          this.marcar(dia, { etapa: 'Parado (clique em Continuar para seguir de onde parou)', erro: '' });
           break;
         }
         // Um dia com problema não segura a semana: marca e segue para o próximo
         this.marcar(dia, { etapa: 'Deu erro', erro: String(e?.message || e).slice(0, 300) });
       }
     }
+    this.diaAtual = null;
+  }
+
+  /** Tira um dia da semana (não cria nem envia). Os arquivos já feitos ficam na pasta. */
+  tirarDia(i) {
+    const dia = this.estado?.dias?.[Number(i)];
+    if (!dia) throw new Error('Dia não encontrado.');
+    if (dia.passo === 'agendado') throw new Error('Este já está agendado: use "Cancelar envio" no cartão dele.');
+    if (this.rodando && this.diaAtual === dia) throw new Error('Este dia está sendo criado agora: clique em Cancelar (lá embaixo) e depois tire o dia.');
+    this.marcar(dia, { tirado: true, erro: '', etapa: 'Tirado da semana: não será criado nem enviado' });
+    return this.paraTela();
+  }
+
+  voltarDia(i) {
+    const dia = this.estado?.dias?.[Number(i)];
+    if (!dia) throw new Error('Dia não encontrado.');
+    this.marcar(dia, { tirado: false, fila: true, erro: '', etapa: 'De volta à semana: clique em Continuar' });
+    return this.paraTela();
+  }
+
+  /** Troca o motor das músicas da semana já criada (ex.: Lyria sem crédito → ElevenLabs) e libera os dias com erro. */
+  trocarMotor(motor) {
+    if (!this.estado) throw new Error('Nenhuma semana criada.');
+    this.estado.plano.motorMusica = motor === 'elevenlabs' ? 'elevenlabs' : 'lyria';
+    for (const dia of this.estado.dias) if (dia.erro && !dia.tirado && dia.passo !== 'agendado') Object.assign(dia, { erro: '', fila: true, etapa: 'Motor trocado: clique em Continuar' });
+    this.salvar();
+    return this.paraTela();
   }
 
   /** Você viu a prévia e gostou: agora sim vai para a fila de envio agendado. */
@@ -471,7 +512,8 @@ class DormirSemana {
               pasta: path.join(pasta, 'musicas'),
             });
             dia.musicas.push(m);
-            this.marcar(dia, { etapa: `Criando as músicas no Estúdio (${dia.musicas.length} de ${p.qtdMusicas})` });
+            const aviso = m.motor && m.motor !== p.motorMusica ? ` · ${p.motorMusica === 'lyria' ? 'Lyria' : 'ElevenLabs'} sem crédito, usando ${m.motor === 'lyria' ? 'Lyria' : 'ElevenLabs'}` : '';
+            this.marcar(dia, { etapa: `Criando as músicas no Estúdio (${dia.musicas.length} de ${p.qtdMusicas})${aviso}` });
             return;
           } catch (e) {
             erro = e.message;
