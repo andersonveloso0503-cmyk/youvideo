@@ -17,7 +17,7 @@ const EXT_AUDIO = ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus'];
 const USADAS = 'Usadas';
 // longoMin: o vídeo longo repete o álbum (em outra ordem) até chegar perto desse tempo — o público do canal
 // gospel deixa tocando na TV (assiste 2x mais que no celular). 0 = só o álbum, do tamanho que der.
-const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 1, folgaDias: 3, fundoAnimado: true, longoMin: 60 };
+const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 1, folgaDias: 3, fundoAnimado: false, longoMin: 60 };
 const FORA_DO_NORMAL = ['infantil']; // estilos que não entram sozinhos no canal de música normal
 const MAX_TENTATIVAS_DIA = 2;
 // Quanto da letra precisa ser entendido ao ouvir a música (0 a 1). Abaixo disso a música é refeita.
@@ -108,6 +108,13 @@ class MusicaAuto {
     // fica mais nos vídeos longos — passa para 1 Short por álbum e vídeo longo de ~1 hora (uma vez só)
     if (!c.ajusteOut26) {
       c = { ...c, shorts: Math.min(Number(c.shorts ?? 1), 1), longoMin: 60, ajusteOut26: 1 };
+      try {
+        this.salvarConfig({ musicaAuto: c });
+      } catch {}
+    }
+    // Ajuste de 23/out/2026: o fundo animado derrubou o engajamento — volta para a imagem parada (o dono pode religar)
+    if (!c.ajusteFundoParado) {
+      c = { ...c, fundoAnimado: false, ajusteFundoParado: 1 };
       try {
         this.salvarConfig({ musicaAuto: c });
       } catch {}
@@ -648,7 +655,13 @@ class MusicaAuto {
 
   /** Fundo do vídeo longo: a cena (animada ou parada); sem cena, a capa — mas nunca a capa simples com texto. */
   async fundoDoLongo(a, pasta) {
-    if (a.cena?.arquivo && fs.existsSync(a.cena.arquivo)) return a.cena.arquivo;
+    // Como era antes: a CAPA parada atrás das músicas (a do Gemini ou a que o dono trocou), não a cena animada
+    if (this.prefs().fundoAnimado === false) {
+      if (a.capa?.capaArquivo && !a.capa.simples && fs.existsSync(a.capa.capaArquivo)) return a.capa.capaArquivo;
+      if (a.cena?.arquivo && !a.cena.animado && fs.existsSync(a.cena.arquivo)) return a.cena.arquivo;
+    }
+    if (a.cena?.arquivo && fs.existsSync(a.cena.arquivo) && (this.prefs().fundoAnimado !== false || !a.cena.animado)) return a.cena.arquivo;
+    if (a.capa?.capaArquivo && fs.existsSync(a.capa.capaArquivo) && this.prefs().fundoAnimado === false) return a.capa.capaArquivo;
     // Sem cena: NUNCA a capa (ela tem o título escrito e ficava parada a hora inteira atrás da onda de som).
     // Usa o fundo em pé sem texto da capa, se houver; senão um degradê liso.
     if (a.capa?.fundoArquivo && fs.existsSync(a.capa.fundoArquivo)) return a.capa.fundoArquivo;
