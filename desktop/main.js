@@ -1279,6 +1279,60 @@ app.whenReady().then(() => {
   });
 
   // ---------- Central Youvideo (Biblioteca e Agenda das redes) ----------
+  // Sons para dormir: os vídeos são montados pela própria tela (não passam pela fila de montagem),
+  // então a Biblioteca procura na pasta "Sons para dormir" (um vídeo só) e em "Sons para dormir/Semana".
+  const duracoesDormir = new Map(); // caminho -> { mtime, duracao }
+  async function videosDeDormir(doEnvio) {
+    const base = pastaDormir();
+    const dias = semana?.estado?.dias || [];
+    const doDia = (arq) => dias.find((d) => d.video?.arquivo && path.resolve(d.video.arquivo) === path.resolve(arq));
+    const saida = [];
+    for (const dir of [base, path.join(base, 'Semana')]) {
+      let nomes = [];
+      try {
+        nomes = fs.readdirSync(dir);
+      } catch {
+        continue;
+      }
+      for (const nome of nomes) {
+        if (path.extname(nome).toLowerCase() !== '.mp4') continue;
+        const arq = path.join(dir, nome);
+        let st;
+        try {
+          st = fs.statSync(arq);
+        } catch {
+          continue;
+        }
+        if (!st.isFile() || st.size < 1e6) continue;
+        let dur = duracoesDormir.get(arq);
+        if (!dur || dur.mtime !== st.mtimeMs) {
+          dur = { mtime: st.mtimeMs, duracao: (await probe(arq).catch(() => ({ duracao: 0 }))).duracao };
+          duracoesDormir.set(arq, dur);
+        }
+        const dia = doDia(arq);
+        const envio = fila
+          .lista()
+          .filter((j) => j.tipo === 'envio' && j.envio?.arquivo && path.resolve(j.envio.arquivo) === path.resolve(arq))
+          .sort((a, b) => (b.status === 'concluido') - (a.status === 'concluido'))[0];
+        saida.push({
+          chave: `dormir:${require('crypto').createHash('md5').update(path.resolve(arq).toLowerCase()).digest('hex').slice(0, 16)}`,
+          origem: 'dormir',
+          id: arq,
+          categoria: 'dormir',
+          titulo: dia?.tema?.titulo || path.basename(nome, '.mp4'),
+          arquivo: arq,
+          capa: capaAoLado(arq),
+          curto: false,
+          duracao: dur.duracao,
+          clima: 'sons para dormir e relaxar',
+          criadoEm: new Date(st.mtimeMs).toISOString(),
+          youtube: doEnvio(envio) || (dia?.semEnvio ? { estado: 'manual' } : null),
+        });
+      }
+    }
+    return saida;
+  }
+
   ipcMain.handle('central:biblioteca', async () => {
     const d = await Central.chamar(store.ler(), '/api/central/biblioteca');
     const eu = identidadePc().pc;
@@ -1351,7 +1405,8 @@ app.whenReady().then(() => {
       if (j.status === 'erro') return { estado: 'erro', erro: j.erro || '' };
       return null;
     };
-    const todos = [...locais, ...deOutros, ...d.itens].map((i) => {
+    const dormir = await videosDeDormir(doEnvio);
+    const todos = [...locais, ...dormir, ...deOutros, ...d.itens].map((i) => {
       let youtube = i.youtube || null;
       const local = doEnvio(envios.get(chaveDe(i.chave))) || (i.origem === 'pc' ? doEnvio(envios.get(`comp-${i.id}`)) : null);
       if (i.origem === 'pc') {
@@ -1363,7 +1418,7 @@ app.whenReady().then(() => {
       if (!youtube) youtube = i.categoria === 'cover' ? null : { estado: 'manual' };
       return { ...i, youtube, publicado: { ...(i.publicado || {}), youtube: youtube?.estado === 'publicado' } };
     });
-    return { ...d, categorias: { compilacoes: 'Feitos no PC', ...d.categorias }, itens: todos };
+    return { ...d, categorias: { compilacoes: 'Feitos no PC', dormir: 'Sons para dormir', ...d.categorias }, itens: todos };
   });
   ipcMain.handle('central:categoria', (_e, dados) => Central.chamar(store.ler(), '/api/central/categoria', { metodo: 'POST', corpo: dados }));
   ipcMain.handle('central:agenda', () => Central.chamar(store.ler(), '/api/central/agenda'));

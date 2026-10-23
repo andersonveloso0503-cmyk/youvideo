@@ -15,7 +15,7 @@ const Biblioteca = (() => {
   };
   const q = (s) => document.querySelector(s);
   const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  const ICONES = { todos: '🗂', compilacoes: '💻', historias: '🎨', series: '📖', cortes: '😂', musicas: '🎵', medleys: '🎶', cover: '🎤', outros: '📦' };
+  const ICONES = { todos: '🗂', compilacoes: '💻', dormir: '🌙', historias: '🎨', series: '📖', cortes: '😂', musicas: '🎵', medleys: '🎶', cover: '🎤', outros: '📦' };
   const REDES = [
     ['youtube', 'YouTube', 'yt', '▶'],
     ['facebook', 'Facebook', 'fb', 'f'],
@@ -70,7 +70,7 @@ const Biblioteca = (() => {
     const lista = ['todos', ...Object.keys(B.categorias)];
     for (const c of lista) {
       const n = cont(c);
-      if (c !== 'todos' && !n && c !== 'compilacoes') continue;
+      if (c !== 'todos' && !n && c !== 'compilacoes' && c !== 'dormir') continue;
       const b = document.createElement('button');
       b.className = 'bib-cat' + (B.cat === c ? ' ativo' : '');
       b.innerHTML = `<span>${ICONES[c] || '📁'}</span><span class="nome">${esc(c === 'todos' ? 'Todos' : B.categorias[c])}</span><b>${n}</b>`;
@@ -228,7 +228,7 @@ const Biblioteca = (() => {
     const sel = document.createElement('select');
     sel.className = 'bib-mover';
     for (const [c, nome] of Object.entries(B.categorias)) {
-      if (c === 'compilacoes' || c === 'cover') continue;
+      if (c === 'compilacoes' || c === 'cover' || c === 'dormir') continue;
       const o = document.createElement('option');
       o.value = c;
       o.textContent = nome;
