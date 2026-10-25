@@ -463,6 +463,9 @@ class MusicaAuto {
       inscrever: { ativo: false },
       publicar: { ativo: false },
     };
+    // Botão animado "Inscreva-se" no vídeo longo (aparece aos 30 s e depois a cada 8 min). Quase ninguém se inscreve sem um lembrete.
+    const botao = prefs.botaoInscrever !== false && this.botaoInscrever ? this.botaoInscrever(a.idioma === 'en' ? 'en' : 'pt') : null;
+    const inscreverLongo = botao ? { ativo: true, idioma: a.idioma === 'en' ? 'en' : 'pt', posicao: 'inf_dir', tamanho: 28, primeiroSeg: 30, intervaloMin: 8, arquivo: botao } : { ativo: false };
     // Vídeo longo de ~1 hora: repete as músicas do álbum em outra ordem (sem a mesma música duas vezes seguidas)
     const alvoSeg = (Number(prefs.longoMin) || 0) * 60;
     let musicasLongo = [...musicas];
@@ -477,6 +480,7 @@ class MusicaAuto {
     }
     const longo = this.fila.adicionar({
       ...comum,
+      inscrever: inscreverLongo,
       nome,
       musicas: musicasLongo,
       fundos: [await this.fundoDoLongo(a, pasta)],

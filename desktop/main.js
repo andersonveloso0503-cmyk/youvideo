@@ -461,6 +461,7 @@ app.whenReady().then(() => {
     infoMusicas,
     verAgenda: agendaDoCanal,
     transcrever: require('./src/engine/legenda').transcrever,
+    botaoInscrever: (idioma) => { const f = path.join(app.getPath('userData'), 'cache', 'botao', `v2-${idioma}`, 'botao.mov'); return fs.existsSync(f) ? f : null; },
     dirCache: path.join(dirDados, 'cache'),
     pastaMusicas: path.join(app.getPath('music'), 'Youvideo Estúdio'),
     enviar,

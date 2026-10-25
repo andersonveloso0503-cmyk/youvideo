@@ -1237,6 +1237,8 @@ async function iniciar() {
   setTimeout(checarAtualizacao, 4000);
   // Deixa pronto o botão animado de like (a Fábrica usa nos vídeos do YouTube)
   setTimeout(() => window.api.botao.existe('v2-pt').then((f) => f || prepararBotao('pt')).catch(() => {}), 12000);
+  // Álbuns em inglês da Fábrica de Música usam o botão em inglês
+  setTimeout(() => window.api.botao.existe('v2-en').then((f) => f || prepararBotao('en')).catch(() => {}), 40000);
   setInterval(checarAtualizacao, 3 * 3600 * 1000);
   // Créditos das IAs: chip amarelo/vermelho quando algum está acabando
   const mostrarCreditos = (c) => {
