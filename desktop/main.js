@@ -1334,7 +1334,14 @@ app.whenReady().then(() => {
   }
 
   ipcMain.handle('central:biblioteca', async () => {
-    const d = await Central.chamar(store.ler(), '/api/central/biblioteca');
+    // Sem internet ou site fora do ar: mostra pelo menos os vídeos deste PC (compilações e Sons para dormir)
+    let d;
+    try {
+      d = await Central.chamar(store.ler(), '/api/central/biblioteca');
+    } catch (e) {
+      d = { itens: [], categorias: {}, avisos: [`os vídeos da nuvem (${String(e?.message || e).slice(0, 120)})`] };
+    }
+    d.itens = d.itens || [];
     const eu = identidadePc().pc;
     let videosNuvem = [];
     try {

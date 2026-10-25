@@ -31,9 +31,11 @@ const Biblioteca = (() => {
     a.innerHTML = txt || '';
   }
 
-  async function carregar() {
-    q('#bibGrade').innerHTML = '<p class="bib-vazio">Carregando os vídeos do Youvideo...</p>';
-    aviso('');
+  async function carregar({ silencioso = false } = {}) {
+    if (!silencioso) {
+      q('#bibGrade').innerHTML = '<p class="bib-vazio">Carregando os vídeos do Youvideo...</p>';
+      aviso('');
+    }
     try {
       const d = await window.api.central.biblioteca();
       B.itens = d.itens || [];
@@ -41,6 +43,7 @@ const Biblioteca = (() => {
       B.carregado = true;
       if (d.avisos?.length) aviso('Alguns vídeos não carregaram: ' + esc(d.avisos.join(' · ')));
     } catch (e) {
+      if (silencioso) return; // sem internet agora: fica a lista que já estava na tela
       B.itens = [];
       aviso(
         `⚠ ${esc(msgErro(e))}<br><span class="nota">Para ligar a Biblioteca: crie <b>CENTRAL_TOKEN</b> na Vercel e cole a mesma senha em <b>Configurações → Central Youvideo</b>.</span>`
@@ -634,7 +637,12 @@ const Biblioteca = (() => {
     if (opcoes.aba) B.aba = opcoes.aba;
     trocarAba(B.aba);
     if (!B.carregado || opcoes.recarregar) await carregar();
-    else renderGrade();
+    else {
+      // Mostra na hora o que já tinha e atualiza por trás: vídeos novos (ex.: Sons para dormir) aparecem sem clicar em Atualizar
+      renderCategorias();
+      renderGrade();
+      carregar({ silencioso: true });
+    }
   }
 
   // A fila muda várias vezes por segundo durante um envio: atualiza a agenda no máximo a cada 5 s
