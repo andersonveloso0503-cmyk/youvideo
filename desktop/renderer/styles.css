@@ -868,3 +868,4 @@ span.chip-estilo { cursor: default; }
 .drs-tema { justify-content: flex-start; }
 .drs-tema input { width: auto; flex: none; margin: 0; accent-color: var(--terracota); }
 .drs-tema span { text-align: left; }
+.bib-outro-pc { display: block; font-size: 11.5px; color: var(--ouro); margin-top: 2px; }

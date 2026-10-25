@@ -105,6 +105,7 @@ const Biblioteca = (() => {
 
   function capaHtml(i) {
     if (i.categoria === 'cover') return '<div class="bib-capa audio">🎤</div>';
+    if (i.origem === 'outro-pc') return '<div class="bib-capa audio">🌙</div>';
     const img = i.thumbnailUrl || (i.capa ? urlArquivo(i.capa) : null);
     if (img) return `<div class="bib-capa"><img loading="lazy" src="${esc(img)}" /></div>`;
     const src = i.videoUrl || (i.arquivo ? urlArquivo(i.arquivo) : null);
@@ -148,11 +149,12 @@ const Biblioteca = (() => {
       card.innerHTML = `
         ${capaHtml(i)}
         ${tarjaYoutube(i)}
-        ${i.categoria !== 'cover' ? `<label class="bib-check" title="Selecionar para agendar"><input type="checkbox" ${marcado ? 'checked' : ''} /><span>${marcado ? B.sel.indexOf(i.chave) + 1 : ''}</span></label>` : ''}
+        ${i.categoria !== 'cover' && i.origem !== 'outro-pc' ? `<label class="bib-check" title="Selecionar para agendar"><input type="checkbox" ${marcado ? 'checked' : ''} /><span>${marcado ? B.sel.indexOf(i.chave) + 1 : ''}</span></label>` : ''}
         <span class="bib-formato">${i.categoria === 'cover' ? 'ÁUDIO' : i.curto ? 'SHORT' : 'LONGO'}</span>
         <div class="bib-info">
           <b title="${esc(i.titulo)}">${esc(i.titulo)}</b>
           <span>${esc(B.categorias[i.categoria] || '')} · ${data}${i.duracao ? ' · ' + tempo(i.duracao) : ''}</span>
+          ${i.origem === 'outro-pc' ? `<span class="bib-outro-pc" title="O arquivo está no outro computador: para subir, abra o Compilador lá">🖥 No PC ${esc(i.pcNome)}</span>` : ''}
           <div class="bib-pub">${pub}</div>
         </div>
         <div class="bib-acoes"></div>`;

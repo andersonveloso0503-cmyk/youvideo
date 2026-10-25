@@ -903,6 +903,14 @@ app.whenReady().then(() => {
   // ---------- Fila deste PC na nuvem (para acompanhar de outro computador) ----------
   let tFilaNuvem = null;
   let ultimaFilaNuvem = 0;
+  // Situação de um envio da fila no YouTube (usada pela Biblioteca e pela lista de Sons para dormir dos outros PCs)
+  function estadoDoEnvio(j) {
+    if (!j) return null;
+    if (j.status === 'concluido' && j.youtube) return { estado: 'publicado', url: j.youtube.url || null, quando: j.youtube.agendadoPara || null, canal: j.youtube.canal || '' };
+    if (['aguardando', 'publicando'].includes(j.status)) return { estado: 'nafila', motivo: j.etapa || 'Na fila para subir', quando: j.naoAntesDe || null };
+    if (j.status === 'erro') return { estado: 'erro', erro: j.erro || '' };
+    return null;
+  }
   async function mandarFilaParaNuvem() {
     tFilaNuvem = null;
     const cfg = store.ler();
@@ -914,7 +922,18 @@ app.whenReady().then(() => {
       nuvem: j.espelho?.status || null,
     }));
     const { pc, pcNome } = identidadePc();
-    await Central.chamar(cfg, '/api/central/pc-filas', { metodo: 'PUT', corpo: { pc, pcNome, jobs } }).catch(() => {});
+    // Lista dos vídeos de Sons para dormir deste PC (só nome e situação, sem o arquivo): aparecem na Biblioteca dos outros PCs
+    let dormir = [];
+    try {
+      dormir = (await videosDeDormir(estadoDoEnvio)).slice(0, 80).map((v) => ({
+        nome: path.basename(v.arquivo),
+        titulo: v.titulo,
+        duracao: v.duracao,
+        criadoEm: v.criadoEm,
+        youtube: v.youtube ? { estado: v.youtube.estado, url: v.youtube.url || null, quando: v.youtube.quando || null } : null,
+      }));
+    } catch {}
+    await Central.chamar(cfg, '/api/central/pc-filas', { metodo: 'PUT', corpo: { pc, pcNome, jobs, dormir } }).catch(() => {});
   }
   fila.on('mudou', () => {
     if (tFilaNuvem) return;
@@ -1406,14 +1425,29 @@ app.whenReady().then(() => {
       const peso = (x) => (x.status === 'concluido' && x.youtube ? 3 : ['aguardando', 'publicando'].includes(x.status) ? 2 : x.status === 'erro' ? 1 : 0);
       if (!atual || peso(j) > peso(atual)) envios.set(k, j);
     }
-    const doEnvio = (j) => {
-      if (!j) return null;
-      if (j.status === 'concluido' && j.youtube) return { estado: 'publicado', url: j.youtube.url || null, quando: j.youtube.agendadoPara || null, canal: j.youtube.canal || '' };
-      if (['aguardando', 'publicando'].includes(j.status)) return { estado: 'nafila', motivo: j.etapa || 'Na fila para subir', quando: j.naoAntesDe || null };
-      if (j.status === 'erro') return { estado: 'erro', erro: j.erro || '' };
-      return null;
-    };
+    const doEnvio = estadoDoEnvio;
     const dormir = await videosDeDormir(doEnvio);
+    // Sons para dormir feitos em OUTROS PCs: só a lista (nome, duração, situação no YouTube); o arquivo fica lá
+    try {
+      const { pcs = [] } = await Central.chamar(store.ler(), '/api/central/pc-filas');
+      for (const p of pcs) {
+        if (p.pc === eu) continue;
+        for (const v of p.dormir || []) {
+          dormir.push({
+            chave: `dormir-pc:${p.pc}:${v.nome}`,
+            origem: 'outro-pc',
+            id: `${p.pc}:${v.nome}`,
+            categoria: 'dormir',
+            titulo: v.titulo || v.nome,
+            curto: false,
+            duracao: v.duracao,
+            criadoEm: v.criadoEm,
+            pcNome: p.pcNome || 'outro PC',
+            youtube: v.youtube || { estado: 'manual' },
+          });
+        }
+      }
+    } catch {}
     const todos = [...locais, ...dormir, ...deOutros, ...d.itens].map((i) => {
       let youtube = i.youtube || null;
       const local = doEnvio(envios.get(chaveDe(i.chave))) || (i.origem === 'pc' ? doEnvio(envios.get(`comp-${i.id}`)) : null);

@@ -35,7 +35,15 @@ export default async function handler(req, res) {
         concluidoEm: j.concluidoEm ? txt(j.concluidoEm, 40) : null,
         nuvem: j.nuvem ? txt(j.nuvem, 40) : null,
       }));
-      await col.doc(pc).set({ pcNome: txt(b.pcNome, 60), atualizadoEm: Date.now(), jobs });
+      // Sons para dormir deste PC (só a lista, para aparecer na Biblioteca dos outros PCs)
+      const dormir = (Array.isArray(b.dormir) ? b.dormir : []).slice(0, 80).map((v) => ({
+        nome: txt(v.nome, 160),
+        titulo: txt(v.titulo, 150),
+        duracao: Number(v.duracao) || 0,
+        criadoEm: txt(v.criadoEm, 40),
+        youtube: v.youtube ? { estado: txt(v.youtube.estado, 20), url: v.youtube.url ? txt(v.youtube.url, 200) : null, quando: v.youtube.quando ? txt(v.youtube.quando, 40) : null } : null,
+      }));
+      await col.doc(pc).set({ pcNome: txt(b.pcNome, 60), atualizadoEm: Date.now(), jobs, ...(Array.isArray(b.dormir) ? { dormir } : {}) }, { merge: true });
       return res.status(200).json({ ok: true });
     }
     return res.status(405).json({ erro: 'Método não permitido.' });
