@@ -412,6 +412,7 @@ const Dormir = (() => {
         res: q('#drsRes').value,
         cenas: q('#drsCenas').value,
         animar: q('#drsAnimar').checked,
+        fonte: q('#drsFonte').value,
         aprovar: q('#drsAprovar').checked,
         musicas: q('#drsMusicas').value,
         motor: q('#drsMotor').value,
@@ -661,6 +662,7 @@ const Dormir = (() => {
           resolucao: q('#drsRes').value,
           trocaMin: 25,
           animar: q('#drsAnimar').checked,
+          fonteCenas: q('#drsFonte').value,
           aprovar: q('#drsAprovar').checked,
           qtdCenas: Number(q('#drsCenas').value),
           qtdSons: 5,
@@ -679,7 +681,7 @@ const Dormir = (() => {
     function ligarS() {
       if (ligadoS) return;
       ligadoS = true;
-      for (const id of ['#drsCanal', '#drsHora', '#drsHoras', '#drsRes', '#drsCenas', '#drsAnimar', '#drsAprovar', '#drsMusicas', '#drsMotor']) q(id).onchange = guardar;
+      for (const id of ['#drsCanal', '#drsHora', '#drsHoras', '#drsRes', '#drsCenas', '#drsAnimar', '#drsFonte', '#drsAprovar', '#drsMusicas', '#drsMotor']) q(id).onchange = guardar;
       q('#drsInicio').onchange = contar;
       for (const id of ['#drsVolAmb', '#drsVolMus']) {
         q(id).oninput = () => (q(id + 'Txt').textContent = `${q(id).value}%`);
@@ -750,6 +752,7 @@ const Dormir = (() => {
       if (p.res) q('#drsRes').value = p.res;
       if (p.cenas) q('#drsCenas').value = p.cenas;
       q('#drsAnimar').checked = p.animar !== false;
+      if (p.fonte) q('#drsFonte').value = p.fonte;
       q('#drsAprovar').checked = p.aprovar !== false;
       if (p.musicas != null) q('#drsMusicas').value = p.musicas;
       if (p.motor) q('#drsMotor').value = p.motor;

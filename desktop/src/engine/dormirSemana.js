@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const Dormir = require('./dormir');
+const Central = require('./central');
 
 const PASSOS = ['cenas', 'som', 'musicas', 'video', 'aprovar', 'agendado'];
 
@@ -151,6 +152,7 @@ class DormirSemana {
         resolucao: pref.res || '1080',
         trocaMin: 25,
         animar: pref.animar !== false,
+        fonteCenas: pref.fonte === 'ia' ? 'ia' : 'gratis',
         aprovar: true,
         qtdCenas: Number(pref.cenas) || 3,
         qtdSons: 5,
@@ -450,9 +452,33 @@ class DormirSemana {
     dia.cenas = vivo(dia.cenas);
     if (dia.cenas.length < p.qtdCenas) {
       this.marcar(dia, { passo: 'cenas', etapa: `Criando as cenas (${dia.cenas.length} de ${p.qtdCenas})` });
-      const faltam = p.qtdCenas - dia.cenas.length;
-      const baseCenas = dia.cenas.length;
       let erro = '';
+      // Vídeos reais e grátis (Pexels/Pixabay): sem custo. Se não achar o suficiente, completa com a IA.
+      if (p.fonteCenas === 'gratis') {
+        try {
+          const usados = (this.estado.dias || []).flatMap((d) => (d.cenas || []).map((c) => c.gratisId)).filter(Boolean);
+          const { videos = [] } = await Central.chamar(cfg, '/api/central/videos-gratis', {
+            metodo: 'POST',
+            corpo: { tema: t.nome, prompt: t.prompt, quantidade: (p.qtdCenas - dia.cenas.length) * 2, evitar: usados },
+          });
+          for (const v of videos) {
+            if (dia.cenas.length >= p.qtdCenas || this.cancelado) break;
+            try {
+              const arq = await Central.baixar(v.url, path.join(pasta, 'cenas', `${v.id}.mp4`));
+              if (fs.statSync(arq).size < 3e5) continue;
+              dia.cenas.push({ video: arq, gratis: true, gratisId: v.id, fonte: v.fonte, autor: v.autor, pagina: v.pagina });
+              this.marcar(dia, { etapa: `Baixando vídeos grátis (${dia.cenas.length} de ${p.qtdCenas})` });
+            } catch {
+              /* um vídeo que não baixou: tenta o próximo */
+            }
+          }
+        } catch (e) {
+          erro = e.message;
+          this.marcar(dia, { etapa: `Vídeos grátis: ${String(e.message).slice(0, 120)} — usando a IA` });
+        }
+      }
+      const faltam = Math.max(0, p.qtdCenas - dia.cenas.length);
+      const baseCenas = dia.cenas.length;
       await emLotes(2, faltam, async (k) => {
         if (this.cancelado) return;
         // Cada "tentar outro" muda o ângulo da cena (as variações andam de 2 em 2), então vem algo diferente
