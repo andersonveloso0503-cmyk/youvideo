@@ -1714,6 +1714,10 @@ app.whenReady().then(() => {
     semana.aprovar(Number(i)).catch(() => {});
     return semana.paraTela();
   });
+  ipcMain.handle('dormir:semanaRemontar', (_e, i) => {
+    semana.remontar(Number(i)).catch(() => {});
+    return semana.paraTela();
+  });
   ipcMain.handle('dormir:semanaRefazerSom', (_e, i) => {
     semana.refazerSom(Number(i)).catch(() => {});
     return semana.paraTela();

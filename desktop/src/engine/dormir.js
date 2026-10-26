@@ -386,8 +386,8 @@ async function gerarVideo(op) {
     avisar('audio', 0.2, 'Preparando o som');
     const ent = [];
     const partes = [];
-    const volA = (Number(op.volAmbiente ?? 45) / 100).toFixed(2);
-    const volM = (Number(op.volMusica ?? 80) / 100).toFixed(2);
+    const volA = (Number(op.volAmbiente ?? 30) / 100).toFixed(2);
+    const volM = (Number(op.volMusica ?? 100) / 100).toFixed(2);
     if (ambientes.length) {
       const amb = await prepararAmbiente(ambientes, tmp, cancelar);
       ent.push('-f', 'concat', '-safe', '0', '-i', await listaRepetida(amb, duracao, path.join(tmp, 'ambiente.txt')));

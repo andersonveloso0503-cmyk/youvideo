@@ -29,7 +29,7 @@ const Dormir = (() => {
       qtd: q('#drmQtd').value,
       volAmb: q('#drmVolAmb').value,
       volMus: q('#drmVolMus').value,
-      v: 2, // v2: som e música normalizados (volumes antigos não valem mais)
+      v: 3, // v3: música acima do som ambiente (volumes antigos não valem mais)
     };
     window.api.config.salvar({ dormir: config.dormir }).catch(() => {});
   }
@@ -347,9 +347,10 @@ const Dormir = (() => {
     if (p.resolucao) q('#drmRes').value = p.resolucao;
     if (p.qtd) q('#drmQtd').value = p.qtd;
     q('#drmAnimar').checked = p.animar !== false;
-    const novo = p.v === 2;
-    q('#drmVolAmb').value = novo ? p.volAmb ?? 45 : 45;
-    q('#drmVolMus').value = novo ? p.volMus ?? 80 : 80;
+    // v3: música bem acima do som ambiente (o volume final do vídeo é acertado sozinho)
+    const novo = p.v === 3;
+    q('#drmVolAmb').value = novo ? p.volAmb ?? 30 : 30;
+    q('#drmVolMus').value = novo ? p.volMus ?? 100 : 100;
     q('#drmVolAmbTxt').textContent = `${q('#drmVolAmb').value}%`;
     q('#drmVolMusTxt').textContent = `${q('#drmVolMus').value}%`;
     if (!q('#drmTitulo').value) aplicarTema();
@@ -521,12 +522,21 @@ const Dormir = (() => {
           p.innerHTML =
             '<video controls preload="metadata" style="width:100%;max-width:760px;border-radius:8px;background:#000"></video>' +
             '<small style="color:var(--mudo)">Assista um pedaço (pode pular pela barra). Repare se o fundo se mexe de verdade e se a troca de cena fica suave.</small>' +
-            '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-primario" data-ok>✓ Aprovar e agendar</button><button class="btn-mini perigo" data-outro>✗ Não gostei, tentar outro</button><button class="btn-mini" data-som title="O som ambiente ficou com estalos/chiado: cria outro som e monta de novo (as cenas e as músicas ficam)">🌧 Refazer só o som</button></div>';
+            '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-primario" data-ok>✓ Aprovar e agendar</button><button class="btn-mini perigo" data-outro>✗ Não gostei, tentar outro</button><button class="btn-mini" data-remontar title="Monta este vídeo de novo com a música mais alta que o som ambiente (sem gastar crédito: usa as mesmas cenas, som e músicas)">🎚 Montar de novo com a música mais alta</button><button class="btn-mini" data-som title="O som ambiente ficou com estalos/chiado: cria outro som e monta de novo (as cenas e as músicas ficam)">🌧 Refazer só o som</button></div>';
           p.querySelector('video').src = urlArquivo(d.video.arquivo);
           p.querySelector('[data-ok]').onclick = async (ev) => {
             ev.target.disabled = true;
             try {
               estado = await window.api.dormir.semanaAprovar(i);
+            } catch (e) {
+              q('#drsErro').textContent = msgErro(e);
+            }
+            render();
+          };
+          p.querySelector('[data-remontar]').onclick = async (ev) => {
+            ev.target.disabled = true;
+            try {
+              estado = await window.api.dormir.semanaRemontar(i);
             } catch (e) {
               q('#drsErro').textContent = msgErro(e);
             }
@@ -794,8 +804,9 @@ const Dormir = (() => {
       q('#drsAprovar').checked = p.aprovar !== false;
       if (p.musicas != null) q('#drsMusicas').value = p.musicas;
       if (p.motor) q('#drsMotor').value = p.motor;
-      q('#drsVolAmb').value = p.volAmb ?? 45;
-      q('#drsVolMus').value = p.volMus ?? 80;
+      const antigos = String(p.volAmb) === '45' && String(p.volMus) === '80'; // padrão antigo: troca pelo novo
+      q('#drsVolAmb').value = antigos ? 30 : p.volAmb ?? 30;
+      q('#drsVolMus').value = antigos ? 100 : p.volMus ?? 100;
       q('#drsVolAmbTxt').textContent = `${q('#drsVolAmb').value}%`;
       q('#drsVolMusTxt').textContent = `${q('#drsVolMus').value}%`;
       renderTemas();

@@ -70,6 +70,15 @@ class DormirSemana {
     try {
       this.consertarSemMusica();
     } catch {}
+    // Semana criada com o volume antigo (som 45% / música 80%): os vídeos que ainda vão ser montados saem com a música mais alta
+    const pl = this.estado?.plano;
+    if (pl && Number(pl.volAmbiente) === 45 && Number(pl.volMusica) === 80) {
+      pl.volAmbiente = 30;
+      pl.volMusica = 100;
+      try {
+        this.salvar();
+      } catch {}
+    }
   }
 
   // Grava sem risco de estragar: escreve num arquivo novo e troca de uma vez (e guarda a versão anterior)
@@ -158,8 +167,8 @@ class DormirSemana {
         qtdSons: 5,
         qtdMusicas: pref.musicas != null ? Number(pref.musicas) : 8,
         motorMusica: pref.motor || 'lyria',
-        volAmbiente: Number(pref.volAmb ?? 45),
-        volMusica: Number(pref.volMus ?? 80),
+        volAmbiente: Number(pref.volAmb ?? 30),
+        volMusica: Number(pref.volMus ?? 100),
       },
       dias,
     };
@@ -448,6 +457,21 @@ class DormirSemana {
       erro: '',
       etapa: 'Você pediu outro: criando novas cenas',
     });
+    this.refazer = true;
+    return this.rodar({ soFila: true });
+  }
+
+  /** Na prévia: só monta o vídeo de novo (ex.: depois de mudar o volume). Não gasta crédito: usa as mesmas cenas, som e músicas. */
+  remontar(i) {
+    const dia = this.estado?.dias?.[i];
+    if (!dia || dia.passo !== 'aprovar') throw new Error('Esse vídeo não está esperando aprovação.');
+    const base = path.resolve(this.pastaBase());
+    for (const f of [dia.video?.arquivo, dia.video?.capa]) {
+      try {
+        if (f && path.resolve(f).startsWith(base + path.sep)) fs.rmSync(f, { force: true });
+      } catch {}
+    }
+    this.marcar(dia, { passo: 'video', video: null, aprovado: false, fila: true, erro: '', etapa: 'Montando de novo com o volume novo' });
     this.refazer = true;
     return this.rodar({ soFila: true });
   }

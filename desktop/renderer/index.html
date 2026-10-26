@@ -437,8 +437,8 @@
       <div class="can-linha">
         <label>Músicas por vídeo <select id="drsMusicas"><option value="0">Nenhuma (só som ambiente)</option><option value="4">4</option><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option></select></label>
         <label>Motor <select id="drsMotor"><option value="lyria" selected>Google Lyria (Estúdio)</option><option value="elevenlabs">ElevenLabs (Estúdio)</option></select></label>
-        <label>Volume do som <input type="range" id="drsVolAmb" min="0" max="150" value="45" /> <span id="drsVolAmbTxt">45%</span></label>
-        <label>Volume da música <input type="range" id="drsVolMus" min="0" max="150" value="80" /> <span id="drsVolMusTxt">80%</span></label>
+        <label>Volume do som <input type="range" id="drsVolAmb" min="0" max="150" value="30" /> <span id="drsVolAmbTxt">30%</span></label>
+        <label>Volume da música <input type="range" id="drsVolMus" min="0" max="150" value="100" /> <span id="drsVolMusTxt">100%</span></label>
       </div>
       <p class="modal-erro" id="drsErro"></p>
       <div class="can-linha">
@@ -492,12 +492,12 @@
       <div class="drm-sons">
         <div>
           <div class="can-linha"><b class="drm-rot">Som ambiente</b><button class="btn-mini" id="drmAddAmbiente">+ Escolher som</button>
-            <label>Volume <input type="range" id="drmVolAmb" min="0" max="150" value="45" /> <span id="drmVolAmbTxt">45%</span></label></div>
+            <label>Volume <input type="range" id="drmVolAmb" min="0" max="150" value="30" /> <span id="drmVolAmbTxt">30%</span></label></div>
           <div id="drmAmbientes" class="arr-lista"></div>
         </div>
         <div>
           <div class="can-linha"><b class="drm-rot">Músicas</b><button class="btn-mini" id="drmAddMusica">+ Escolher músicas</button>
-            <label>Volume <input type="range" id="drmVolMus" min="0" max="150" value="80" /> <span id="drmVolMusTxt">80%</span></label></div>
+            <label>Volume <input type="range" id="drmVolMus" min="0" max="150" value="100" /> <span id="drmVolMusTxt">100%</span></label></div>
           <div id="drmMusicas" class="arr-lista"></div>
         </div>
       </div>
