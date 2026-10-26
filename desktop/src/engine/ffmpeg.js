@@ -10,6 +10,22 @@ function corrigirCaminhoAsar(p) {
 const FFMPEG = corrigirCaminhoAsar(require('ffmpeg-static'));
 const FFPROBE = corrigirCaminhoAsar(require('ffprobe-static').path);
 
+// Transforma a saída enorme do ffmpeg numa mensagem que diz o motivo de verdade
+function erroLegivel(stderr) {
+  const txt = String(stderr || '');
+  if (/No space left on device|There is not enough space|ENOSPC/i.test(txt)) {
+    const e = new Error('O disco do PC está cheio: o vídeo não coube. Libere espaço (botão 🧹 Liberar espaço em Sons para dormir, ou apague vídeos antigos) e clique em Continuar.');
+    e.discoCheio = true;
+    return e;
+  }
+  if (/Permission denied|Access is denied/i.test(txt)) return new Error('O Windows não deixou gravar o arquivo (pasta protegida ou arquivo aberto em outro programa). Feche o vídeo se estiver aberto e tente de novo.');
+  const ruido = /Auto-inserting|^\s*(Stream #|Metadata|encoder|handler_name|vendor_id|Duration|Input #|Output #|Stream mapping|Press \[q\])/i;
+  const linhas = txt.split('\n').map((l) => l.trim()).filter(Boolean);
+  const importantes = linhas.filter((l) => !ruido.test(l) && /error|erro|invalid|failed|could not|cannot|unable|impossible|not found|no such|denied|too many|mismatch|unsupported/i.test(l));
+  const mostrar = (importantes.length ? importantes : linhas.filter((l) => !ruido.test(l))).slice(-5);
+  return new Error('Erro no ffmpeg:\n' + (mostrar.length ? mostrar : linhas.slice(-8)).join('\n'));
+}
+
 function probe(arquivo) {
   return new Promise((resolve, reject) => {
     const p = spawn(FFPROBE, ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', arquivo]);
@@ -80,7 +96,7 @@ function rodar(args, { duracaoTotal = 0, onProgresso, modo = 'normal', cwd } = {
     p.on('error', reject);
     p.on('close', (code) => {
       if (cancelado) return reject(new Error('CANCELADO'));
-      if (code !== 0) return reject(new Error('Erro no ffmpeg:\n' + stderr.split('\n').slice(-12).join('\n')));
+      if (code !== 0) return reject(erroLegivel(stderr));
       resolve();
     });
   });
@@ -112,4 +128,4 @@ async function detectarEncoder() {
   return encoderCache;
 }
 
-module.exports = { FFMPEG, FFPROBE, probe, rodar, detectarEncoder };
+module.exports = { FFMPEG, FFPROBE, probe, rodar, detectarEncoder, erroLegivel };

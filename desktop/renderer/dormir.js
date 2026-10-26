@@ -466,6 +466,7 @@ const Dormir = (() => {
       q('#drsCancelar').hidden = !rodando;
       q('#drsLimpar').hidden = !estado || rodando;
       q('#drsRecuperar').hidden = rodando;
+      q('#drsLimpeza').classList.toggle('destaque', !!estado?.dias?.some((d) => /disco|espa[cç]o|No space/i.test(d.erro || '')));
       q('#drsRecuperadoNota').hidden = !estado?.recuperado;
       contar();
       if (!estado) return;
@@ -688,6 +689,33 @@ const Dormir = (() => {
         q(id).onchange = guardar;
       }
       q('#drsCriar').onclick = criar;
+      q('#drsLimpeza').onclick = async () => {
+        q('#drsErro').textContent = '';
+        const b = q('#drsLimpeza');
+        b.disabled = true;
+        try {
+          const l = await window.api.dormir.limpezaListar();
+          const gb = (x) => (x / 1024 ** 3).toFixed(1).replace('.', ',') + ' GB';
+          const livre = l.livre != null ? `Livre agora no disco: ${gb(l.livre)}.\n\n` : '';
+          if (!l.itens.length) {
+            alert(`${livre}Não achei nada que dê para apagar com segurança (nenhum vídeo de dormir já está no YouTube nem sobrou versão antiga).\n\nPara liberar mais, apague vídeos que você não usa em Biblioteca → 🌙 Sons para dormir → 📂.`);
+            return;
+          }
+          const r = l.resumo;
+          const linhas = [
+            r.youtube.n ? `• ${r.youtube.n} vídeo(s) que JÁ ESTÃO no YouTube: ${gb(r.youtube.bytes)}` : '',
+            r.antigo.n ? `• ${r.antigo.n} versão(ões) antiga(s) que nenhum dia usa mais: ${gb(r.antigo.bytes)}` : '',
+            r.sobra.n ? `• ${r.sobra.n} sobra(s) de montagem interrompida: ${gb(r.sobra.bytes)}` : '',
+          ].filter(Boolean);
+          if (!confirm(`${livre}Posso apagar do PC:\n${linhas.join('\n')}\n\nTotal: ${gb(l.total)}\n\nO que já está no YouTube continua lá. Vídeos esperando envio ou aprovação NÃO são apagados.`)) return;
+          const f = await window.api.dormir.limpezaFazer();
+          avisar(`🧹 Liberei ${gb(f.apagado)}${f.livre != null ? ` — agora tem ${gb(f.livre)} livres` : ''}. Clique em Continuar para terminar os dias que pararam.`);
+        } catch (e) {
+          q('#drsErro').textContent = msgErro(e);
+        } finally {
+          b.disabled = false;
+        }
+      };
       q('#drsRecuperar').onclick = async () => {
         q('#drsErro').textContent = '';
         if (estado?.dias?.length && !confirm('Montar a lista de novo a partir das pastas? A lista atual será trocada (nenhum arquivo é apagado).')) return;

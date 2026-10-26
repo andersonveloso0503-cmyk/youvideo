@@ -165,6 +165,88 @@ class DormirSemana {
     };
   }
 
+  /**
+   * O que dá para apagar sem perder nada:
+   *  - vídeos que JÁ ESTÃO no YouTube (o envio terminou);
+   *  - versões antigas na pasta Semana que nenhum dia usa mais e que não estão esperando envio;
+   *  - sobras de montagens interrompidas na pasta temporária do Windows.
+   */
+  listarLimpeza() {
+    const os = require('os');
+    const base = this.pastaBase();
+    const envios = ((this.listarEnvios && this.listarEnvios()) || []).filter((j) => j.tipo === 'envio' && j.envio?.arquivo);
+    const mesmo = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+    const noYoutube = (arq) => envios.some((j) => mesmo(j.envio.arquivo, arq) && j.status === 'concluido' && j.youtube?.id);
+    const esperando = (arq) => envios.some((j) => mesmo(j.envio.arquivo, arq) && !['concluido', 'cancelado', 'erro'].includes(j.status));
+    const emUso = (arq) => (this.estado?.dias || []).some((d) => d.video?.arquivo && mesmo(d.video.arquivo, arq) && d.passo !== 'agendado');
+    const tam = (f) => {
+      try {
+        return fs.statSync(f).size;
+      } catch {
+        return 0;
+      }
+    };
+    const itens = [];
+    const add = (arquivo, motivo) => {
+      const t = tam(arquivo);
+      if (t) itens.push({ arquivo, motivo, tamanho: t });
+      const capa = arquivo.replace(/\.mp4$/i, '.jpg');
+      if (capa !== arquivo && tam(capa)) itens.push({ arquivo: capa, motivo, tamanho: tam(capa), capa: true });
+    };
+    for (const dir of [base, path.join(base, 'Semana')]) {
+      let nomes = [];
+      try {
+        nomes = fs.readdirSync(dir);
+      } catch {
+        continue;
+      }
+      for (const nome of nomes) {
+        if (!/\.mp4$/i.test(nome)) continue;
+        const arq = path.join(dir, nome);
+        if (esperando(arq) || emUso(arq)) continue;
+        if (noYoutube(arq)) add(arq, 'youtube');
+        else if (dir !== base && !(this.estado?.dias || []).some((d) => d.video?.arquivo && mesmo(d.video.arquivo, arq))) add(arq, 'antigo');
+      }
+    }
+    // Sobras de montagens que pararam no meio (PC travou, disco encheu...)
+    try {
+      for (const nome of fs.readdirSync(os.tmpdir())) {
+        if (!/^youvideo-dormir-/.test(nome)) continue;
+        if (this.rodando) continue; // pode ser a montagem de agora
+        const dir = path.join(os.tmpdir(), nome);
+        let t = 0;
+        try {
+          for (const f of fs.readdirSync(dir)) t += tam(path.join(dir, f));
+        } catch {}
+        itens.push({ arquivo: dir, motivo: 'sobra', tamanho: t, pasta: true });
+      }
+    } catch {}
+    const soma = (m) => itens.filter((i) => i.motivo === m).reduce((t, i) => t + i.tamanho, 0);
+    const conta = (m) => itens.filter((i) => i.motivo === m && !i.capa).length;
+    return {
+      itens,
+      total: itens.reduce((t, i) => t + i.tamanho, 0),
+      resumo: { youtube: { n: conta('youtube'), bytes: soma('youtube') }, antigo: { n: conta('antigo'), bytes: soma('antigo') }, sobra: { n: conta('sobra'), bytes: soma('sobra') } },
+      livre: Dormir.livreEm(base)?.livre ?? null,
+    };
+  }
+
+  /** Apaga o que listarLimpeza() achou (confere de novo na hora, para não apagar nada que mudou). */
+  liberarEspaco() {
+    const { itens } = this.listarLimpeza();
+    let apagado = 0;
+    for (const i of itens) {
+      try {
+        fs.rmSync(i.arquivo, { recursive: !!i.pasta, force: true });
+        apagado += i.tamanho;
+      } catch {}
+    }
+    // Dias cujo vídeo saiu da pasta (já está no YouTube): anota para a tela
+    for (const d of this.estado?.dias || []) if (d.video?.arquivo && !fs.existsSync(d.video.arquivo)) d.video.apagadoDoPc = true;
+    if (this.estado) this.salvar();
+    return { apagado, livre: Dormir.livreEm(this.pastaBase())?.livre ?? null };
+  }
+
   /** Botão "Procurar na pasta": refaz a lista a partir das pastas (não apaga nada). */
   recuperarDaPasta() {
     if (this.rodando) throw new Error('Espere terminar (ou cancele) antes de procurar na pasta.');

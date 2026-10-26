@@ -236,6 +236,37 @@ async function listaRepetida(arquivo, total, destino) {
   return destino;
 }
 
+const gb = (b) => (b / 1024 ** 3).toFixed(1).replace('.', ',');
+function livreEm(dir) {
+  try {
+    const st = fs.statfsSync(dir);
+    return { livre: Number(st.bavail) * Number(st.bsize), id: `${st.type}-${st.blocks}-${st.bsize}` };
+  } catch {
+    return null; // não deu para medir: segue sem conferir
+  }
+}
+
+/** Confere o espaço livre (somando o que vai em cada disco) e para ANTES de montar se não couber. */
+function conferirEspaco(pedidos) {
+  const porDisco = new Map();
+  for (const p of pedidos) {
+    const l = livreEm(p.dir);
+    if (!l) continue;
+    const atual = porDisco.get(l.id) || { livre: l.livre, precisa: 0, dir: p.dir };
+    atual.precisa += p.bytes;
+    porDisco.set(l.id, atual);
+  }
+  for (const d of porDisco.values()) {
+    const folga = 1024 ** 3; // 1 GB a mais para o Windows não ficar sem nada
+    if (d.livre < d.precisa + folga) {
+      const raiz = path.parse(path.resolve(d.dir)).root || d.dir;
+      const e = new Error(`Falta espaço no disco ${raiz}: este vídeo precisa de uns ${gb(d.precisa + folga)} GB livres e tem só ${gb(d.livre)} GB. Clique em 🧹 Liberar espaço (Sons para dormir) ou apague vídeos antigos, e depois em Continuar.`);
+      e.discoCheio = true;
+      throw e;
+    }
+  }
+}
+
 /** Monta a lista de clipes: cada cena fica `trocaSeg` na tela, em ciclo, até completar a duração. */
 function montarLista(clipes, transicoes, total, trocaSeg) {
   const n = clipes.length;
@@ -340,6 +371,14 @@ async function gerarVideo(op) {
     const listaTxt = path.join(tmp, 'lista.txt');
     fs.writeFileSync(listaTxt, lista.itens.map((a) => `file '${barra(a).replace(/'/g, "'\\''")}'`).join('\n'));
     const duracao = Math.min(total, lista.duracao);
+
+    // Cabe no disco? O vídeo final é a soma dos clipes repetidos + o áudio (sabemos o tamanho exato antes de montar)
+    const bytesVideo = lista.itens.reduce((t, a) => t + fs.statSync(a).size, 0);
+    const bytesAudio = Math.ceil((duracao * 200e3) / 8);
+    conferirEspaco([
+      { dir: pasta, bytes: bytesVideo + bytesAudio },
+      { dir: tmp, bytes: bytesAudio },
+    ]);
 
     // 2) Áudio (peso 35%)
     checar();
@@ -509,4 +548,4 @@ async function gerarMusicaEstudioCom({ cfg, prompt, segundos = 180, indice = 0, 
   return { arquivo, titulo: d.musica.titulo || `Música ${indice + 1}`, duracao: (await probe(arquivo)).duracao };
 }
 
-module.exports = { gerarCena, gerarSom, gerarMusica, gerarMusicaEstudio, gerarVideo, montarLista, slug, ehImagem };
+module.exports = { conferirEspaco, livreEm, gerarCena, gerarSom, gerarMusica, gerarMusicaEstudio, gerarVideo, montarLista, slug, ehImagem };
