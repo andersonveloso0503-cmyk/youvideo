@@ -452,6 +452,23 @@ class DormirSemana {
     return this.rodar({ soFila: true });
   }
 
+  /** Na prévia: o som ambiente ficou ruim (estalos, chiado). Refaz só o som e monta de novo (cenas e músicas ficam). */
+  refazerSom(i) {
+    const dia = this.estado?.dias?.[i];
+    if (!dia || dia.passo !== 'aprovar') throw new Error('Esse vídeo não está esperando aprovação.');
+    const base = path.resolve(this.pastaBase());
+    const apagar = (f) => {
+      try {
+        if (f && path.resolve(f).startsWith(base + path.sep)) fs.rmSync(f, { force: true });
+      } catch {}
+    };
+    for (const s of dia.sons || []) apagar(s.arquivo);
+    [dia.video?.arquivo, dia.video?.capa].forEach(apagar);
+    this.marcar(dia, { passo: 'som', sons: [], video: null, aprovado: false, fila: true, erro: '', etapa: 'Você pediu outro som: criando o som ambiente de novo' });
+    this.refazer = true;
+    return this.rodar({ soFila: true });
+  }
+
   /**
    * Dia que já ficou pronto ou já foi agendado: refaz SÓ as cenas e a montagem do vídeo.
    * O som ambiente e as músicas que já estão no PC são reaproveitados (não gasta crédito deles de novo).

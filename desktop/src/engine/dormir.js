@@ -182,7 +182,8 @@ const NORMALIZAR = 'loudnorm=I=-23:TP=-2:LRA=11,aresample=48000,aformat=sample_r
 async function prepararAmbiente(arquivos, dir, cancelar) {
   const unido = path.join(dir, 'ambiente-unido.flac');
   const ent = arquivos.flatMap((a) => ['-i', a]);
-  let filtro = arquivos.map((_, i) => `[${i}:a]${NORMALIZAR}[a${i}]`).join(';');
+  // Tira os estalinhos (adeclick) e suaviza o chiado agudo que faz a chuva da IA parecer fogo crepitando
+  let filtro = arquivos.map((_, i) => `[${i}:a]aresample=48000,highpass=f=35,adeclick=w=55:o=75,lowpass=f=9500,${NORMALIZAR}[a${i}]`).join(';');
   let ultimo = 'a0';
   for (let i = 1; i < arquivos.length; i++) {
     filtro += `;[${ultimo}][a${i}]acrossfade=d=3:c1=tri:c2=tri[x${i}]`;
@@ -469,7 +470,13 @@ async function gerarSom({ falKey, texto, indice = 0, pasta, onStatus }) {
   fs.mkdirSync(pasta, { recursive: true });
   onStatus && onStatus('Gerando o som');
   const r = await fal.subscribe(MODELO_SOM, {
-    input: { text: `${String(texto).trim()}. Continuous, steady, no music, no voices.`, duration_seconds: 22, loop: true, prompt_influence: 0.45, output_format: 'mp3_44100_192' },
+    input: {
+      text: `${String(texto).trim()}. Smooth, soft and continuous, natural recording, no music, no voices${/fire|lareira|fogo|crackl/i.test(texto) ? '' : ', no fire, no crackling, no clicks, no static, no popping'}.`,
+      duration_seconds: 22,
+      loop: true,
+      prompt_influence: 0.7,
+      output_format: 'mp3_44100_192',
+    },
     logs: false,
   });
   const url = r?.data?.audio?.url || r?.audio?.url;

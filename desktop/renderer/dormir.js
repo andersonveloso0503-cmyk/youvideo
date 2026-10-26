@@ -521,12 +521,22 @@ const Dormir = (() => {
           p.innerHTML =
             '<video controls preload="metadata" style="width:100%;max-width:760px;border-radius:8px;background:#000"></video>' +
             '<small style="color:var(--mudo)">Assista um pedaço (pode pular pela barra). Repare se o fundo se mexe de verdade e se a troca de cena fica suave.</small>' +
-            '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-primario" data-ok>✓ Aprovar e agendar</button><button class="btn-mini perigo" data-outro>✗ Não gostei, tentar outro</button></div>';
+            '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-primario" data-ok>✓ Aprovar e agendar</button><button class="btn-mini perigo" data-outro>✗ Não gostei, tentar outro</button><button class="btn-mini" data-som title="O som ambiente ficou com estalos/chiado: cria outro som e monta de novo (as cenas e as músicas ficam)">🌧 Refazer só o som</button></div>';
           p.querySelector('video').src = urlArquivo(d.video.arquivo);
           p.querySelector('[data-ok]').onclick = async (ev) => {
             ev.target.disabled = true;
             try {
               estado = await window.api.dormir.semanaAprovar(i);
+            } catch (e) {
+              q('#drsErro').textContent = msgErro(e);
+            }
+            render();
+          };
+          p.querySelector('[data-som]').onclick = async (ev) => {
+            if (!confirm('Criar outro som ambiente para este vídeo e montar de novo? As cenas e as músicas ficam. (Gasta crédito só no som.)')) return;
+            ev.target.disabled = true;
+            try {
+              estado = await window.api.dormir.semanaRefazerSom(i);
             } catch (e) {
               q('#drsErro').textContent = msgErro(e);
             }
