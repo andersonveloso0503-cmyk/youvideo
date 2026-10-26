@@ -439,7 +439,7 @@ function renderFundos() {
   box.innerHTML = '';
   P.fundos.forEach((f, i) => {
     const d = document.createElement('div');
-    d.className = 'mini' + (i === P.fundoAtivo ? ' ativa' : '');
+    d.className = 'pc-btn' + (i === P.fundoAtivo ? ' ativa' : '');
     d.title = f;
     const img = ehImagem(f);
     d.innerHTML = img ? `<img src="${urlArquivo(f)}" />` : `<video src="${urlArquivo(f)}#t=1" muted preload="metadata"></video><span class="tipo">VÍDEO</span>`;
@@ -1301,6 +1301,70 @@ async function iniciar() {
   $('#btnPasta').onclick = async () => { const p = await window.api.dialogo.pastaSaida(); if (p) { P.saida.pasta = p; $('#inPasta').value = p; salvarDepois(); } };
   $('#btnGerar').onclick = gerar;
   const ROTULO_PC = { aguardando: 'Na fila', concluido: 'Pronto', erro: 'Erro', cancelado: 'Cancelado', interrompido: 'Interrompido' };
+  // Sons para dormir do outro PC: ver em que passo está cada dia, assistir a prévia e aprovar daqui
+  const PASSO_PC = { cenas: '🎨 Fazendo as cenas', som: '🌧 Fazendo o som', musicas: '🎵 Fazendo as músicas', video: '🎬 Montando o vídeo', aprovar: '👀 Esperando você aprovar', agendado: '✅ Na fila / agendado', tirado: '— Tirado da semana' };
+  function semanaDoPc(pc, aberto) {
+    const s = pc.semana;
+    const box = document.createElement('div');
+    box.className = 'pc-semana';
+    const esperando = s.dias.filter((x) => x.passo === 'aprovar').length;
+    const parados = s.dias.filter((x) => x.erro || (!s.rodando && !['aprovar', 'agendado', 'tirado'].includes(x.passo))).length;
+    box.innerHTML = `<h4></h4><div class="pc-sem-dias"></div><div class="pc-sem-acoes"></div><p class="nota pc-sem-aviso"></p>`;
+    box.querySelector('h4').textContent = `🌙 Sons para dormir${s.canalNome ? ' · ' + s.canalNome : ''} · ${s.rodando ? 'trabalhando agora' : 'parado'}${esperando ? ` · ${esperando} esperando aprovação` : ''}`;
+    const aviso = box.querySelector('.pc-sem-aviso');
+    aviso.textContent = aberto ? '' : '⚠ O Compilador desse PC parece fechado: o pedido só vai ser feito quando ele abrir de novo.';
+    const mandar = async (btn, acao, i, texto) => {
+      btn.disabled = true;
+      try {
+        await window.api.dormir.comandoOutroPc({ pc: pc.pc, acao, i });
+        btn.textContent = '⏳ Pedido enviado';
+        aviso.textContent = `${texto} Em até 1 minuto o outro PC faz. Clique em "Atualizar" daqui a pouco para ver.`;
+      } catch (e) {
+        btn.disabled = false;
+        aviso.textContent = msgErro(e);
+      }
+    };
+    const lista = box.querySelector('.pc-sem-dias');
+    for (const x of s.dias) {
+      if (x.passo === 'tirado') continue;
+      const l = document.createElement('div');
+      l.className = 'pc-sem-dia' + (x.passo === 'aprovar' ? ' esperando' : '') + (x.erro ? ' com-erro' : '');
+      const quando = x.quando ? new Date(x.quando).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) : '';
+      l.innerHTML = `<span class="n"></span><span class="s"></span><span class="b"></span>`;
+      l.querySelector('.n').textContent = `${quando} · ${x.nome}`;
+      l.querySelector('.s').textContent = x.erro ? `⚠ ${x.erro}` : `${PASSO_PC[x.passo] || x.passo}${x.etapa && x.passo !== 'agendado' ? ' · ' + x.etapa : ''}`;
+      const b = l.querySelector('.b');
+      if (x.passo === 'aprovar') {
+        const ver = document.createElement('button');
+        ver.className = 'sec pc-btn';
+        if (x.previa) {
+          ver.textContent = '▶ Ver prévia';
+          ver.onclick = () => window.api.abrir.link(x.previa);
+        } else {
+          ver.textContent = '⏳ Prévia sendo preparada';
+          ver.disabled = true;
+        }
+        const ok = document.createElement('button');
+        ok.className = 'pc-btn';
+        ok.textContent = '✅ Aprovar';
+        ok.onclick = () => mandar(ok, 'semanaAprovar', x.i, `"${x.nome}" aprovado: vai para a fila de envio do outro PC.`);
+        const nao = document.createElement('button');
+        nao.className = 'sec pc-btn';
+        nao.textContent = '↻ Pedir outro';
+        nao.onclick = () => { if (confirm(`Fazer o vídeo "${x.nome}" de novo com cenas novas? (o som e as músicas ficam)`)) mandar(nao, 'semanaRecusar', x.i, `"${x.nome}" vai ser refeito com cenas novas.`); };
+        b.append(ver, ok, nao);
+      }
+      lista.appendChild(l);
+    }
+    if (parados && !s.rodando) {
+      const c = document.createElement('button');
+      c.className = 'pc-btn';
+      c.textContent = '▶ Continuar a semana nesse PC';
+      c.onclick = () => mandar(c, 'semanaContinuar', null, 'Pedido para continuar enviado.');
+      box.querySelector('.pc-sem-acoes').appendChild(c);
+    }
+    return box;
+  }
   async function carregarPcs() {
     const box = $('#listaPcs');
     box.innerHTML = '<p class="nota">Carregando...</p>';
@@ -1328,6 +1392,7 @@ async function iniciar() {
           l.querySelector('.s').textContent = txt;
           lista.appendChild(l);
         }
+        if (pc.semana?.dias?.length) d.appendChild(semanaDoPc(pc, aberto));
         box.appendChild(d);
       }
     } catch (e) {

@@ -43,7 +43,25 @@ export default async function handler(req, res) {
         criadoEm: txt(v.criadoEm, 40),
         youtube: v.youtube ? { estado: txt(v.youtube.estado, 20), url: v.youtube.url ? txt(v.youtube.url, 200) : null, quando: v.youtube.quando ? txt(v.youtube.quando, 40) : null } : null,
       }));
-      await col.doc(pc).set({ pcNome: txt(b.pcNome, 60), atualizadoEm: Date.now(), jobs, ...(Array.isArray(b.dormir) ? { dormir } : {}) }, { merge: true });
+      // Semana de Sons para dormir deste PC (para ver e aprovar de outro PC)
+      let semana;
+      if (b.semana && typeof b.semana === 'object') {
+        semana = {
+          rodando: !!b.semana.rodando,
+          canalNome: txt(b.semana.canalNome, 80),
+          dias: (Array.isArray(b.semana.dias) ? b.semana.dias : []).slice(0, 14).map((d) => ({
+            i: Number(d.i) || 0,
+            nome: txt(d.nome, 100),
+            quando: txt(d.quando, 40),
+            passo: txt(d.passo, 20),
+            etapa: txt(d.etapa, 200),
+            erro: d.erro ? txt(d.erro, 300) : '',
+            previa: /^https:\/\//.test(String(d.previa || '')) ? txt(d.previa, 400) : null,
+            pulado: !!d.pulado,
+          })),
+        };
+      } else if (b.semana === null) semana = null;
+      await col.doc(pc).set({ pcNome: txt(b.pcNome, 60), atualizadoEm: Date.now(), jobs, ...(Array.isArray(b.dormir) ? { dormir } : {}), ...(semana !== undefined ? { semana } : {}) }, { merge: true });
       return res.status(200).json({ ok: true });
     }
     return res.status(405).json({ erro: 'Método não permitido.' });

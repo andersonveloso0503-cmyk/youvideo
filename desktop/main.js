@@ -911,6 +911,7 @@ app.whenReady().then(() => {
     if (j.status === 'erro') return { estado: 'erro', erro: j.erro || '' };
     return null;
   }
+  let resumoSemanaRemota = null; // preenchido mais abaixo, quando a semana de Sons para dormir é criada
   async function mandarFilaParaNuvem() {
     tFilaNuvem = null;
     const cfg = store.ler();
@@ -933,7 +934,11 @@ app.whenReady().then(() => {
         youtube: v.youtube ? { estado: v.youtube.estado, url: v.youtube.url || null, quando: v.youtube.quando || null } : null,
       }));
     } catch {}
-    await Central.chamar(cfg, '/api/central/pc-filas', { metodo: 'PUT', corpo: { pc, pcNome, jobs, dormir } }).catch(() => {});
+    let semanaRes;
+    try {
+      semanaRes = resumoSemanaRemota ? resumoSemanaRemota() : undefined;
+    } catch {}
+    await Central.chamar(cfg, '/api/central/pc-filas', { metodo: 'PUT', corpo: { pc, pcNome, jobs, dormir, semana: semanaRes } }).catch(() => {});
   }
   fila.on('mudou', () => {
     if (tFilaNuvem) return;
@@ -1713,6 +1718,99 @@ app.whenReady().then(() => {
     semana.recusar(Number(i)).catch(() => {});
     return semana.paraTela();
   });
+  // ---------- Ver e mexer na semana de outro PC ----------
+  // Este PC manda o resumo da semana para a nuvem (com uma prévia curta de cada vídeo esperando aprovação)
+  // e, de minuto em minuto, busca os comandos que outro PC mandou (aprovar, pedir outro, continuar).
+  resumoSemanaRemota = () => {
+    const e = semana.paraTela();
+    if (!e?.dias?.length) return null;
+    return {
+      rodando: !!e.rodando,
+      canalNome: e.plano?.canalNome || '',
+      dias: e.dias.map((d, i) => ({
+        i,
+        nome: d.tema?.nome || `Dia ${i + 1}`,
+        quando: d.quando,
+        passo: d.tirado ? 'tirado' : d.passo,
+        etapa: d.etapa || '',
+        erro: d.erro || '',
+        previa: d.previaRemota && d.video?.arquivo && d.previaRemota.arquivo === d.video.arquivo ? d.previaRemota.url : null,
+      })),
+    };
+  };
+  let fazendoPrevia = false;
+  async function fazerPreviasRemotas() {
+    if (fazendoPrevia || !store.ler().centralToken) return;
+    const dia = (semana.estado?.dias || []).find(
+      (d) => d.passo === 'aprovar' && !d.aprovado && d.video?.arquivo && fs.existsSync(d.video.arquivo) && d.previaRemota?.arquivo !== d.video.arquivo && (d.previaFalhou || 0) < 3
+    );
+    if (!dia) return;
+    fazendoPrevia = true;
+    const saida = path.join(os.tmpdir(), `previa-dormir-${Date.now()}.mp4`);
+    try {
+      const arq = dia.video.arquivo;
+      let inicio = 120;
+      try {
+        const dur = (await probe(arq))?.duracao || 0;
+        if (dur && dur < 400) inicio = Math.max(0, dur / 3);
+      } catch {}
+      await rodar(['-y', '-ss', String(Math.round(inicio)), '-t', '40', '-i', arq, '-vf', 'scale=-2:480', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', saida]).promise;
+      const url = await Central.subirParaNuvem(store.ler(), saida);
+      if (dia.video?.arquivo === arq) {
+        dia.previaRemota = { arquivo: arq, url: typeof url === 'string' ? url : url?.url };
+        semana.salvar();
+        mandarFilaParaNuvem();
+      }
+    } catch {
+      dia.previaFalhou = (dia.previaFalhou || 0) + 1;
+    } finally {
+      fazendoPrevia = false;
+      fs.rm(saida, { force: true }, () => {});
+    }
+  }
+  async function buscarComandosRemotos() {
+    const cfg = store.ler();
+    if (!cfg.centralToken) return;
+    const { pc } = identidadePc();
+    let comandos = [];
+    try {
+      ({ comandos = [] } = await Central.chamar(cfg, `/api/central/pc-comandos?pc=${encodeURIComponent(pc)}`));
+    } catch {
+      return;
+    }
+    for (const c of comandos) {
+      let erro = null;
+      try {
+        const i = Number(c.i);
+        if (c.acao === 'semanaAprovar') {
+          if (semana.estado?.dias?.[i]?.passo !== 'aprovar') throw new Error('Esse vídeo não está mais esperando aprovação.');
+          semana.aprovar(i).catch(() => {});
+        } else if (c.acao === 'semanaRecusar') {
+          if (semana.estado?.dias?.[i]?.passo !== 'aprovar') throw new Error('Esse vídeo não está mais esperando aprovação.');
+          semana.recusar(i).catch(() => {});
+        } else if (c.acao === 'semanaContinuar') {
+          semana.rodar().catch(() => {});
+        }
+        if (Notification.isSupported()) new Notification({ title: 'Sons para dormir', body: `Pedido de ${c.deNome || 'outro PC'}: ${c.acao === 'semanaAprovar' ? 'aprovado' : c.acao === 'semanaRecusar' ? 'fazer outro vídeo' : 'continuar a semana'}` }).show();
+      } catch (e) {
+        erro = e.message;
+      }
+      await Central.chamar(cfg, '/api/central/pc-comandos', { metodo: 'PATCH', corpo: { id: c.id, status: erro ? 'erro' : 'feito', erro } }).catch(() => {});
+    }
+    if (comandos.length) setTimeout(mandarFilaParaNuvem, 3000);
+  }
+  setTimeout(() => {
+    buscarComandosRemotos();
+    fazerPreviasRemotas();
+  }, 20000);
+  setInterval(() => {
+    buscarComandosRemotos();
+    fazerPreviasRemotas();
+  }, 60000);
+  // Daqui: mandar um pedido para a semana de outro PC
+  ipcMain.handle('dormir:comandoOutroPc', (_e, { pc, acao, i }) =>
+    Central.chamar(store.ler(), '/api/central/pc-comandos', { metodo: 'POST', corpo: { pc, acao, i, deNome: identidadePc().pcNome } })
+  );
   ipcMain.handle('dormir:semanaRefazerCenas', (_e, { i, forcar }) => {
     semana.refazerCenas(Array.isArray(i) ? i.map(Number) : Number(i), { forcar: !!forcar }).catch(() => {});
     return semana.paraTela();

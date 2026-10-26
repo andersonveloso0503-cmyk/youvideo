@@ -154,7 +154,7 @@ const Biblioteca = (() => {
         <div class="bib-info">
           <b title="${esc(i.titulo)}">${esc(i.titulo)}</b>
           <span>${esc(B.categorias[i.categoria] || '')} · ${data}${i.duracao ? ' · ' + tempo(i.duracao) : ''}</span>
-          ${i.origem === 'outro-pc' ? `<span class="bib-outro-pc" title="O arquivo está no outro computador: para subir, abra o Compilador lá">🖥 No PC ${esc(i.pcNome)}</span>` : ''}
+          ${i.origem === 'outro-pc' ? `<span class="bib-outro-pc" title="Clique para ver e aprovar os Sons para dormir desse PC daqui" style="cursor:pointer">🖥 No PC ${esc(i.pcNome)}</span>` : ''}
           <div class="bib-pub">${pub}</div>
         </div>
         <div class="bib-acoes"></div>`;
@@ -659,3 +659,11 @@ const Biblioteca = (() => {
 
   return { abrir, atualizarAgenda };
 })();
+
+// "🖥 No PC X": abre a janela Outros PCs, onde dá para ver a semana de Sons para dormir de lá, assistir a prévia e aprovar
+document.addEventListener('click', (e) => {
+  if (!e.target.closest?.('.bib-outro-pc')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  document.querySelector('#btnOutrosPcs')?.click();
+}, true);
