@@ -1078,8 +1078,31 @@ app.whenReady().then(() => {
     await new Promise((res) => arquivo.end(res));
     // Marca para retomar sozinho o que estava gerando/enviando quando o app voltar
     try { fs.writeFileSync(path.join(dirDados, 'retomar-apos-atualizar'), new Date().toISOString()); } catch {}
-    // Instala em silêncio (sem clicar em nada) e abre o app de novo no final
-    require('child_process').spawn(destino, ['/S', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
+    // O download terminou mas o arquivo veio menor: não instala um instalador quebrado
+    const tam = fs.statSync(destino).size;
+    if (tamanho && tam < tamanho) throw new Error(`A atualização veio incompleta (${Math.round(tam / 1e6)} de ${Math.round(tamanho / 1e6)} MB). Tente de novo.`);
+    // Instala em silêncio (sem clicar em nada) e abre o app de novo no final.
+    // Logo depois do download o antivírus do Windows ainda está lendo o .exe e pode bloquear a abertura:
+    // tenta algumas vezes e, se não der, abre o instalador normal (com tela) para você clicar.
+    let aberto = false;
+    for (let tentativa = 0; tentativa < 6 && !aberto; tentativa++) {
+      if (tentativa) await new Promise((ok) => setTimeout(ok, 2500));
+      try {
+        const filho = require('child_process').spawn(destino, ['/S', '--force-run'], { detached: true, stdio: 'ignore' });
+        await new Promise((ok, falha) => {
+          filho.once('error', falha);
+          filho.once('spawn', ok);
+        });
+        filho.unref();
+        aberto = true;
+      } catch {
+        /* antivírus ainda segurando o arquivo: espera e tenta de novo */
+      }
+    }
+    if (!aberto) {
+      const erro = await shell.openPath(destino);
+      if (erro) throw new Error(`Não consegui abrir o instalador (${erro}). Ele está em: ${destino}`);
+    }
     setTimeout(() => app.exit(0), 800);
     return true;
   });
