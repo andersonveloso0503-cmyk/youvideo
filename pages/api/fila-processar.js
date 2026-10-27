@@ -5,7 +5,7 @@ import { empresa, gerarRoteiroEmpresa } from '../../lib/empresa';
 import { gerarRoteiroOracaoDia } from '../../lib/oracaoDia';
 import { buscarSaldoFal } from '../../lib/orcamento';
 import { passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario, temposDasCenas, buscarMidiaReal, conferidorDeCena } from '../../lib/documentario';
-import { EPISODIOS } from '../../lib/documentarioEpisodios';
+import { TODOS_EPISODIOS as EPISODIOS } from '../../lib/documentarioEpisodios';
 import {
   gerarRoteiroInfantil,
   garantirReferencia,

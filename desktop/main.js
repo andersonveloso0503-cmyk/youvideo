@@ -748,6 +748,8 @@ app.whenReady().then(() => {
                   titulo: `As Aventuras do ${it.infantil.personagem || 'Pingo'} — Historinhas e Músicas`,
                   descricao: `Todas as aventuras do ${it.infantil.personagem || 'Pingo'}: historinhas animadas com lições e uma música nova para cantar em cada episódio. 🎵`,
                 }
+            : it.playlist?.titulo
+              ? { titulo: String(it.playlist.titulo).slice(0, 150), descricao: String(it.playlist.descricao || '') } // documentário: playlist da série
               : null,
           conteudoIa: true, // histórias feitas com IA: marca no YouTube
           paraCriancas: !!it.infantil, // desenho infantil: "conteúdo para crianças" (regra do YouTube/COPPA)

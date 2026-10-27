@@ -316,6 +316,7 @@ export default async function handler(req, res) {
           formato: x.formato || 'short',
           longo: x.longo === true,
           documentario: x.documentario === true,
+          playlist: x.roteiro?.playlist?.titulo ? x.roteiro.playlist : null, // documentário: entra sozinho na playlist da série (ex.: "Catástrofes do Brasil")
           infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true, shortMusica: x.shortMusica === true, temporada: x.infantil.temporada ? { nome: x.infantil.temporada.nome, numero: x.infantil.temporada.numero, ep: x.infantil.temporada.ep, total: x.infantil.temporada.total } : null } : null,
           comBotao: x.comBotao === true,
           renderId: x.renderId || null, // pedido de montagem no PC: liga o cartão da Fila do Compilador a este vídeo
