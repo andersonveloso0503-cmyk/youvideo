@@ -4,7 +4,7 @@ import { agendarItemPronto } from '../../lib/fabrica';
 import { empresa, gerarRoteiroEmpresa } from '../../lib/empresa';
 import { gerarRoteiroOracaoDia } from '../../lib/oracaoDia';
 import { buscarSaldoFal } from '../../lib/orcamento';
-import { passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario, temposDasCenas, buscarMidiaReal, conferidorDeCena } from '../../lib/documentario';
+import { roteiroDoEpisodio, passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario, temposDasCenas, buscarMidiaReal, conferidorDeCena } from '../../lib/documentario';
 import { TODOS_EPISODIOS as EPISODIOS } from '../../lib/documentarioEpisodios';
 import {
   gerarRoteiroInfantil,
@@ -86,14 +86,28 @@ export default async function handler(req, res) {
   // pros dois de uma vez. Também repassa audioSegments quando a narração
   // foi dividida em mais de um pedaço (textos longos passam do limite de
   // caracteres da ElevenLabs numa chamada só).
-  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta, legenda, semBotao }) => {
+  // Quadrinhos do documentário: aparecem quando a cena muda de lugar, ficam até 8 s
+  const quadrinhosDoDocumentario = (arquivos) => {
+    const lista = [];
+    let anterior = '';
+    for (const a of arquivos || []) {
+      if (!a.local?.titulo || a.start == null || !a.length) continue;
+      const chave = `${a.local.titulo}|${a.local.texto || ''}`;
+      if (chave === anterior || a.length < 3) continue;
+      anterior = chave;
+      lista.push({ titulo: a.local.titulo, texto: a.local.texto || '', start: Number((a.start + 0.8).toFixed(2)), length: Number(Math.min(8, a.length - 1.2).toFixed(2)) });
+    }
+    return lista;
+  };
+
+  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta, legenda, semBotao, textos, musica }) => {
     // Um pedaço só e sem palavras (Short da música): manda o pedaço com a duração, senão a montagem não sabe o tamanho
     const temVariosPedacos = (audioSegments || []).length > 1 || ((audioSegments || []).length === 1 && !(palavras || []).length);
     const r = await fetch(`${baseUrl}/api/assemble-video`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}), ...(semBotao ? { semBotao: true } : {}) }
+        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}), ...(semBotao ? { semBotao: true } : {}), ...(textos?.length ? { textos } : {}), ...(musica?.url ? { musica } : {}) }
       ),
     });
     const data = await r.json();
@@ -318,7 +332,16 @@ export default async function handler(req, res) {
           break;
         }
         if (item.documentario) {
-          // Voz lenta, em pedaços (o texto é longo): cada rodada do cron faz alguns pedaços
+          // Antes da primeira voz: usa o roteiro mais novo do episódio escrito (o episódio pode ter sido
+          // melhorado depois de entrar na Fábrica, ex.: vídeos reais, quadrinhos e música de fundo)
+          if (!item.narracaoParcial?.segmentos?.length) {
+            const epAtual = EPISODIOS.find((e) => e.id === item.episodioId);
+            if (epAtual) {
+              item.roteiro = roteiroDoEpisodio(epAtual);
+              await ref.update({ roteiro: item.roteiro });
+            }
+          }
+          // Voz em pedaços (o texto é longo): cada rodada do cron faz alguns pedaços
           await ref.update(await passoVozDocumentario(item));
           break;
         }
@@ -488,6 +511,8 @@ export default async function handler(req, res) {
             // Documentário: sem legenda (não acorda quem dorme); infantil: criança pequena não lê, a tela fica limpa
             ...(item.documentario || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}), // conteúdo para crianças: sem botão de like/inscrever gravado
+            // Documentário: quadrinho explicando o lugar que aparece e música baixinha por baixo da narração
+            ...(item.documentario ? { textos: quadrinhosDoDocumentario(item.arquivos), musica: item.musicaUrl ? { url: item.musicaUrl, volume: 0.1 } : null } : {}),
           });
           // duracaoAlvo só existe quando a narração guarda as palavras (o documentário não guarda)
           await ref.update({ ...(duracaoAlvo != null ? { duracaoAlvo } : {}), renderId, status: 'montando' });

@@ -155,6 +155,7 @@ export default async function handler(req, res) {
         length: lengthFatia,
         fit: 'cover',
         effect: contadorCena % 2 === 0 ? 'zoomIn' : 'zoomOut',
+        ...(c.movimento ? { movimento: c.movimento } : {}),
       }];
     }
 
@@ -201,6 +202,9 @@ export default async function handler(req, res) {
       cta: String(req.body.cta || '').slice(0, 60), // chamada grande nos últimos segundos (ex.: WhatsApp da empresa)
       ...(req.body.legenda === false ? { legenda: false } : {}), // documentário para dormir: sem legenda na tela
       ...(req.body.semBotao ? { semBotao: true } : {}), // desenho infantil: sem botão de like/inscrever
+      // Documentário: quadrinhos explicativos na tela e música de fundo
+      ...(Array.isArray(req.body.textos) && req.body.textos.length ? { textos: req.body.textos.slice(0, 200) } : {}),
+      ...(req.body.musica?.url ? { musica: { url: String(req.body.musica.url), volume: Math.max(0.02, Math.min(0.5, Number(req.body.musica.volume) || 0.1)) } } : {}),
       audio: temAudioSegments
         ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length, ...(s.volume != null ? { volume: s.volume } : {}), ...(s.fade ? { fade: s.fade } : {}) }))
         : [{ url: audioUrl, start: 0, length: duracaoTotalAudio }],
@@ -210,6 +214,7 @@ export default async function handler(req, res) {
         start: c.start,
         length: c.length,
         efeito: c.effect || null,
+        ...(c.movimento ? { movimento: c.movimento } : {}),
       })),
       palavras: (palavras || [])
         .filter((p) => p && p.start != null && p.end != null)
@@ -348,7 +353,7 @@ export default async function handler(req, res) {
       // quando o vídeo entra pela API — então continuamos precisando
       // queimar isso no vídeo.
       ...(legendaKaraoke.length ? [{ clips: legendaKaraoke }] : []),
-      { clips: clipsVideo },
+      { clips: clipsVideo.map(({ movimento, ...c }) => c) }, // "movimento" é só da montagem no PC
       { clips: clipsAudio },
     ],
   };

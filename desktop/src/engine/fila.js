@@ -933,9 +933,9 @@ class Fila extends EventEmitter {
         modo, registrarCancelar, checar, onProgresso: faixa(0.2, 0.45, 'fundos', 'Preparando as cenas'),
       });
       let assArquivo = null;
-      if (rc.legenda !== false && (rc.palavras || []).length || rc.marca) {
+      if (rc.legenda !== false && (rc.palavras || []).length || rc.marca || (rc.textos || []).length) {
         assArquivo = path.join(dir, 'legenda.ass');
-        fs.writeFileSync(assArquivo, M.gerarAssNarracao({ W, H, palavras: rc.legenda === false ? [] : rc.palavras, duracao: rc.duracao, marca: rc.marca, curto, cta: rc.cta }));
+        fs.writeFileSync(assArquivo, M.gerarAssNarracao({ W, H, palavras: rc.legenda === false ? [] : rc.palavras, duracao: rc.duracao, marca: rc.marca, curto, cta: rc.cta, textos: rc.textos }));
         const fontsTmp = path.join(dir, 'fonts');
         fs.mkdirSync(fontsTmp, { recursive: true });
         for (const f of fs.readdirSync(this.fontsDir)) fs.copyFileSync(path.join(this.fontsDir, f), path.join(fontsTmp, f));

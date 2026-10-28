@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { rodar, probe } = require('./ffmpeg');
 const R = require('./render');
 const Central = require('./central');
+const { filtroEfeitos } = require('./efeitos');
 
 const FPS = R.FPS;
 
@@ -23,7 +24,7 @@ const nomeCache = (url) => crypto.createHash('sha1').update(url).digest('hex').s
 
 /** Baixa tudo o que a receita usa (cada link uma vez só). */
 async function baixarTudo(receita, dirCache, onProgresso, checar) {
-  const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url)].filter(Boolean))];
+  const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url), receita.musica?.url].filter(Boolean))];
   const locais = {};
   for (let i = 0; i < urls.length; i++) {
     checar && checar();
@@ -49,7 +50,34 @@ async function prepararAudio(receita, locais, dir, { modo, registrarCancelar }) 
     const fd = p.fade && p.length ? `afade=t=out:st=${Math.max(0, Number(p.length) - Number(p.fade)).toFixed(2)}:d=${Number(p.fade).toFixed(2)},` : '';
     return `[${i}:a]${corte}${vol}${fd}aresample=48000,adelay=${ms}:all=1[a${i}]`;
   });
-  partes.push(`${pedacos.map((_, i) => `[a${i}]`).join('')}amix=inputs=${pedacos.length}:normalize=0:dropout_transition=0,apad[mix]`);
+  partes.push(`${pedacos.map((_, i) => `[a${i}]`).join('')}amix=inputs=${pedacos.length}:normalize=0:dropout_transition=0,apad[voz]`);
+  // Música de fundo (documentário): repetida com emenda suave pelo vídeo todo, bem baixinha por baixo da narração
+  const musica = receita.musica?.url && locais[receita.musica.url];
+  let durMusica = 0;
+  if (musica) {
+    try {
+      durMusica = (await probe(musica)).duracao || 0;
+    } catch {
+      durMusica = 0;
+    }
+  }
+  if (musica && durMusica > 20) {
+    const X = 4; // segundos de emenda entre uma volta e outra
+    const voltas = Math.min(60, Math.ceil((receita.duracao + X) / (durMusica - X)));
+    const base = pedacos.length;
+    for (let v = 0; v < voltas; v++) args.push('-i', musica);
+    let atual = `${base}:a`;
+    for (let v = 1; v < voltas; v++) {
+      partes.push(`[${atual}][${base + v}:a]acrossfade=d=${X}:c1=tri:c2=tri[mc${v}]`);
+      atual = `mc${v}`;
+    }
+    const vol = Math.max(0.02, Math.min(0.5, Number(receita.musica.volume) || 0.1));
+    const fim = Math.max(0, receita.duracao - 5);
+    partes.push(`[${atual}]aresample=48000,atrim=0:${receita.duracao.toFixed(3)},volume=${vol.toFixed(2)},afade=t=in:d=3,afade=t=out:st=${fim.toFixed(2)}:d=5[mus]`);
+    partes.push('[voz][mus]amix=inputs=2:normalize=0:duration=first:dropout_transition=0[mix]');
+  } else {
+    partes.push('[voz]anull[mix]');
+  }
   args.push('-filter_complex', partes.join(';'), '-map', '[mix]', '-t', receita.duracao.toFixed(3), '-c:a', 'aac', '-b:a', '192k', saida);
   const r = rodar(args, { modo, duracaoTotal: receita.duracao });
   registrarCancelar && registrarCancelar(r.cancelar);
@@ -101,7 +129,15 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
       // Imagem: aproximação/afastamento lento, igual ao site
       const quadros = Math.max(1, Math.round(c.length * FPS));
       const z = c.efeito === 'zoomOut' ? `1.12-0.12*on/${quadros}` : `1+0.12*on/${quadros}`;
-      args = [
+      const efeitos = c.movimento ? filtroEfeitos({ W, H, fps: FPS, movimento: c.movimento }) : null;
+      if (efeitos) {
+        // Documentário: chuva caindo, névoa andando, luz de vela... por cima da foto, além do zoom
+        args = [
+          '-loop', '1', '-framerate', String(FPS), '-t', L, '-i', arq, '-filter_complex',
+          `[0:v]${cobrir(W * 2, H * 2)},zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p[base];${efeitos}`,
+          '-map', '[saida]', '-frames:v', String(quadros), ...comum, saida,
+        ];
+      } else args = [
         '-loop', '1', '-framerate', String(FPS), '-t', L, '-i', arq,
         '-vf', `${cobrir(W * 2, H * 2)},zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${FPS}`,
         ...comum, saida,
@@ -123,7 +159,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
 }
 
 /** Legenda estilo karaokê: blocos de palavras em caixa alta, a palavra falada em destaque. */
-function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta }) {
+function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos }) {
   const tempo = (s) => {
     s = Math.max(0, s);
     const h = Math.floor(s / 3600);
@@ -159,6 +195,47 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta }) {
     linhas.splice(linhas.indexOf('[Events]') - 1, 0,
       `Style: Cta,Montserrat ExtraBold,${tamCta},&H00FFFFFF,&H000000FF,&H001E7A12,&H001E7A12,-1,0,0,0,100,100,0,0,3,${Math.round(tamCta * 0.35)},0,8,${Math.round(W * 0.06)},${Math.round(W * 0.06)},${Math.round(H * (curto ? 0.16 : 0.1))},1`);
     linhas.push(`Dialogue: 2,${tempo(Math.max(0, duracao - 5))},${tempo(duracao)},Cta,,0,0,0,,{\\fad(400,0)}${limpar(cta)}`);
+  }
+
+  // Quadrinho explicativo (documentário): caixa escura no canto de baixo, com faixa amarela do lado,
+  // nome do lugar em amarelo e até duas linhas explicando
+  const quadros = (textos || []).filter((t) => t && t.titulo && t.start != null && t.length > 1 && t.start < duracao);
+  if (quadros.length) {
+    const tamT = Math.round(menor * (curto ? 0.042 : 0.036));
+    const tamX = Math.round(tamT * 0.74);
+    linhas.splice(linhas.indexOf('[Events]') - 1, 0,
+      `Style: QuadroFundo,Montserrat Bold,10,&H00000000,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
+      `Style: Quadro,Montserrat Bold,${tamX},&H00FFFFFF,&H000000FF,&H00000000,&H96000000,0,0,0,0,100,100,0,0,1,0,${Math.max(1, Math.round(tamX / 14))},7,0,0,0,1`);
+    const quebrar = (t, max) => {
+      const ls = [''];
+      for (const p of String(t || '').split(/\s+/)) {
+        if ((ls[ls.length - 1] + ' ' + p).trim().length > max && ls[ls.length - 1]) ls.push(p);
+        else ls[ls.length - 1] = (ls[ls.length - 1] + ' ' + p).trim();
+      }
+      return ls.filter(Boolean).slice(0, 2);
+    };
+    const sem = (t) => String(t || '').replace(/[{}\\]/g, '').replace(/\s+/g, ' ').trim();
+    const mx = Math.round(W * 0.04);
+    const my = Math.round(H * (curto ? 0.2 : 0.085));
+    const pad = Math.round(tamX * 0.75);
+    const barra = Math.max(5, Math.round(tamT * 0.16));
+    for (const t of quadros) {
+      const fim = Math.min(duracao, t.start + t.length);
+      const titulo = sem(t.titulo).toUpperCase();
+      const corpo = t.texto ? quebrar(sem(t.texto), curto ? 30 : 44) : [];
+      // Tamanho da caixa pela largura aproximada do texto (Montserrat Bold: ~0,5 da altura por letra maiúscula, ~0,38 por minúscula)
+      const largura = Math.min(W - 2 * mx, Math.round(Math.max(titulo.length * tamT * 0.52, ...corpo.map((l) => l.length * tamX * 0.38)) + pad * 2 + barra));
+      const altura = Math.round(pad * 2 + tamT * 1.15 + corpo.length * tamX * 1.3);
+      const x = mx;
+      const y = H - my - altura;
+      const caixa = `m 0 0 l ${largura} 0 ${largura} ${altura} 0 ${altura}`;
+      const faixa = `m 0 0 l ${barra} 0 ${barra} ${altura} 0 ${altura}`;
+      const fad = '\\fad(500,500)';
+      linhas.push(`Dialogue: 3,${tempo(t.start)},${tempo(fim)},QuadroFundo,,0,0,0,,{${fad}\\pos(${x},${y})\\1c&H000000&\\1a&H40&\\p1}${caixa}{\\p0}`);
+      linhas.push(`Dialogue: 4,${tempo(t.start)},${tempo(fim)},QuadroFundo,,0,0,0,,{${fad}\\pos(${x},${y})\\1c&H0AD6FF&\\1a&H00&\\p1}${faixa}{\\p0}`);
+      const texto = `{\\fs${tamT}\\c&H0AD6FF&\\b1}${titulo}{\\r}` + (corpo.length ? `\\N{\\fs${Math.round(tamT * 0.3)}} \\N{\\fs${tamX}}${corpo.join('\\N')}` : '');
+      linhas.push(`Dialogue: 5,${tempo(t.start)},${tempo(fim)},Quadro,,0,0,0,,{${fad}\\pos(${x + barra + pad},${y + pad})}${texto}`);
+    }
   }
 
   const validas = (palavras || []).filter((p) => p && p.start != null && p.end != null && p.end > p.start && String(p.texto || '').trim());
