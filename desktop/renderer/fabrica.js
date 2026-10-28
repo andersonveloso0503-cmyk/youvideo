@@ -848,6 +848,16 @@ const Fabrica = (() => {
           carregar();
         });
         if (i.status === 'erro') botao('↻', 'Tentar de novo (continua de onde parou)', async () => { await window.api.fabrica.acao({ id: i.id, acao: 'repetir' }); carregar(); });
+        if (i.documentario && ['concluido', 'erro'].includes(i.status)) botao('🎬', 'Refazer com vídeos reais, quadrinhos e música (aproveita a narração, sem gastar voz)', async () => {
+          if (!confirm(`Refazer "${i.titulo || i.tema}" com a versão nova (vídeos reais, quadrinhos explicando os lugares e música de fundo)?\n\nA narração já feita é aproveitada: não gasta crédito da ElevenLabs. O horário no YouTube continua o mesmo.${i.youtube?.status === 'ok' ? '\n\nEste já está no YouTube: APAGUE o antigo no YouTube Studio antes, senão o novo não sobe (mesmo título).' : ''}`)) return;
+          try {
+            const r = await window.api.fabrica.acao({ id: i.id, acao: 'refazer-documentario' });
+            avisar(`${r?.aproveitouVoz ? 'Refazendo com a mesma narração' : 'Refazendo (a narração vai ser feita de novo)'}${r?.jaNoYoutube ? '. Lembre de apagar o vídeo antigo no YouTube Studio.' : ''}`);
+          } catch (e) {
+            avisar(msgErro(e), true);
+          }
+          carregar();
+        });
         if (i.longo) botao('⤢', 'Refazer mais longo (roteiro novo, mesmo tema e horário)', async () => {
           const min = Math.round(Number(q('#fabLgDuracao')?.value || 720) / 60);
           if (!confirm(`Refazer "${i.titulo || i.tema}" com uns ${min} minutos?\n\nA fábrica escreve um roteiro novo (mesmo tema e mesmo horário) e monta de novo. O custo é o de um vídeo novo (imagens e voz).${i.youtube?.status === 'ok' ? '\n\nEste já subiu para o YouTube: apague o antigo no YouTube Studio para não ficar repetido.' : ''}`)) return;

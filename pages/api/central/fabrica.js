@@ -20,7 +20,7 @@ import { PERIODOS, intencaoDoDia, tituloOracao } from '../../../lib/oracaoDia';
 import { testarConta } from '../../../lib/publicarSocial';
 import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
-import { EPISODIOS } from '../../../lib/documentarioEpisodios';
+import { EPISODIOS, TODOS_EPISODIOS } from '../../../lib/documentarioEpisodios';
 import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora, criarShortDaMusica } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
@@ -1140,6 +1140,64 @@ export default async function handler(req, res) {
         await ref.delete();
       }
       return res.status(200).json({ ok: true, id: novo.id, jaNoYoutube });
+    }
+    // Documentário pronto feito antes das melhorias: refaz imagens/vídeos, quadrinhos, música e montagem
+    // com o roteiro novo do episódio, APROVEITANDO a narração já paga (o texto narrado é o mesmo).
+    // Cria um vídeo novo na fábrica (mesmo horário) e tira o antigo; o que já subiu o dono apaga no YouTube Studio.
+    if (b.acao === 'refazer-documentario') {
+      const d = (await ref.get()).data();
+      if (!d?.documentario) return res.status(400).json({ erro: 'Só dá para refazer documentários.' });
+      const ep = TODOS_EPISODIOS.find((e) => e.id === d.episodioId);
+      if (!ep) return res.status(400).json({ erro: 'Não achei o episódio escrito deste documentário.' });
+      const novoRoteiro = roteiroDoEpisodio(ep);
+      const antigas = d.roteiro?.cenas || [];
+      const temVoz = !!d.narracao?.audioSegments?.length && antigas.length === novoRoteiro.cenas.length && antigas.every((c) => c.start != null);
+      const f = d.fabrica || {};
+      const novo = col.doc();
+      await novo.set({
+        tema: d.tema,
+        documentario: true,
+        episodioId: d.episodioId,
+        serie: null,
+        estilo: d.estilo || 'realista',
+        formato: 'longo',
+        animar: false,
+        ...(d.vozId ? { vozId: d.vozId } : {}),
+        origem: 'fabrica',
+        refeitoDe: ref.id,
+        criadoEm: new Date().toISOString(),
+        ...(temVoz
+          ? {
+              // Mesma narração: só troca as cenas (busca, quadrinho) mantendo o tempo de cada uma
+              roteiro: {
+                ...novoRoteiro,
+                descricao: d.roteiro.descricao || novoRoteiro.descricao, // já tem os capítulos com o tempo certo
+                cenas: novoRoteiro.cenas.map((c, i) => ({ ...c, start: antigas[i].start, length: antigas[i].length })),
+              },
+              narracao: d.narracao,
+              duracaoNarracao: d.duracaoNarracao || null,
+              cauda: novoRoteiro.semCauda ? null : d.cauda || null,
+              status: 'voz_ok',
+            }
+          : { roteiro: novoRoteiro, status: 'roteiro_ok' }),
+        fabrica: {
+          ativo: true,
+          lote: f.lote || Date.now().toString(36),
+          // Começa já (precisa de tempo para buscar as cenas e montar), o YouTube continua no horário marcado
+          quando: new Date().toISOString(),
+          quandoOriginal: f.quandoOriginal || f.quando || null,
+          quandoYoutube: f.quandoYoutube || f.quando,
+          redes: f.redes || { youtube: true },
+          canalYoutube: f.canalYoutube || null,
+        },
+      });
+      if (d.status === 'concluido') {
+        await ref.update({ 'fabrica.ativo': false });
+        if (f.agendaId) await db.collection('youvideo_agenda').doc(f.agendaId).delete().catch(() => {});
+      } else {
+        await ref.delete();
+      }
+      return res.status(200).json({ ok: true, id: novo.id, aproveitouVoz: temVoz, jaNoYoutube: f.youtube?.status === 'ok' ? f.youtube.url || 'sim' : '' });
     }
     if (b.acao === 'produzir-agora') {
       // Adianta um vídeo que está esperando a vez: a fábrica começa já na próxima volta (5 min).
