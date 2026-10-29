@@ -75,7 +75,7 @@ const FabMusica = (() => {
       acoes.push(`<button class="btn-mini fm-prompt-capa" data-id="${a.id}" title="Copia o pedido da capa para você fazer no Gemini (app ou gemini.google.com)">📝 Prompt da capa</button>`);
       acoes.push(`<button class="btn-mini fm-usar-capa" data-id="${a.id}" title="Escolhe a imagem que você fez no Gemini (ou no Canva) e usa como capa">📥 Trazer capa</button>`);
     }
-    if (['pronto', 'erro', 'aprovado'].includes(a.fase)) acoes.push(`<button class="btn-mini ${a.fundo !== 'animado' ? 'destaque' : ''} fm-refazer-fundo" data-id="${a.id}" title="Desenha a cena de novo, anima e monta o vídeo longo outra vez (~US$ 0,50)">🎬 Refazer fundo</button>`);
+    if (['pronto', 'erro', 'aprovado'].includes(a.fase)) acoes.push(`<button class="btn-mini ${['animado', 'cenas'].includes(a.fundo) ? '' : 'destaque'} fm-refazer-fundo" data-id="${a.id}" title="${dados.prefs?.fundoCenas ? 'Busca outras cenas reais (grátis) e monta o vídeo longo outra vez' : 'Desenha a cena de novo, anima e monta o vídeo longo outra vez (~US$ 0,50)'}">🎬 Refazer fundo</button>`);
     if (!['trabalhando', 'na vez'].includes(a.fase)) acoes.push(`<button class="btn-mini ${a.capaSimples ? 'destaque' : ''} fm-refazer-capa" data-id="${a.id}" title="Faz a capa de novo no Gemini">🎨 ${a.capaSimples ? 'Refazer capa' : 'Outra capa'}</button>`);
     if (!['trabalhando', 'na vez'].includes(a.fase)) acoes.push(`<button class="btn-mini fm-descartar" data-id="${a.id}" title="Tira da lista (as músicas e os vídeos continuam na pasta)">✕</button>`);
     const nome = a.titulo ? `${esc(a.titulo)}${a.subtitulo ? ` <small>${esc(a.subtitulo)}</small>` : ''}` : esc(a.preset || 'Álbum');
@@ -88,7 +88,7 @@ const FabMusica = (() => {
           <div class="nota">${NOME_CANAL[a.canal]} · ${esc(a.preset || '')} · ${nomeMotor(a.motor)} · ${new Date(`${a.dia}T12:00`).toLocaleDateString('pt-BR')}</div>
           <div class="fm-fase">${FASE[a.fase] || a.fase}${a.etapa && !['pronto', 'aprovado'].includes(a.fase) ? ` — ${esc(a.etapa)}` : ''}${progresso}</div>
           ${a.erro ? `<div class="erro">${esc(a.erro)}</div>` : ''}
-          ${a.fundo === 'animado' ? '<div class="nota">🎬 Vídeo com fundo animado (cena que se mexe)</div>' : a.fundo === 'parado' ? '<div class="nota">🖼 Fundo com a cena parada (a animação não ficou pronta a tempo)</div>' : a.fundo === 'erro' ? `<div class="nota" style="color:var(--terracota)">⚠ O fundo animado não saiu${a.fundoErro ? ` (${esc(a.fundoErro.slice(0, 100))})` : ''}: o vídeo usou a capa parada</div>` : ''}
+          ${a.fundo === 'cenas' ? `<div class="nota">🏞 Fundo com ${a.qtdCenas || ''} cenas reais trocando (Pexels, grátis)</div>` : a.fundo === 'erroCenas' ? `<div class="nota" style="color:var(--terracota)">⚠ As cenas não saíram${a.fundoErro ? ` (${esc(a.fundoErro.slice(0, 100))})` : ''}: o vídeo usou a capa parada. Use 🎬 Refazer fundo para tentar de novo.</div>` : a.fundo === 'animado' ? '<div class="nota">🎬 Vídeo com fundo animado (cena que se mexe)</div>' : a.fundo === 'parado' ? '<div class="nota">🖼 Fundo com a cena parada (a animação não ficou pronta a tempo)</div>' : a.fundo === 'erro' ? `<div class="nota" style="color:var(--terracota)">⚠ O fundo animado não saiu${a.fundoErro ? ` (${esc(a.fundoErro.slice(0, 100))})` : ''}: o vídeo usou a capa parada</div>` : ''}
           ${a.capaSimples ? `<div class="nota" style="color:var(--terracota)">⚠ Capa simples: o Gemini não conseguiu fazer a capa${a.capaErro ? ` (${esc(a.capaErro.slice(0, 120))})` : ''}. O álbum seguiu mesmo assim — depois use 🎨 Refazer capa, ou 📝 Prompt da capa para fazer no Gemini e 📥 Trazer capa.</div>` : ''}
           ${a.recusadas ? `<div class="nota">🎧 ${a.recusadas} música${a.recusadas > 1 ? 's foram refeitas' : ' foi refeita'} porque a letra não ficou clara</div>` : ''}
           ${a.musicas.length && ['pronto', 'aprovado', 'montando'].includes(a.fase) ? `<details><summary>${a.musicas.length} músicas</summary><ol>${a.musicas.map((t) => `<li>${esc(t)}</li>`).join('')}</ol></details>` : ''}
@@ -107,7 +107,8 @@ const FabMusica = (() => {
         <div class="campo-config"><label>Começar todo dia às</label><input type="time" id="fmHora" value="${esc(p.hora)}" /></div>
         <div class="campo-config"><label>Músicas por álbum</label><select id="fmQtd">${[5, 8, 10, 12, 15, 18, 20].map((n) => `<option ${n === p.qtd ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="campo-config"><label>Não fazer se já tiver vídeo longo agendado para</label><select id="fmFolga">${[2, 3, 5, 7, 14].map((n) => `<option value="${n}" ${n === p.folgaDias ? 'selected' : ''}>${n} dias ou mais</option>`).join('')}</select></div>
-        <div class="campo-config"><label>Fundo do vídeo longo</label><select id="fmFundo"><option value="0" ${p.fundoAnimado === false ? 'selected' : ''}>Capa parada (como era antes)</option><option value="1" ${p.fundoAnimado !== false ? 'selected' : ''}>Cena desenhada que se mexe (~US$ 0,50)</option></select></div>
+        <div class="campo-config"><label>Fundo do vídeo longo</label><select id="fmFundo" title="Cenas reais: vídeos grátis do Pexels no clima do estilo (campo, praia, montanha...), trocando a cada 8 s com dissolve — como nos canais de música que mais crescem"><option value="2" ${p.fundoCenas ? 'selected' : ''}>Cenas reais trocando (grátis)</option><option value="0" ${!p.fundoCenas && p.fundoAnimado === false ? 'selected' : ''}>Capa parada (como era antes)</option><option value="1" ${!p.fundoCenas && p.fundoAnimado !== false ? 'selected' : ''}>Cena desenhada que se mexe (~US$ 0,50)</option></select></div>
+        <div class="campo-config"><label>Letra no vídeo longo</label><select id="fmLetra" title="Letra frase a frase embaixo, em branco com contorno (sem karaokê). Usa a chave da Groq para ouvir a música."><option value="1" ${p.letraLongo ? 'selected' : ''}>Mostrar a letra</option><option value="0" ${!p.letraLongo ? 'selected' : ''}>Sem letra</option></select></div>
         <div class="campo-config"><label>Tamanho do vídeo longo</label><select id="fmLongo" title="Repete as músicas do álbum em outra ordem até chegar no tempo (quem assiste na TV deixa tocando)">${[[0, 'Só o álbum'], [60, '~1 hora'], [90, '~1h30'], [120, '~2 horas']].map(([v, t]) => `<option value="${v}" ${Number(p.longoMin || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
         <div class="campo-config"><label>Shorts por álbum</label><select id="fmShorts">${[0, 1, 2, 3].map((n) => `<option ${n === p.shorts ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
       </div>
@@ -207,7 +208,8 @@ const FabMusica = (() => {
     q('#fmHora').onchange = (e) => salvar({ hora: e.target.value || '08:00' });
     q('#fmQtd').onchange = async (e) => { await salvar({ qtd: Number(e.target.value) }); custo(); };
     q('#fmFolga').onchange = (e) => salvar({ folgaDias: Number(e.target.value) });
-    q('#fmFundo').onchange = (e) => salvar({ fundoAnimado: e.target.value === '1' });
+    q('#fmFundo').onchange = (e) => salvar({ fundoCenas: e.target.value === '2', fundoAnimado: e.target.value === '1' });
+    q('#fmLetra').onchange = (e) => salvar({ letraLongo: e.target.value === '1' });
     q('#fmShorts').onchange = async (e) => { await salvar({ shorts: Number(e.target.value) }); custo(); };
     q('#fmLongo').onchange = async (e) => { await salvar({ longoMin: Number(e.target.value) }); custo(); };
     document.querySelectorAll('#fabMusica .fm-subir').forEach((b) => (b.onclick = () => verESubir(b.dataset.id)));
@@ -250,7 +252,7 @@ const FabMusica = (() => {
       const jaSubiu = b.closest('.fm-album')?.classList.contains('fase-aprovado');
       if (!confirm(jaSubiu
         ? 'Este álbum já subiu. Antes, APAGUE o vídeo longo no YouTube Studio (senão ficam dois). Depois o vídeo é montado de novo com fundo novo e você sobe em "Ver e subir". Continuar?'
-        : 'Desenhar o fundo de novo e montar o vídeo longo outra vez? (uns US$ 0,50 e alguns minutos)')) return;
+        : dados.prefs?.fundoCenas ? 'Buscar outras cenas reais (grátis) e montar o vídeo longo outra vez? (alguns minutos)' : 'Desenhar o fundo de novo e montar o vídeo longo outra vez? (uns US$ 0,50 e alguns minutos)')) return;
       try {
         await window.api.musicaAuto.refazerFundo(b.dataset.id);
         avisar('Refazendo o fundo — acompanhe no cartão do álbum');

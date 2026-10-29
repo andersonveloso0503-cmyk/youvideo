@@ -1,5 +1,6 @@
-// Vídeos reais e grátis (Pexels; Pixabay se tiver a chave) para as cenas dos Sons para dormir.
-// POST { tema, prompt, quantidade, evitar: ['pexels-123', ...] }
+// Vídeos reais e grátis (Pexels; Pixabay se tiver a chave) para as cenas dos Sons para dormir
+// e para o fundo de cenas do vídeo longo da Fábrica de Música (uso: 'musica').
+// POST { tema, prompt, quantidade, evitar: ['pexels-123', ...], uso?: 'musica', gospel?: true }
 //   -> { videos: [{ id, url, largura, altura, duracao, fonte, autor, pagina }] }
 // Chaves na Vercel (grátis): PEXELS_API_KEY (pexels.com/api) e, opcional, PIXABAY_API_KEY (pixabay.com/api/docs).
 // A licença do Pexels e do Pixabay permite usar em vídeos do YouTube, inclusive monetizados.
@@ -7,8 +8,28 @@ import { exigirToken } from '../../../lib/central';
 
 export const config = { maxDuration: 60 };
 
-async function buscasDaIa(tema, prompt) {
+// Buscas prontas por estilo de música (em inglês, que é como o Pexels acha melhor)
+function buscasMusica(tema, gospel) {
+  const t = String(tema || '').toLowerCase();
+  let base;
+  if (/sertanej|modão|modao|raiz|country|viola/.test(t)) base = ['countryside golden hour', 'farm field sunset drone', 'rural dirt road', 'horses grazing sunset', 'wheat field wind'];
+  else if (/pagode|samba/.test(t)) base = ['tropical beach sunset', 'rio de janeiro aerial', 'city lights evening aerial', 'palm trees golden hour', 'ocean waves sunset'];
+  else if (/forr[oó]|nordest/.test(t)) base = ['sertao landscape', 'dry land sunset', 'rural village aerial', 'sunrise countryside'];
+  else base = ['mountains aerial golden hour', 'lake drone sunrise', 'waterfall aerial', 'clouds sunlight rays', 'green valley drone'];
+  return gospel ? [...base, 'sunlight through clouds', 'countryside church aerial'] : base;
+}
+
+async function buscasDaIa(tema, prompt, uso, gospel) {
   if (!process.env.GROQ_API_KEY) return [];
+  const pedido = uso === 'musica'
+    ? `I need free stock footage (Pexels) for the background of a ${gospel ? 'Christian worship ' : ''}music lyric video on YouTube.
+Music style: "${tema}". ${String(prompt || '').slice(0, 300)}
+Write 5 short English search queries (2 to 4 words each) that find beautiful cinematic real footage with slow camera movement (drone, landscapes, sky, golden hour, nature, scenery) matching the mood of this music style. No people facing the camera, no text, no concerts, no religious symbols of other religions. Most specific first.
+Reply only JSON: {"buscas": ["...", "...", "...", "...", "..."]}`
+    : `I need free stock footage (Pexels) for a calm "sounds to sleep" YouTube video.
+Theme: "${tema}". Scene idea: ${String(prompt || '').slice(0, 500)}
+Write 4 short English search queries (2 to 4 words each) that find calm, beautiful, real nature/ambience footage matching the theme (no people talking, no text). Most specific first.
+Reply only JSON: {"buscas": ["...", "...", "...", "..."]}`;
   try {
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -17,18 +38,12 @@ async function buscasDaIa(tema, prompt) {
         model: 'llama-3.3-70b-versatile',
         temperature: 0.5,
         response_format: { type: 'json_object' },
-        messages: [{
-          role: 'user',
-          content: `I need free stock footage (Pexels) for a calm "sounds to sleep" YouTube video.
-Theme: "${tema}". Scene idea: ${String(prompt || '').slice(0, 500)}
-Write 4 short English search queries (2 to 4 words each) that find calm, beautiful, real nature/ambience footage matching the theme (no people talking, no text). Most specific first.
-Reply only JSON: {"buscas": ["...", "...", "...", "..."]}`,
-        }],
+        messages: [{ role: 'user', content: pedido }],
       }),
     });
     const d = await r.json();
     const j = JSON.parse(d.choices?.[0]?.message?.content || '{}');
-    return (Array.isArray(j.buscas) ? j.buscas : []).map((x) => String(x).slice(0, 60)).filter(Boolean).slice(0, 4);
+    return (Array.isArray(j.buscas) ? j.buscas : []).map((x) => String(x).slice(0, 60)).filter(Boolean).slice(0, 5);
   } catch {
     return [];
   }
@@ -78,7 +93,13 @@ export default async function handler(req, res) {
   const tema = String(b.tema || '').slice(0, 120);
   const qtd = Math.max(1, Math.min(20, Number(b.quantidade) || 6));
   const evitar = new Set((Array.isArray(b.evitar) ? b.evitar : []).map(String));
-  const buscas = [...(await buscasDaIa(tema, b.prompt)), tema].filter(Boolean);
+  const uso = b.uso === 'musica' ? 'musica' : 'dormir';
+  const gospel = !!b.gospel;
+  const buscas = uso === 'musica'
+    ? [...new Set([...(await buscasDaIa(tema, b.prompt, uso, gospel)), ...buscasMusica(tema, gospel)])]
+    : [...(await buscasDaIa(tema, b.prompt, uso, gospel)), tema].filter(Boolean);
+  // Música: poucos vídeos de cada busca, para as cenas variarem (não 10 tomadas da mesma montanha)
+  const porBusca = uso === 'musica' ? 3 : Infinity;
   const achados = [];
   const vistos = new Set();
   try {
@@ -88,8 +109,11 @@ export default async function handler(req, res) {
         process.env.PEXELS_API_KEY ? pexels(busca).catch(() => []) : [],
         process.env.PIXABAY_API_KEY ? pixabay(busca).catch(() => []) : [],
       ]);
+      let destaBusca = 0;
       for (const v of lotes.flat()) {
+        if (destaBusca >= porBusca) break;
         if (evitar.has(v.id) || vistos.has(v.id)) continue;
+        destaBusca++;
         vistos.add(v.id);
         achados.push({ ...v, busca });
         if (achados.length >= qtd) break;

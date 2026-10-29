@@ -17,7 +17,12 @@ const EXT_AUDIO = ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus'];
 const USADAS = 'Usadas';
 // longoMin: o vídeo longo repete o álbum (em outra ordem) até chegar perto desse tempo — o público do canal
 // gospel deixa tocando na TV (assiste 2x mais que no celular). 0 = só o álbum, do tamanho que der.
-const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 1, folgaDias: 3, fundoAnimado: false, longoMin: 60 };
+// fundoCenas: o fundo do vídeo longo vira vídeos reais grátis (Pexels) do estilo da música, trocando a cada ~8 s
+// com dissolve — o padrão dos vídeos de música que mais crescem (out/2026). letraLongo: letra frase a frase.
+const PADRAO = { gospel: { ...PADRAO_CANAL }, normal: { ...PADRAO_CANAL }, hora: '08:00', qtd: 10, shorts: 1, folgaDias: 3, fundoAnimado: false, fundoCenas: true, letraLongo: true, longoMin: 60 };
+const CENAS_QTD = 14; // cenas por álbum (o loop tem ~1 min e 40 s e se repete no vídeo inteiro)
+const CENA_SEG = 8; // quanto tempo cada cena fica na tela
+const CENA_DISSOLVE = 1.2; // duração do dissolve entre as cenas
 const FORA_DO_NORMAL = ['infantil']; // estilos que não entram sozinhos no canal de música normal
 const MAX_TENTATIVAS_DIA = 2;
 // Quanto da letra precisa ser entendido ao ouvir a música (0 a 1). Abaixo disso a música é refeita.
@@ -119,6 +124,13 @@ class MusicaAuto {
         this.salvarConfig({ musicaAuto: c });
       } catch {}
     }
+    // Ajuste de 29/out/2026: fundo de cenas reais trocando + letra no vídeo longo (o dono pode voltar para a capa parada)
+    if (!c.ajusteCenas) {
+      c = { ...c, fundoCenas: true, fundoAnimado: false, letraLongo: true, ajusteCenas: 1 };
+      try {
+        this.salvarConfig({ musicaAuto: c });
+      } catch {}
+    }
     return {
       ...PADRAO,
       ...c,
@@ -163,7 +175,8 @@ class MusicaAuto {
         id: a.id, canal: a.canal, dia: a.dia, preset: a.presetNome, motor: a.motor, fase: a.fase, etapa: a.etapa, erro: a.erro,
         titulo: a.capa?.titulo || '', subtitulo: a.capa?.subtitulo || '', capa: a.capa?.capaArquivo || null,
         capaSimples: !!a.capa?.simples, capaErro: a.capa?.simples ? a.capa.erro || '' : '',
-        fundo: a.cena?.arquivo ? (a.cena.animado ? 'animado' : 'parado') : a.cena?.erro ? 'erro' : '', fundoErro: a.cena?.erro || '',
+        fundo: a.cenas?.arquivo ? 'cenas' : a.cenas?.erro ? 'erroCenas' : a.cena?.arquivo ? (a.cena.animado ? 'animado' : 'parado') : a.cena?.erro ? 'erro' : '',
+        fundoErro: a.cenas?.erro || a.cena?.erro || '', qtdCenas: a.cenas?.qtd || 0,
         musicas: (a.musicas || []).filter(Boolean).map((m) => m.titulo), total: a.ideias?.length || 0,
         prontas: (a.musicas || []).filter((m) => m && (m.url || m.arquivo)).length,
         fonte: a.fonte || 'ia',
@@ -425,8 +438,18 @@ class MusicaAuto {
       }
     }
 
+    // 4a) Fundo de cenas reais (Pexels, grátis) trocando com dissolve
+    if (prefs.fundoCenas && !(a.cenas?.arquivo && fs.existsSync(a.cenas.arquivo))) {
+      try {
+        await this.fazerFundoCenas(a, estilo, pasta);
+      } catch (e) {
+        a.cenas = { ...(a.cenas || {}), arquivo: null, erro: String(e.message || e).slice(0, 200) }; // segue com a capa de fundo
+        this.salvar();
+      }
+    }
+
     // 4b) Fundo animado do vídeo longo: cena desenhada que combina com o estilo, animada em loop
-    if (prefs.fundoAnimado !== false && !(a.cena?.arquivo && fs.existsSync(a.cena.arquivo))) {
+    if (!prefs.fundoCenas && prefs.fundoAnimado !== false && !(a.cena?.arquivo && fs.existsSync(a.cena.arquivo))) {
       try {
         await this.fazerFundoAnimado(a, estilo, pasta);
       } catch (e) {
@@ -455,6 +478,7 @@ class MusicaAuto {
 
     const base = this.obterConfig().ultimoProjeto || {};
     const nome = limpo(`${a.capa.titulo}${a.capa.subtitulo ? ` - ${a.capa.subtitulo}` : ''}`) || limpo(`${estilo.nome} ${a.dia}`);
+    const comCenas = !!(prefs.fundoCenas && a.cenas?.arquivo && fs.existsSync(a.cenas.arquivo));
     const comum = {
       enquadramento: 'auto',
       efeito: { estilo: 'onda', cor: '#d9a441', largura: 66, intensidade: 75, posX: 50, posY: 88, opacidade: 95, ...(base.efeito || {}) },
@@ -483,8 +507,13 @@ class MusicaAuto {
       inscrever: inscreverLongo,
       nome,
       musicas: musicasLongo,
+      // Com as cenas: imagem limpa como nos vídeos que mais crescem — sem a onda de som e quase sem escurecer
+      ...(comCenas ? { efeito: { ...comum.efeito, estilo: 'nenhum' }, textura: { granulado: 0, vinheta: true, escurecer: 8 } } : {}),
       fundos: [await this.fundoDoLongo(a, pasta)],
-      legenda: { ...(base.legenda || {}), ativo: false, mostrarNome: false },
+      // Letra frase a frase embaixo (branca com contorno), sem karaokê. Precisa da chave da Groq.
+      legenda: prefs.letraLongo && this.obterConfig().groqKey
+        ? { idioma: a.idioma === 'en' ? 'en' : 'pt', posicao: 'baixo', tamanho: 100, cor: '#ffffff', ...(base.legenda || {}), ativo: true, mostrarNome: false }
+        : { ...(base.legenda || {}), ativo: false, mostrarNome: false },
       formato: { tipo: 'longo', resolucao: base.formato?.resolucao || '1080', versoes: '', qtdVideos: '1', duracaoMaxMin: '', limiteMusicaSeg: '' },
       saida: { pasta: base.saida?.pasta || '', nome },
     });
@@ -639,6 +668,44 @@ class MusicaAuto {
     this.salvar();
   }
 
+  /**
+   * Fundo de cenas: busca vídeos reais grátis (Pexels/Pixabay) que combinam com o estilo da música,
+   * corta ~8 s de cada um e junta tudo com dissolve num loop (~1 min e 40 s) que se repete atrás das músicas.
+   * Não repete cenas dos álbuns recentes. Custo zero.
+   */
+  async fazerFundoCenas(a, estilo, pasta) {
+    const { probe } = require('./ffmpeg');
+    const cfg = this.obterConfig();
+    const dirCenas = path.join(pasta, 'cenas');
+    fs.mkdirSync(dirCenas, { recursive: true });
+    this.marcar(a, { etapa: 'Buscando as cenas (vídeos grátis do Pexels)' });
+    const usados = this.estado.albuns.filter((x) => x.id !== a.id).slice(-15).flatMap((x) => x.cenas?.ids || []);
+    const { videos = [] } = await this.central.chamar(cfg, '/api/central/videos-gratis', {
+      metodo: 'POST',
+      corpo: { uso: 'musica', tema: estilo.nome, gospel: !!estilo.gospel, prompt: a.capa?.titulo ? `Album title: ${a.capa.titulo}` : '', quantidade: CENAS_QTD + 4, evitar: usados },
+    });
+    const clipes = [];
+    for (const v of videos) {
+      if (clipes.length >= CENAS_QTD) break;
+      try {
+        const arq = await this.central.baixar(v.url, path.join(dirCenas, `${v.id}.mp4`));
+        if (fs.statSync(arq).size < 3e5) continue;
+        const { duracao } = await probe(arq).catch(() => ({ duracao: 0 }));
+        if (duracao < CENA_SEG + 1) continue;
+        clipes.push({ arquivo: arq, id: v.id, duracao });
+        this.marcar(a, { etapa: `Baixando as cenas (${clipes.length} de ${CENAS_QTD})` });
+      } catch {
+        /* uma cena que não baixou: tenta a próxima */
+      }
+    }
+    if (clipes.length < 4) throw new Error(`Só ${clipes.length} cena(s) do Pexels: o vídeo usou a capa parada`);
+    this.marcar(a, { etapa: `Juntando ${clipes.length} cenas com dissolve` });
+    const saida = path.join(pasta, '00 - Fundo cenas.mp4');
+    await montarLoopCenas(clipes, saida);
+    a.cenas = { arquivo: saida, ids: clipes.map((c) => c.id), qtd: clipes.length };
+    this.salvar();
+  }
+
   /** Capa no Gemini (ou a capa simples feita no site, se o Gemini falhar). */
   async fazerCapa(a, estilo, pasta) {
     const cfg = () => this.obterConfig();
@@ -659,6 +726,8 @@ class MusicaAuto {
 
   /** Fundo do vídeo longo: a cena (animada ou parada); sem cena, a capa — mas nunca a capa simples com texto. */
   async fundoDoLongo(a, pasta) {
+    // Cenas reais trocando (Pexels), quando estiver ligado e o loop tiver saído
+    if (this.prefs().fundoCenas && a.cenas?.arquivo && fs.existsSync(a.cenas.arquivo)) return a.cenas.arquivo;
     // Como era antes: a CAPA parada atrás das músicas (a do Gemini ou a que o dono trocou), não a cena animada
     if (this.prefs().fundoAnimado === false) {
       if (a.capa?.capaArquivo && !a.capa.simples && fs.existsSync(a.capa.capaArquivo)) return a.capa.capaArquivo;
@@ -682,6 +751,7 @@ class MusicaAuto {
     if (!a) throw new Error('Álbum não encontrado.');
     if (['trabalhando', 'na vez'].includes(a.fase)) throw new Error('O álbum ainda está sendo feito.');
     a.cena = null;
+    a.cenas = null; // com o fundo de cenas ligado, busca cenas novas
     a.jobs = null;
     this.salvar();
     return this.fazer(a.canal, { continuar: a.id });
@@ -835,4 +905,29 @@ Coloque o texto do lado oposto ao rosto do cantor e deixe o canto inferior direi
   }
 }
 
-module.exports = { MusicaAuto, CANAIS, hoje, motorDoDia, palavras, idiomaDe };
+/**
+ * Junta as cenas num vídeo só: ~8 s de cada (pulando o 1º segundo, que costuma tremer), 1920x1080,
+ * cor levemente mais viva, dissolve de 1,2 s entre elas. Sem áudio. Feito para repetir em loop.
+ */
+async function montarLoopCenas(clipes, saida, { W = 1920, H = 1080, fps = 24 } = {}) {
+  const { rodar } = require('./ffmpeg');
+  const args = [];
+  const filtros = [];
+  clipes.forEach((c, i) => {
+    const inicio = c.duracao > CENA_SEG + 3 ? 1.5 : 0.5;
+    args.push('-ss', String(inicio), '-t', String(CENA_SEG), '-i', c.arquivo);
+    filtros.push(`[${i}:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${fps},eq=saturation=1.12:contrast=1.04,format=yuv420p,trim=duration=${CENA_SEG},setpts=PTS-STARTPTS[c${i}]`);
+  });
+  let ultimo = 'c0';
+  for (let i = 1; i < clipes.length; i++) {
+    const offset = (i * (CENA_SEG - CENA_DISSOLVE)).toFixed(3);
+    const nome = i === clipes.length - 1 ? 'saida' : `x${i}`;
+    filtros.push(`[${ultimo}][c${i}]xfade=transition=fade:duration=${CENA_DISSOLVE}:offset=${offset}[${nome}]`);
+    ultimo = nome;
+  }
+  const total = clipes.length * (CENA_SEG - CENA_DISSOLVE) + CENA_DISSOLVE;
+  await rodar([...args, '-filter_complex', filtros.join(';'), '-map', `[${ultimo}]`, '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-r', String(fps), saida], { duracaoTotal: total }).promise;
+  return saida;
+}
+
+module.exports = { MusicaAuto, CANAIS, hoje, motorDoDia, palavras, idiomaDe, montarLoopCenas };
