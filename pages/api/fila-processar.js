@@ -625,6 +625,12 @@ export default async function handler(req, res) {
           if (item.infantil && !item.shortMusica) {
             // Desenho infantil: o personagem grande e alegre (o Compilador põe o título por cima, se quiser)
             thumbnailUrl = (await thumbInfantil({ avisar: (m) => { avisoThumb = `A thumbnail com título não saiu (${m}) — foi uma imagem sem texto. Use 🎨 na Fábrica para refazer.`; }, personagem: item.infantil.personagem, referencia: item.infantil.refUrl, titulo: item.roteiro.titulo, thumbnailTitulo: item.roteiro.thumbnailTitulo, cena: (item.roteiro.cenas || []).find((c) => c.bloco === 'antes' && !/close-up/i.test(c.descricao))?.descricao || '' }).catch(() => null)) || primeiraImagem;
+          } else if (item.games) {
+            // Canal de games: imagem oficial do jogo + texto curto gigante (branco e verde neon)
+            const { thumbGames } = await import('../../lib/capaGames');
+            thumbnailUrl =
+              (await thumbGames({ fotoUrl: item.capaUrl || primeiraImagem, texto: item.roteiro.thumbnailTitulo, subtitulo: item.roteiro.thumbnailSubtitulo }).catch(() => null)) ||
+              primeiraImagem;
           } else if (item.documentario) {
             // Documentário: foto real escurecida + a pergunta da capa
             // Episódios criados antes da capa pintada: pega título, subtítulo e pintura do episódio escrito
@@ -657,7 +663,7 @@ export default async function handler(req, res) {
           if (agendaId && !item.fabrica.agendaId) await ref.update({ 'fabrica.agendaId': agendaId });
           await db.collection('youvideo_projects').add({
             origem: 'fabrica',
-            categoria: item.marca ? 'empresa' : item.infantil ? 'infantil' : item.documentario ? 'documentarios' : item.corte ? 'cortes' : item.longo ? 'longos' : item.estilo === 'desenho' ? 'historias' : 'series',
+            categoria: item.marca ? 'empresa' : item.infantil ? 'infantil' : item.games ? 'games' : item.documentario ? 'documentarios' : item.corte ? 'cortes' : item.longo ? 'longos' : item.estilo === 'desenho' ? 'historias' : 'series',
             ...(item.marca ? { canal: item.marca } : {}),
             tema: item.tema,
             estilo: item.estilo,

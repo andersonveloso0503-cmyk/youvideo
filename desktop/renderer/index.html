@@ -612,6 +612,7 @@
       <button type="button" class="ativo" data-marca="">📖 Histórias bíblicas</button>
       <button type="button" data-marca="longos">📺 Vídeos longos</button>
       <button type="button" data-marca="documentario">🌙 Documentários para dormir</button>
+      <button type="button" data-marca="games">🎮 Games</button>
       <button type="button" data-marca="infantil">🧸 Infantil</button>
       <button type="button" data-marca="cortes">🎬 Cortes</button>
       <button type="button" data-marca="oracao">🙏 Oração do dia</button>
@@ -655,6 +656,16 @@
       <div class="campo-config"><label>Horário no YouTube (1 por dia)</label><input type="time" id="fabDocHora" value="19:30" /></div>
       <div class="campo-config"><label>Canal do YouTube</label><select id="fabDocCanal"></select></div>
       <div class="campo-config"><label>Voz da ElevenLabs (ID, opcional — vazio = voz padrão)</label><input type="text" id="fabDocVoz" placeholder="Ex.: pNInz6obpgDQGcFmaJgB" /></div>
+    </div>
+    <div class="fab-config" id="fabConfigGames" hidden>
+      <div class="campo-config"><label>Quantos vídeos</label>
+        <select id="fabGmQuantos"><option value="10" selected>Todos os prontos</option><option value="1">1 (teste)</option></select></div>
+      <div class="campo-config"><label>Frequência</label>
+        <select id="fabGmIntervalo"><option value="1">1 por dia</option><option value="2" selected>1 a cada 2 dias</option><option value="3">1 a cada 3 dias</option></select></div>
+      <div class="campo-config"><label>Primeiro dia no ar</label><input type="date" id="fabGmInicio" /></div>
+      <div class="campo-config"><label>Horário no YouTube</label><input type="time" id="fabGmHora" value="18:00" /></div>
+      <div class="campo-config"><label>Canal do YouTube</label><select id="fabGmCanal"></select></div>
+      <div class="campo-config"><label>Voz da ElevenLabs (ID, opcional — vazio = voz padrão)</label><input type="text" id="fabGmVoz" placeholder="Ex.: pNInz6obpgDQGcFmaJgB" /></div>
     </div>
     <div class="fab-config" id="fabConfigInfantil" hidden>
       <div class="campo-config"><label>Personagem</label><input type="text" id="fabIfNome" value="Pingo" maxlength="40" /></div>

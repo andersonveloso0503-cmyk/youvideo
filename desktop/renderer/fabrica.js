@@ -6,11 +6,12 @@ const Fabrica = (() => {
   let ligado = false;
   let marca = ''; // '' = histórias bíblicas; 'cortes' = cortes de filme e cômicos; 'oracao' = oração do dia; 'lcs' = vídeos de divulgação da LCS
   // Em qual aba cada vídeo da fábrica aparece
-  const abaDe = (i) => i.marca || (i.infantil ? 'infantil' : i.documentario ? 'documentario' : i.oracao ? 'oracao' : i.corte ? 'cortes' : i.longo ? 'longos' : '');
+  const abaDe = (i) => i.marca || (i.infantil ? 'infantil' : i.games ? 'games' : i.documentario ? 'documentario' : i.oracao ? 'oracao' : i.corte ? 'cortes' : i.longo ? 'longos' : '');
   const NOTAS = {
     '': 'A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.',
     longos: '<b>Vídeos longos</b> (cerca de 12 minutos) no estilo <b>mistério</b>: o título faz uma pergunta (ex.: "O que aconteceu com Jesus nos 3 dias no túmulo?"), o vídeo vai revelando detalhes e só responde no final. Thumbnail com a frase grande. São os vídeos que trazem <b>inscritos</b> e monetização. Vão para o <b>YouTube</b> (e Facebook, se marcar), com imagens em zoom para caber no orçamento.',
     documentario: '<b>Documentários para dormir</b> (canal Noites na História): os <b>roteiros já estão escritos</b> (vikings, castelo medieval, caravelas, Egito, gaúchos, Pompeia, monges, imigrantes italianos, pirâmides e iglus). O site narra <b>devagar, com pausas</b>, usa <b>vídeos e fotos reais</b> (Pexels e Wikimedia) conferidos pela IA para combinar com a fala e com a época (quando nenhum serve, pinta a cena), faz a <b>capa pintada</b> com o título em letra medieval e coloca os <b>capítulos</b> na descrição. O seu PC monta e sobe <b>1 por dia</b> no YouTube.',
+    games: '<b>Canal de games</b> (Próxima Fase): os <b>roteiros já estão escritos</b> (GTA 6: tudo que sabemos; 10 jogos parecidos com GTA). O site narra no <b>ritmo de notícia</b>, usa só <b>imagens e trailers oficiais</b> dos jogos (IGDB e página do jogo na Steam — nunca gameplay de outros canais), faz a <b>capa</b> com o texto grande em branco e verde neon e coloca os <b>capítulos</b> e os créditos na descrição. O seu PC monta e sobe no YouTube.',
     infantil: '<b>Desenho infantil</b> com um personagem fixo (começa com o <b>Pingo</b>): episódios de <b>4 a 5 minutos</b>, todo animado, com uma <b>música chiclete nova</b> no meio de cada episódio (o refrão volta no final). A IA escreve a historinha com uma lição, narra, compõe e canta a música (Estúdio de Música), cria as imagens sempre com o mesmo personagem, anima, o seu PC monta e sobe no <b>YouTube</b> marcado como <b>conteúdo para crianças</b>, na playlist do personagem.',
     cortes: 'Cenas curtas em <b>diálogo</b>, com uma voz para cada personagem. <b>Corte de filme</b>: cena bíblica dramática, com imagem realista (cerca de 45 s). <b>Corte cômico</b>: situação engraçada em desenho animado (cerca de 1 min). A IA escolhe as cenas sem repetir, escreve as falas, o seu PC monta, e cada corte é agendado sozinho nas redes.',
     oracao: 'Um Short de <b>oração por dia</b> (cerca de 1 minuto), com a data no título — por exemplo "Oração da Manhã de 7 de Outubro" —, que é como as pessoas procuram oração no YouTube. A IA escreve a oração (um assunto diferente por dia), narra com imagens calmas, o seu PC monta, e ela é publicada sozinha no horário.',
@@ -27,7 +28,7 @@ const Fabrica = (() => {
     for (const id of ['#fabLinhaCriar', '#fabErro', '#fabTopoLista', '#fabLista']) q(id).hidden = musica;
     q('#modalFabrica .fab-redes').hidden = musica;
     if (musica) {
-      ['#fabConfigLcs', '#fabConfigOracao', '#fabConfigCortes', '#fabConfigBiblia', '#fabConfigLongos', '#fabConfigDoc', '#fabConfigInfantil'].forEach((id) => (q(id).hidden = true));
+      ['#fabConfigLcs', '#fabConfigOracao', '#fabConfigCortes', '#fabConfigBiblia', '#fabConfigLongos', '#fabConfigDoc', '#fabConfigGames', '#fabConfigInfantil'].forEach((id) => (q(id).hidden = true));
       FabMusica.mostrar();
       return;
     }
@@ -36,8 +37,13 @@ const Fabrica = (() => {
     q('#fabConfigCortes').hidden = marca !== 'cortes';
     q('#fabConfigLongos').hidden = marca !== 'longos';
     q('#fabConfigDoc').hidden = marca !== 'documentario';
+    q('#fabConfigGames').hidden = marca !== 'games';
     q('#fabConfigInfantil').hidden = marca !== 'infantil';
-    const soYoutube = marca === 'longos' || marca === 'documentario' || marca === 'infantil';
+    const soYoutube = marca === 'longos' || marca === 'documentario' || marca === 'games' || marca === 'infantil';
+    if (marca === 'games' && !q('#fabGmInicio').value) {
+      const d = new Date(Date.now() + 2 * 86400e3);
+      q('#fabGmInicio').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
     if (marca === 'documentario' && !q('#fabDocInicio').value) {
       const d = new Date(Date.now() + 2 * 86400e3);
       q('#fabDocInicio').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -47,7 +53,7 @@ const Fabrica = (() => {
     document.querySelectorAll('#modalFabrica .so-biblia').forEach((el) => (el.hidden = marca === 'lcs'));
     // Longos: só YouTube (sempre) e Facebook. Instagram, TikTok e Kwai são para vídeo curto.
     q('#fabInstagram').parentElement.hidden = soYoutube;
-    q('#fabFacebook').parentElement.hidden = marca === 'documentario'; // infantil: YouTube + Página do Planeta Fofura
+    q('#fabFacebook').parentElement.hidden = marca === 'documentario' || marca === 'games'; // infantil: YouTube + Página do Planeta Fofura
     for (const id of ['#fabTiktok', '#fabKwai']) q(id).parentElement.hidden = marca === 'lcs' || soYoutube;
     q('#fabYoutube').disabled = soYoutube;
     if (soYoutube) q('#fabYoutube').checked = true;
@@ -111,6 +117,12 @@ const Fabrica = (() => {
       q('#fabCusto').textContent = `${qtd} episódios · custo aproximado US$ ${Math.max(1, Math.round(qtd * porEp))} (imagens, voz, música e animação) + ~${qtd * 3} mil caracteres e ${qtd} músicas da ElevenLabs`;
       return;
     }
+    if (marca === 'games') {
+      const qtd = Number(q('#fabGmQuantos').value);
+      // Imagens oficiais são grátis (IGDB/Steam); a voz gasta ~9 mil caracteres por vídeo de ~9 min
+      q('#fabCusto').textContent = `até ${qtd} vídeos de games · imagens oficiais grátis + ~${qtd * 9} mil caracteres da ElevenLabs (voz)`;
+      return;
+    }
     if (marca === 'documentario') {
       const qtd = Number(q('#fabDocQuantos').value);
       // Imagens e vídeos reais são grátis (Pexels/Wikimedia); a voz gasta ~25 mil caracteres por episódio
@@ -147,7 +159,7 @@ const Fabrica = (() => {
   function preencherCanais() {
     const lista = typeof canais !== 'undefined' ? canais : [];
     const p = prefs();
-    for (const id of ['#fabCanal', '#fabOrCanal', '#fabCtCanal', '#fabLgCanal', '#fabDocCanal', '#fabIfCanal']) {
+    for (const id of ['#fabCanal', '#fabOrCanal', '#fabCtCanal', '#fabLgCanal', '#fabDocCanal', '#fabGmCanal', '#fabIfCanal']) {
       const sel = q(id);
       sel.innerHTML = lista.length
         ? lista.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)}</option>`).join('')
@@ -157,6 +169,9 @@ const Fabrica = (() => {
     // Documentários: já vem marcado o canal Noites na História (se estiver conectado)
     const noites = lista.find((c) => /noites|dormir/i.test(c.titulo || ''));
     if (noites) q('#fabDocCanal').value = noites.id;
+    // Games: já vem marcado o canal Próxima Fase (se estiver conectado)
+    const proxima = lista.find((c) => /pr[óo]xima fase|games?/i.test(c.titulo || ''));
+    if (proxima) q('#fabGmCanal').value = proxima.id;
   }
 
   function ligar() {
@@ -181,7 +196,7 @@ const Fabrica = (() => {
       })
     );
     document.querySelectorAll('#fabMarcaAbas button').forEach((b) => (b.onclick = () => trocarMarca(b.dataset.marca || '')));
-    ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs', '#fabOrDias', '#fabLgSemanas', '#fabLgDias', '#fabLgDuracao', '#fabDocQuantos', '#fabIfSemanas', '#fabIfDias', '#fabIfAnim', '#fabIfDuracao'].forEach((id) => q(id).addEventListener('change', custo));
+    ['#fabSemanas', '#fabDiasSemana', '#fabHoraLcs', '#fabOrDias', '#fabLgSemanas', '#fabLgDias', '#fabLgDuracao', '#fabDocQuantos', '#fabGmQuantos', '#fabIfSemanas', '#fabIfDias', '#fabIfAnim', '#fabIfDuracao'].forEach((id) => q(id).addEventListener('change', custo));
     // Cortes: lembra as escolhas da última vez
     const pc = p.cortes || {};
     for (const [chave, id] of [['tipo', '#fabCtTipo'], ['dias', '#fabCtDias'], ['porDia', '#fabCtPorDia'], ['hora1', '#fabCtHora1'], ['hora2', '#fabCtHora2'], ['animacao', '#fabCtAnimacao']]) {
@@ -217,6 +232,7 @@ const Fabrica = (() => {
     if (marca === 'cortes') return criarCortes(erro);
     if (marca === 'longos') return criarLongos(erro);
     if (marca === 'documentario') return criarDocumentarios(erro);
+    if (marca === 'games') return criarGames(erro);
     if (marca === 'infantil') return criarInfantil(erro);
     const redes = {
       youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked,
@@ -657,6 +673,40 @@ const Fabrica = (() => {
     }
   }
 
+  async function criarGames(erro) {
+    const canalId = q('#fabGmCanal').value;
+    if (!canalId) return (erro.textContent = 'Conecte o canal Próxima Fase em Contas YouTube primeiro.');
+    const canal = (typeof canais !== 'undefined' ? canais : []).find((c) => c.id === canalId);
+    // Vídeo de games não é para os canais bíblicos, de música, infantil ou de documentário
+    if (canal && /jesus|cristo|b[ií]bli|ora[cç][aã]o|evangel|m[uú]sica|frequ[eê]ncia|louvor|noites|dormir|fofura|infantil/i.test(canal.titulo || '') &&
+        !confirm(`O canal "${canal.titulo}" parece ser de outro assunto. Mandar os vídeos de games para ele mesmo?`)) return;
+    const quantos = Number(q('#fabGmQuantos').value);
+    const intervalo = Number(q('#fabGmIntervalo').value);
+    const inicio = q('#fabGmInicio').value;
+    if (!confirm(`Colocar até ${quantos} vídeos de games na fábrica, ${intervalo === 1 ? '1 por dia' : `1 a cada ${intervalo} dias`} às ${q('#fabGmHora').value}, começando em ${inicio ? new Date(inicio + 'T12:00:00').toLocaleDateString('pt-BR') : 'daqui a 2 dias'}?\n\n${q('#fabCusto').textContent}\n\nA voz de cada um só começa a ser gerada 3 dias antes de ir ao ar.`)) return;
+    const b = q('#btnFabCriar');
+    b.disabled = true;
+    b.textContent = '🎮 Colocando os vídeos na fábrica...';
+    try {
+      const r = await window.api.fabrica.criar({
+        tipo: 'games',
+        quantos,
+        intervalo,
+        inicio,
+        horarios: [q('#fabGmHora').value],
+        vozId: q('#fabGmVoz').value.trim(),
+        canalYoutube: canal ? { id: canal.id, titulo: canal.titulo } : null,
+      });
+      avisar(`${r.criados.length} vídeos de games na fábrica, a partir de ${new Date(r.primeiroDia + 'T12:00:00').toLocaleDateString('pt-BR')}`);
+      carregar();
+    } catch (e) {
+      erro.textContent = msgErro(e);
+    } finally {
+      b.disabled = false;
+      b.textContent = '🏭 Criar lote';
+    }
+  }
+
   async function criarCortes(erro) {
     const redes = {
       youtube: q('#fabYoutube').checked, facebook: q('#fabFacebook').checked, instagram: q('#fabInstagram').checked,
@@ -793,7 +843,7 @@ const Fabrica = (() => {
         l.className = `fab-item st-${i.status}`;
         l.innerHTML = `
           <span class="hora">${esc(new Date(i.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))}</span>
-          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.infantil ? `Desenho infantil${i.infantil.musica ? ` · música: ${i.infantil.musica}` : ''}` : i.oracao ? 'Oração do dia' : i.documentario ? 'Documentário para dormir' : i.longo ? 'Vídeo longo (mistério)' : `${i.corte ? (i.corte.tipo === 'comico' ? 'Corte cômico · ' : 'Corte de filme · ') : ''}${i.animar ? 'Animado' : 'Imagens com zoom'}`}">${i.marca ? '🏢' : i.infantil ? '🧸' : i.oracao ? '🙏' : i.documentario ? '🌙' : i.longo ? '📺' : i.corte ? (i.corte.tipo === 'comico' ? '😂' : '🎬') : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
+          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.infantil ? `Desenho infantil${i.infantil.musica ? ` · música: ${i.infantil.musica}` : ''}` : i.oracao ? 'Oração do dia' : i.games ? 'Vídeo de games (Próxima Fase)' : i.documentario ? 'Documentário para dormir' : i.longo ? 'Vídeo longo (mistério)' : `${i.corte ? (i.corte.tipo === 'comico' ? 'Corte cômico · ' : 'Corte de filme · ') : ''}${i.animar ? 'Animado' : 'Imagens com zoom'}`}">${i.marca ? '🏢' : i.infantil ? '🧸' : i.oracao ? '🙏' : i.games ? '🎮' : i.documentario ? '🌙' : i.longo ? '📺' : i.corte ? (i.corte.tipo === 'comico' ? '😂' : '🎬') : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
           <span class="txt"><b></b><small></small></span>
           <span class="acoes"></span>`;
         l.querySelector('b').textContent = i.titulo || (i.serie ? `${i.serie.nome} (Parte ${i.serie.parte}/${i.serie.total})` : i.tema);

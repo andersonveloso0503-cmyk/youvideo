@@ -21,6 +21,7 @@ import { testarConta } from '../../../lib/publicarSocial';
 import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS, TODOS_EPISODIOS } from '../../../lib/documentarioEpisodios';
+import { GAMES } from '../../../lib/gamesEpisodios';
 import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora, criarShortDaMusica } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
@@ -316,6 +317,7 @@ export default async function handler(req, res) {
           formato: x.formato || 'short',
           longo: x.longo === true,
           documentario: x.documentario === true,
+          games: x.games === true, // canal de games (Próxima Fase): aba própria no Compilador
           playlist: x.roteiro?.playlist?.titulo ? x.roteiro.playlist : null, // documentário: entra sozinho na playlist da série (ex.: "Catástrofes do Brasil")
           infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true, shortMusica: x.shortMusica === true, temporada: x.infantil.temporada ? { nome: x.infantil.temporada.nome, numero: x.infantil.temporada.numero, ep: x.infantil.temporada.ep, total: x.infantil.temporada.total } : null } : null,
           comBotao: x.comBotao === true,
@@ -739,7 +741,8 @@ export default async function handler(req, res) {
       if (b.tipo === 'documentario') {
         if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube do documentário.' });
         const horarioDoc = hora(b.horarios?.[0], '19:30');
-        const todosDoc = await col.where('documentario', '==', true).get();
+        // Os vídeos do canal de games usam o mesmo motor (documentario: true), mas têm agenda própria
+        const todosDoc = { docs: (await col.where('documentario', '==', true).get()).docs.filter((d) => !d.data().games) };
         const jaUsados = new Set(todosDoc.docs.filter((d) => d.data().status !== 'erro' && d.data().fabrica?.ativo !== false).map((d) => d.data().episodioId));
         const livres = EPISODIOS.filter((e) => !jaUsados.has(e.id));
         if (!livres.length) return res.status(400).json({ erro: 'Todos os episódios já escritos estão na fábrica. Peça novos roteiros.' });
@@ -781,6 +784,57 @@ export default async function handler(req, res) {
         });
         await batchDoc.commit();
         return res.status(200).json({ lote: loteDoc, criados: criadosDoc, primeiroDia: diaDoc });
+      }
+
+      // ── Canal de games (Próxima Fase): episódios já escritos, imagens oficiais dos jogos, só YouTube ──
+      // Usa o mesmo motor dos documentários (voz, cenas, montagem no PC), com ritmo de notícia.
+      if (b.tipo === 'games') {
+        if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube do Próxima Fase.' });
+        const horarioGm = hora(b.horarios?.[0], '18:00');
+        const todosGm = (await col.where('games', '==', true).get()).docs;
+        const usadosGm = new Set(todosGm.filter((d) => d.data().status !== 'erro' && d.data().fabrica?.ativo !== false).map((d) => d.data().episodioId));
+        const livresGm = GAMES.filter((e) => !usadosGm.has(e.id));
+        if (!livresGm.length) return res.status(400).json({ erro: 'Todos os episódios de games já escritos estão na fábrica. Peça novos roteiros.' });
+        const quantosGm = Math.max(1, Math.min(livresGm.length, Number(b.quantos) || livresGm.length));
+        // Dias entre um vídeo e outro (padrão 2: terça/quinta/sábado mais ou menos)
+        const intervaloGm = Math.max(1, Math.min(7, Number(b.intervalo) || 2));
+        const minimoGm = somarDias(diaBrasilia(), 1);
+        let diaGm = /^\d{4}-\d{2}-\d{2}$/.test(String(b.inicio || '')) && b.inicio >= minimoGm ? b.inicio : somarDias(diaBrasilia(), 2);
+        const ultimoGm = todosGm.map((d) => d.data().fabrica?.quando).filter(Boolean).sort().pop();
+        if (ultimoGm && diaBrasilia(new Date(ultimoGm)) >= diaGm) diaGm = somarDias(diaBrasilia(new Date(ultimoGm)), intervaloGm);
+        const loteGm = Date.now().toString(36);
+        const batchGm = db.batch();
+        const criadosGm = [];
+        livresGm.slice(0, quantosGm).forEach((ep, i) => {
+          const quando = horarioBrasilia(somarDias(diaGm, i * intervaloGm), horarioGm);
+          const ref = col.doc();
+          batchGm.set(ref, {
+            tema: ep.titulo,
+            documentario: true, // mesmo motor dos documentários
+            games: true,
+            episodioId: ep.id,
+            serie: null,
+            estilo: 'realista',
+            formato: 'longo',
+            animar: false,
+            ...(String(b.vozId || '').trim() ? { vozId: String(b.vozId).trim().slice(0, 60) } : {}),
+            roteiro: roteiroDoEpisodio(ep),
+            status: 'pendente',
+            origem: 'fabrica',
+            criadoEm: new Date().toISOString(),
+            fabrica: {
+              ativo: true,
+              lote: loteGm,
+              quando,
+              quandoYoutube: quando,
+              redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
+              canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') },
+            },
+          });
+          criadosGm.push({ id: ref.id, tema: ep.titulo, quando });
+        });
+        await batchGm.commit();
+        return res.status(200).json({ lote: loteGm, criados: criadosGm, primeiroDia: diaGm });
       }
 
       // ── Vídeos longos (~12 min, estilo mistério): 2 ou 3 por semana, só no YouTube (+ Facebook opcional) ──
@@ -1157,6 +1211,7 @@ export default async function handler(req, res) {
       await novo.set({
         tema: d.tema,
         documentario: true,
+        ...(d.games ? { games: true } : {}),
         episodioId: d.episodioId,
         serie: null,
         estilo: d.estilo || 'realista',
