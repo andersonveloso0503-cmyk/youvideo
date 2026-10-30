@@ -13,6 +13,7 @@ const Montagem = require('./src/engine/montagem');
 const { MusicaAuto } = require('./src/engine/musicaAuto');
 const Sync = require('./src/sync');
 const { analisarMusica, resumoClima } = require('./src/engine/analise');
+const { instalarTextoNoClaude } = require('./src/engine/claude');
 
 // Depois de mudar chaves ou canais, guarda uma cópia criptografada na nuvem (se a Central estiver ligada)
 let tSync = null;
@@ -437,6 +438,8 @@ async function agendaDoCanal(canalId) {
 app.whenReady().then(() => {
   const dirDados = app.getPath('userData');
   store = new Store(dirDados, safeStorage);
+  // Textos (títulos, descrições, tags, capas) pelo Claude quando a chave dele estiver em Configurações
+  instalarTextoNoClaude(() => store.ler().claudeKey);
   fila = new Fila({
     dirDados,
     fontsDir: fontsDir(),
@@ -959,10 +962,10 @@ app.whenReady().then(() => {
   ipcMain.handle('config:salvar', (_e, novo) => {
     const limpo = JSON.parse(JSON.stringify(novo || {}));
     const mascarado = (v) => typeof v === 'string' && v.startsWith('••••');
-    for (const k of ['falKey', 'groqKey', 'centralToken']) if (mascarado(limpo[k]) || limpo[k] === undefined) delete limpo[k];
+    for (const k of ['falKey', 'groqKey', 'claudeKey', 'centralToken']) if (mascarado(limpo[k]) || limpo[k] === undefined) delete limpo[k];
     if (limpo.google && mascarado(limpo.google.clientSecret)) delete limpo.google.clientSecret;
     store.salvar(limpo);
-    if (['falKey', 'groqKey', 'google', 'modo', 'simultaneos', 'encoder', 'envioPrefs'].some((k) => k in limpo)) sincronizarDepois();
+    if (['falKey', 'groqKey', 'claudeKey', 'google', 'modo', 'simultaneos', 'encoder', 'envioPrefs'].some((k) => k in limpo)) sincronizarDepois();
     return store.paraTela();
   });
   ipcMain.handle('config:salvarProjeto', (_e, projeto) => {

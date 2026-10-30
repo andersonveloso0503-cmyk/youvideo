@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const Central = require('./engine/central');
 
-const CAMPOS = ['falKey', 'groqKey', 'google', 'envioPrefs', 'modo', 'simultaneos', 'encoder'];
+const CAMPOS = ['falKey', 'groqKey', 'claudeKey', 'google', 'envioPrefs', 'modo', 'simultaneos', 'encoder'];
 
 function cifrar(obj, senha) {
   const sal = crypto.randomBytes(16);

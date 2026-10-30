@@ -1163,6 +1163,7 @@ async function abrirConfig(msg) {
   config = await window.api.config.ler();
   $('#cfgFal').value = config.falKey || '';
   $('#cfgGroq').value = config.groqKey || '';
+  $('#cfgClaude').value = config.claudeKey || '';
   $('#cfgCentralUrl').value = config.centralUrl || '';
   $('#cfgCentralToken').value = config.centralToken || '';
   $('#cfgNuvemAuto').checked = config.nuvemAuto !== false;
@@ -1500,6 +1501,7 @@ async function iniciar() {
     config = await window.api.config.salvar({
       falKey: $('#cfgFal').value.trim(),
       groqKey: $('#cfgGroq').value.trim(),
+      claudeKey: $('#cfgClaude').value.trim(),
       centralUrl: $('#cfgCentralUrl').value.trim() || 'https://youvideors2.vercel.app',
       centralToken: $('#cfgCentralToken').value.trim(),
       google: { clientId: $('#cfgClientId').value.trim(), clientSecret: $('#cfgClientSecret').value.trim(), redirectOriginal: $('#cfgRedirect').value.trim() },

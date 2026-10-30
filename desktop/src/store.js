@@ -6,6 +6,7 @@ const path = require('path');
 const PADRAO = {
   falKey: '',
   groqKey: '',
+  claudeKey: '',
   google: { clientId: '', clientSecret: '', redirectOriginal: '' },
   modo: 'normal', // leve | normal | maximo
   simultaneos: 1,
@@ -16,7 +17,7 @@ const PADRAO = {
   ultimoProjeto: null,
 };
 
-const SECRETOS = ['falKey', 'groqKey', 'centralToken'];
+const SECRETOS = ['falKey', 'groqKey', 'claudeKey', 'centralToken'];
 
 // Grava num arquivo novo e troca de uma vez: se o PC desligar no meio, o arquivo antigo fica inteiro
 function gravarSeguro(arquivo, texto) {
@@ -90,11 +91,13 @@ class Store {
       ...c,
       falKey: mascarar(c.falKey),
       groqKey: mascarar(c.groqKey),
+      claudeKey: mascarar(c.claudeKey),
       centralToken: mascarar(c.centralToken),
       temCentral: !!c.centralToken,
       google: { ...c.google, clientSecret: mascarar(c.google.clientSecret) },
       temFal: !!c.falKey,
       temGroq: !!c.groqKey,
+      temClaude: !!c.claudeKey,
       temGoogle: !!(c.google.clientId && c.google.clientSecret),
     };
   }
