@@ -22,13 +22,28 @@ function lerReceita(arquivo) {
 
 const nomeCache = (url) => crypto.createHash('sha1').update(url).digest('hex').slice(0, 20) + (path.extname(new URL(url).pathname).slice(0, 6) || '');
 
+/**
+ * Trailer em streaming (HLS .m3u8, como a Steam entrega hoje): o ffmpeg baixa e junta num .mp4,
+ * só a imagem e no máximo 2 minutos (é o que as cenas usam).
+ */
+async function baixarStreaming(url, destino) {
+  if (fs.existsSync(destino) && fs.statSync(destino).size > 0) return destino;
+  fs.mkdirSync(path.dirname(destino), { recursive: true });
+  const tmp = destino.replace(/\.mp4$/, '.parcial.mp4');
+  await rodar(['-y', '-i', url, '-t', '120', '-map', '0:v:0', '-an', '-c', 'copy', tmp]).promise;
+  fs.renameSync(tmp, destino);
+  return destino;
+}
+
 /** Baixa tudo o que a receita usa (cada link uma vez só). */
 async function baixarTudo(receita, dirCache, onProgresso, checar) {
   const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url), receita.musica?.url].filter(Boolean))];
   const locais = {};
   for (let i = 0; i < urls.length; i++) {
     checar && checar();
-    locais[urls[i]] = await Central.baixar(urls[i], path.join(dirCache, 'montagem', nomeCache(urls[i])), (x) => onProgresso && onProgresso((i + x) / urls.length));
+    locais[urls[i]] = /\.m3u8(\?|$)/i.test(urls[i])
+      ? await baixarStreaming(urls[i], path.join(dirCache, 'montagem', nomeCache(urls[i]).replace(/\.m3u8$/i, '') + '.mp4'))
+      : await Central.baixar(urls[i], path.join(dirCache, 'montagem', nomeCache(urls[i])), (x) => onProgresso && onProgresso((i + x) / urls.length));
     onProgresso && onProgresso((i + 1) / urls.length);
   }
   return locais;
@@ -94,7 +109,7 @@ function organizarCenas(receita) {
   const cenas = [];
   for (const c of clipes) {
     const ultima = cenas[cenas.length - 1];
-    if (ultima && ultima.tipo === 'video' && c.tipo === 'video' && ultima.url === c.url && Math.abs(ultima.start + ultima.length - c.start) < 0.1) {
+    if (ultima && ultima.tipo === 'video' && c.tipo === 'video' && ultima.url === c.url && (ultima.inicio || 0) === (c.inicio || 0) && Math.abs(ultima.start + ultima.length - c.start) < 0.1) {
       ultima.length += c.length;
       ultima.repetir = true;
     } else cenas.push({ ...c });
@@ -124,7 +139,15 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
     let args;
     if (c.tipo === 'video') {
       // Clipe animado: repete emendado pelo tempo todo da cena (loop), nunca para
-      args = ['-stream_loop', '-1', '-i', arq, '-t', L, '-vf', `fps=${FPS},${cobrir(W, H)}`, ...comum, saida];
+      // Trailer de jogo: começa no trecho pedido (pula logos e repete menos o começo)
+      // (se o trailer for mais curto que o ponto pedido, dá a volta: nunca pula para depois do fim)
+      let ini = Number(c.inicio) || 0;
+      if (ini > 0) {
+        const dur = (await probe(arq).catch(() => ({ duracao: 0 }))).duracao || 0;
+        ini = dur > 4 ? ini % Math.max(1, dur - 2) : 0;
+      }
+      const pular = ini > 0 ? ['-ss', ini.toFixed(2)] : [];
+      args = ['-stream_loop', '-1', ...pular, '-i', arq, '-t', L, '-vf', `fps=${FPS},${cobrir(W, H)}`, ...comum, saida];
     } else {
       // Imagem: aproximação/afastamento lento, igual ao site
       const quadros = Math.max(1, Math.round(c.length * FPS));
