@@ -171,7 +171,7 @@ const Fabrica = (() => {
     const noites = lista.find((c) => /noites|dormir/i.test(c.titulo || ''));
     if (noites) q('#fabDocCanal').value = noites.id;
     // Games: já vem marcado o canal Próxima Fase (se estiver conectado)
-    const proxima = lista.find((c) => /pr[óo]xima fase|games?/i.test(c.titulo || ''));
+    const proxima = lista.find((c) => /pr[óo]xima fase|games?/i.test(c.titulo || '')) || lista.find((c) => /planeta fofura|fofura/i.test(c.titulo || '')); // canal renomeado: ainda pode aparecer com o nome antigo
     if (proxima) q('#fabGmCanal').value = proxima.id;
   }
 

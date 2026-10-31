@@ -669,11 +669,11 @@
       <div class="gm-noticias" style="flex-basis:100%;width:100%;margin-top:14px">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <h3 style="margin:0">📰 Notícias para aprovar</h3>
-          <button type="button" id="btnGmBuscar">🔎 Buscar notícias agora</button>
-          <button type="button" id="btnGmVideo">📺 Juntar marcadas num vídeo</button>
-          <button type="button" id="btnGmDicas">💡 Criar vídeo de dicas</button>
-          <button type="button" id="btnGmNarrar">🎙️ Narrar gameplay</button>
-          <button type="button" id="btnGmAtualizar" title="Atualizar">↻</button>
+          <button type="button" class="btn-mini" id="btnGmBuscar">🔎 Buscar notícias agora</button>
+          <button type="button" class="btn-mini" id="btnGmVideo">📺 Juntar marcadas num vídeo</button>
+          <button type="button" class="btn-mini" id="btnGmDicas">💡 Criar vídeo de dicas</button>
+          <button type="button" class="btn-mini" id="btnGmNarrar">🎙️ Narrar gameplay</button>
+          <button type="button" class="btn-mini" id="btnGmAtualizar" title="Atualizar">↻</button>
           <span class="nota" id="gmInfo" style="margin:0"></span>
         </div>
         <p class="nota" style="margin:6px 0">Notícias reais de PlayStation, Xbox, Steam e Voxel, buscadas sozinhas a cada 2 horas. Nada vira vídeo sem o seu ✅. O aprovado sobe em cerca de 1h30 — aprovando vários, eles saem com 3 horas de diferença (nunca de madrugada).</p>
@@ -681,7 +681,7 @@
           <b>🎙️ Narrar gameplay</b>
           <p class="nota" style="margin:4px 0">Escolha uma partida que VOCÊ gravou (até 3 min). A IA assiste, escreve uma narração jovem e engraçada combinando com a tela e a ElevenLabs fala. O áudio original sai (inclusive a música), entra uma trilha livre e a legenda, e o Short é montado aqui no PC.</p>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-            <button type="button" id="btnNarEscolher">📂 Escolher a gravação</button>
+            <button type="button" class="btn-mini" id="btnNarEscolher">📂 Escolher a gravação</button>
             <span id="narArquivo" class="nota"></span>
           </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
@@ -691,19 +691,19 @@
             <div class="campo-config"><label>Rodapé do vídeo</label>
               <select id="narCortar"><option value="0">Manter inteiro</option><option value="0.21">Cortar a faixa de baixo (tira letra de música escrita)</option></select></div>
           </div>
-          <button type="button" id="btnNarRoteiro" disabled style="margin-top:8px">✍️ Assistir e escrever a narração</button>
+          <button type="button" class="btn-mini" id="btnNarRoteiro" disabled style="margin-top:8px">✍️ Assistir e escrever a narração</button>
           <span id="narStatus" class="nota"></span>
           <div id="narPrevia" hidden style="margin-top:10px">
             <div class="campo-config"><label>Título</label><input type="text" id="narTitulo" maxlength="100" style="width:100%" /></div>
             <label class="nota">Narração (uma fala por linha: segundo | texto). Pode mudar o que quiser antes de gerar a voz.</label>
             <textarea id="narFalas" rows="10" style="width:100%;font-family:monospace;font-size:12px"></textarea>
-            <button type="button" id="btnNarMontar">🎬 Gerar a voz e montar o Short</button>
+            <button type="button" class="btn-primario" id="btnNarMontar">🎬 Gerar a voz e montar o Short</button>
           </div>
         </div>
         <div id="gmDicasCaixa" hidden style="margin:8px 0;padding:10px;border:1px dashed var(--borda, #444);border-radius:10px">
           <label>Jogos para as dicas (um por linha, até 2 por vez, com o nome como está na Steam). Vazio = os mais vendidos da Steam agora.</label>
           <textarea id="gmDicasJogos" rows="3" style="width:100%" placeholder="Ex.:&#10;Red Dead Redemption 2&#10;Minecraft Dungeons"></textarea>
-          <button type="button" id="btnGmDicasCriar">💡 Pesquisar e escrever as dicas</button>
+          <button type="button" class="btn-mini" id="btnGmDicasCriar">💡 Pesquisar e escrever as dicas</button>
           <span class="nota">O Claude pesquisa as dicas na web e escreve. Imagens: gameplay e trailers oficiais da página do jogo na Steam. Leva cerca de 1 minuto por jogo.</span>
         </div>
         <div id="gmLista"></div>
