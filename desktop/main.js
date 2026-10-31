@@ -652,6 +652,10 @@ app.whenReady().then(() => {
         } else if (it.infantil) {
           // Desenho infantil (episódio ou Short da música): título, descrição e tags já vêm prontos do site
           seoOk = true;
+        } else if (it.games) {
+          // Canal de games (notícias, dicas, listas): título, descrição, fontes e tags já vêm prontos do site.
+          // NUNCA passa pela IA de Shorts bíblicos (ela trocava o título por "História bíblica curta: ...").
+          seoOk = true;
         } else if (it.oracao) {
           // Oração do dia: o título já vem pronto no formato que as pessoas procuram ("Oração da Manhã de 7 de Outubro: ...")
           const periodo = it.oracao.periodo === 'noite' ? 'oraçãodanoite' : 'oraçãodamanhã';
@@ -732,6 +736,7 @@ app.whenReady().then(() => {
           curto: !longo,
           fabricaId: it.id,
           tipo: it.oracao ? 'oracao' : 'historias', // categoria "Pessoas e blogs" e idioma português (não "Música")
+          ...(it.games ? { categoria: '20', idioma: 'pt-BR' } : {}), // games: categoria "Jogos" do YouTube
           // Desenho infantil: cada personagem é uma série com a sua playlist (ex.: "As Aventuras do Pingo — Historinhas e Músicas")
           playlist: it.oracao
             ? PLAYLISTS_ORACAO[it.oracao.periodo === 'noite' ? 'noite' : 'manha']
