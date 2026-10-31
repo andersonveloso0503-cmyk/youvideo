@@ -4,7 +4,7 @@ import { agendarItemPronto } from '../../lib/fabrica';
 import { empresa, gerarRoteiroEmpresa } from '../../lib/empresa';
 import { gerarRoteiroOracaoDia } from '../../lib/oracaoDia';
 import { buscarSaldoFal } from '../../lib/orcamento';
-import { roteiroDoEpisodio, passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario, temposDasCenas, buscarMidiaReal, conferidorDeCena } from '../../lib/documentario';
+import { comLegenda, roteiroDoEpisodio, passoVozDocumentario, passoMidiaDocumentario, thumbDocumentario, temposDasCenas, buscarMidiaReal, conferidorDeCena } from '../../lib/documentario';
 import { TODOS_EPISODIOS as EPISODIOS } from '../../lib/documentarioEpisodios';
 import {
   gerarRoteiroInfantil,
@@ -505,11 +505,11 @@ export default async function handler(req, res) {
             cenas: item.arquivos,
             formato: item.formato,
             // Documentário para dormir: sem legenda na tela (não acorda quem está dormindo)
-            palavras: item.documentario || item.infantil ? [] : item.narracao.palavras,
+            palavras: (item.documentario && !comLegenda(item)) || item.infantil ? [] : item.narracao.palavras,
             marca: marcaDe(item),
             cta: item.marca ? empresa(item.marca)?.cta : '',
             // Documentário: sem legenda (não acorda quem dorme); infantil: criança pequena não lê, a tela fica limpa
-            ...(item.documentario || item.infantil ? { legenda: false } : {}),
+            ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}), // conteúdo para crianças: sem botão de like/inscrever gravado
             // Documentário: quadrinho explicando o lugar que aparece e música baixinha por baixo da narração
             ...(item.documentario ? { textos: quadrinhosDoDocumentario(item.arquivos), musica: item.musicaUrl ? { url: item.musicaUrl, volume: 0.1 } : null } : {}),
@@ -601,10 +601,10 @@ export default async function handler(req, res) {
             titulo: item.roteiro?.titulo || item.tema,
             cenas: arquivosAtualizados,
             formato: item.formato,
-            palavras: item.documentario || item.infantil ? [] : item.narracao.palavras,
+            palavras: (item.documentario && !comLegenda(item)) || item.infantil ? [] : item.narracao.palavras,
             marca: marcaDe(item),
             cta: item.marca ? empresa(item.marca)?.cta : '',
-            ...(item.documentario || item.infantil ? { legenda: false } : {}),
+            ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}),
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
