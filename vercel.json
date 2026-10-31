@@ -11,6 +11,10 @@
     {
       "path": "/api/central/limpeza",
       "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/central/games-noticias?auto=1",
+      "schedule": "15 */2 * * *"
     }
   ]
 }

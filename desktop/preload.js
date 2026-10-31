@@ -116,6 +116,10 @@ contextBridge.exposeInMainWorld('api', {
     criar: chamar('fabrica:criar'),
     acao: chamar('fabrica:acao'),
   },
+  noticias: {
+    listar: chamar('noticias:listar'),
+    acao: chamar('noticias:acao'),
+  },
   creditos: { ler: chamar('creditos:ler') },
   caminhoDoArquivo: (file) => webUtils.getPathForFile(file),
   ao: (canal, fn) => {

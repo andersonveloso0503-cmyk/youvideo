@@ -666,6 +666,17 @@
       <div class="campo-config"><label>Horário no YouTube</label><input type="time" id="fabGmHora" value="18:00" /></div>
       <div class="campo-config"><label>Canal do YouTube</label><select id="fabGmCanal"></select></div>
       <div class="campo-config"><label>Voz da ElevenLabs (ID, opcional — vazio = voz padrão)</label><input type="text" id="fabGmVoz" placeholder="Vazio = voz jovem e animada escolhida para o canal" /></div>
+      <div class="gm-noticias" style="flex-basis:100%;width:100%;margin-top:14px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <h3 style="margin:0">📰 Notícias para aprovar</h3>
+          <button type="button" id="btnGmBuscar">🔎 Buscar notícias agora</button>
+          <button type="button" id="btnGmVideo">📺 Juntar marcadas num vídeo</button>
+          <button type="button" id="btnGmAtualizar" title="Atualizar">↻</button>
+          <span class="nota" id="gmInfo" style="margin:0"></span>
+        </div>
+        <p class="nota" style="margin:6px 0">Notícias reais de PlayStation, Xbox, Steam e Voxel, buscadas sozinhas a cada 2 horas. Nada vira vídeo sem o seu ✅. Short aprovado sobe em cerca de 1h30.</p>
+        <div id="gmLista"></div>
+      </div>
     </div>
     <div class="fab-config" id="fabConfigInfantil" hidden>
       <div class="campo-config"><label>Personagem</label><input type="text" id="fabIfNome" value="Pingo" maxlength="40" /></div>

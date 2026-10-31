@@ -904,6 +904,9 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('fabrica:criar', (_e, dados) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { ...dados, acao: 'criar' } }));
   ipcMain.handle('fabrica:acao', (_e, { id, acao }) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao } }));
+  // Notícias do canal de games: esperam aprovação aqui antes de virar vídeo
+  ipcMain.handle('noticias:listar', () => Central.chamar(store.ler(), '/api/central/games-noticias'));
+  ipcMain.handle('noticias:acao', (_e, dados) => Central.chamar(store.ler(), '/api/central/games-noticias', { metodo: 'POST', corpo: dados || {} }));
 
   // ---------- Fila deste PC na nuvem (para acompanhar de outro computador) ----------
   let tFilaNuvem = null;

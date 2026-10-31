@@ -11,7 +11,7 @@ const Fabrica = (() => {
     '': 'A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.',
     longos: '<b>Vídeos longos</b> (cerca de 12 minutos) no estilo <b>mistério</b>: o título faz uma pergunta (ex.: "O que aconteceu com Jesus nos 3 dias no túmulo?"), o vídeo vai revelando detalhes e só responde no final. Thumbnail com a frase grande. São os vídeos que trazem <b>inscritos</b> e monetização. Vão para o <b>YouTube</b> (e Facebook, se marcar), com imagens em zoom para caber no orçamento.',
     documentario: '<b>Documentários para dormir</b> (canal Noites na História): os <b>roteiros já estão escritos</b> (vikings, castelo medieval, caravelas, Egito, gaúchos, Pompeia, monges, imigrantes italianos, pirâmides e iglus). O site narra <b>devagar, com pausas</b>, usa <b>vídeos e fotos reais</b> (Pexels e Wikimedia) conferidos pela IA para combinar com a fala e com a época (quando nenhum serve, pinta a cena), faz a <b>capa pintada</b> com o título em letra medieval e coloca os <b>capítulos</b> na descrição. O seu PC monta e sobe <b>1 por dia</b> no YouTube.',
-    games: '<b>Canal de games</b> (Próxima Fase): os <b>roteiros já estão escritos</b> (GTA 6: tudo que sabemos; 10 jogos parecidos com GTA). O site narra no <b>ritmo de notícia</b>, usa só <b>imagens e trailers oficiais</b> dos jogos (IGDB e página do jogo na Steam — nunca gameplay de outros canais), faz a <b>capa</b> com o texto grande em branco e verde neon e coloca os <b>capítulos</b> e os créditos na descrição. O seu PC monta e sobe no YouTube.',
+    games: '<b>Canal de games</b> (Próxima Fase). <b>Notícias:</b> o site busca sozinho as notícias reais e escreve os Shorts — você lê e aprova logo abaixo. <b>Listas e especiais:</b> os <b>roteiros já estão escritos</b> (GTA 6: tudo que sabemos; 10 jogos parecidos com GTA). O site narra no <b>ritmo de notícia</b>, usa só <b>imagens e trailers oficiais</b> dos jogos (IGDB e página do jogo na Steam — nunca gameplay de outros canais), faz a <b>capa</b> com o texto grande em branco e verde neon e coloca os <b>capítulos</b> e os créditos na descrição. O seu PC monta e sobe no YouTube.',
     infantil: '<b>Desenho infantil</b> com um personagem fixo (começa com o <b>Pingo</b>): episódios de <b>4 a 5 minutos</b>, todo animado, com uma <b>música chiclete nova</b> no meio de cada episódio (o refrão volta no final). A IA escreve a historinha com uma lição, narra, compõe e canta a música (Estúdio de Música), cria as imagens sempre com o mesmo personagem, anima, o seu PC monta e sobe no <b>YouTube</b> marcado como <b>conteúdo para crianças</b>, na playlist do personagem.',
     cortes: 'Cenas curtas em <b>diálogo</b>, com uma voz para cada personagem. <b>Corte de filme</b>: cena bíblica dramática, com imagem realista (cerca de 45 s). <b>Corte cômico</b>: situação engraçada em desenho animado (cerca de 1 min). A IA escolhe as cenas sem repetir, escreve as falas, o seu PC monta, e cada corte é agendado sozinho nas redes.',
     oracao: 'Um Short de <b>oração por dia</b> (cerca de 1 minuto), com a data no título — por exemplo "Oração da Manhã de 7 de Outubro" —, que é como as pessoas procuram oração no YouTube. A IA escreve a oração (um assunto diferente por dia), narra com imagens calmas, o seu PC monta, e ela é publicada sozinha no horário.',
@@ -59,6 +59,7 @@ const Fabrica = (() => {
     if (soYoutube) q('#fabYoutube').checked = true;
     custo();
     carregar();
+    if (marca === 'games') carregarNoticias();
   }
 
   const ETAPA = {
@@ -221,6 +222,9 @@ const Fabrica = (() => {
     q('#btnFabIfBoca2').onclick = () => testarBoca('imagem');
     q('#fabIfRes').addEventListener('change', custo);
     q('#btnFabAtualizar').onclick = () => carregar(true);
+    q('#btnGmBuscar').onclick = buscarNoticias;
+    q('#btnGmVideo').onclick = videoDasMarcadas;
+    q('#btnGmAtualizar').onclick = () => carregarNoticias();
   }
 
   async function criar() {
@@ -704,6 +708,109 @@ const Fabrica = (() => {
     } finally {
       b.disabled = false;
       b.textContent = '🏭 Criar lote';
+    }
+  }
+
+  // ───────── Notícias do canal de games: esperam o ✅ do dono ─────────
+  function canalGames() {
+    const canalId = q('#fabGmCanal').value;
+    const canal = (typeof canais !== 'undefined' ? canais : []).find((c) => c.id === canalId);
+    return canal ? { id: canal.id, titulo: canal.titulo } : null;
+  }
+
+  async function carregarNoticias() {
+    const lista = q('#gmLista');
+    const info = q('#gmInfo');
+    if (!config.temCentral) {
+      lista.innerHTML = '<p class="nota">Cadastre a senha da Central em Configurações.</p>';
+      return;
+    }
+    try {
+      const r = await window.api.noticias.listar();
+      const falhas = (r.fontes || []).filter((f) => !f.ok).map((f) => f.nome);
+      info.textContent = r.ultimaBusca
+        ? `Última busca: ${quandoTxt(r.ultimaBusca)}${falhas.length ? ` · sem resposta: ${falhas.join(', ')}` : ''}`
+        : 'Ainda não buscou notícias.';
+      const cartao = (n, aprovada) => `
+        <div class="gm-noticia" data-id="${esc(n.id)}" style="display:flex;gap:10px;padding:10px;border:1px solid var(--borda, #333);border-radius:10px;margin:8px 0;align-items:flex-start${aprovada ? ';opacity:.6' : ''}">
+          ${aprovada || n.tipo === 'longo' ? '' : `<input type="checkbox" class="gm-marca" value="${esc(n.id)}" title="Marcar para juntar num vídeo" style="margin-top:4px" />`}
+          ${n.imagem ? `<img src="${esc(n.imagem)}" style="width:120px;height:68px;object-fit:cover;border-radius:6px;flex-shrink:0" />` : ''}
+          <div style="flex:1;min-width:0">
+            <div><b>${n.tipo === 'longo' ? '📺 Vídeo: ' : '📱 Short: '}${esc(n.tituloVideo || n.titulo)}</b>${n.rumor ? ' <span style="color:#f5a524">· ⚠️ rumor</span>' : ''}</div>
+            <div class="nota" style="margin:2px 0">${esc(n.fonte)}${n.oficial ? ' (oficial)' : ''}${n.data ? ' · ' + quandoTxt(n.data) : ''} · ${n.link ? `<a href="${esc(n.link)}" target="_blank">abrir a notícia</a>` : (n.links || []).map((l) => `<a href="${esc(l.link)}" target="_blank" title="${esc(l.titulo)}">fonte</a>`).join(' ')}</div>
+            <details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>
+          </div>
+          ${aprovada ? `<span class="nota">✅ ${quandoTxt(n.aprovadaEm)}</span>` : `<div style="display:flex;flex-direction:column;gap:6px">
+            <button type="button" class="gm-aprovar" data-id="${esc(n.id)}">✅ Aprovar</button>
+            <button type="button" class="gm-descartar" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
+        </div>`;
+      lista.innerHTML =
+        (r.aguardando.length ? r.aguardando.map((n) => cartao(n, false)).join('') : '<p class="nota">Nenhuma notícia esperando. Clique em 🔎 Buscar notícias agora.</p>') +
+        (r.aprovadas.length ? `<details style="margin-top:8px"><summary class="nota" style="cursor:pointer">Aprovadas recentemente (${r.aprovadas.length})</summary>${r.aprovadas.map((n) => cartao(n, true)).join('')}</details>` : '');
+      lista.querySelectorAll('.gm-aprovar').forEach((b) => (b.onclick = () => aprovarNoticia(b.dataset.id, b)));
+      lista.querySelectorAll('.gm-descartar').forEach((b) => (b.onclick = () => descartarNoticia(b.dataset.id, b)));
+    } catch (e) {
+      lista.innerHTML = `<p class="nota">Não consegui carregar as notícias: ${esc(msgErro(e))}</p>`;
+    }
+  }
+
+  async function buscarNoticias() {
+    const b = q('#btnGmBuscar');
+    b.disabled = true;
+    b.textContent = '🔎 Lendo as notícias e escrevendo os roteiros (até 2 min)...';
+    try {
+      const r = await window.api.noticias.acao({ acao: 'buscar' });
+      avisar(r.novas ? `${r.novas} notícias novas esperando aprovação` : 'Nenhuma notícia nova agora');
+      carregarNoticias();
+    } catch (e) {
+      avisar(msgErro(e), true);
+    } finally {
+      b.disabled = false;
+      b.textContent = '🔎 Buscar notícias agora';
+    }
+  }
+
+  async function aprovarNoticia(id, botao) {
+    const canal = canalGames();
+    if (!canal) return avisar('Escolha o canal do Próxima Fase (Canal do YouTube) antes de aprovar.', true);
+    botao.disabled = true;
+    try {
+      const r = await window.api.noticias.acao({ acao: 'aprovar', id, canalYoutube: canal });
+      avisar(`Aprovada! Vai ao ar ${quandoTxt(r.quando)} no ${canal.titulo}`);
+      carregarNoticias();
+      carregar();
+    } catch (e) {
+      botao.disabled = false;
+      avisar(msgErro(e), true);
+    }
+  }
+
+  async function descartarNoticia(id, botao) {
+    botao.disabled = true;
+    try {
+      await window.api.noticias.acao({ acao: 'descartar', id });
+      carregarNoticias();
+    } catch (e) {
+      botao.disabled = false;
+      avisar(msgErro(e), true);
+    }
+  }
+
+  async function videoDasMarcadas() {
+    const ids = [...document.querySelectorAll('.gm-marca:checked')].map((c) => c.value);
+    if (ids.length < 2) return avisar('Marque pelo menos 2 notícias (a caixinha ao lado de cada uma) para juntar num vídeo.', true);
+    const b = q('#btnGmVideo');
+    b.disabled = true;
+    b.textContent = '📺 Escrevendo o vídeo (até 2 min)...';
+    try {
+      await window.api.noticias.acao({ acao: 'video', ids });
+      avisar('Vídeo de notícias escrito: confira o roteiro e aprove na lista');
+      carregarNoticias();
+    } catch (e) {
+      avisar(msgErro(e), true);
+    } finally {
+      b.disabled = false;
+      b.textContent = '📺 Juntar marcadas num vídeo';
     }
   }
 
