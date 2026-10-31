@@ -9,6 +9,24 @@ import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 import { COLECAO } from '../../../lib/montarPc';
 
+// Trailers da Steam vêm em streaming (.m3u8). Só o Compilador 2.5.24 em diante baixa isso direito;
+// para os mais antigos, a cena do trailer vira a imagem do próprio trailer (com zoom), em vez de dar erro.
+const ehStreaming = (u) => /\.m3u8(\?|$)/i.test(String(u || ''));
+function aceitaStreaming(v) {
+  const [a, b, c] = String(v || '0').split('.').map(Number);
+  return a > 2 || (a === 2 && (b > 5 || (b === 5 && (c || 0) >= 24)));
+}
+function semStreaming(receita) {
+  if (!(receita.clipes || []).some((c) => ehStreaming(c.url))) return receita;
+  const clipes = [];
+  for (const c of receita.clipes) {
+    if (!ehStreaming(c.url)) clipes.push(c);
+    else if (c.imagem) clipes.push({ tipo: 'imagem', url: c.imagem, start: c.start, length: c.length, efeito: 'zoomIn' });
+    // sem imagem de reserva: a cena anterior se estende por cima
+  }
+  return { ...receita, clipes: clipes.length ? clipes : receita.clipes.filter((c) => !ehStreaming(c.url)) };
+}
+
 const TEMPO_MAX_MONTANDO = 3 * 3600e3; // PC sumiu no meio: depois de 3 h o pedido volta para a fila
 
 export default async function handler(req, res) {
@@ -28,6 +46,7 @@ export default async function handler(req, res) {
         try {
           receita = d.receita ? JSON.parse(d.receita) : d.receitaUrl ? await (await fetch(d.receitaUrl)).json() : null;
         } catch {}
+        if (receita && !aceitaStreaming(req.query.v)) receita = semStreaming(receita);
         if (receita) pedidos.push({ id: doc.id, titulo: d.titulo || receita.titulo || '', criadoEm: d.criadoEm, origem: d.origem || '', receita });
       }
       pedidos.sort((a, b) => (a.criadoEm || 0) - (b.criadoEm || 0));

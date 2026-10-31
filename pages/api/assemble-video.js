@@ -168,7 +168,7 @@ export default async function handler(req, res) {
       const dur = Math.max(1, duracoesReais[idx] || DURACAO_PADRAO_VIDEO_ANIMADO);
       const partes = [];
       for (let t = 0; t < lengthFatia - 0.05; t += dur) {
-        partes.push({ asset: { type: 'video', src: c.videoUrl }, start: start + t, length: Math.min(dur, lengthFatia - t), fit: 'cover', ...(c.videoInicio != null ? { inicio: Number(c.videoInicio) || 0 } : {}) });
+        partes.push({ asset: { type: 'video', src: c.videoUrl }, start: start + t, length: Math.min(dur, lengthFatia - t), fit: 'cover', ...(c.videoInicio != null ? { inicio: Number(c.videoInicio) || 0 } : {}), ...(c.imageUrl ? { reserva: c.imageUrl } : {}) });
       }
       return partes;
     }
@@ -216,6 +216,7 @@ export default async function handler(req, res) {
         efeito: c.effect || null,
         ...(c.movimento ? { movimento: c.movimento } : {}),
         ...(c.inicio ? { inicio: c.inicio } : {}), // trailer de jogo: começa neste segundo do vídeo
+        ...(c.reserva ? { imagem: c.reserva } : {}), // imagem de reserva se o PC não conseguir usar o vídeo
       })),
       palavras: (palavras || [])
         .filter((p) => p && p.start != null && p.end != null)

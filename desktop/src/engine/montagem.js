@@ -22,6 +22,18 @@ function lerReceita(arquivo) {
 
 const nomeCache = (url) => crypto.createHash('sha1').update(url).digest('hex').slice(0, 20) + (path.extname(new URL(url).pathname).slice(0, 6) || '');
 
+function ehListaStreaming(arq) {
+  try {
+    const fd = fs.openSync(arq, 'r');
+    const b = Buffer.alloc(16);
+    fs.readSync(fd, b, 0, 16, 0);
+    fs.closeSync(fd);
+    return b.toString('utf8').startsWith('#EXTM3U');
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Trailer em streaming (HLS .m3u8, como a Steam entrega hoje): o ffmpeg baixa e junta num .mp4,
  * só a imagem e no máximo 2 minutos (é o que as cenas usam).
@@ -30,7 +42,8 @@ async function baixarStreaming(url, destino) {
   if (fs.existsSync(destino) && fs.statSync(destino).size > 0) return destino;
   fs.mkdirSync(path.dirname(destino), { recursive: true });
   const tmp = destino.replace(/\.mp4$/, '.parcial.mp4');
-  await rodar(['-y', '-i', url, '-t', '120', '-map', '0:v:0', '-an', '-c', 'copy', tmp]).promise;
+  // Sem -map: o ffmpeg escolhe sozinho a versão de maior resolução do trailer
+  await rodar(['-f', 'hls', '-i', url, '-t', '120', '-an', '-c', 'copy', tmp]).promise;
   fs.renameSync(tmp, destino);
   return destino;
 }
@@ -41,9 +54,13 @@ async function baixarTudo(receita, dirCache, onProgresso, checar) {
   const locais = {};
   for (let i = 0; i < urls.length; i++) {
     checar && checar();
-    locais[urls[i]] = /\.m3u8(\?|$)/i.test(urls[i])
-      ? await baixarStreaming(urls[i], path.join(dirCache, 'montagem', nomeCache(urls[i]).replace(/\.m3u8$/i, '') + '.mp4'))
-      : await Central.baixar(urls[i], path.join(dirCache, 'montagem', nomeCache(urls[i])), (x) => onProgresso && onProgresso((i + x) / urls.length));
+    const comoMp4 = path.join(dirCache, 'montagem', nomeCache(urls[i]).replace(/\.m3u8$/i, '') + '.hls.mp4');
+    if (/\.m3u8(\?|$)/i.test(urls[i])) locais[urls[i]] = await baixarStreaming(urls[i], comoMp4);
+    else {
+      const arq = await Central.baixar(urls[i], path.join(dirCache, 'montagem', nomeCache(urls[i])), (x) => onProgresso && onProgresso((i + x) / urls.length));
+      // Veio uma lista de streaming (#EXTM3U) em vez do vídeo: o ffmpeg baixa de verdade a partir do link
+      locais[urls[i]] = ehListaStreaming(arq) ? await baixarStreaming(urls[i], comoMp4) : arq;
+    }
     onProgresso && onProgresso((i + 1) / urls.length);
   }
   return locais;

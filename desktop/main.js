@@ -587,7 +587,7 @@ app.whenReady().then(() => {
     if (buscandoPedidos || !cfg.centralToken) return;
     buscandoPedidos = true;
     try {
-      const { pedidos = [] } = await Central.chamar(cfg, '/api/central/montar-pc');
+      const { pedidos = [] } = await Central.chamar(cfg, '/api/central/montar-pc', { query: { v: app.getVersion() } });
       const pasta = cfg.ultimoProjeto?.saida?.pasta || app.getPath('videos');
       for (const p of pedidos) {
         if (fila.pedidoNaFila(p.id)) continue;
