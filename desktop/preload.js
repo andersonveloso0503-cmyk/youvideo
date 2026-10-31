@@ -120,10 +120,15 @@ contextBridge.exposeInMainWorld('api', {
     listar: chamar('noticias:listar'),
     acao: chamar('noticias:acao'),
   },
+  narrar: {
+    escolher: chamar('narrar:escolher'),
+    roteiro: chamar('narrar:roteiro'),
+    montar: chamar('narrar:montar'),
+  },
   creditos: { ler: chamar('creditos:ler') },
   caminhoDoArquivo: (file) => webUtils.getPathForFile(file),
   ao: (canal, fn) => {
-    const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download', 'sync:feito', 'creditos:status', 'abrir:agenda', 'canais:progresso', 'cantor:progresso', 'dormir:progresso', 'dormir:semana', 'estudio:musicas', 'musicaAuto:mudou'];
+    const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download', 'sync:feito', 'creditos:status', 'abrir:agenda', 'canais:progresso', 'cantor:progresso', 'dormir:progresso', 'dormir:semana', 'estudio:musicas', 'musicaAuto:mudou', 'narrar:progresso'];
     if (!permitidos.includes(canal)) return;
     ipcRenderer.on(canal, (_e, dados) => fn(dados));
   },

@@ -226,6 +226,11 @@ const Fabrica = (() => {
     q('#btnGmVideo').onclick = videoDasMarcadas;
     q('#btnGmDicas').onclick = () => (q('#gmDicasCaixa').hidden = !q('#gmDicasCaixa').hidden);
     q('#btnGmDicasCriar').onclick = criarDicas;
+    q('#btnGmNarrar').onclick = () => (q('#gmNarrarCaixa').hidden = !q('#gmNarrarCaixa').hidden);
+    q('#btnNarEscolher').onclick = narrarEscolher;
+    q('#btnNarRoteiro').onclick = narrarRoteiro;
+    q('#btnNarMontar').onclick = narrarMontar;
+    window.api.ao('narrar:progresso', (p) => (q('#narStatus').textContent = p.etapa));
     q('#btnGmAtualizar').onclick = () => carregarNoticias();
   }
 
@@ -795,6 +800,65 @@ const Fabrica = (() => {
     } catch (e) {
       botao.disabled = false;
       avisar(msgErro(e), true);
+    }
+  }
+
+  // ───────── Narrar gameplay ─────────
+  let narArq = null; // { arquivo, nome, duracao }
+  let narId = null;
+  async function narrarEscolher() {
+    try {
+      const a = await window.api.narrar.escolher();
+      if (!a) return;
+      narArq = a;
+      narId = null;
+      q('#narPrevia').hidden = true;
+      q('#narArquivo').textContent = `${a.nome} · ${Math.round(a.duracao)} s${a.duracao > 180 ? ' — passa de 3 min, corte antes' : ''}`;
+      q('#btnNarRoteiro').disabled = a.duracao > 180;
+    } catch (e) {
+      avisar(msgErro(e), true);
+    }
+  }
+  async function narrarRoteiro() {
+    if (!narArq) return;
+    const b = q('#btnNarRoteiro');
+    b.disabled = true;
+    try {
+      const r = await window.api.narrar.roteiro({
+        arquivo: narArq.arquivo, duracao: narArq.duracao, estilo: q('#narEstilo').value,
+        jogo: q('#narJogo').value.trim(), cortarBaixo: Number(q('#narCortar').value) || 0,
+      });
+      narId = r.id;
+      q('#narTitulo').value = r.roteiro.titulo || '';
+      q('#narFalas').value = r.roteiro.falas.map((f) => `${f.t.toFixed(1)} | ${f.texto}`).join('\n');
+      q('#narPrevia').hidden = false;
+      q('#narStatus').textContent = `Pronto: ${r.analise.jogo || 'jogo'} — leia a narração e ajuste se quiser.`;
+    } catch (e) {
+      q('#narStatus').textContent = '';
+      avisar(msgErro(e), true);
+    } finally {
+      b.disabled = false;
+    }
+  }
+  async function narrarMontar() {
+    if (!narId) return;
+    const falas = q('#narFalas').value.split('\n').map((l) => {
+      const m = l.match(/^\s*([\d.,]+)\s*\|\s*(.+)$/);
+      return m ? { t: Number(m[1].replace(',', '.')), texto: m[2].trim() } : null;
+    }).filter(Boolean);
+    if (!falas.length) return avisar('Escreva as falas no formato "segundo | texto".', true);
+    const b = q('#btnNarMontar');
+    b.disabled = true;
+    b.textContent = '🎙️ Gerando a voz...';
+    try {
+      const r = await window.api.narrar.montar({ id: narId, falas, titulo: q('#narTitulo').value.trim() });
+      avisar(`Voz pronta (${r.falas} falas). O Short vai aparecer na Fila e ser montado aqui no PC em instantes.`);
+      q('#narStatus').textContent = 'Enviado para montar: acompanhe na Fila.';
+    } catch (e) {
+      avisar(msgErro(e), true);
+    } finally {
+      b.disabled = false;
+      b.textContent = '🎬 Gerar a voz e montar o Short';
     }
   }
 

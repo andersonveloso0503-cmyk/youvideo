@@ -912,6 +912,28 @@ app.whenReady().then(() => {
   // Notícias do canal de games: esperam aprovação aqui antes de virar vídeo
   ipcMain.handle('noticias:listar', () => Central.chamar(store.ler(), '/api/central/games-noticias'));
   ipcMain.handle('noticias:acao', (_e, dados) => Central.chamar(store.ler(), '/api/central/games-noticias', { metodo: 'POST', corpo: dados || {} }));
+  // Narrar gameplay: escolhe a gravação, sobe para a nuvem, o site assiste, escreve a narração e (depois do OK) narra e manda montar aqui
+  ipcMain.handle('narrar:escolher', async () => {
+    const r = await dialog.showOpenDialog(janela, {
+      title: 'Escolher a gravação da partida',
+      properties: ['openFile'],
+      filters: [{ name: 'Vídeo', extensions: ['mp4', 'mov', 'mkv', 'webm', 'avi'] }],
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const arq = r.filePaths[0];
+    const i = await probe(arq);
+    if (!i.temVideo) throw new Error('Esse arquivo não tem vídeo.');
+    return { arquivo: arq, nome: path.basename(arq), duracao: i.duracao, largura: i.largura, altura: i.altura };
+  });
+  ipcMain.handle('narrar:roteiro', async (_e, { arquivo, duracao, estilo, jogo, cortarBaixo }) => {
+    const cfg = store.ler();
+    if (duracao > 180) throw new Error('A gravação tem mais de 3 minutos. Para Short, corte antes um trecho de até 3 minutos.');
+    enviar('narrar:progresso', { etapa: 'Enviando a gravação para a nuvem', x: 0 });
+    const videoUrl = await Central.subirParaNuvem(cfg, arquivo, (x) => enviar('narrar:progresso', { etapa: `Enviando a gravação ${Math.round(x * 100)}%`, x }));
+    enviar('narrar:progresso', { etapa: 'A IA está assistindo a partida e escrevendo a narração (até 2 min)', x: 1 });
+    return Central.chamar(cfg, '/api/central/narrar-gameplay', { metodo: 'POST', corpo: { acao: 'roteiro', videoUrl, duracao, estilo, jogo, cortarBaixo } });
+  });
+  ipcMain.handle('narrar:montar', (_e, dados) => Central.chamar(store.ler(), '/api/central/narrar-gameplay', { metodo: 'POST', corpo: { ...dados, acao: 'montar' } }));
 
   // ---------- Fila deste PC na nuvem (para acompanhar de outro computador) ----------
   let tFilaNuvem = null;

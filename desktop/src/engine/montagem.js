@@ -179,6 +179,9 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
     const saida = path.join(dir, `cena_${String(i).padStart(4, '0')}.mp4`);
     const L = c.length.toFixed(3);
     let args;
+    // Recorte de baixo (ex.: gravação com letra de música escrita no rodapé): corta essa faixa antes de tudo
+    const baixo = Math.max(0, Math.min(0.4, Number(c.recorte?.baixo) || 0));
+    const recorte = baixo ? `crop=iw:trunc(ih*${(1 - baixo).toFixed(3)}/2)*2:0:0,` : '';
     // Games num Short: imagem ou vídeo DEITADO aparece inteiro (sem cortar o nome do jogo), com ele mesmo desfocado no fundo
     let encaixar = false;
     if (receita.encaixar && H > W) {
@@ -190,7 +193,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
       args = [
         '-stream_loop', '-1', ...(ini > 0 ? ['-ss', ini.toFixed(2)] : []), '-i', arq, '-t', L,
         '-filter_complex',
-        `[0:v]fps=${FPS},split[fa][fb];[fa]${cobrir(W, H)},boxblur=24:2,eq=brightness=-0.12[fundo];` +
+        `[0:v]${recorte}fps=${FPS},split[fa][fb];[fa]${cobrir(W, H)},boxblur=24:2,eq=brightness=-0.12[fundo];` +
           `[fb]scale=${W}:-2,setsar=1[frente];[fundo][frente]overlay=(W-w)/2:(H-h)/2,format=yuv420p[saida]`,
         '-map', '[saida]', ...comum, saida,
       ];
@@ -212,7 +215,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
       // (se o trailer for mais curto que o ponto pedido, dá a volta: nunca pula para depois do fim)
       const ini = await trechoSemPreto(arq, Number(c.inicio) || 0, c.length, !!receita.encaixar);
       const pular = ini > 0 ? ['-ss', ini.toFixed(2)] : [];
-      args = ['-stream_loop', '-1', ...pular, '-i', arq, '-t', L, '-vf', `fps=${FPS},${cobrir(W, H)}`, ...comum, saida];
+      args = ['-stream_loop', '-1', ...pular, '-i', arq, '-t', L, '-vf', `${recorte}fps=${FPS},${cobrir(W, H)}`, ...comum, saida];
     } else {
       // Imagem: aproximação/afastamento lento, igual ao site
       const quadros = Math.max(1, Math.round(c.length * FPS));
