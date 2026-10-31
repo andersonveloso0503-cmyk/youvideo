@@ -154,7 +154,38 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
     const saida = path.join(dir, `cena_${String(i).padStart(4, '0')}.mp4`);
     const L = c.length.toFixed(3);
     let args;
-    if (c.tipo === 'video') {
+    // Games num Short: imagem ou vídeo DEITADO aparece inteiro (sem cortar o nome do jogo), com ele mesmo desfocado no fundo
+    let encaixar = false;
+    if (receita.encaixar && H > W) {
+      const dim = await probe(arq).catch(() => null);
+      encaixar = !!dim && dim.largura > dim.altura * 1.15;
+    }
+    if (encaixar && c.tipo === 'video') {
+      let ini = Number(c.inicio) || 0;
+      if (ini > 0) {
+        const dur = (await probe(arq).catch(() => ({ duracao: 0 }))).duracao || 0;
+        ini = dur > 4 ? ini % Math.max(1, dur - 2) : 0;
+      }
+      args = [
+        '-stream_loop', '-1', ...(ini > 0 ? ['-ss', ini.toFixed(2)] : []), '-i', arq, '-t', L,
+        '-filter_complex',
+        `[0:v]fps=${FPS},split[fa][fb];[fa]${cobrir(W, H)},boxblur=24:2,eq=brightness=-0.12[fundo];` +
+          `[fb]scale=${W}:-2,setsar=1[frente];[fundo][frente]overlay=(W-w)/2:(H-h)/2,format=yuv420p[saida]`,
+        '-map', '[saida]', ...comum, saida,
+      ];
+    } else if (encaixar) {
+      // Imagem: zoom lento só na frente; o fundo desfocado fica parado
+      const quadros = Math.max(1, Math.round(c.length * FPS));
+      const z = c.efeito === 'zoomOut' ? `1.10-0.10*on/${quadros}` : `1+0.10*on/${quadros}`;
+      const altFrente = Math.round((W * 9) / 16 / 2) * 2;
+      args = [
+        '-loop', '1', '-framerate', String(FPS), '-t', L, '-i', arq, '-filter_complex',
+        `[0:v]split[fa][fb];[fa]${cobrir(W, H)},boxblur=24:2,eq=brightness=-0.12[fundo];` +
+          `[fb]${cobrir(W * 2, altFrente * 2)},zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${altFrente}:fps=${FPS},setsar=1[frente];` +
+          `[fundo][frente]overlay=(W-w)/2:(H-h)/2:shortest=1,format=yuv420p[saida]`,
+        '-map', '[saida]', '-frames:v', String(quadros), ...comum, saida,
+      ];
+    } else if (c.tipo === 'video') {
       // Clipe animado: repete emendado pelo tempo todo da cena (loop), nunca para
       // Trailer de jogo: começa no trecho pedido (pula logos e repete menos o começo)
       // (se o trailer for mais curto que o ponto pedido, dá a volta: nunca pula para depois do fim)

@@ -100,14 +100,14 @@ export default async function handler(req, res) {
     return lista;
   };
 
-  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta, legenda, semBotao, textos, musica }) => {
+  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta, legenda, semBotao, textos, musica, encaixar }) => {
     // Um pedaço só e sem palavras (Short da música): manda o pedaço com a duração, senão a montagem não sabe o tamanho
     const temVariosPedacos = (audioSegments || []).length > 1 || ((audioSegments || []).length === 1 && !(palavras || []).length);
     const r = await fetch(`${baseUrl}/api/assemble-video`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}), ...(semBotao ? { semBotao: true } : {}), ...(textos?.length ? { textos } : {}), ...(musica?.url ? { musica } : {}) }
+        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}), ...(semBotao ? { semBotao: true } : {}), ...(textos?.length ? { textos } : {}), ...(musica?.url ? { musica } : {}), ...(encaixar ? { encaixar: true } : {}) }
       ),
     });
     const data = await r.json();
@@ -511,6 +511,7 @@ export default async function handler(req, res) {
             // Documentário: sem legenda (não acorda quem dorme); infantil: criança pequena não lê, a tela fica limpa
             ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}), // conteúdo para crianças: sem botão de like/inscrever gravado
+            ...(item.games ? { encaixar: true } : {}), // games: mídia deitada inteira no Short, com fundo desfocado
             // Documentário: quadrinho explicando o lugar que aparece e música baixinha por baixo da narração
             ...(item.documentario ? { textos: quadrinhosDoDocumentario(item.arquivos), musica: item.musicaUrl ? { url: item.musicaUrl, volume: 0.1 } : null } : {}),
           });
@@ -606,6 +607,7 @@ export default async function handler(req, res) {
             cta: item.marca ? empresa(item.marca)?.cta : '',
             ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}),
+            ...(item.games ? { encaixar: true } : {}),
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
         } else {

@@ -202,6 +202,7 @@ export default async function handler(req, res) {
       cta: String(req.body.cta || '').slice(0, 60), // chamada grande nos últimos segundos (ex.: WhatsApp da empresa)
       ...(req.body.legenda === false ? { legenda: false } : {}), // documentário para dormir: sem legenda na tela
       ...(req.body.semBotao ? { semBotao: true } : {}), // desenho infantil: sem botão de like/inscrever
+      ...(req.body.encaixar ? { encaixar: true } : {}), // games: mídia deitada inteira no vídeo em pé, com fundo desfocado
       // Documentário: quadrinhos explicativos na tela e música de fundo
       ...(Array.isArray(req.body.textos) && req.body.textos.length ? { textos: req.body.textos.slice(0, 200) } : {}),
       ...(req.body.musica?.url ? { musica: { url: String(req.body.musica.url), volume: Math.max(0.02, Math.min(0.5, Number(req.body.musica.volume) || 0.1)) } } : {}),
