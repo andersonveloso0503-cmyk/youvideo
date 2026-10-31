@@ -15,6 +15,38 @@ import { roteiroDicas, jogosEmAlta } from '../../../lib/gamesDicas';
 
 export const config = { maxDuration: 300 };
 
+const INTERVALO = 3 * 3600e3; // vídeos do canal de games saem com pelo menos 3 h de diferença
+
+/**
+ * Horário de ir ao ar sem bater com os outros vídeos do canal de games já marcados:
+ * pelo menos 3 h de distância de cada um, e nunca de madrugada (entre 23h e 8h passa para as 8h).
+ */
+async function proximoHorario(db, desejado) {
+  const snap = await db.collection('youvideo_fila').where('games', '==', true).get();
+  const marcados = snap.docs
+    .map((d) => d.data())
+    .filter((x) => x.fabrica?.ativo !== false && x.status !== 'erro')
+    .map((x) => new Date(x.fabrica?.quandoYoutube || x.fabrica?.quando || 0).getTime())
+    .filter((t) => t > Date.now() - INTERVALO)
+    .sort((a, b) => a - b);
+  const horaBrasilia = (t) => new Date(t - 3 * 3600e3).getUTCHours();
+  const paraManha = (t) => {
+    const h = horaBrasilia(t);
+    if (h >= 8 && h < 23) return t;
+    const d = new Date(t - 3 * 3600e3);
+    if (h >= 23) d.setUTCDate(d.getUTCDate() + 1);
+    d.setUTCHours(8, 0, 0, 0);
+    return d.getTime() + 3 * 3600e3;
+  };
+  let t = paraManha(desejado);
+  for (let volta = 0; volta < 50; volta++) {
+    const perto = marcados.find((m) => Math.abs(m - t) < INTERVALO);
+    if (!perto) break;
+    t = paraManha(perto + INTERVALO);
+  }
+  return new Date(t).toISOString();
+}
+
 export default async function handler(req, res) {
   const ehCron =
     (process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`) || /vercel-cron/i.test(req.headers['user-agent'] || '');
@@ -147,7 +179,7 @@ export default async function handler(req, res) {
       const longo = d.tipo === 'longo' || d.tipo === 'dicas';
       // Notícia é para já: Short sobe em ~1h30 (tempo de voz, imagens e montagem), vídeo em ~3h, ou no horário escolhido
       const pedido = b.quando ? new Date(b.quando) : null;
-      const quando = new Date(pedido && pedido.getTime() > Date.now() + 30 * 60e3 ? pedido.getTime() : Date.now() + (longo ? 3 : 1.5) * 3600e3).toISOString();
+      const quando = await proximoHorario(db, pedido && pedido.getTime() > Date.now() + 30 * 60e3 ? pedido.getTime() : Date.now() + (longo ? 3 : 1.5) * 3600e3);
       const fab = db.collection('youvideo_fila').doc();
       await fab.set({
         tema: d.ep.titulo,
