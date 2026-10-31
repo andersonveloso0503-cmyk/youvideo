@@ -671,10 +671,17 @@
           <h3 style="margin:0">📰 Notícias para aprovar</h3>
           <button type="button" id="btnGmBuscar">🔎 Buscar notícias agora</button>
           <button type="button" id="btnGmVideo">📺 Juntar marcadas num vídeo</button>
+          <button type="button" id="btnGmDicas">💡 Criar vídeo de dicas</button>
           <button type="button" id="btnGmAtualizar" title="Atualizar">↻</button>
           <span class="nota" id="gmInfo" style="margin:0"></span>
         </div>
         <p class="nota" style="margin:6px 0">Notícias reais de PlayStation, Xbox, Steam e Voxel, buscadas sozinhas a cada 2 horas. Nada vira vídeo sem o seu ✅. Short aprovado sobe em cerca de 1h30.</p>
+        <div id="gmDicasCaixa" hidden style="margin:8px 0;padding:10px;border:1px dashed var(--borda, #444);border-radius:10px">
+          <label>Jogos para as dicas (um por linha, até 2 por vez, com o nome como está na Steam). Vazio = os mais vendidos da Steam agora.</label>
+          <textarea id="gmDicasJogos" rows="3" style="width:100%" placeholder="Ex.:&#10;Red Dead Redemption 2&#10;Minecraft Dungeons"></textarea>
+          <button type="button" id="btnGmDicasCriar">💡 Pesquisar e escrever as dicas</button>
+          <span class="nota">O Claude pesquisa as dicas na web e escreve. Imagens: gameplay e trailers oficiais da página do jogo na Steam. Leva cerca de 1 minuto por jogo.</span>
+        </div>
         <div id="gmLista"></div>
       </div>
     </div>

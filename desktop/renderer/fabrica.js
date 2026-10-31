@@ -224,6 +224,8 @@ const Fabrica = (() => {
     q('#btnFabAtualizar').onclick = () => carregar(true);
     q('#btnGmBuscar').onclick = buscarNoticias;
     q('#btnGmVideo').onclick = videoDasMarcadas;
+    q('#btnGmDicas').onclick = () => (q('#gmDicasCaixa').hidden = !q('#gmDicasCaixa').hidden);
+    q('#btnGmDicasCriar').onclick = criarDicas;
     q('#btnGmAtualizar').onclick = () => carregarNoticias();
   }
 
@@ -733,10 +735,10 @@ const Fabrica = (() => {
         : 'Ainda não buscou notícias.';
       const cartao = (n, aprovada) => `
         <div class="gm-noticia" data-id="${esc(n.id)}" style="display:flex;gap:10px;padding:10px;border:1px solid var(--borda, #333);border-radius:10px;margin:8px 0;align-items:flex-start${aprovada ? ';opacity:.6' : ''}">
-          ${aprovada || n.tipo === 'longo' ? '' : `<input type="checkbox" class="gm-marca" value="${esc(n.id)}" title="Marcar para juntar num vídeo" style="margin-top:4px" />`}
+          ${aprovada || n.tipo !== 'short' ? '' : `<input type="checkbox" class="gm-marca" value="${esc(n.id)}" title="Marcar para juntar num vídeo" style="margin-top:4px" />`}
           ${n.imagem ? `<img src="${esc(n.imagem)}" style="width:120px;height:68px;object-fit:cover;border-radius:6px;flex-shrink:0" />` : ''}
           <div style="flex:1;min-width:0">
-            <div><b>${n.tipo === 'longo' ? '📺 Vídeo: ' : '📱 Short: '}${esc(n.tituloVideo || n.titulo)}</b>${n.rumor ? ' <span style="color:#f5a524">· ⚠️ rumor</span>' : ''}</div>
+            <div><b>${n.tipo === 'dicas' ? '💡 Dicas: ' : n.tipo === 'longo' ? '📺 Vídeo: ' : '📱 Short: '}${esc(n.tituloVideo || n.titulo)}</b>${n.rumor ? ' <span style="color:#f5a524">· ⚠️ rumor</span>' : ''}</div>
             <div class="nota" style="margin:2px 0">${esc(n.fonte)}${n.oficial ? ' (oficial)' : ''}${n.data ? ' · ' + quandoTxt(n.data) : ''} · ${n.link ? `<a href="${esc(n.link)}" target="_blank">abrir a notícia</a>` : (n.links || []).map((l) => `<a href="${esc(l.link)}" target="_blank" title="${esc(l.titulo)}">fonte</a>`).join(' ')}</div>
             <details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>
           </div>
@@ -793,6 +795,25 @@ const Fabrica = (() => {
     } catch (e) {
       botao.disabled = false;
       avisar(msgErro(e), true);
+    }
+  }
+
+  async function criarDicas() {
+    const jogos = q('#gmDicasJogos').value.split('\n').map((x) => x.trim()).filter(Boolean);
+    const b = q('#btnGmDicasCriar');
+    b.disabled = true;
+    b.textContent = `💡 Pesquisando as dicas (cerca de ${Math.max(1, jogos.length || 2)} min)...`;
+    try {
+      const r = await window.api.noticias.acao({ acao: 'dicas', jogos });
+      avisar(`Dicas escritas: ${r.criados.join(', ')} — leia e aprove na lista${r.erros?.length ? ` (não deu: ${r.erros.join(' · ')})` : ''}`, !!r.erros?.length);
+      q('#gmDicasJogos').value = '';
+      q('#gmDicasCaixa').hidden = true;
+      carregarNoticias();
+    } catch (e) {
+      avisar(msgErro(e), true);
+    } finally {
+      b.disabled = false;
+      b.textContent = '💡 Pesquisar e escrever as dicas';
     }
   }
 
