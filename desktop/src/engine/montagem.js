@@ -143,8 +143,8 @@ function organizarCenas(receita) {
  * Trailer de jogo: escolhe o ponto de início do trecho. Dá a volta se o trailer for curto e,
  * se o trecho cair numa tela preta (fade entre cenas, fim do trailer), anda para frente até achar imagem.
  */
-async function trechoSemPreto(arq, inicio, duracao) {
-  if (!(inicio > 0)) return 0;
+async function trechoSemPreto(arq, inicio, duracao, sempre = false) {
+  if (!(inicio > 0) && !sempre) return 0;
   const dur = (await probe(arq).catch(() => ({ duracao: 0 }))).duracao || 0;
   if (dur <= 4) return 0;
   const janela = Math.min(Math.max(1, duracao), 6);
@@ -186,7 +186,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
       encaixar = !!dim && dim.largura > dim.altura * 1.15;
     }
     if (encaixar && c.tipo === 'video') {
-      const ini = await trechoSemPreto(arq, Number(c.inicio) || 0, c.length);
+      const ini = await trechoSemPreto(arq, Number(c.inicio) || 0, c.length, !!receita.encaixar);
       args = [
         '-stream_loop', '-1', ...(ini > 0 ? ['-ss', ini.toFixed(2)] : []), '-i', arq, '-t', L,
         '-filter_complex',
@@ -210,7 +210,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
       // Clipe animado: repete emendado pelo tempo todo da cena (loop), nunca para
       // Trailer de jogo: começa no trecho pedido (pula logos e repete menos o começo)
       // (se o trailer for mais curto que o ponto pedido, dá a volta: nunca pula para depois do fim)
-      const ini = await trechoSemPreto(arq, Number(c.inicio) || 0, c.length);
+      const ini = await trechoSemPreto(arq, Number(c.inicio) || 0, c.length, !!receita.encaixar);
       const pular = ini > 0 ? ['-ss', ini.toFixed(2)] : [];
       args = ['-stream_loop', '-1', ...pular, '-i', arq, '-t', L, '-vf', `fps=${FPS},${cobrir(W, H)}`, ...comum, saida];
     } else {
