@@ -22,6 +22,7 @@ import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS, TODOS_EPISODIOS } from '../../../lib/documentarioEpisodios';
 import { GAMES } from '../../../lib/gamesEpisodios';
+import { COLECAO_NOTICIAS } from '../../../lib/gamesNoticias';
 import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora, criarShortDaMusica } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
@@ -1201,21 +1202,26 @@ export default async function handler(req, res) {
     if (b.acao === 'refazer-documentario') {
       const d = (await ref.get()).data();
       if (!d?.documentario) return res.status(400).json({ erro: 'Só dá para refazer documentários.' });
-      const ep = TODOS_EPISODIOS.find((e) => e.id === d.episodioId);
-      if (!ep) return res.status(400).json({ erro: 'Não achei o episódio escrito deste documentário.' });
+      // Notícia e dicas do canal de games: o roteiro está guardado na lista de notícias (não nos episódios escritos)
+      let ep = TODOS_EPISODIOS.find((e) => e.id === d.episodioId);
+      if (!ep && d.noticia) ep = (await db.collection(COLECAO_NOTICIAS).doc(String(d.noticia)).get()).data()?.ep || null;
+      if (!ep) return res.status(400).json({ erro: 'Não achei o roteiro deste vídeo para refazer.' });
       const novoRoteiro = roteiroDoEpisodio(ep);
       const antigas = d.roteiro?.cenas || [];
-      const temVoz = !!d.narracao?.audioSegments?.length && antigas.length === novoRoteiro.cenas.length && antigas.every((c) => c.start != null);
+      // Short de games: narra de novo (é curto e barato) para sair com legenda e com os cortes de 3 segundos
+      const shortGames = d.games && d.formato === 'short';
+      const temVoz = !shortGames && !!d.narracao?.audioSegments?.length && antigas.length === novoRoteiro.cenas.length && antigas.every((c) => c.start != null);
       const f = d.fabrica || {};
       const novo = col.doc();
       await novo.set({
         tema: d.tema,
         documentario: true,
         ...(d.games ? { games: true } : {}),
+        ...(d.noticia ? { noticia: d.noticia } : {}),
         episodioId: d.episodioId,
         serie: null,
         estilo: d.estilo || 'realista',
-        formato: 'longo',
+        formato: d.formato || 'longo',
         animar: false,
         ...(d.vozId ? { vozId: d.vozId } : {}),
         origem: 'fabrica',
