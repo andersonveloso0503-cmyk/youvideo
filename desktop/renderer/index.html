@@ -688,6 +688,8 @@
             <div class="campo-config"><label>Quem fala</label>
               <select id="narEstilo"><option value="narrador" selected>Narrador jovem e zoeiro (comenta de fora)</option><option value="jogadora">A própria jogadora (garota jovem, em primeira pessoa)</option></select></div>
             <div class="campo-config"><label>Jogo (opcional)</label><input type="text" id="narJogo" placeholder="Ex.: Roblox Flee the Facility" /></div>
+            <div class="campo-config"><label>Som do jogo</label>
+              <select id="narSomJogo"><option value="0" selected>Tirar (a gravação tem música por cima)</option><option value="1">Manter baixinho por baixo da narração</option></select></div>
             <div class="campo-config"><label>Rodapé do vídeo</label>
               <select id="narCortar"><option value="0">Manter inteiro</option><option value="0.21">Cortar a faixa de baixo (tira letra de música escrita)</option></select></div>
           </div>
@@ -697,6 +699,8 @@
             <div class="campo-config"><label>Título</label><input type="text" id="narTitulo" maxlength="100" style="width:100%" /></div>
             <label class="nota">Narração (uma fala por linha: segundo | texto). Pode mudar o que quiser antes de gerar a voz.</label>
             <textarea id="narFalas" rows="10" style="width:100%;font-family:monospace;font-size:12px"></textarea>
+            <label class="nota">Efeitos sonoros animados (segundo | tipo). Tipos: susto, risada, whoosh, plim, fail, alarme, vitoria, suspense, boing, impacto, correr. Apague a linha para tirar.</label>
+            <textarea id="narEfeitos" rows="4" style="width:100%;font-family:monospace;font-size:12px"></textarea>
             <button type="button" class="btn-primario" id="btnNarMontar">🎬 Gerar a voz e montar o Short</button>
           </div>
         </div>

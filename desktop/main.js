@@ -925,13 +925,13 @@ app.whenReady().then(() => {
     if (!i.temVideo) throw new Error('Esse arquivo não tem vídeo.');
     return { arquivo: arq, nome: path.basename(arq), duracao: i.duracao, largura: i.largura, altura: i.altura };
   });
-  ipcMain.handle('narrar:roteiro', async (_e, { arquivo, duracao, estilo, jogo, cortarBaixo }) => {
+  ipcMain.handle('narrar:roteiro', async (_e, { arquivo, duracao, estilo, jogo, cortarBaixo, somDoJogo }) => {
     const cfg = store.ler();
     if (duracao > 180) throw new Error('A gravação tem mais de 3 minutos. Para Short, corte antes um trecho de até 3 minutos.');
     enviar('narrar:progresso', { etapa: 'Enviando a gravação para a nuvem', x: 0 });
     const videoUrl = await Central.subirParaNuvem(cfg, arquivo, (x) => enviar('narrar:progresso', { etapa: `Enviando a gravação ${Math.round(x * 100)}%`, x }));
     enviar('narrar:progresso', { etapa: 'A IA está assistindo a partida e escrevendo a narração (até 2 min)', x: 1 });
-    return Central.chamar(cfg, '/api/central/narrar-gameplay', { metodo: 'POST', corpo: { acao: 'roteiro', videoUrl, duracao, estilo, jogo, cortarBaixo } });
+    return Central.chamar(cfg, '/api/central/narrar-gameplay', { metodo: 'POST', corpo: { acao: 'roteiro', videoUrl, duracao, estilo, jogo, cortarBaixo, somDoJogo: !!somDoJogo } });
   });
   ipcMain.handle('narrar:montar', (_e, dados) => Central.chamar(store.ler(), '/api/central/narrar-gameplay', { metodo: 'POST', corpo: { ...dados, acao: 'montar' } }));
 

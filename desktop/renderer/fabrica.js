@@ -850,7 +850,9 @@ const Fabrica = (() => {
       const r = await window.api.narrar.roteiro({
         arquivo: narArq.arquivo, duracao: narArq.duracao, estilo: q('#narEstilo').value,
         jogo: q('#narJogo').value.trim(), cortarBaixo: Number(q('#narCortar').value) || 0,
+        somDoJogo: q('#narSomJogo').value === '1',
       });
+      q('#narEfeitos').value = (r.roteiro.efeitos || []).map((e) => `${e.t.toFixed(1)} | ${e.tipo}`).join('\n');
       narId = r.id;
       q('#narTitulo').value = r.roteiro.titulo || '';
       q('#narFalas').value = r.roteiro.falas.map((f) => `${f.t.toFixed(1)} | ${f.texto}`).join('\n');
@@ -877,7 +879,11 @@ const Fabrica = (() => {
     b.disabled = true;
     b.textContent = '🎙️ Gerando a voz...';
     try {
-      const r = await window.api.narrar.montar({ id: narId, falas, titulo: q('#narTitulo').value.trim() });
+      const efeitos = q('#narEfeitos').value.split('\n').map((l) => {
+        const m = l.match(/^\s*([\d.,]+)\s*\|\s*([a-zà-ú]+)/i);
+        return m ? { t: Number(m[1].replace(',', '.')), tipo: m[2].toLowerCase() } : null;
+      }).filter(Boolean);
+      const r = await window.api.narrar.montar({ id: narId, falas, efeitos, titulo: q('#narTitulo').value.trim() });
       avisar(`Voz pronta (${r.falas} falas). O Short vai aparecer na Fila e ser montado aqui no PC em instantes.`);
       narStatus('✅ Enviado para montar: feche a Fábrica e acompanhe na FILA da tela principal (aparece em até 1 minuto).');
     } catch (e) {

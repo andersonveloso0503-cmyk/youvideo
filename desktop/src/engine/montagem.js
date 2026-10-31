@@ -69,7 +69,15 @@ async function baixarTudo(receita, dirCache, onProgresso, checar) {
 /** Junta os pedaços da narração, cada um no seu tempo. */
 async function prepararAudio(receita, locais, dir, { modo, registrarCancelar }) {
   const saida = path.join(dir, 'narracao.m4a');
-  const pedacos = (receita.audio || []).filter((a) => a.url);
+  const pedacos = [];
+  for (const a of (receita.audio || []).filter((x) => x.url)) {
+    // Arquivo sem faixa de som (ex.: "som do jogo" de uma gravação muda): pula em vez de quebrar a montagem
+    if (/\.(mp4|mov|mkv|webm)(\?|$)/i.test(a.url)) {
+      const i = await probe(locais[a.url]).catch(() => null);
+      if (!i?.temAudio) continue;
+    }
+    pedacos.push(a);
+  }
   if (!pedacos.length) throw new Error('A receita veio sem áudio.');
   const args = [];
   pedacos.forEach((p) => args.push('-i', locais[p.url]));

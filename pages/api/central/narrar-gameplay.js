@@ -4,7 +4,7 @@
 import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 import { criarPedido } from '../../../lib/montarPc';
-import { analisarGameplay, escreverNarracao, vozDasFalas, musicaDaNarracao, COLECAO_NARRACOES, ESTILOS } from '../../../lib/narrarGameplay';
+import { analisarGameplay, escreverNarracao, vozDasFalas, musicaDaNarracao, audioDosEfeitos, COLECAO_NARRACOES, ESTILOS, EFEITOS } from '../../../lib/narrarGameplay';
 
 export const config = { maxDuration: 300, api: { bodyParser: { sizeLimit: '2mb' } } };
 
@@ -31,6 +31,7 @@ export default async function handler(req, res) {
         duracao,
         estilo,
         cortarBaixo: Math.max(0, Math.min(0.35, Number(b.cortarBaixo) || 0)),
+        somDoJogo: b.somDoJogo === true, // mantém o som da gravação baixinho (só quando não tem música por cima)
         analise,
         roteiro,
         status: 'roteiro',
@@ -50,9 +51,14 @@ export default async function handler(req, res) {
         .sort((a, c) => a.t - c.t);
       if (!falas.length) return res.status(400).json({ erro: 'Sem falas para narrar.' });
       const titulo = String(b.titulo || d.roteiro.titulo || 'Gameplay narrada').slice(0, 100);
-      const [voz, musicaUrl] = await Promise.all([
+      // Efeitos sonoros: os que o dono deixou na tela (ou os que a IA escolheu)
+      const efeitos = (Array.isArray(b.efeitos) ? b.efeitos : d.roteiro.efeitos || [])
+        .map((x) => ({ t: Math.max(0, Number(x.t) || 0), tipo: String(x.tipo || '').toLowerCase().trim() }))
+        .filter((x) => EFEITOS[x.tipo]);
+      const [voz, musicaUrl, sons] = await Promise.all([
         vozDasFalas(falas, { estilo: d.estilo, vozId: String(b.vozId || '').trim(), duracao: d.duracao }),
         musicaDaNarracao().catch(() => null),
+        audioDosEfeitos(efeitos, d.duracao).catch(() => []),
       ]);
       if (!voz.audio.length) throw new Error('Nenhuma fala coube no vídeo.');
       const receita = {
@@ -62,7 +68,12 @@ export default async function handler(req, res) {
         formato: 'short',
         duracao: d.duracao,
         encaixar: true, // partida inteira no meio, com ela mesma desfocada no fundo
-        audio: voz.audio,
+        audio: [
+          ...voz.audio,
+          ...sons,
+          // Som do jogo baixinho por baixo (o próprio vídeo da gravação)
+          ...(d.somDoJogo ? [{ url: d.videoUrl, start: 0, length: d.duracao, volume: 0.3 }] : []),
+        ],
         ...(musicaUrl ? { musica: { url: musicaUrl, volume: 0.12 } } : {}),
         clipes: [{ tipo: 'video', url: d.videoUrl, start: 0, length: d.duracao, ...(d.cortarBaixo ? { recorte: { baixo: d.cortarBaixo } } : {}) }],
         palavras: voz.palavras,
