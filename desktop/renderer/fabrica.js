@@ -224,9 +224,17 @@ const Fabrica = (() => {
     q('#btnFabAtualizar').onclick = () => carregar(true);
     q('#btnGmBuscar').onclick = buscarNoticias;
     q('#btnGmVideo').onclick = videoDasMarcadas;
-    q('#btnGmDicas').onclick = () => (q('#gmDicasCaixa').hidden = !q('#gmDicasCaixa').hidden);
+    q('#btnGmDicas').onclick = () => {
+      const caixa = q('#gmDicasCaixa');
+      caixa.hidden = !caixa.hidden;
+      if (!caixa.hidden) caixa.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
     q('#btnGmDicasCriar').onclick = criarDicas;
-    q('#btnGmNarrar').onclick = () => (q('#gmNarrarCaixa').hidden = !q('#gmNarrarCaixa').hidden);
+    q('#btnGmNarrar').onclick = () => {
+      const caixa = q('#gmNarrarCaixa');
+      caixa.hidden = !caixa.hidden;
+      if (!caixa.hidden) caixa.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
     q('#btnNarEscolher').onclick = narrarEscolher;
     q('#btnNarRoteiro').onclick = narrarRoteiro;
     q('#btnNarMontar').onclick = narrarMontar;
