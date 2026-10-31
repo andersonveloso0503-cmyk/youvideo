@@ -139,6 +139,31 @@ function organizarCenas(receita) {
   return cenas;
 }
 
+/**
+ * Trailer de jogo: escolhe o ponto de início do trecho. Dá a volta se o trailer for curto e,
+ * se o trecho cair numa tela preta (fade entre cenas, fim do trailer), anda para frente até achar imagem.
+ */
+async function trechoSemPreto(arq, inicio, duracao) {
+  if (!(inicio > 0)) return 0;
+  const dur = (await probe(arq).catch(() => ({ duracao: 0 }))).duracao || 0;
+  if (dur <= 4) return 0;
+  const janela = Math.min(Math.max(1, duracao), 6);
+  let ini = inicio % Math.max(1, dur - 2);
+  for (let tentativa = 0; tentativa < 5; tentativa++) {
+    let preto = 0;
+    try {
+      const r = rodar(['-ss', ini.toFixed(2), '-t', janela.toFixed(2), '-i', arq, '-vf', 'scale=320:-2,blackdetect=d=0.2:pix_th=0.10', '-an', '-f', 'null', '-']);
+      await r.promise;
+      for (const m of String(r.saida ? r.saida() : '').matchAll(/black_duration:([0-9.]+)/g)) preto += Number(m[1]) || 0;
+    } catch {
+      return ini; // não deu para conferir: usa o trecho assim mesmo
+    }
+    if (preto < 0.3) return ini;
+    ini = (ini + 7) % Math.max(1, dur - 2);
+  }
+  return ini;
+}
+
 /** Gera o vídeo de fundo: cada cena no tamanho certo, depois tudo emendado. */
 async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, registrarCancelar, checar }) {
   const cenas = organizarCenas(receita);
@@ -161,11 +186,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
       encaixar = !!dim && dim.largura > dim.altura * 1.15;
     }
     if (encaixar && c.tipo === 'video') {
-      let ini = Number(c.inicio) || 0;
-      if (ini > 0) {
-        const dur = (await probe(arq).catch(() => ({ duracao: 0 }))).duracao || 0;
-        ini = dur > 4 ? ini % Math.max(1, dur - 2) : 0;
-      }
+      const ini = await trechoSemPreto(arq, Number(c.inicio) || 0, c.length);
       args = [
         '-stream_loop', '-1', ...(ini > 0 ? ['-ss', ini.toFixed(2)] : []), '-i', arq, '-t', L,
         '-filter_complex',
@@ -189,11 +210,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
       // Clipe animado: repete emendado pelo tempo todo da cena (loop), nunca para
       // Trailer de jogo: começa no trecho pedido (pula logos e repete menos o começo)
       // (se o trailer for mais curto que o ponto pedido, dá a volta: nunca pula para depois do fim)
-      let ini = Number(c.inicio) || 0;
-      if (ini > 0) {
-        const dur = (await probe(arq).catch(() => ({ duracao: 0 }))).duracao || 0;
-        ini = dur > 4 ? ini % Math.max(1, dur - 2) : 0;
-      }
+      const ini = await trechoSemPreto(arq, Number(c.inicio) || 0, c.length);
       const pular = ini > 0 ? ['-ss', ini.toFixed(2)] : [];
       args = ['-stream_loop', '-1', ...pular, '-i', arq, '-t', L, '-vf', `fps=${FPS},${cobrir(W, H)}`, ...comum, saida];
     } else {
@@ -375,4 +392,4 @@ async function juntarClipes(receita, locais, dir, W, H, { modo, onProgresso, reg
   return { final, duracao: total };
 }
 
-module.exports = { juntarClipes, lerReceita, baixarTudo, prepararAudio, prepararFundo, gerarAssNarracao, organizarCenas };
+module.exports = { juntarClipes, lerReceita, baixarTudo, prepararAudio, prepararFundo, gerarAssNarracao, organizarCenas, trechoSemPreto };

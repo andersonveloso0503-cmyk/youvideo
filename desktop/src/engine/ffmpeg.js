@@ -102,6 +102,7 @@ function rodar(args, { duracaoTotal = 0, onProgresso, modo = 'normal', cwd } = {
   });
   return {
     promise,
+    saida: () => stderr, // o que o ffmpeg escreveu (ex.: resultado do blackdetect)
     cancelar: () => {
       cancelado = true;
       try {
