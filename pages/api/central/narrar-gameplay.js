@@ -21,7 +21,10 @@ export default async function handler(req, res) {
       const duracao = Math.max(5, Math.min(180, Number(b.duracao) || 60));
       const estilo = ESTILOS[b.estilo] ? b.estilo : 'narrador';
       const analise = await analisarGameplay(videoUrl, { jogo: String(b.jogo || '').slice(0, 80), duracao });
-      const roteiro = await escreverNarracao(analise, { estilo, duracao });
+      if (!analise.momentos.length) throw new Error('O Gemini assistiu, mas não descreveu nenhum momento da partida. Tente de novo.');
+      const roteiro = await escreverNarracao(analise, { estilo, duracao }).catch((e) => {
+        throw new Error(`A IA não conseguiu escrever a narração: ${e.message}`);
+      });
       const ref = col.doc();
       await ref.set({
         videoUrl,

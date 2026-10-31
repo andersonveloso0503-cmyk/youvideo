@@ -238,7 +238,7 @@ const Fabrica = (() => {
     q('#btnNarEscolher').onclick = narrarEscolher;
     q('#btnNarRoteiro').onclick = narrarRoteiro;
     q('#btnNarMontar').onclick = narrarMontar;
-    window.api.ao('narrar:progresso', (p) => (q('#narStatus').textContent = p.etapa));
+    window.api.ao('narrar:progresso', (p) => narStatus(p.etapa));
     q('#btnGmAtualizar').onclick = () => carregarNoticias();
   }
 
@@ -827,10 +827,25 @@ const Fabrica = (() => {
       avisar(msgErro(e), true);
     }
   }
+  let narRelogio = null;
+  let narEtapa = '';
+  function narStatus(texto, erro = false) {
+    narEtapa = texto;
+    const el = q('#narStatus');
+    el.style.color = erro ? '#ff6b6b' : '';
+    el.style.fontWeight = erro ? '700' : '';
+    el.textContent = texto;
+  }
   async function narrarRoteiro() {
     if (!narArq) return;
     const b = q('#btnNarRoteiro');
     b.disabled = true;
+    const comeco = Date.now();
+    narStatus('Começando...');
+    narRelogio = setInterval(() => {
+      const s = Math.round((Date.now() - comeco) / 1000);
+      q('#narStatus').textContent = `${narEtapa.replace(/ · \d+:\d+$/, '')} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    }, 1000);
     try {
       const r = await window.api.narrar.roteiro({
         arquivo: narArq.arquivo, duracao: narArq.duracao, estilo: q('#narEstilo').value,
@@ -840,9 +855,12 @@ const Fabrica = (() => {
       q('#narTitulo').value = r.roteiro.titulo || '';
       q('#narFalas').value = r.roteiro.falas.map((f) => `${f.t.toFixed(1)} | ${f.texto}`).join('\n');
       q('#narPrevia').hidden = false;
-      q('#narStatus').textContent = `Pronto: ${r.analise.jogo || 'jogo'} — leia a narração e ajuste se quiser.`;
+      clearInterval(narRelogio);
+      narStatus(`✅ Pronto: ${r.analise.jogo || 'jogo'} — leia a narração abaixo, ajuste se quiser e clique em Gerar a voz.`);
+      q('#narPrevia').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) {
-      q('#narStatus').textContent = '';
+      clearInterval(narRelogio);
+      narStatus(`❌ ${msgErro(e)}`, true);
       avisar(msgErro(e), true);
     } finally {
       b.disabled = false;
@@ -861,8 +879,9 @@ const Fabrica = (() => {
     try {
       const r = await window.api.narrar.montar({ id: narId, falas, titulo: q('#narTitulo').value.trim() });
       avisar(`Voz pronta (${r.falas} falas). O Short vai aparecer na Fila e ser montado aqui no PC em instantes.`);
-      q('#narStatus').textContent = 'Enviado para montar: acompanhe na Fila.';
+      narStatus('✅ Enviado para montar: feche a Fábrica e acompanhe na FILA da tela principal (aparece em até 1 minuto).');
     } catch (e) {
+      narStatus(`❌ ${msgErro(e)}`, true);
       avisar(msgErro(e), true);
     } finally {
       b.disabled = false;
