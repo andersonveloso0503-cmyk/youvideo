@@ -12,6 +12,7 @@ import { autorizado } from '../../../lib/central';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { buscarNoticias, roteiroVideo, COLECAO_NOTICIAS } from '../../../lib/gamesNoticias';
 import { roteiroDicas, jogosEmAlta } from '../../../lib/gamesDicas';
+import { roteiroLancamentos } from '../../../lib/gamesLancamentos';
 
 export const config = { maxDuration: 300 };
 
@@ -59,7 +60,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET' && req.query.auto) {
-      const r = await buscarNoticias(db, { quantas: 4 });
+      const r = await buscarNoticias(db, { quantas: 6 });
       await cfg.set({ ultimaBusca: new Date().toISOString(), fontes: r.fontes }, { merge: true });
       return res.status(200).json(r);
     }
@@ -105,7 +106,7 @@ export default async function handler(req, res) {
     const b = req.body || {};
 
     if (b.acao === 'buscar') {
-      const r = await buscarNoticias(db, { quantas: Math.max(1, Math.min(8, Number(b.quantas) || 4)) });
+      const r = await buscarNoticias(db, { quantas: Math.max(1, Math.min(8, Number(b.quantas) || 6)) });
       await cfg.set({ ultimaBusca: new Date().toISOString(), fontes: r.fontes }, { merge: true });
       return res.status(200).json(r);
     }
@@ -139,6 +140,24 @@ export default async function handler(req, res) {
         criadoEm: new Date().toISOString(),
       });
       return res.status(200).json({ ok: true, id: ref.id });
+    }
+
+    // Lançamentos: jogos chegando e recém-lançados (dados reais da Steam), Short ou vídeo longo
+    if (b.acao === 'lancamentos') {
+      const formato = b.formato === 'longo' ? 'longo' : 'short';
+      const { ep, jogos } = await roteiroLancamentos({ formato });
+      await col.doc(ep.id).set({
+        status: 'aguardando',
+        tipo: formato === 'longo' ? 'longo' : 'short',
+        titulo: ep.titulo,
+        fonte: 'Loja da Steam (lançamentos)',
+        oficial: true,
+        links: jogos.map((g) => ({ titulo: g.nome, link: `https://store.steampowered.com/app/${g.appid}` })),
+        imagens: [],
+        ep,
+        criadoEm: new Date().toISOString(),
+      });
+      return res.status(200).json({ ok: true, jogos: jogos.map((g) => g.nome) });
     }
 
     if (b.acao === 'dicas') {

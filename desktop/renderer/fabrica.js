@@ -230,6 +230,8 @@ const Fabrica = (() => {
       if (!caixa.hidden) caixa.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
     q('#btnGmDicasCriar').onclick = criarDicas;
+    q('#btnGmLancShort').onclick = () => criarLancamentos('short');
+    q('#btnGmLancLongo').onclick = () => criarLancamentos('longo');
     q('#btnGmNarrar').onclick = () => {
       const caixa = q('#gmNarrarCaixa');
       caixa.hidden = !caixa.hidden;
@@ -892,6 +894,23 @@ const Fabrica = (() => {
     } finally {
       b.disabled = false;
       b.textContent = '🎬 Gerar a voz e montar o Short';
+    }
+  }
+
+  async function criarLancamentos(formato) {
+    const b = q(formato === 'longo' ? '#btnGmLancLongo' : '#btnGmLancShort');
+    const rotulo = b.textContent;
+    b.disabled = true;
+    b.textContent = '🚀 Buscando os lançamentos na Steam...';
+    try {
+      const r = await window.api.noticias.acao({ acao: 'lancamentos', formato });
+      avisar(`Roteiro de lançamentos pronto (${r.jogos.join(', ')}) — leia e aprove na lista`);
+      carregarNoticias();
+    } catch (e) {
+      avisar(msgErro(e), true);
+    } finally {
+      b.disabled = false;
+      b.textContent = rotulo;
     }
   }
 
