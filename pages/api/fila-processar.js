@@ -511,7 +511,7 @@ export default async function handler(req, res) {
             // Documentário: sem legenda (não acorda quem dorme); infantil: criança pequena não lê, a tela fica limpa
             ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}), // conteúdo para crianças: sem botão de like/inscrever gravado
-            ...(item.games ? { encaixar: true } : {}), // games: mídia deitada inteira no Short, com fundo desfocado
+            ...(item.games || item.politica ? { encaixar: true } : {}), // games: mídia deitada inteira no Short, com fundo desfocado
             // Documentário: quadrinho explicando o lugar que aparece e música baixinha por baixo da narração
             ...(item.documentario ? { textos: quadrinhosDoDocumentario(item.arquivos), musica: item.musicaUrl ? { url: item.musicaUrl, volume: 0.1 } : null } : {}),
           });
@@ -607,7 +607,7 @@ export default async function handler(req, res) {
             cta: item.marca ? empresa(item.marca)?.cta : '',
             ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}),
-            ...(item.games ? { encaixar: true } : {}),
+            ...(item.games || item.politica ? { encaixar: true } : {}),
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
         } else {

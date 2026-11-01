@@ -206,10 +206,25 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
     const baixo = Math.max(0, Math.min(0.4, Number(c.recorte?.baixo) || 0));
     const recorte = baixo ? `crop=iw:trunc(ih*${(1 - baixo).toFixed(3)}/2)*2:0:0,` : '';
     // Games num Short: imagem ou vídeo DEITADO aparece inteiro (sem cortar o nome do jogo), com ele mesmo desfocado no fundo
+    // Agora vale para qualquer mídia que não seja em pé (quadrada, 4:3, deitada): ela aparece INTEIRA, sem cortar
+    // texto nem nome, no tamanho certo (nunca estourada), e o resto da tela é ela mesma desfocada.
     let encaixar = false;
+    let fw = W;
+    let fh = Math.round((W * 9) / 16 / 2) * 2;
     if (receita.encaixar && H > W) {
       const dim = await probe(arq).catch(() => null);
-      encaixar = !!dim && dim.largura > dim.altura * 1.15;
+      encaixar = !!dim && dim.largura > dim.altura * 0.9;
+      if (encaixar) {
+        const maxH = Math.round(H * 0.6);
+        fw = W;
+        fh = Math.round((W * dim.altura) / dim.largura);
+        if (fh > maxH) {
+          fh = maxH;
+          fw = Math.round((maxH * dim.largura) / dim.altura);
+        }
+        fw = Math.max(2, Math.round(fw / 2) * 2);
+        fh = Math.max(2, Math.round(fh / 2) * 2);
+      }
     }
     if (encaixar && c.tipo === 'video') {
       const ini = await trechoSemPreto(arq, Number(c.inicio) || 0, c.length, !!receita.encaixar);
@@ -217,18 +232,18 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
         '-stream_loop', '-1', ...(ini > 0 ? ['-ss', ini.toFixed(2)] : []), '-i', arq, '-t', L,
         '-filter_complex',
         `[0:v]${recorte}fps=${FPS},split[fa][fb];[fa]${cobrir(W, H)},boxblur=24:2,eq=brightness=-0.12[fundo];` +
-          `[fb]scale=${W}:-2,setsar=1[frente];[fundo][frente]overlay=(W-w)/2:(H-h)/2,format=yuv420p[saida]`,
+          `[fb]scale=${fw}:${fh},setsar=1[frente];[fundo][frente]overlay=(W-w)/2:(H-h)/2,format=yuv420p[saida]`,
         '-map', '[saida]', ...comum, saida,
       ];
     } else if (encaixar) {
       // Imagem: zoom lento só na frente; o fundo desfocado fica parado
       const quadros = Math.max(1, Math.round(c.length * FPS));
-      const z = c.efeito === 'zoomOut' ? `1.10-0.10*on/${quadros}` : `1+0.10*on/${quadros}`;
-      const altFrente = Math.round((W * 9) / 16 / 2) * 2;
+      // zoom bem leve (5%) para não cortar as bordas da imagem
+      const z = c.efeito === 'zoomOut' ? `1.05-0.05*on/${quadros}` : `1+0.05*on/${quadros}`;
       args = [
         '-loop', '1', '-framerate', String(FPS), '-t', L, '-i', arq, '-filter_complex',
         `[0:v]split[fa][fb];[fa]${cobrir(W, H)},boxblur=24:2,eq=brightness=-0.12[fundo];` +
-          `[fb]${cobrir(W * 2, altFrente * 2)},zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${altFrente}:fps=${FPS},setsar=1[frente];` +
+          `[fb]scale=${fw * 2}:${fh * 2},setsar=1,zoompan=z='${z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${fw}x${fh}:fps=${FPS},setsar=1[frente];` +
           `[fundo][frente]overlay=(W-w)/2:(H-h)/2:shortest=1,format=yuv420p[saida]`,
         '-map', '[saida]', '-frames:v', String(quadros), ...comum, saida,
       ];
