@@ -613,6 +613,7 @@
       <button type="button" data-marca="longos">📺 Vídeos longos</button>
       <button type="button" data-marca="documentario">🌙 Documentários para dormir</button>
       <button type="button" data-marca="games">🎮 Games</button>
+      <button type="button" data-marca="politica">🏛️ Política</button>
       <button type="button" data-marca="infantil">🧸 Infantil</button>
       <button type="button" data-marca="cortes">🎬 Cortes</button>
       <button type="button" data-marca="oracao">🙏 Oração do dia</button>
@@ -713,6 +714,37 @@
           <span class="nota">O Claude pesquisa as dicas na web e escreve. Imagens: gameplay e trailers oficiais da página do jogo na Steam. Leva cerca de 1 minuto por jogo.</span>
         </div>
         <div id="gmLista"></div>
+      </div>
+    </div>
+    <div class="fab-config" id="fabConfigPolitica" hidden>
+      <div class="campo-config"><label>Canal do YouTube</label><select id="fabPlCanal"></select></div>
+      <div class="campo-config"><label>Voz da ElevenLabs (ID, opcional — vazio = voz padrão de narração)</label><input type="text" id="fabPlVoz" placeholder="Ex.: voz séria de telejornal" /></div>
+      <div class="pl-noticias" style="grid-column:1 / -1;width:100%;margin-top:14px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <h3 style="margin:0">📰 Roteiros para aprovar</h3>
+          <button type="button" class="btn-mini" id="btnPlBuscar">🔎 Buscar notícias agora</button>
+          <button type="button" class="btn-mini" id="btnPlVideo">📺 Juntar marcadas num resumo</button>
+          <button type="button" class="btn-mini" id="btnPlExplicador">💡 Criar explicador</button>
+          <button type="button" class="btn-mini" id="btnPlAtualizar" title="Atualizar">↻</button>
+          <span class="nota" id="plInfo" style="margin:0"></span>
+        </div>
+        <p class="nota" style="margin:6px 0">Notícias reais da Agência Brasil, Agência Senado, Agência Câmara, G1, Folha, Estadão, Poder360, CNN Brasil, Gazeta do Povo e CartaCapital (linhas diferentes, para o canal não ficar de um lado só), buscadas sozinhas a cada 3 horas. O roteiro mostra o que cada lado diz e trata quem não foi condenado como investigado. Imagens: só fotos das agências públicas (uso livre com crédito) e vídeos reais do Pexels — <b>nunca IA imitando político</b>. Nada vira vídeo sem o seu ✅. <b>Leia o roteiro antes de aprovar.</b></p>
+        <div id="plExplicadorCaixa" hidden style="margin:8px 0;padding:10px;border:1px dashed var(--borda, #444);border-radius:10px">
+          <label>Tema do explicador (curiosidade, em forma de pergunta funciona melhor)</label>
+          <input type="text" id="plTema" maxlength="200" style="width:100%" placeholder="Ex.: Como Lula virou no segundo turno de 2026" />
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0">
+            <button type="button" class="btn-mini" data-pl-tema="Como Lula virou no segundo turno de 2026">Como Lula virou no 2º turno</button>
+            <button type="button" class="btn-mini" data-pl-tema="Por que Jair Bolsonaro foi preso: a linha do tempo">Por que Bolsonaro foi preso</button>
+            <button type="button" class="btn-mini" data-pl-tema="O caso Banco Master e Daniel Vorcaro explicado do começo">Caso Banco Master / Vorcaro</button>
+            <button type="button" class="btn-mini" data-pl-tema="Como fica o governo com o PL na maior bancada do Congresso">Como fica o governo agora</button>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="plFormato"><option value="longo" selected>Vídeo longo (8 a 10 min)</option><option value="short">Short</option></select>
+            <button type="button" class="btn-mini" id="btnPlExplicadorCriar">💡 Pesquisar e escrever</button>
+            <span class="nota">O Claude pesquisa na web em fontes de linhas diferentes e escreve com os dois lados. Leva 1 a 2 minutos.</span>
+          </div>
+        </div>
+        <div id="plLista"></div>
       </div>
     </div>
     <div class="fab-config" id="fabConfigInfantil" hidden>

@@ -23,6 +23,7 @@ import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS, TODOS_EPISODIOS } from '../../../lib/documentarioEpisodios';
 import { GAMES } from '../../../lib/gamesEpisodios';
 import { COLECAO_NOTICIAS } from '../../../lib/gamesNoticias';
+import { COLECAO_POLITICA } from '../../../lib/politicaNoticias';
 import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora, criarShortDaMusica } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
@@ -319,6 +320,7 @@ export default async function handler(req, res) {
           longo: x.longo === true,
           documentario: x.documentario === true,
           games: x.games === true, // canal de games (Próxima Fase): aba própria no Compilador
+          politica: x.politica === true, // canal de política: aba própria no Compilador
           playlist: x.roteiro?.playlist?.titulo ? x.roteiro.playlist : null, // documentário: entra sozinho na playlist da série (ex.: "Catástrofes do Brasil")
           infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true, shortMusica: x.shortMusica === true, temporada: x.infantil.temporada ? { nome: x.infantil.temporada.nome, numero: x.infantil.temporada.numero, ep: x.infantil.temporada.ep, total: x.infantil.temporada.total } : null } : null,
           comBotao: x.comBotao === true,
@@ -743,7 +745,7 @@ export default async function handler(req, res) {
         if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube do documentário.' });
         const horarioDoc = hora(b.horarios?.[0], '19:30');
         // Os vídeos do canal de games usam o mesmo motor (documentario: true), mas têm agenda própria
-        const todosDoc = { docs: (await col.where('documentario', '==', true).get()).docs.filter((d) => !d.data().games) };
+        const todosDoc = { docs: (await col.where('documentario', '==', true).get()).docs.filter((d) => !d.data().games && !d.data().politica) };
         const jaUsados = new Set(todosDoc.docs.filter((d) => d.data().status !== 'erro' && d.data().fabrica?.ativo !== false).map((d) => d.data().episodioId));
         const livres = EPISODIOS.filter((e) => !jaUsados.has(e.id));
         if (!livres.length) return res.status(400).json({ erro: 'Todos os episódios já escritos estão na fábrica. Peça novos roteiros.' });
@@ -1204,7 +1206,7 @@ export default async function handler(req, res) {
       if (!d?.documentario) return res.status(400).json({ erro: 'Só dá para refazer documentários.' });
       // Notícia e dicas do canal de games: o roteiro está guardado na lista de notícias (não nos episódios escritos)
       let ep = TODOS_EPISODIOS.find((e) => e.id === d.episodioId);
-      if (!ep && d.noticia) ep = (await db.collection(COLECAO_NOTICIAS).doc(String(d.noticia)).get()).data()?.ep || null;
+      if (!ep && d.noticia) ep = (await db.collection(d.politica ? COLECAO_POLITICA : COLECAO_NOTICIAS).doc(String(d.noticia)).get()).data()?.ep || null;
       if (!ep) return res.status(400).json({ erro: 'Não achei o roteiro deste vídeo para refazer.' });
       const novoRoteiro = roteiroDoEpisodio(ep);
       const antigas = d.roteiro?.cenas || [];
@@ -1217,6 +1219,7 @@ export default async function handler(req, res) {
         tema: d.tema,
         documentario: true,
         ...(d.games ? { games: true } : {}),
+        ...(d.politica ? { politica: true } : {}),
         ...(d.noticia ? { noticia: d.noticia } : {}),
         episodioId: d.episodioId,
         serie: null,

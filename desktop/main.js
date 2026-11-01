@@ -652,6 +652,9 @@ app.whenReady().then(() => {
         } else if (it.infantil) {
           // Desenho infantil (episódio ou Short da música): título, descrição e tags já vêm prontos do site
           seoOk = true;
+        } else if (it.politica) {
+          // Canal de política: título, descrição, fontes e tags já vêm prontos (imparciais) do site
+          seoOk = true;
         } else if (it.games) {
           // Canal de games (notícias, dicas, listas): título, descrição, fontes e tags já vêm prontos do site.
           // NUNCA passa pela IA de Shorts bíblicos (ela trocava o título por "História bíblica curta: ...").
@@ -737,6 +740,7 @@ app.whenReady().then(() => {
           fabricaId: it.id,
           tipo: it.oracao ? 'oracao' : 'historias', // categoria "Pessoas e blogs" e idioma português (não "Música")
           ...(it.games ? { categoria: '20', idioma: 'pt-BR' } : {}), // games: categoria "Jogos" do YouTube
+          ...(it.politica ? { categoria: '25', idioma: 'pt-BR' } : {}), // política: categoria "Notícias e política"
           // Desenho infantil: cada personagem é uma série com a sua playlist (ex.: "As Aventuras do Pingo — Historinhas e Músicas")
           playlist: it.oracao
             ? PLAYLISTS_ORACAO[it.oracao.periodo === 'noite' ? 'noite' : 'manha']
@@ -912,6 +916,8 @@ app.whenReady().then(() => {
   // Notícias do canal de games: esperam aprovação aqui antes de virar vídeo
   ipcMain.handle('noticias:listar', () => Central.chamar(store.ler(), '/api/central/games-noticias'));
   ipcMain.handle('noticias:acao', (_e, dados) => Central.chamar(store.ler(), '/api/central/games-noticias', { metodo: 'POST', corpo: dados || {} }));
+  ipcMain.handle('politica:listar', () => Central.chamar(store.ler(), '/api/central/politica-noticias'));
+  ipcMain.handle('politica:acao', (_e, dados) => Central.chamar(store.ler(), '/api/central/politica-noticias', { metodo: 'POST', corpo: dados || {} }));
   // Narrar gameplay: escolhe a gravação, sobe para a nuvem, o site assiste, escreve a narração e (depois do OK) narra e manda montar aqui
   ipcMain.handle('narrar:escolher', async () => {
     const r = await dialog.showOpenDialog(janela, {

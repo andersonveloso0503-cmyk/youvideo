@@ -1,0 +1,190 @@
+// Notícias do canal de POLÍTICA: busca, aprovação e envio para a Fábrica (mesmo esquema do canal de games).
+//
+// GET                         -> roteiros esperando aprovação + os últimos aprovados e o resultado da última busca
+// GET  ?auto=1 (cron Vercel)  -> busca notícias novas
+// POST { acao:'buscar' }                                   -> busca agora
+// POST { acao:'aprovar', id, canalYoutube, quando?, vozId? } -> vira vídeo na Fábrica (sobe no horário pedido ou daqui a ~1h30)
+// POST { acao:'descartar', id }
+// POST { acao:'video', ids:[...] }                         -> resumo com as notícias marcadas (fica esperando aprovação)
+// POST { acao:'explicador', tema, formato:'longo'|'short' } -> o Claude pesquisa e escreve um explicador (ex.: "Como Lula virou no 2º turno")
+import { getDb } from '../../../lib/firebase-admin';
+import { autorizado } from '../../../lib/central';
+import { roteiroDoEpisodio } from '../../../lib/documentario';
+import { buscarNoticiasPolitica, roteiroVideoPolitica, roteiroExplicador, COLECAO_POLITICA } from '../../../lib/politicaNoticias';
+
+export const config = { maxDuration: 300 };
+
+const INTERVALO = 3 * 3600e3; // vídeos do canal de política saem com pelo menos 3 h de diferença
+
+async function proximoHorario(db, desejado) {
+  const snap = await db.collection('youvideo_fila').where('politica', '==', true).get();
+  const marcados = snap.docs
+    .map((d) => d.data())
+    .filter((x) => x.fabrica?.ativo !== false && x.status !== 'erro')
+    .map((x) => new Date(x.fabrica?.quandoYoutube || x.fabrica?.quando || 0).getTime())
+    .filter((t) => t > Date.now() - INTERVALO)
+    .sort((a, b) => a - b);
+  const horaBrasilia = (t) => new Date(t - 3 * 3600e3).getUTCHours();
+  const paraManha = (t) => {
+    const h = horaBrasilia(t);
+    if (h >= 7 && h < 23) return t;
+    const d = new Date(t - 3 * 3600e3);
+    if (h >= 23) d.setUTCDate(d.getUTCDate() + 1);
+    d.setUTCHours(7, 0, 0, 0);
+    return d.getTime() + 3 * 3600e3;
+  };
+  let t = paraManha(desejado);
+  for (let volta = 0; volta < 50; volta++) {
+    const perto = marcados.find((m) => Math.abs(m - t) < INTERVALO);
+    if (!perto) break;
+    t = paraManha(perto + INTERVALO);
+  }
+  return new Date(t).toISOString();
+}
+
+export default async function handler(req, res) {
+  const ehCron =
+    (process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`) || /vercel-cron/i.test(req.headers['user-agent'] || '');
+  const a = autorizado(req);
+  if (!a.ok && !(ehCron && req.method === 'GET' && req.query.auto)) return res.status(401).json({ erro: a.erro });
+
+  const db = getDb();
+  const col = db.collection(COLECAO_POLITICA);
+  const cfg = db.collection('youvideo_config').doc('politica_noticias');
+
+  try {
+    if (req.method === 'GET' && req.query.auto) {
+      const r = await buscarNoticiasPolitica(db, { quantas: 5 });
+      await cfg.set({ ultimaBusca: new Date().toISOString(), fontes: r.fontes }, { merge: true });
+      return res.status(200).json(r);
+    }
+
+    if (req.method === 'GET') {
+      const [aguardando, aprovadas, c] = await Promise.all([col.where('status', '==', 'aguardando').get(), col.where('status', '==', 'aprovada').get(), cfg.get()]);
+      const resumo = (d) => {
+        const x = d.data();
+        return {
+          id: d.id,
+          tipo: x.tipo || 'short',
+          titulo: x.titulo,
+          tituloVideo: x.ep?.titulo || '',
+          fonte: x.fonte || '',
+          oficial: !!x.oficial,
+          link: x.link || '',
+          links: x.links || null,
+          data: x.data || null,
+          imagem: x.imagens?.[0] || null,
+          roteiro: String(x.ep?.texto || '').split('\n').filter((l) => l && !l.startsWith('@ ') && !l.startsWith('# ')).join('\n'),
+          criadoEm: x.criadoEm,
+          aprovadaEm: x.aprovadaEm || null,
+        };
+      };
+      const porData = (a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
+      return res.status(200).json({
+        aguardando: aguardando.docs.map(resumo).sort(porData),
+        aprovadas: aprovadas.docs.map(resumo).sort((a, b) => String(b.aprovadaEm || '').localeCompare(String(a.aprovadaEm || ''))).slice(0, 15),
+        ultimaBusca: c.data()?.ultimaBusca || null,
+        fontes: c.data()?.fontes || [],
+      });
+    }
+
+    if (req.method !== 'POST') return res.status(405).json({ erro: 'Use GET ou POST.' });
+    const b = req.body || {};
+
+    if (b.acao === 'buscar') {
+      const r = await buscarNoticiasPolitica(db, { quantas: Math.max(1, Math.min(8, Number(b.quantas) || 5)) });
+      await cfg.set({ ultimaBusca: new Date().toISOString(), fontes: r.fontes }, { merge: true });
+      return res.status(200).json(r);
+    }
+
+    if (b.acao === 'descartar') {
+      await col.doc(String(b.id)).update({ status: 'descartada', descartadaEm: new Date().toISOString() });
+      return res.status(200).json({ ok: true });
+    }
+
+    if (b.acao === 'video') {
+      const ids = (Array.isArray(b.ids) ? b.ids : []).map(String).slice(0, 7);
+      if (ids.length < 2) return res.status(400).json({ erro: 'Marque pelo menos 2 notícias para o vídeo.' });
+      const docs = await Promise.all(ids.map((id) => col.doc(id).get()));
+      const noticias = docs
+        .filter((d) => d.exists && d.data().texto)
+        .map((d) => {
+          const x = d.data();
+          return { titulo: x.titulo, link: x.link, fonteNome: x.fonte, data: x.data, texto: x.texto, imagens: x.imagens || [] };
+        });
+      if (noticias.length < 2) return res.status(400).json({ erro: 'Não achei o texto dessas notícias.' });
+      const ep = await roteiroVideoPolitica(noticias);
+      await col.doc(ep.id).set({
+        status: 'aguardando',
+        tipo: 'longo',
+        titulo: ep.titulo,
+        fonte: [...new Set(noticias.map((n) => n.fonteNome))].join(', '),
+        links: noticias.map((n) => ({ titulo: n.titulo, link: n.link })),
+        imagens: noticias.flatMap((n) => n.imagens).slice(0, 1),
+        ep,
+        criadoEm: new Date().toISOString(),
+      });
+      return res.status(200).json({ ok: true, id: ep.id });
+    }
+
+    if (b.acao === 'explicador') {
+      const tema = String(b.tema || '').trim().slice(0, 200);
+      if (!tema) return res.status(400).json({ erro: 'Escreva o tema do explicador.' });
+      const formato = b.formato === 'short' ? 'short' : 'longo';
+      const { ep, fontes } = await roteiroExplicador(tema, formato);
+      await col.doc(ep.id).set({
+        status: 'aguardando',
+        tipo: formato === 'short' ? 'explicador-short' : 'explicador',
+        titulo: ep.titulo,
+        fonte: 'Pesquisa na web',
+        links: fontes.slice(0, 8).map((f) => ({ titulo: f.titulo, link: f.url })),
+        imagens: [],
+        ep,
+        criadoEm: new Date().toISOString(),
+      });
+      return res.status(200).json({ ok: true, id: ep.id, titulo: ep.titulo });
+    }
+
+    if (b.acao === 'aprovar') {
+      if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube de política.' });
+      const ref = col.doc(String(b.id));
+      const d = (await ref.get()).data();
+      if (!d?.ep) return res.status(404).json({ erro: 'Roteiro não encontrado.' });
+      if (d.status === 'aprovada') return res.status(400).json({ erro: 'Esse roteiro já foi aprovado.' });
+      const longo = d.tipo === 'longo' || d.tipo === 'explicador';
+      const pedido = b.quando ? new Date(b.quando) : null;
+      const quando = await proximoHorario(db, pedido && pedido.getTime() > Date.now() + 30 * 60e3 ? pedido.getTime() : Date.now() + (longo ? 3 : 1.5) * 3600e3);
+      const fab = db.collection('youvideo_fila').doc();
+      await fab.set({
+        tema: d.ep.titulo,
+        documentario: true, // mesmo motor dos documentários (imagens reais, capítulos, capa com texto)
+        politica: true,
+        noticia: ref.id,
+        episodioId: d.ep.id,
+        serie: null,
+        estilo: 'realista',
+        formato: longo ? 'longo' : 'short',
+        animar: false,
+        ...(b.vozId ? { vozId: String(b.vozId).trim() } : {}),
+        roteiro: roteiroDoEpisodio(d.ep),
+        status: 'pendente',
+        origem: 'fabrica',
+        criadoEm: new Date().toISOString(),
+        fabrica: {
+          ativo: true,
+          lote: `politica-${Date.now().toString(36)}`,
+          quando,
+          quandoYoutube: quando,
+          redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
+          canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') },
+        },
+      });
+      await ref.update({ status: 'aprovada', aprovadaEm: new Date().toISOString(), filaId: fab.id, quando });
+      return res.status(200).json({ ok: true, filaId: fab.id, quando });
+    }
+
+    return res.status(400).json({ erro: 'Ação desconhecida.' });
+  } catch (e) {
+    return res.status(500).json({ erro: String(e.message || e).slice(0, 300) });
+  }
+}
