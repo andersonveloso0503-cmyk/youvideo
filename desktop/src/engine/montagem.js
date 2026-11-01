@@ -52,8 +52,21 @@ async function baixarStreaming(url, destino) {
 async function baixarTudo(receita, dirCache, onProgresso, checar) {
   const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url), receita.musica?.url].filter(Boolean))];
   const locais = {};
+  // Vídeos de cena que têm plano B (imagem de reserva ou outra cena): se não baixar, a montagem segue sem eles
+  const comReserva = new Set(receita.clipes.filter((c) => c.tipo === 'video').map((c) => c.url));
   for (let i = 0; i < urls.length; i++) {
     checar && checar();
+    try {
+      await baixarUm(i);
+    } catch (e) {
+      if (e?.message === 'CANCELADO' || !comReserva.has(urls[i])) throw e;
+      locais[urls[i]] = null; // prepararFundo usa a imagem de reserva ou repete a cena anterior
+    }
+    onProgresso && onProgresso((i + 1) / urls.length);
+  }
+  return locais;
+
+  async function baixarUm(i) {
     const comoMp4 = path.join(dirCache, 'montagem', nomeCache(urls[i]).replace(/\.m3u8$/i, '') + '.hls.mp4');
     if (/\.m3u8(\?|$)/i.test(urls[i])) locais[urls[i]] = await baixarStreaming(urls[i], comoMp4);
     else {
@@ -61,9 +74,7 @@ async function baixarTudo(receita, dirCache, onProgresso, checar) {
       // Veio uma lista de streaming (#EXTM3U) em vez do vídeo: o ffmpeg baixa de verdade a partir do link
       locais[urls[i]] = ehListaStreaming(arq) ? await baixarStreaming(urls[i], comoMp4) : arq;
     }
-    onProgresso && onProgresso((i + 1) / urls.length);
   }
-  return locais;
 }
 
 /** Junta os pedaços da narração, cada um no seu tempo. */
@@ -172,6 +183,9 @@ async function trechoSemPreto(arq, inicio, duracao, sempre = false) {
   return ini;
 }
 
+// Pasta de cache para baixar a imagem de reserva de uma cena (ao lado da pasta de trabalho)
+const dirCacheDe = (dir) => path.join(path.dirname(dir), 'montagem-reserva');
+
 /** Gera o vídeo de fundo: cada cena no tamanho certo, depois tudo emendado. */
 async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, registrarCancelar, checar }) {
   const cenas = organizarCenas(receita);
@@ -183,9 +197,10 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
   for (let i = 0; i < cenas.length; i++) {
     checar && checar();
     const c = cenas[i];
-    const arq = locais[c.url];
     const saida = path.join(dir, `cena_${String(i).padStart(4, '0')}.mp4`);
     const L = c.length.toFixed(3);
+    const montarArgs = async (c, arq) => {
+    if (!arq) throw new Error('arquivo da cena não baixou');
     let args;
     // Recorte de baixo (ex.: gravação com letra de música escrita no rodapé): corta essa faixa antes de tudo
     const baixo = Math.max(0, Math.min(0.4, Number(c.recorte?.baixo) || 0));
@@ -242,9 +257,50 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
         ...comum, saida,
       ];
     }
-    const r = rodar(args, { modo, duracaoTotal: c.length, onProgresso: (x) => onProgresso && onProgresso((pronto + x * c.length) / total) });
-    registrarCancelar && registrarCancelar(r.cancelar);
-    await r.promise;
+    return args;
+    };
+    const rodarCena = async (args) => {
+      const r = rodar(args, { modo, duracaoTotal: c.length, onProgresso: (x) => onProgresso && onProgresso((pronto + x * c.length) / total) });
+      registrarCancelar && registrarCancelar(r.cancelar);
+      await r.promise;
+    };
+    try {
+      await rodarCena(await montarArgs(c, locais[c.url]));
+    } catch (e) {
+      if (e?.message === 'CANCELADO' || e?.discoCheio) throw e;
+      // Plano B (trailer com defeito, formato que o ffmpeg não abre, link que não baixou):
+      // 1) o vídeo de novo, sem pular trecho; 2) a imagem de reserva da cena; 3) repete a cena anterior; 4) tela escura
+      console.warn(`[montagem] cena ${i + 1} falhou, usando plano B:`, String(e?.message || e).slice(0, 300));
+      let ok = false;
+      if (c.tipo === 'video' && locais[c.url]) {
+        try {
+          await rodarCena(['-i', locais[c.url], '-t', L, '-vf', `fps=${FPS},${cobrir(W, H)},tpad=stop_mode=clone:stop_duration=${L}`, ...comum, saida]);
+          ok = true;
+        } catch (e2) {
+          if (e2?.message === 'CANCELADO') throw e2;
+          // arquivo estragado no cache: apaga para baixar de novo na próxima vez
+          try { fs.unlinkSync(locais[c.url]); } catch {}
+        }
+      }
+      if (!ok && c.imagem) {
+        try {
+          const img = await Central.baixar(c.imagem, path.join(dirCacheDe(dir), nomeCache(c.imagem)));
+          await rodarCena(await montarArgs({ ...c, tipo: 'imagem' }, img));
+          ok = true;
+        } catch (e3) {
+          if (e3?.message === 'CANCELADO') throw e3;
+        }
+      }
+      if (!ok && feitos.length) {
+        try {
+          await rodarCena(['-stream_loop', '-1', '-i', feitos[feitos.length - 1], '-t', L, ...comum, saida]);
+          ok = true;
+        } catch (e4) {
+          if (e4?.message === 'CANCELADO') throw e4;
+        }
+      }
+      if (!ok) await rodarCena(['-f', 'lavfi', '-i', `color=c=0x10101a:s=${W}x${H}:r=${FPS}`, '-t', L, ...comum, saida]);
+    }
     pronto += c.length;
     feitos.push(saida);
   }
