@@ -911,8 +911,8 @@ const Fabrica = (() => {
             <details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>
           </div>
           ${aprovada ? `<span class="nota">✅ ${quandoTxt(n.aprovadaEm)}</span>` : `<div style="display:flex;flex-direction:column;gap:6px">
-            <button type="button" class="pl-aprovar" data-id="${esc(n.id)}">✅ Aprovar</button>
-            <button type="button" class="pl-descartar" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
+            <button type="button" class="btn-primario pl-aprovar" data-id="${esc(n.id)}">✅ Aprovar</button>
+            <button type="button" class="btn-mini perigo pl-descartar" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
         </div>`;
       lista.innerHTML =
         (r.aguardando.length ? r.aguardando.map((n) => cartao(n, false)).join('') : '<p class="nota">Nenhum roteiro esperando. Clique em 🔎 Buscar notícias agora ou 💡 Criar explicador.</p>') +
@@ -920,7 +920,9 @@ const Fabrica = (() => {
       lista.querySelectorAll('.pl-aprovar').forEach((b) => (b.onclick = () => aprovarPolitica(b.dataset.id, b)));
       lista.querySelectorAll('.pl-descartar').forEach((b) => (b.onclick = () => descartarPolitica(b.dataset.id, b)));
     } catch (e) {
-      lista.innerHTML = `<p class="nota">Não consegui carregar os roteiros: ${esc(msgErro(e))}</p>`;
+      lista.innerHTML = /RESOURCE_EXHAUSTED|Quota exceeded/i.test(msgErro(e))
+        ? '<p class="nota alerta">⚠ O banco de dados do Youvideo (Firebase) passou do limite grátis de hoje: aprovar, juntar e listar voltam sozinhos de madrugada (por volta das 5h), ou na hora se ativar o plano Blaze no Firebase.</p>'
+        : `<p class="nota">Não consegui carregar os roteiros: ${esc(msgErro(e))}</p>`;
     }
   }
 

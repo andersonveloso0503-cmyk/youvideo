@@ -77,6 +77,14 @@ function ext(p) { return p.split('.').pop().toLowerCase(); }
 function ehImagem(p) { return EXT_IMG.includes(ext(p)) || !EXT_VID.includes(ext(p)); }
 function avisar(txt, erro = false) {
   const a = $('#aviso');
+  // Janela aberta (Fábrica, Biblioteca...) fica por cima de tudo: o aviso precisa ir para dentro dela, senão some atrás
+  const janelas = [...document.querySelectorAll('dialog[open]')];
+  const destino = janelas[janelas.length - 1] || document.body;
+  if (a.parentElement !== destino) destino.appendChild(a);
+  if (/RESOURCE_EXHAUSTED|Quota exceeded/i.test(txt)) {
+    txt = 'O banco de dados do Youvideo (Firebase) passou do limite grátis de hoje. Ele volta sozinho de madrugada (por volta das 5h), ou na hora se ativar o plano Blaze no Firebase.';
+    erro = true;
+  }
   a.textContent = txt;
   a.classList.toggle('erro', erro);
   a.classList.add('visivel');
