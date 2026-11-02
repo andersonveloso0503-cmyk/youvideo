@@ -213,7 +213,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
     let fh = Math.round((W * 9) / 16 / 2) * 2;
     if (receita.encaixar && H > W) {
       const dim = await probe(arq).catch(() => null);
-      encaixar = !!dim && dim.largura > dim.altura * 0.9;
+      encaixar = !!dim && dim.largura > dim.altura * 0.7; // só a mídia já quase em pé (9:16) enche a tela inteira
       if (encaixar) {
         const maxH = Math.round(H * 0.6);
         fw = W;
