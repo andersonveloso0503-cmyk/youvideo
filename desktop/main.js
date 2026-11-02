@@ -659,6 +659,10 @@ app.whenReady().then(() => {
           // Canal de games (notícias, dicas, listas): título, descrição, fontes e tags já vêm prontos do site.
           // NUNCA passa pela IA de Shorts bíblicos (ela trocava o título por "História bíblica curta: ...").
           seoOk = true;
+        } else if (it.documentario || it.marca || it.longo) {
+          // Documentário, Noites na História, empresa: o texto já vem pronto do site.
+          // A IA de Shorts abaixo é SÓ para histórias bíblicas.
+          seoOk = true;
         } else if (it.oracao) {
           // Oração do dia: o título já vem pronto no formato que as pessoas procuram ("Oração da Manhã de 7 de Outubro: ...")
           const periodo = it.oracao.periodo === 'noite' ? 'oraçãodanoite' : 'oraçãodamanhã';

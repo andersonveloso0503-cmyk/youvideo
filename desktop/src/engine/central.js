@@ -4,6 +4,11 @@ const fs = require('fs');
 const path = require('path');
 
 const URL_PADRAO = 'https://youvideors2.vercel.app';
+// A Central só entrega os vídeos de política/games/documentário para quem sabe tratar o título deles
+let VERSAO = '0.0.0';
+try {
+  VERSAO = require('../../package.json').version;
+} catch {}
 
 function base(cfg) {
   return String(cfg.centralUrl || URL_PADRAO).replace(/\/+$/, '');
@@ -17,7 +22,7 @@ async function chamar(cfg, rota, { metodo = 'GET', corpo, query } = {}) {
   try {
     r = await fetch(url, {
       method: metodo,
-      headers: { 'x-central-token': cfg.centralToken, ...(corpo ? { 'Content-Type': 'application/json' } : {}) },
+      headers: { 'x-central-token': cfg.centralToken, 'x-compilador-versao': VERSAO, ...(corpo ? { 'Content-Type': 'application/json' } : {}) },
       body: corpo ? JSON.stringify(corpo) : undefined,
     });
   } catch (e) {

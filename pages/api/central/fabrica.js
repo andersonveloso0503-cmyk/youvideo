@@ -332,6 +332,11 @@ export default async function handler(req, res) {
       });
       if (req.query.youtube === '1') {
         const agora = Date.now();
+        // Compilador antigo (antes da 2.5.43) não sabe que política/games/documentário NÃO são histórias bíblicas
+        // e trocava o título e a descrição por "História bíblica curta: ...". Esses vídeos só vão para PC atualizado.
+        const versao = String(req.headers['x-compilador-versao'] || '0.0.0').split('.').map((n) => parseInt(n, 10) || 0);
+        const atualizado = versao[0] > 2 || (versao[0] === 2 && (versao[1] > 5 || (versao[1] === 5 && versao[2] >= 43)));
+        if (!atualizado) itens = itens.filter((i) => !i.politica && !i.games && !i.documentario);
         itens = itens.filter(
           (i) =>
             i.status === 'concluido' && i.videoUrl && i.redes?.youtube &&
