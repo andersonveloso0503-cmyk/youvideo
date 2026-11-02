@@ -85,7 +85,7 @@ export default function ConexaoTiktok() {
   );
   const nota = { fontSize: 14, color: '#c9bda6', lineHeight: 1.5 };
   const temChaves = r && r.chaves?.key && r.chaves?.secret;
-  const linkConectar = (escopo) => `/api/auth/tiktok?token=${encodeURIComponent(token)}${escopo ? `&escopo=${escopo}` : ''}`;
+  const linkConectar = (escopo, conta) => `/api/auth/tiktok?token=${encodeURIComponent(token)}${escopo ? `&escopo=${escopo}` : ''}${conta ? `&conta=${conta}` : ''}`;
 
   return (
     <div className="container">
@@ -180,6 +180,22 @@ export default function ConexaoTiktok() {
               </>
             ) : linha(false, 'Primeiro coloque as chaves do aplicativo (passo 1).')}
           </div>
+
+          {temChaves && (
+            <div className="card">
+              <h2>Contas dos canais</h2>
+              <p style={nota}>
+                Cada canal manda para o próprio TikTok (botão 📱 TikTok nos vídeos prontos da Fábrica). Antes de clicar, saia da outra conta no TikTok
+                do navegador, ou ele conecta a mesma. No Sandbox, cada conta precisa estar em <b>Target Users</b>.
+              </p>
+              {(r.canais || []).map((c) => (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '8px 0' }}>
+                  {linha(c.conectado, `${c.nome}: ${c.conectado ? 'conectado' : 'ainda não conectado'}`)}
+                  <a href={linkConectar('upload', c.id)}><button>{c.conectado ? '↻ Conectar de novo' : '🔗 Conectar'}</button></a>
+                </div>
+              ))}
+            </div>
+          )}
 
           {r.conectado && (
             <div className="card">

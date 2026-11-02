@@ -32,8 +32,8 @@ export default async function handler(req, res) {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || d.error) throw new Error(d.error_description || d.error || `TikTok respondeu ${r.status}`);
-    await salvarTokensTiktok(d, { conectadoEm: new Date().toISOString() });
-    return pagina(res, 200, 'TikTok conectado ✅', 'A conexão ficou guardada. Volte para a página do TikTok e mande um vídeo de teste.');
+    await salvarTokensTiktok(d, { conectadoEm: new Date().toISOString() }, guardado.conta || '');
+    return pagina(res, 200, 'TikTok conectado ✅', guardado.conta ? 'A conexão desse canal ficou guardada. Agora é só usar o botão 📱 TikTok nos vídeos prontos da Fábrica.' : 'A conexão ficou guardada. Volte para a página do TikTok e mande um vídeo de teste.');
   } catch (e) {
     return pagina(res, 500, 'Não deu para conectar', `Erro: <b>${limpo(e.message)}</b>`);
   }

@@ -248,6 +248,7 @@ const Fabrica = (() => {
     q('#btnNarRoteiro').onclick = narrarRoteiro;
     q('#btnNarMontar').onclick = narrarMontar;
     window.api.ao('narrar:progresso', (p) => narStatus(p.etapa));
+    window.api.ao('redes:progresso', (p) => p?.texto && avisar(p.texto));
     q('#btnGmAtualizar').onclick = () => carregarNoticias();
     q('#btnPlBuscar').onclick = buscarPolitica;
     q('#btnGmRefazerProg').onclick = () => refazerProgramados('games', q('#btnGmRefazerProg'));
@@ -1315,6 +1316,30 @@ const Fabrica = (() => {
           }
           carregar();
         });
+        // Redes dos canais: 📸 Instagram (Noites na História, publica sozinho) e 📱 TikTok (Noites e games, chega como rascunho)
+        const contaRedes = i.games ? 'games' : i.documentario && !i.politica ? 'noites' : '';
+        if (contaRedes && i.status === 'concluido' && i.videoUrl) {
+          const redes = contaRedes === 'noites' ? [['instagram', '📸', 'Instagram']] : [];
+          redes.push(['tiktok', '📱', 'TikTok']);
+          for (const [rede, icone, nome] of redes) {
+            const env = i.envios?.[rede];
+            const feito = env && env.status !== 'erro';
+            botao(`${icone}${feito ? '✓' : ''}`, feito ? `Já mandado para o ${nome} (${new Date(env.em).toLocaleString('pt-BR')}). Clique para mandar de novo.` : `Mandar para o ${nome}${contaRedes === 'noites' ? ' (vídeo longo vira um corte em pé de 1 minuto)' : ''}`, async (ev) => {
+              if (feito && !confirm(`Esse vídeo já foi mandado para o ${nome}. Mandar de novo?`)) return;
+              const bt = ev.currentTarget;
+              bt.disabled = true;
+              avisar(`Preparando para o ${nome}... (vídeo longo leva 1 a 3 minutos para cortar)`);
+              try {
+                const r = await window.api.fabrica.enviarRede({ id: i.id, rede, videoUrl: i.videoUrl });
+                avisar(`${r.texto || 'Enviado'}${r.corte ? ' (foi o corte em pé de 1 minuto)' : ''}${rede === 'tiktok' ? ' A legenda está copiada.' : ''}`);
+              } catch (e) {
+                avisar(msgErro(e), true);
+              }
+              bt.disabled = false;
+              carregar();
+            });
+          }
+        }
         if (i.status === 'erro') botao('↻', 'Tentar de novo (continua de onde parou)', async () => { await window.api.fabrica.acao({ id: i.id, acao: 'repetir' }); carregar(); });
         if (i.documentario && ['concluido', 'erro'].includes(i.status)) botao('🎬', 'Refazer com vídeos reais, quadrinhos e música (aproveita a narração, sem gastar voz)', async () => {
           if (!confirm(`Refazer "${i.titulo || i.tema}" com a versão nova (vídeos reais, quadrinhos explicando os lugares e música de fundo)?\n\nA narração já feita é aproveitada: não gasta crédito da ElevenLabs. O horário no YouTube continua o mesmo.${i.youtube?.status === 'ok' ? '\n\nEste já está no YouTube: APAGUE o antigo no YouTube Studio antes, senão o novo não sobe (mesmo título).' : ''}`)) return;

@@ -913,6 +913,48 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('fabrica:criar', (_e, dados) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { ...dados, acao: 'criar' } }));
   ipcMain.handle('fabrica:acao', (_e, { id, acao }) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao } }));
+  // Botões 📸 Instagram / 📱 TikTok de um vídeo pronto. Vídeo longo ou deitado vira antes um corte EM PÉ de 1 minuto
+  // (fundo desfocado, "história completa no YouTube"), porque Reels e TikTok são em pé e curtos.
+  ipcMain.handle('redes:enviar', async (_e, { id, rede, videoUrl }) => {
+    const cfg = store.ler();
+    const progresso = (texto) => enviar('redes:progresso', { id, rede, texto });
+    let corteUrl = null;
+    if (videoUrl) {
+      progresso('Conferindo o vídeo...');
+      const info = await probe(videoUrl).catch(() => null);
+      const longo = !info || info.duracao > 89;
+      const deitado = !info || info.largura > info.altura;
+      if (longo || deitado) {
+        const saida = path.join(os.tmpdir(), `corte-redes-${Date.now()}.mp4`);
+        try {
+          const dur = Math.min(60, Math.max(5, (info?.duracao || 60) - 1));
+          progresso('Fazendo o corte em pé de 1 minuto...');
+          await rodar([
+            '-t', String(dur), '-i', videoUrl,
+            '-filter_complex',
+            `[0:v]split[fa][fb];[fa]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:2,eq=brightness=-0.12[fundo];` +
+              `[fb]scale=1080:-2[frente];[fundo][frente]overlay=(W-w)/2:(H-h)/2,fade=t=out:st=${(dur - 1).toFixed(2)}:d=1,format=yuv420p[v]` +
+              (info?.temAudio === false ? '' : `;[0:a]afade=t=out:st=${(dur - 1.5).toFixed(2)}:d=1.5[a]`),
+            '-map', '[v]', ...(info?.temAudio === false ? [] : ['-map', '[a]']), '-r', '30', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', saida,
+          ], { duracaoTotal: dur }).promise;
+          progresso('Enviando o corte...');
+          const up = await Central.subirParaNuvem(cfg, saida);
+          corteUrl = typeof up === 'string' ? up : up?.url;
+        } finally {
+          fs.rm(saida, { force: true }, () => {});
+        }
+      }
+    }
+    progresso(rede === 'tiktok' ? 'Mandando para o TikTok...' : 'Mandando para o Instagram...');
+    const r = await Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao: 'enviar-rede', rede, ...(corteUrl ? { videoUrl: corteUrl } : {}) } });
+    // O rascunho do TikTok não leva legenda: ela fica copiada para colar no celular/app
+    if (r?.legenda) {
+      try {
+        require('electron').clipboard.writeText(r.legenda);
+      } catch {}
+    }
+    return { ...r, corte: !!corteUrl };
+  });
   // Notícias do canal de games: esperam aprovação aqui antes de virar vídeo
   ipcMain.handle('noticias:listar', () => Central.chamar(store.ler(), '/api/central/games-noticias'));
   ipcMain.handle('noticias:acao', (_e, dados) => Central.chamar(store.ler(), '/api/central/games-noticias', { metodo: 'POST', corpo: dados || {} }));

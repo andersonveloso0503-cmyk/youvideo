@@ -18,6 +18,7 @@ import { horarioBrasilia, diaBrasilia, somarDias } from '../../../lib/fabrica';
 import { empresa, faltaConfigurar, temasEmpresa } from '../../../lib/empresa';
 import { PERIODOS, intencaoDoDia, tituloOracao } from '../../../lib/oracaoDia';
 import { testarConta } from '../../../lib/publicarSocial';
+import { enviarRascunhoTiktok, tiktokConectado, CONTAS_TIKTOK } from '../../../lib/publicarTiktok';
 import { temasCortesDaIa, TONS_FILME } from '../../../lib/cortes';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS, TODOS_EPISODIOS } from '../../../lib/documentarioEpisodios';
@@ -27,7 +28,7 @@ import { COLECAO_POLITICA } from '../../../lib/politicaNoticias';
 import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora, criarShortDaMusica } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
-export const config = { maxDuration: 120 }; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
+export const config = { maxDuration: 300 }; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
 
 const COL = 'youvideo_fila';
 
@@ -306,6 +307,7 @@ export default async function handler(req, res) {
             : null,
           criadoEm: x.criadoEm || null,
           videoUrl: x.videoUrl || null,
+          envios: x.envios || null, // botões 📸 Instagram / 📱 TikTok
           thumbnailUrl: x.thumbnailUrl || null,
           quando: x.fabrica.quando,
           quandoYoutube: x.fabrica.quandoYoutube || null,
@@ -1262,6 +1264,58 @@ export default async function handler(req, res) {
         await ref.delete();
       }
       return res.status(200).json({ ok: true, id: novo.id, aproveitouVoz: temVoz, jaNoYoutube: f.youtube?.status === 'ok' ? f.youtube.url || 'sim' : '' });
+    }
+    if (b.acao === 'enviar-rede') {
+      // Botões 📸 Instagram e 📱 TikTok de um vídeo pronto:
+      //  Instagram: vai para a agenda das redes e o robô publica sozinho em até 10 min (Reels).
+      //  TikTok: chega como rascunho no TikTok do canal; é só tocar no aviso, colar a legenda e publicar.
+      const d = (await ref.get()).data() || {};
+      const rede = b.rede === 'tiktok' ? 'tiktok' : b.rede === 'instagram' ? 'instagram' : '';
+      if (!rede) return res.status(400).json({ erro: 'Rede desconhecida.' });
+      const conta = d.games ? 'games' : d.documentario && !d.politica ? 'noites' : '';
+      if (!conta) return res.status(400).json({ erro: 'Por enquanto o envio para as redes é dos canais Próxima Fase (games) e Noites na História.' });
+      if (rede === 'instagram' && conta !== 'noites') return res.status(400).json({ erro: 'O canal de games ainda não tem Instagram.' });
+      // O Compilador pode mandar um corte em pé (vídeo longo ou deitado); senão vai o próprio vídeo
+      const corte = typeof b.videoUrl === 'string' && /^https:\/\/[a-z0-9.-]+\.blob\.vercel-storage\.com\//i.test(b.videoUrl) ? b.videoUrl : '';
+      const videoUrl = corte || d.videoUrl;
+      if (!videoUrl) return res.status(400).json({ erro: 'O vídeo ainda não está pronto.' });
+      const r = d.roteiro || {};
+      const titulo = String(r.titulo || d.tema || '').slice(0, 150);
+      const resumo = String(r.descricao || '').split(/\n\s*\n/).find((p) => p.trim() && p.trim() !== titulo && !/^https?:|inscrev|^imagens:|^fontes/i.test(p.trim())) || '';
+      const hashtags = [...new Set((r.tags || []).slice(0, 5).map((t) => '#' + String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')).filter((t) => t.length > 2))];
+      const fixas = conta === 'noites' ? ['#noitesnahistoria', '#historia', '#curiosidades'] : ['#proximafase', '#games', '#jogos'];
+      const chamada = corte ? (conta === 'noites' ? '▶ A história completa está no YouTube: Noites na História' : '▶ Vídeo completo no YouTube: Próxima Fase') : conta === 'noites' ? '🌙 Siga para mais histórias reais' : '🎮 Siga para mais novidades dos games';
+      const legenda = [titulo, resumo.trim().slice(0, 600), chamada, [...hashtags, ...fixas].slice(0, 8).join(' ')].filter(Boolean).join('\n\n').slice(0, 2200);
+      const envios = d.envios || {};
+      if (rede === 'instagram') {
+        const ag = await db.collection('youvideo_agenda').add({
+          titulo,
+          legenda,
+          videoUrl,
+          thumbnailUrl: d.thumbnailUrl || null,
+          conta: 'noites',
+          curto: true,
+          quando: new Date().toISOString(),
+          redes: { instagram: { status: 'pendente' } },
+          pendente: true,
+          origem: 'fabrica-botao',
+          filaId: ref.id,
+          criadoEm: new Date().toISOString(),
+        });
+        await ref.update({ 'envios.instagram': { status: 'agendado', agendaId: ag.id, em: new Date().toISOString(), corte: !!corte } });
+        return res.status(200).json({ ok: true, rede, legenda, texto: 'Vai para o Instagram do Noites na História em até 10 minutos (o robô publica sozinho).' });
+      }
+      if (!(await tiktokConectado(conta))) {
+        return res.status(400).json({ erro: `O TikTok do ${CONTAS_TIKTOK[conta]} ainda não está conectado. Abra o site, página /tiktok, e clique em Conectar nesse canal (uma vez só).` });
+      }
+      try {
+        const t = await enviarRascunhoTiktok({ videoUrl, conta });
+        await ref.update({ 'envios.tiktok': { status: 'rascunho', id: t.id, em: new Date().toISOString(), corte: !!corte } });
+        return res.status(200).json({ ok: true, rede, legenda, texto: `Chegou no TikTok do ${CONTAS_TIKTOK[conta]}: abra o app, toque no aviso do vídeo, cole a legenda (já está copiada) e publique.` });
+      } catch (e) {
+        await ref.update({ 'envios.tiktok': { status: 'erro', erro: String(e.message).slice(0, 300), em: new Date().toISOString() } });
+        return res.status(400).json({ erro: e.message });
+      }
     }
     if (b.acao === 'produzir-agora') {
       // Adianta um vídeo que está esperando a vez: a fábrica começa já na próxima volta (5 min).

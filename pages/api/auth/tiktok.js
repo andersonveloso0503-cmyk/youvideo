@@ -4,7 +4,7 @@
 import { randomBytes } from 'crypto';
 import { getDb } from '../../../lib/firebase-admin';
 import { autorizado } from '../../../lib/central';
-import { redirectTiktok, credenciaisTiktok } from '../../../lib/publicarTiktok';
+import { redirectTiktok, credenciaisTiktok, CONTAS_TIKTOK } from '../../../lib/publicarTiktok';
 
 export default async function handler(req, res) {
   const pagina = (texto) => res.status(400).setHeader('Content-Type', 'text/html; charset=utf-8').send(
@@ -16,7 +16,9 @@ export default async function handler(req, res) {
 
   // "state" guardado para a volta: só vale a autorização que saiu daqui, nos próximos 15 minutos
   const state = randomBytes(16).toString('hex');
-  await getDb().collection('youvideo_central').doc('tiktok_state').set({ state, em: new Date().toISOString() });
+  // conta = qual TikTok está sendo conectado (games, noites...); vazio = a conta principal
+  const conta = CONTAS_TIKTOK[req.query.conta] ? String(req.query.conta) : '';
+  await getDb().collection('youvideo_central').doc('tiktok_state').set({ state, conta, em: new Date().toISOString() });
 
   const params = new URLSearchParams({
     client_key: key,

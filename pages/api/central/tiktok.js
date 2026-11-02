@@ -5,7 +5,7 @@
 // POST { acao: 'desconectar' }         -> esquece a conexão
 import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
-import { chavesTiktok, validarChavesTiktok, redirectTiktok, tiktokConectado, contaTiktok, enviarRascunhoTiktok, statusEnvioTiktok, desconectarTiktok } from '../../../lib/publicarTiktok';
+import { chavesTiktok, validarChavesTiktok, redirectTiktok, tiktokConectado, contaTiktok, enviarRascunhoTiktok, statusEnvioTiktok, desconectarTiktok, CONTAS_TIKTOK } from '../../../lib/publicarTiktok';
 
 export const config = { maxDuration: 120 };
 
@@ -26,6 +26,8 @@ export default async function handler(req, res) {
       saida.validacao = await validarChavesTiktok();
       saida.tamanhos = tamanhosChaves();
       saida.conectado = await tiktokConectado();
+      // Contas dos canais (botão 📱 TikTok da Fábrica)
+      saida.canais = await Promise.all(Object.entries(CONTAS_TIKTOK).map(async ([id, nome]) => ({ id, nome, conectado: await tiktokConectado(id).catch(() => false) })));
       if (saida.conectado) {
         const guardado = (await getDb().collection('youvideo_central').doc('tiktok').get()).data() || {};
         saida.escopos = guardado.escopos || '';
@@ -56,7 +58,7 @@ export default async function handler(req, res) {
       return res.status(200).json(await statusEnvioTiktok(String(b.publishId)));
     }
     if (b.acao === 'desconectar') {
-      await desconectarTiktok();
+      await desconectarTiktok(CONTAS_TIKTOK[b.conta] ? String(b.conta) : '');
       return res.status(200).json({ ok: true });
     }
     return res.status(400).json({ erro: 'Pedido desconhecido.' });
