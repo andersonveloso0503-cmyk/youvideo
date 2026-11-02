@@ -180,11 +180,29 @@ const Fabrica = (() => {
     // Política: já vem marcado o canal de política (se estiver conectado)
     const pol = lista.find((c) => /pol[ií]tic|not[ií]cia|bras[ií]lia|planalto/i.test(c.titulo || ''));
     if (pol) q('#fabPlCanal').value = pol.id;
+    // O canal que você escolheu em cada aba vale mais que tudo (fica lembrado de uma vez para a outra)
+    const escolhidos = config.fabricaCanais || {};
+    for (const [id, canalId] of Object.entries(escolhidos)) {
+      const sel = q(id);
+      if (sel && lista.some((c) => c.id === canalId)) sel.value = canalId;
+    }
+  }
+
+  function lembrarCanais() {
+    for (const id of ['#fabOrCanal', '#fabCtCanal', '#fabLgCanal', '#fabDocCanal', '#fabGmCanal', '#fabPlCanal', '#fabIfCanal']) {
+      const sel = q(id);
+      if (!sel) continue;
+      sel.addEventListener('change', () => {
+        config.fabricaCanais = { ...(config.fabricaCanais || {}), [id]: sel.value };
+        window.api.config.salvar({ fabricaCanais: config.fabricaCanais }).catch(() => {});
+      });
+    }
   }
 
   function ligar() {
     if (ligado) return;
     ligado = true;
+    lembrarCanais();
     const p = prefs();
     if (p.dias) q('#fabDias').value = p.dias;
     if (p.porDia) q('#fabPorDia').value = p.porDia;
