@@ -83,6 +83,7 @@ contextBridge.exposeInMainWorld('api', {
     conferir: chamar('canais:conferir'),
     corrigir: chamar('canais:corrigir'),
     desprogramar: chamar('canais:desprogramar'),
+    apagarProgramado: chamar('canais:apagarProgramado'),
   },
   fila: {
     listar: chamar('fila:listar'),

@@ -700,7 +700,24 @@ async function publicarAgora({ credenciais, refreshToken, redirectOriginal, id }
   return { jaPublico: false };
 }
 
+/**
+ * Apaga um vídeo que AINDA NÃO foi ao ar (privado e com data programada). Vídeo público ou já no ar: não mexe.
+ * Serve para refazer um vídeo programado (ex.: montado com a imagem estourada) sem deixar o antigo repetido.
+ */
+async function apagarProgramado({ credenciais, refreshToken, redirectOriginal, id }) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const v = await yt.videos.list({ part: ['status'], id: [id] });
+  const st = v.data.items?.[0]?.status;
+  if (!st) return { naoAchou: true };
+  if (st.privacyStatus !== 'private' || !st.publishAt || new Date(st.publishAt).getTime() < Date.now()) {
+    throw new Error('Este vídeo já está no ar; não apaguei');
+  }
+  await yt.videos.delete({ id });
+  return { apagado: true };
+}
+
 module.exports = {
+  apagarProgramado,
   publicarAgora,
   agendados,
   trocarCapa,

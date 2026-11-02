@@ -1210,6 +1210,14 @@ app.whenReady().then(() => {
       onProgresso: (x) => enviar('canais:progresso', x),
     });
   });
+  ipcMain.handle('canais:apagarProgramado', async (_e, { canalId, videoId }) => {
+    const canal = store.canal(canalId);
+    if (!canal) throw new Error('Canal não encontrado. Conecte de novo em Contas YouTube.');
+    const cfg = store.ler();
+    const r = await YT.apagarProgramado({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect, id: String(videoId) });
+    if (fila.cacheCanal) delete fila.cacheCanal[canalId]; // o canal mudou: a conferência de título repetido olha de novo
+    return r;
+  });
   ipcMain.handle('canais:remover', (_e, id) => {
     store.removerCanal(id);
     sincronizarDepois();

@@ -250,6 +250,8 @@ const Fabrica = (() => {
     window.api.ao('narrar:progresso', (p) => narStatus(p.etapa));
     q('#btnGmAtualizar').onclick = () => carregarNoticias();
     q('#btnPlBuscar').onclick = buscarPolitica;
+    q('#btnGmRefazerProg').onclick = () => refazerProgramados('games', q('#btnGmRefazerProg'));
+    q('#btnPlRefazerProg').onclick = () => refazerProgramados('politica', q('#btnPlRefazerProg'));
     q('#btnPlVideo').onclick = resumoPolitica;
     q('#btnPlAtualizar').onclick = () => carregarPolitica();
     q('#btnPlExplicador').onclick = () => {
@@ -828,6 +830,37 @@ const Fabrica = (() => {
       botao.disabled = false;
       avisar(msgErro(e), true);
     }
+  }
+
+  // ───────── Refazer os vídeos já enviados mas que ainda NÃO foram ao ar (ex.: imagem estourada) ─────────
+  const idDoYoutube = (url) => (String(url || '').match(/(?:shorts\/|youtu\.be\/|[?&]v=)([\w-]{11})/) || [])[1] || '';
+  async function refazerProgramados(aba, botao) {
+    const { itens: todos = [] } = await window.api.fabrica.listar();
+    const daqui30 = Date.now() + 30 * 60e3;
+    const alvos = todos.filter(
+      (i) => abaDe(i) === aba && i.status === 'concluido' && i.youtube?.status === 'ok' && idDoYoutube(i.youtube.url) &&
+        i.canalYoutube?.id && new Date(i.quandoYoutube || i.quando).getTime() > daqui30
+    );
+    if (!alvos.length) return avisar('Nenhum vídeo programado (ainda fora do ar) para refazer nesta aba.');
+    if (!confirm(`Refazer ${alvos.length} vídeo(s) que ainda NÃO foram ao ar?\n\n${alvos.map((i) => '• ' + (i.titulo || i.tema)).join('\n')}\n\nO Compilador APAGA a versão programada no YouTube (0 visualizações, ainda privada) e monta de novo com a imagem inteira. Cada um volta no mesmo horário. Vídeo que já está público não é tocado.\nGasta um pouco de voz da ElevenLabs nos Shorts.`)) return;
+    const rotulo = botao.textContent;
+    botao.disabled = true;
+    let feitos = 0;
+    const falhas = [];
+    for (const [n, i] of alvos.entries()) {
+      botao.textContent = `♻️ Refazendo ${n + 1} de ${alvos.length}...`;
+      try {
+        await window.api.canais.apagarProgramado({ canalId: i.canalYoutube.id, videoId: idDoYoutube(i.youtube.url) });
+        await window.api.fabrica.acao({ id: i.id, acao: 'refazer-documentario' });
+        feitos++;
+      } catch (e) {
+        falhas.push(`${i.titulo || i.tema}: ${msgErro(e)}`);
+      }
+    }
+    botao.disabled = false;
+    botao.textContent = rotulo;
+    avisar(`${feitos} vídeo(s) sendo refeitos com a imagem nova (sobem de novo no mesmo horário)${falhas.length ? `. Não deu: ${falhas.join(' · ')}` : ''}`, !!falhas.length);
+    carregar();
   }
 
   // ───────── Canal de política: roteiros esperam o ✅ do dono ─────────
