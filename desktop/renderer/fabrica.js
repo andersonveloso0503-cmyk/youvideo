@@ -976,7 +976,8 @@ const Fabrica = (() => {
     b.textContent = '💡 Pesquisando e escrevendo (1 a 2 min)...';
     try {
       const r = await window.api.politica.acao({ acao: 'explicador', tema, formato: q('#plFormato').value });
-      avisar(`Explicador escrito: "${r.titulo}" — leia e aprove na lista`);
+      avisar(r.emSegundoPlano ? `O Claude está pesquisando "${r.titulo}". O cartão ⏳ já está na lista e vira o roteiro em 1 a 4 min` : `Explicador escrito: "${r.titulo}" — leia e aprove na lista`);
+      if (r.emSegundoPlano) [60, 120, 180, 240].forEach((s) => setTimeout(carregarPolitica, s * 1000)); // atualiza a lista sozinho
       q('#plTema').value = '';
       q('#plExplicadorCaixa').hidden = true;
       carregarPolitica();

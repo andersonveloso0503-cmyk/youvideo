@@ -60,7 +60,13 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
-      const [aguardando, aprovadas, c] = await Promise.all([col.where('status', '==', 'aguardando').get(), col.where('status', '==', 'aprovada').get(), cfg.get()]);
+      const [aguardando, aprovadas, c, escrevendo, falhou] = await Promise.all([
+        col.where('status', '==', 'aguardando').get(),
+        col.where('status', '==', 'aprovada').get(),
+        cfg.get(),
+        col.where('status', '==', 'escrevendo').get(),
+        col.where('status', '==', 'falhou').get(),
+      ]);
       const resumo = (d) => {
         const x = d.data();
         return {
@@ -74,14 +80,24 @@ export default async function handler(req, res) {
           links: x.links || null,
           data: x.data || null,
           imagem: x.imagens?.[0] || null,
-          roteiro: String(x.ep?.texto || '').split('\n').filter((l) => l && !l.startsWith('@ ') && !l.startsWith('# ')).join('\n'),
+          roteiro:
+            x.status === 'escrevendo'
+              ? 'O Claude está pesquisando e escrevendo. Clique em ↻ daqui a 1 ou 2 minutos.'
+              : x.status === 'falhou'
+                ? `Não deu certo: ${x.erro || 'erro desconhecido'}. Clique em ❌ Descartar e tente de novo.`
+                : String(x.ep?.texto || '').split('\n').filter((l) => l && !l.startsWith('@ ') && !l.startsWith('# ')).join('\n'),
+          ...(x.status === 'escrevendo' ? { tituloVideo: `⏳ Escrevendo: ${x.titulo}` } : x.status === 'falhou' ? { tituloVideo: `⚠️ Falhou: ${x.titulo}` } : {}),
           criadoEm: x.criadoEm,
           aprovadaEm: x.aprovadaEm || null,
         };
       };
       const porData = (a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
       return res.status(200).json({
-        aguardando: aguardando.docs.map(resumo).sort(porData),
+        // Explicadores ainda sendo escritos (até 10 min) e os que falharam (últimas 24 h) aparecem no alto da lista
+        aguardando: [
+          ...escrevendo.docs.filter((d) => Date.now() - new Date(d.data().criadoEm || 0).getTime() < 10 * 60e3),
+          ...falhou.docs.filter((d) => Date.now() - new Date(d.data().falhouEm || 0).getTime() < 24 * 3600e3),
+        ].map(resumo).sort(porData).concat(aguardando.docs.map(resumo).sort(porData)),
         aprovadas: aprovadas.docs.map(resumo).sort((a, b) => String(b.aprovadaEm || '').localeCompare(String(a.aprovadaEm || ''))).slice(0, 15),
         ultimaBusca: c.data()?.ultimaBusca || null,
         fontes: c.data()?.fontes || [],
@@ -131,18 +147,38 @@ export default async function handler(req, res) {
       const tema = String(b.tema || '').trim().slice(0, 200);
       if (!tema) return res.status(400).json({ erro: 'Escreva o tema do explicador.' });
       const formato = b.formato === 'short' ? 'short' : 'longo';
-      const { ep, fontes } = await roteiroExplicador(tema, formato);
-      await col.doc(ep.id).set({
-        status: 'aguardando',
-        tipo: formato === 'short' ? 'explicador-short' : 'explicador',
-        titulo: ep.titulo,
-        fonte: 'Pesquisa na web',
-        links: fontes.slice(0, 8).map((f) => ({ titulo: f.titulo, link: f.url })),
-        imagens: [],
-        ep,
-        criadoEm: new Date().toISOString(),
-      });
-      return res.status(200).json({ ok: true, id: ep.id, titulo: ep.titulo });
+      // A pesquisa + o roteiro levam de 1 a 4 min: o cartão "⏳ Escrevendo" aparece na lista na hora
+      // e vira o roteiro (ou mostra o erro) quando termina. Assim nada some sem aviso.
+      const tipo = formato === 'short' ? 'explicador-short' : 'explicador';
+      const marcador = col.doc();
+      await marcador.set({ status: 'escrevendo', tipo, titulo: tema, fonte: 'Pesquisa na web', imagens: [], criadoEm: new Date().toISOString() });
+      const trabalho = (async () => {
+        try {
+          const { ep, fontes } = await roteiroExplicador(tema, formato);
+          await col.doc(ep.id).set({
+            status: 'aguardando',
+            tipo,
+            titulo: ep.titulo,
+            fonte: 'Pesquisa na web',
+            links: fontes.slice(0, 8).map((f) => ({ titulo: f.titulo, link: f.url })),
+            imagens: [],
+            ep,
+            criadoEm: new Date().toISOString(),
+          });
+          await marcador.delete();
+        } catch (e) {
+          await marcador.update({ status: 'falhou', erro: String(e.message || e).slice(0, 300), falhouEm: new Date().toISOString() }).catch(() => {});
+        }
+      })();
+      const ctx = globalThis[Symbol.for('@vercel/request-context')]?.get?.();
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(trabalho);
+        return res.status(200).json({ ok: true, id: marcador.id, titulo: tema, emSegundoPlano: true });
+      }
+      await trabalho;
+      const fim = (await marcador.get()).data();
+      if (fim?.status === 'falhou') return res.status(500).json({ erro: fim.erro });
+      return res.status(200).json({ ok: true, titulo: tema });
     }
 
     if (b.acao === 'aprovar') {
