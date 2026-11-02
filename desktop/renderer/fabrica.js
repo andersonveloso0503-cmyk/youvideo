@@ -1338,7 +1338,7 @@ const Fabrica = (() => {
           carregar();
         });
         // Redes dos canais: 📸 Instagram (Noites na História, publica sozinho) e 📱 TikTok (Noites e games, chega como rascunho)
-        const contaRedes = i.games ? 'games' : i.documentario && !i.politica ? 'noites' : '';
+        const contaRedes = i.games ? 'games' : i.documentario || i.politica ? 'noites' : ''; // política sai no canal Noites na História
         if (contaRedes && i.status === 'concluido' && i.videoUrl) {
           const redes = contaRedes === 'noites' ? [['instagram', '📸', 'Instagram']] : [];
           redes.push(['tiktok', '📱', 'TikTok']);

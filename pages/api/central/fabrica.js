@@ -1277,7 +1277,8 @@ export default async function handler(req, res) {
       const d = (await ref.get()).data() || {};
       const rede = b.rede === 'tiktok' ? 'tiktok' : b.rede === 'instagram' ? 'instagram' : '';
       if (!rede) return res.status(400).json({ erro: 'Rede desconhecida.' });
-      const conta = d.games ? 'games' : d.documentario && !d.politica ? 'noites' : '';
+      // Política sai no mesmo canal do Noites na História: mesmas redes
+      const conta = d.games ? 'games' : d.documentario || d.politica ? 'noites' : '';
       if (!conta) return res.status(400).json({ erro: 'Por enquanto o envio para as redes é dos canais Próxima Fase (games) e Noites na História.' });
       if (rede === 'instagram' && conta !== 'noites') return res.status(400).json({ erro: 'O canal de games ainda não tem Instagram.' });
       // O Compilador pode mandar um corte em pé (vídeo longo ou deitado); senão vai o próprio vídeo
