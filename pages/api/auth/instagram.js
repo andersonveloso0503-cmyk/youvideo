@@ -22,5 +22,6 @@ export default async function handler(req, res) {
     scope: 'instagram_business_basic,instagram_business_content_publish',
     state,
   });
+  console.log(`[instagram-auth] conta=${conta} client_id termina em ...${id.slice(-4)} (${id.length} dígitos) redirect_uri=${redirectIg(req.headers.host)}`);
   res.redirect(`https://www.instagram.com/oauth/authorize?${params.toString()}`);
 }
