@@ -639,7 +639,8 @@ export default async function handler(req, res) {
             const ep = EPISODIOS.find((e) => e.id === item.episodioId) || {};
             thumbnailUrl =
               (await thumbDocumentario({
-                fotoUrl: item.capaUrl || primeiraImagem,
+                // Política: a capa mostra a pessoa da notícia (1ª foto de pessoa das cenas), não Brasília
+                fotoUrl: item.politica ? (item.arquivos || []).find((x) => /^wp/.test(String(x.midiaId || '')) && x.imageUrl)?.imageUrl || primeiraImagem : item.capaUrl || primeiraImagem,
                 texto: ep.thumb || item.roteiro.thumbnailTitulo,
                 subtitulo: ep.thumbSub || item.roteiro.thumbnailSubtitulo,
                 arte: item.politica ? '' : ep.arte || item.roteiro.arte,
