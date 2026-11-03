@@ -213,6 +213,7 @@ export default function Acompanhar() {
   const espera = itens.filter(naEspera);
   const prontos = itens.filter((i) => i.status === 'concluido').sort((a, b) => String(b.quandoYoutube || b.quando).localeCompare(String(a.quandoYoutube || a.quando)));
   const avisos = itens.filter((i) => i.status !== 'erro' && i.aviso);
+  const paraAprovar = itens.filter((i) => i.status === 'concluido' && i.youtube?.status === 'revisar');
 
   return (
     <div style={{ minHeight: '100vh', background: '#11111a', color: '#f1f1f7', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', padding: '16px 16px 40px', maxWidth: 640, margin: '0 auto' }}>
@@ -249,6 +250,14 @@ export default function Acompanhar() {
             </button>
           </div>
           {erro && <p style={{ color: '#ff8a8a', fontSize: 14 }}>{erro}</p>}
+
+          <a
+            href="/aprovar"
+            style={{ display: 'block', textDecoration: 'none', background: paraAprovar.length ? '#2f8a5b' : '#1b1b28', color: '#fff', borderRadius: 12, padding: '14px 16px', marginBottom: 12, fontSize: 16, fontWeight: 700 }}
+          >
+            ✅ Aprovar vídeos {paraAprovar.length ? `(${paraAprovar.length} esperando)` : ''} <span style={{ float: 'right' }}>›</span>
+            <div style={{ fontSize: 12.5, fontWeight: 400, opacity: 0.85, marginTop: 4 }}>Assista e aprove antes de ir para o YouTube e o Instagram</div>
+          </a>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
             {[

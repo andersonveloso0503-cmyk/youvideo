@@ -15,7 +15,7 @@ export default function Aprovar() {
 
   useEffect(() => {
     try {
-      setToken(localStorage.getItem(CHAVE) || '');
+      setToken(localStorage.getItem(CHAVE) || localStorage.getItem('central-token') || '');
     } catch {
       /* sem armazenamento */
     }
@@ -78,7 +78,9 @@ export default function Aprovar() {
       </Head>
       <div style={{ maxWidth: 520, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <h1 style={{ fontSize: 22, margin: 0 }}>✅ Aprovar vídeos</h1>
+          <h1 style={{ fontSize: 22, margin: 0 }}>
+            <a href="/acompanhar" style={{ color: '#c9bfae', textDecoration: 'none', marginRight: 8 }}>‹</a>✅ Aprovar vídeos
+          </h1>
           {token && (
             <button onClick={carregar} style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid #3a3226', background: '#211d17', color: '#f3ead9' }}>
               ↻ Atualizar
