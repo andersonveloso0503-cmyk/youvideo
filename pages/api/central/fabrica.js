@@ -264,6 +264,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.revisar === '1') {
       const snap = await col.where('fabrica.youtube.status', '==', 'revisar').get();
       const itens = snap.docs
+        .filter((d) => d.data().fabrica?.ativo !== false) // refeito ou cancelado: não aparece mais
         .map((d) => {
           const x = d.data();
           return {
@@ -1220,7 +1221,8 @@ export default async function handler(req, res) {
       });
       const jaNoYoutube = f.youtube?.status === 'ok' ? f.youtube.url || 'sim' : '';
       if (d.status === 'concluido') {
-        await ref.update({ 'fabrica.ativo': false });
+        // O antigo sai da aba ✅ Aprovar e nunca vai para o YouTube (o novo toma o lugar dele)
+        await ref.update({ 'fabrica.ativo': false, ...(f.youtube?.status === 'revisar' ? { 'fabrica.youtube': null } : {}) });
         if (f.agendaId) await db.collection('youvideo_agenda').doc(f.agendaId).delete().catch(() => {});
       } else {
         await ref.delete();
@@ -1293,7 +1295,8 @@ export default async function handler(req, res) {
         },
       });
       if (d.status === 'concluido') {
-        await ref.update({ 'fabrica.ativo': false });
+        // O antigo sai da aba ✅ Aprovar e nunca vai para o YouTube (o novo toma o lugar dele)
+        await ref.update({ 'fabrica.ativo': false, ...(f.youtube?.status === 'revisar' ? { 'fabrica.youtube': null } : {}) });
         if (f.agendaId) await db.collection('youvideo_agenda').doc(f.agendaId).delete().catch(() => {});
       } else {
         await ref.delete();
