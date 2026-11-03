@@ -91,7 +91,7 @@ async function recuperarErrosDeImagem(db) {
   for (const d of snap.docs) {
     const x = d.data();
     if (!(x.politica || x.games) || x.fabrica?.ativo === false) continue;
-    if (!/Nenhuma imagem real foi encontrada/.test(String(x.erro || ''))) continue;
+    if (!/Nenhuma imagem real foi encontrada|LIMITE_PEXELS/.test(String(x.erro || ''))) continue;
     if ((x.recuperacoesImagem || 0) >= 3) continue;
     await d.ref.update({
       status: x.narracao?.audioSegments?.length ? 'voz_ok' : x.statusAntes || 'roteiro_ok',
@@ -830,6 +830,12 @@ export default async function handler(req, res) {
         feitos.push({ id: doc.id, statusAnterior });
         if (doc.data().tentativas) await doc.ref.update({ tentativas: 0 });
       } catch (err) {
+        // Limite da Pexels (por hora): não é erro do vídeo — espera a próxima rodada, sem contar tentativa
+        if (err?.message === 'LIMITE_PEXELS') {
+          await doc.ref.update({ ultimoErro: 'Banco de imagens pediu uma pausa (limite por hora): continua sozinho na próxima rodada' }).catch(() => {});
+          feitos.push({ id: doc.id, statusAnterior, obs: 'pausa Pexels' });
+          continue;
+        }
         // Não deixa um item com erro travar a fila (nem gastar crédito repetindo para sempre)
         const tentativas = (doc.data().tentativas || 0) + 1;
         // Falta de crédito (Flux, fal.ai, ElevenLabs): espera a recarga automática cair — tenta por até ~1 hora
