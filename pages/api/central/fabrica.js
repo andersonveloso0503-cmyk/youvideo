@@ -1321,7 +1321,6 @@ export default async function handler(req, res) {
       // Política sai no mesmo canal do Noites na História: mesmas redes
       const conta = d.games ? 'games' : d.documentario || d.politica ? 'noites' : '';
       if (!conta) return res.status(400).json({ erro: 'Por enquanto o envio para as redes é dos canais Próxima Fase (games) e Noites na História.' });
-      if (rede === 'instagram' && conta !== 'noites') return res.status(400).json({ erro: 'O canal de games ainda não tem Instagram.' });
       // O Compilador pode mandar um corte em pé (vídeo longo ou deitado); senão vai o próprio vídeo
       const corte = typeof b.videoUrl === 'string' && /^https:\/\/[a-z0-9.-]+\.blob\.vercel-storage\.com\//i.test(b.videoUrl) ? b.videoUrl : '';
       const videoUrl = corte || d.videoUrl;
@@ -1340,7 +1339,7 @@ export default async function handler(req, res) {
           legenda,
           videoUrl,
           thumbnailUrl: d.thumbnailUrl || null,
-          conta: 'noites',
+          conta,
           curto: true,
           quando: new Date().toISOString(),
           redes: { instagram: { status: 'pendente' } },
@@ -1350,7 +1349,7 @@ export default async function handler(req, res) {
           criadoEm: new Date().toISOString(),
         });
         await ref.update({ 'envios.instagram': { status: 'agendado', agendaId: ag.id, em: new Date().toISOString(), corte: !!corte } });
-        return res.status(200).json({ ok: true, rede, legenda, texto: 'Vai para o Instagram do Noites na História em até 10 minutos (o robô publica sozinho).' });
+        return res.status(200).json({ ok: true, rede, legenda, texto: `Vai para o Instagram do ${conta === 'games' ? 'Próxima Fase' : 'Noites na História'} em até 10 minutos (o robô publica sozinho).` });
       }
       if (!(await tiktokConectado(conta))) {
         return res.status(400).json({ erro: `O TikTok do ${CONTAS_TIKTOK[conta]} ainda não está conectado. Abra o site, página /tiktok, e clique em Conectar nesse canal (uma vez só).` });

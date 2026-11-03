@@ -1338,10 +1338,10 @@ const Fabrica = (() => {
           }
           carregar();
         });
-        // Redes dos canais: 📸 Instagram (Noites na História, publica sozinho) e 📱 TikTok (Noites e games, chega como rascunho)
+        // Redes dos canais: 📸 Instagram (publica sozinho) e 📱 TikTok (chega como rascunho), no Noites na História e no Próxima Fase
         const contaRedes = i.games ? 'games' : i.documentario || i.politica ? 'noites' : ''; // política sai no canal Noites na História
         if (contaRedes && i.status === 'concluido' && i.videoUrl) {
-          const redes = contaRedes === 'noites' ? [['instagram', '📸', 'Instagram']] : [];
+          const redes = [['instagram', '📸', 'Instagram']]; // Noites na História e Próxima Fase
           redes.push(['tiktok', '📱', 'TikTok']);
           for (const [rede, icone, nome] of redes) {
             const env = i.envios?.[rede];
