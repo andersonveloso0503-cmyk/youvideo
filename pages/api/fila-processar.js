@@ -77,6 +77,28 @@ async function refazerImagensDocumentarios(db) {
   }
 }
 
+/**
+ * Política e games que deram "Nenhuma imagem real foi encontrada" (limite da Pexels antes da correção de 03/11):
+ * voltam sozinhos para a busca de imagens, já com a escolha nova (pela frase). A voz é aproveitada.
+ */
+async function recuperarErrosDeImagem(db) {
+  const snap = await db.collection('youvideo_fila').where('status', '==', 'erro').limit(100).get();
+  for (const d of snap.docs) {
+    const x = d.data();
+    if (!(x.politica || x.games) || x.fabrica?.ativo === false) continue;
+    if (!/Nenhuma imagem real foi encontrada/.test(String(x.erro || ''))) continue;
+    if ((x.recuperacoesImagem || 0) >= 3) continue;
+    await d.ref.update({
+      status: x.narracao?.audioSegments?.length ? 'voz_ok' : x.statusAntes || 'roteiro_ok',
+      erro: null,
+      tentativas: 0,
+      arquivosParciais: null,
+      midiasPlanejadas: false,
+      recuperacoesImagem: (x.recuperacoesImagem || 0) + 1,
+    });
+  }
+}
+
 export default async function handler(req, res) {
   const db = getDb();
   const baseUrl = `https://${req.headers.host}`;
@@ -762,6 +784,7 @@ export default async function handler(req, res) {
   const soFabrica = req.query.fabrica === '1';
   const inicio = Date.now();
   if (soFabrica) await refazerImagensDocumentarios(db).catch(() => {});
+  if (soFabrica) await recuperarErrosDeImagem(db).catch(() => {});
 
   const feitos = [];
   const vistos = new Set();
