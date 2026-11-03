@@ -307,7 +307,7 @@ export default async function handler(req, res) {
       // Vídeos com erro aparecem sempre, mesmo os antigos (antes sumiam da lista depois de 3 dias)
       const docsLista = [...snap.docs];
       if (req.query.youtube !== '1') {
-        const comErro = await col.where('status', '==', 'erro').get().catch(() => ({ docs: [] }));
+        const comErro = await col.where('status', '==', 'erro').limit(40).get().catch(() => ({ docs: [] }));
         const ja = new Set(docsLista.map((d) => d.id));
         comErro.docs.forEach((d) => !ja.has(d.id) && d.data().fabrica && docsLista.push(d));
       }

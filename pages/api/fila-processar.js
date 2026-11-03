@@ -82,7 +82,12 @@ async function refazerImagensDocumentarios(db) {
  * voltam sozinhos para a busca de imagens, já com a escolha nova (pela frase). A voz é aproveitada.
  */
 async function recuperarErrosDeImagem(db) {
-  const snap = await db.collection('youvideo_fila').where('status', '==', 'erro').limit(100).get();
+  // No máximo a cada 30 min (cada leitura conta no limite diário grátis do banco)
+  const cfg = db.collection('youvideo_config').doc('recuperar_imagens');
+  const c = (await cfg.get()).data() || {};
+  if (c.em && Date.now() - c.em < 30 * 60e3) return;
+  await cfg.set({ em: Date.now() }, { merge: true });
+  const snap = await db.collection('youvideo_fila').where('status', '==', 'erro').limit(40).get();
   for (const d of snap.docs) {
     const x = d.data();
     if (!(x.politica || x.games) || x.fabrica?.ativo === false) continue;
@@ -791,13 +796,15 @@ export default async function handler(req, res) {
   try {
     // Fábrica (cron de 5 em 5 min): lê só os vídeos que vão ao ar entre 4 dias atrás e 3 dias à frente —
     // antes lia a fila inteira a cada volta e estourava o limite diário de leituras do banco.
+    // 03/11: lê só os vídeos EM PRODUÇÃO (status ativo) — os prontos e os com erro, que são a maioria, nem são lidos.
+    // A janela de datas da fábrica é conferida aqui no código.
+    const ATIVOS = ['pendente', 'roteiro_ok', 'voz_ok', 'imagens_ok', 'animando', 'montando'];
+    const snapAtivos = await db.collection('youvideo_fila').where('status', 'in', ATIVOS).limit(300).get();
+    const deIni = new Date(Date.now() - 4 * 24 * 3600e3).toISOString();
+    const ateFim = new Date(Date.now() + 3 * 24 * 3600e3).toISOString();
     const snapshot = soFabrica
-      ? await db
-          .collection('youvideo_fila')
-          .where('fabrica.quando', '>=', new Date(Date.now() - 4 * 24 * 3600e3).toISOString())
-          .where('fabrica.quando', '<=', new Date(Date.now() + 3 * 24 * 3600e3).toISOString())
-          .get()
-      : await db.collection('youvideo_fila').where('status', 'not-in', ['concluido', 'erro']).limit(200).get();
+      ? { docs: snapAtivos.docs.filter((d) => { const q = d.data().fabrica?.quando; return q && q >= deIni && q <= ateFim; }) }
+      : snapAtivos;
     // Na ordem em que vão ser publicados (fábrica) ou de criação: termina um vídeo antes de começar o próximo
     const prioridade = (d) => d.data().fabrica?.quando || d.data().criadoEm || '';
     // Fábrica: só produz o que vai ao ar nos próximos 3 dias (o crédito é gasto aos poucos,
