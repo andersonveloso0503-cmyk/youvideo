@@ -671,7 +671,7 @@ const Biblioteca = (() => {
           avisar(msgErro(e), true);
         }
       };
-      card.querySelector('.ap-ok').onclick = (e) => acao('video-aprovar', `Aprovado: "${i.titulo}" sobe para o YouTube no horário marcado`, e.currentTarget);
+      card.querySelector('.ap-ok').onclick = (e) => acao('video-aprovar', `Aprovado: "${i.titulo}" sobe para o YouTube (e para o Instagram do canal, se for Short) no horário marcado`, e.currentTarget);
       card.querySelector('.ap-refazer').onclick = (e) => {
         if (!confirm(`Refazer "${i.titulo}" com imagens novas?\nQuando ficar pronto, ele volta para esta lista.`)) return;
         acao('refazer-documentario', 'Refazendo: quando ficar pronto, volta para a aba ✅ Aprovar', e.currentTarget);

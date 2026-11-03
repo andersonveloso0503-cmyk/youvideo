@@ -28,7 +28,18 @@ import { COLECAO_POLITICA, replanejarMidiasPolitica } from '../../../lib/politic
 import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora, criarShortDaMusica } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
-export const config = { maxDuration: 300 }; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
+export const config = { maxDuration: 300 };
+
+/** Legenda das redes (Instagram/TikTok) de um vídeo da fábrica: título, resumo, chamada e hashtags do canal. */
+function legendaDasRedes(d, conta, corte = false) {
+  const r = d.roteiro || {};
+  const titulo = String(r.titulo || d.tema || '').slice(0, 150);
+  const resumo = String(r.descricao || '').split(/\n\s*\n/).find((p) => p.trim() && p.trim() !== titulo && !/^https?:|inscrev|^imagens:|^fontes|^📷|^⚖️/i.test(p.trim())) || '';
+  const hashtags = [...new Set((r.tags || []).slice(0, 5).map((t) => '#' + String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')).filter((t) => t.length > 2))];
+  const fixas = conta === 'noites' ? ['#noitesnahistoria', '#historia', '#curiosidades'] : ['#proximafase', '#games', '#jogos'];
+  const chamada = corte ? (conta === 'noites' ? '▶ A história completa está no YouTube: Noites na História' : '▶ Vídeo completo no YouTube: Próxima Fase') : conta === 'noites' ? '🌙 Siga para mais' : '🎮 Siga para mais novidades dos games';
+  return { titulo, legenda: [titulo, resumo.trim().slice(0, 600), chamada, [...hashtags, ...fixas].slice(0, 8).join(' ')].filter(Boolean).join('\n\n').slice(0, 2200) };
+} // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
 
 const COL = 'youvideo_fila';
 
@@ -1309,7 +1320,27 @@ export default async function handler(req, res) {
       const d = (await ref.get()).data() || {};
       if (d.fabrica?.youtube?.status !== 'revisar') return res.status(400).json({ erro: 'Esse vídeo não está esperando aprovação.' });
       await ref.update({ 'fabrica.youtube': { status: 'pendente', aprovadoEm: new Date().toISOString() } });
-      return res.status(200).json({ ok: true });
+      // Aprovou = vai também para o Instagram do canal, sozinho, na mesma hora do YouTube (Shorts; se a conta estiver conectada)
+      let instagram = false;
+      try {
+        const conta = d.games ? 'games' : d.documentario || d.politica ? 'noites' : '';
+        const { igConectado } = await import('../../../lib/instagramLogin');
+        if (conta && d.formato === 'short' && d.videoUrl && !d.envios?.instagram && (await igConectado(conta))) {
+          const { titulo, legenda } = legendaDasRedes(d, conta);
+          let quando = new Date(d.fabrica?.quandoYoutube || Date.now());
+          if (quando.getTime() < Date.now() + 15 * 60e3) quando = new Date(Date.now() + 15 * 60e3);
+          const ag = await db.collection('youvideo_agenda').add({
+            titulo, legenda, videoUrl: d.videoUrl, thumbnailUrl: d.thumbnailUrl || null, conta, curto: true,
+            quando: quando.toISOString(), redes: { instagram: { status: 'pendente' } }, pendente: true,
+            origem: 'fabrica-aprovado', filaId: ref.id, criadoEm: new Date().toISOString(),
+          });
+          await ref.update({ 'envios.instagram': { status: 'agendado', agendaId: ag.id, em: new Date().toISOString(), automatico: true } });
+          instagram = true;
+        }
+      } catch {
+        /* Instagram é extra: a aprovação do YouTube vale mesmo assim */
+      }
+      return res.status(200).json({ ok: true, instagram });
     }
     if (b.acao === 'enviar-rede') {
       // Botões 📸 Instagram e 📱 TikTok de um vídeo pronto:
@@ -1325,13 +1356,7 @@ export default async function handler(req, res) {
       const corte = typeof b.videoUrl === 'string' && /^https:\/\/[a-z0-9.-]+\.blob\.vercel-storage\.com\//i.test(b.videoUrl) ? b.videoUrl : '';
       const videoUrl = corte || d.videoUrl;
       if (!videoUrl) return res.status(400).json({ erro: 'O vídeo ainda não está pronto.' });
-      const r = d.roteiro || {};
-      const titulo = String(r.titulo || d.tema || '').slice(0, 150);
-      const resumo = String(r.descricao || '').split(/\n\s*\n/).find((p) => p.trim() && p.trim() !== titulo && !/^https?:|inscrev|^imagens:|^fontes/i.test(p.trim())) || '';
-      const hashtags = [...new Set((r.tags || []).slice(0, 5).map((t) => '#' + String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')).filter((t) => t.length > 2))];
-      const fixas = conta === 'noites' ? ['#noitesnahistoria', '#historia', '#curiosidades'] : ['#proximafase', '#games', '#jogos'];
-      const chamada = corte ? (conta === 'noites' ? '▶ A história completa está no YouTube: Noites na História' : '▶ Vídeo completo no YouTube: Próxima Fase') : conta === 'noites' ? '🌙 Siga para mais histórias reais' : '🎮 Siga para mais novidades dos games';
-      const legenda = [titulo, resumo.trim().slice(0, 600), chamada, [...hashtags, ...fixas].slice(0, 8).join(' ')].filter(Boolean).join('\n\n').slice(0, 2200);
+      const { titulo, legenda } = legendaDasRedes(d, conta, !!corte);
       const envios = d.envios || {};
       if (rede === 'instagram') {
         const ag = await db.collection('youvideo_agenda').add({
