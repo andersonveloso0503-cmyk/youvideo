@@ -642,7 +642,9 @@ export default async function handler(req, res) {
                 fotoUrl: item.capaUrl || primeiraImagem,
                 texto: ep.thumb || item.roteiro.thumbnailTitulo,
                 subtitulo: ep.thumbSub || item.roteiro.thumbnailSubtitulo,
-                arte: ep.arte || item.roteiro.arte,
+                arte: item.politica ? '' : ep.arte || item.roteiro.arte,
+                // Política sai no mesmo canal, mas não é "história para dormir"
+                ...(item.politica ? { chamada: 'POLÍTICA • NOTÍCIA' } : {}),
               })) || primeiraImagem;
           } else if (item.formato !== 'short') {
             // Vídeo longo: thumbnail de verdade, com a frase grande do mistério (ex.: "ONDE ELE ESTAVA?")
