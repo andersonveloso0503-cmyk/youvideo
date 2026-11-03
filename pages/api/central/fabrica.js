@@ -260,6 +260,28 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.conexao) {
       return res.status(200).json(await testarConta(String(req.query.conexao)));
     }
+    // GET ?revisar=1 -> vídeos prontos esperando o dono assistir e aprovar antes do YouTube
+    if (req.method === 'GET' && req.query.revisar === '1') {
+      const snap = await col.where('fabrica.youtube.status', '==', 'revisar').get();
+      const itens = snap.docs
+        .map((d) => {
+          const x = d.data();
+          return {
+            id: d.id,
+            titulo: x.roteiro?.titulo || x.tema || '',
+            descricao: String(x.roteiro?.descricao || '').slice(0, 1500),
+            videoUrl: x.videoUrl || null,
+            thumbnailUrl: x.thumbnailUrl || null,
+            quando: x.fabrica?.quandoYoutube || x.fabrica?.quando || null,
+            canal: x.fabrica?.canalYoutube?.titulo || '',
+            formato: x.formato || 'short',
+            tipo: x.games ? 'games' : x.politica ? 'politica' : 'documentario',
+          };
+        })
+        .filter((i) => i.videoUrl)
+        .sort((a, b) => String(a.quando || '').localeCompare(String(b.quando || '')));
+      return res.status(200).json({ itens });
+    }
     if (req.method === 'GET' && req.query.capas === '1') {
       // Capas refeitas de vídeos que já estão no YouTube: o PC troca a miniatura lá
       // 'erro' também volta (até 3 tentativas): falha no PC ou canal ainda sem verificação, que o dono pode resolver depois
@@ -1269,6 +1291,14 @@ export default async function handler(req, res) {
         await ref.delete();
       }
       return res.status(200).json({ ok: true, id: novo.id, aproveitouVoz: temVoz, jaNoYoutube: f.youtube?.status === 'ok' ? f.youtube.url || 'sim' : '' });
+    }
+    if (b.acao === 'video-aprovar') {
+      // O dono assistiu e aprovou: agora o Compilador sobe para o YouTube no horário marcado
+      // (se o horário já passou, ele agenda para daqui a 20 minutos)
+      const d = (await ref.get()).data() || {};
+      if (d.fabrica?.youtube?.status !== 'revisar') return res.status(400).json({ erro: 'Esse vídeo não está esperando aprovação.' });
+      await ref.update({ 'fabrica.youtube': { status: 'pendente', aprovadoEm: new Date().toISOString() } });
+      return res.status(200).json({ ok: true });
     }
     if (b.acao === 'enviar-rede') {
       // Botões 📸 Instagram e 📱 TikTok de um vídeo pronto:

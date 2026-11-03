@@ -597,16 +597,102 @@ const Biblioteca = (() => {
     q('#bibAbas').querySelectorAll('button').forEach((b) => b.classList.toggle('ativo', b.dataset.v === aba));
     q('#bibCorpoVideos').hidden = aba !== 'biblioteca';
     q('#bibCorpoAgenda').hidden = aba !== 'agenda';
+    q('#bibCorpoAprovar').hidden = aba !== 'aprovar';
     q('#bibBusca').style.visibility = aba === 'biblioteca' ? 'visible' : 'hidden';
     if (aba === 'agenda') carregarAgenda();
+    if (aba === 'aprovar') carregarAprovar();
   }
+
+  // ───────── ✅ Aprovar: assiste o vídeo pronto antes de ir para o YouTube ─────────
+  const TIPO_APROVAR = { games: '🎮 Games', politica: '🏛️ Política', documentario: '🌙 Noites na História' };
+  function marcarContagem(n) {
+    q('#bibAbaAprovar').textContent = n ? `✅ Aprovar (${n})` : '✅ Aprovar';
+    const topo = q('#btnBiblioteca');
+    let selo = topo.querySelector('.contador');
+    if (n && !selo) {
+      selo = document.createElement('span');
+      selo.className = 'contador';
+      selo.title = 'Vídeos prontos esperando sua aprovação';
+      topo.appendChild(selo);
+    }
+    if (selo) {
+      selo.textContent = String(n);
+      selo.hidden = !n;
+    }
+  }
+  async function contarAprovar() {
+    try {
+      const { itens = [] } = await window.api.fabrica.revisar();
+      marcarContagem(itens.length);
+      return itens;
+    } catch {
+      return null;
+    }
+  }
+  async function carregarAprovar() {
+    const box = q('#aprovarLista');
+    box.innerHTML = '<p class="nota">Carregando...</p>';
+    const itens = await contarAprovar();
+    if (!itens) return (box.innerHTML = '<p class="nota">Não consegui buscar os vídeos agora. Clique em ↻ Atualizar.</p>');
+    if (!itens.length) return (box.innerHTML = '<p class="nota">Nenhum vídeo esperando aprovação. 👍</p>');
+    box.innerHTML = '';
+    for (const i of itens) {
+      const card = document.createElement('div');
+      card.style.cssText = 'background:var(--bg-2);border:1px solid var(--borda);border-radius:10px;overflow:hidden;display:flex;flex-direction:column';
+      const curto = i.formato === 'short';
+      const quando = i.quando ? new Date(i.quando).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'sem horário';
+      card.innerHTML = `
+        <video src="${esc(i.videoUrl)}" ${i.thumbnailUrl ? `poster="${esc(i.thumbnailUrl)}"` : ''} controls preload="none"
+          style="width:100%;background:#000;${curto ? 'aspect-ratio:9/16;max-height:420px' : 'aspect-ratio:16/9'};object-fit:contain"></video>
+        <div style="padding:10px;display:flex;flex-direction:column;gap:6px;flex:1">
+          <span class="nota">${esc(TIPO_APROVAR[i.tipo] || '')} · ${curto ? 'Short' : 'Vídeo longo'} · ${esc(i.canal)}</span>
+          <b style="font-size:14px">${esc(i.titulo)}</b>
+          <span class="nota">📅 Vai ao ar: ${esc(quando)}</span>
+          ${i.thumbnailUrl ? `<a href="#" class="nota ver-capa">🖼 ver a capa</a>` : ''}
+          <div style="display:flex;gap:6px;margin-top:auto;flex-wrap:wrap">
+            <button type="button" class="btn-primario ap-ok" style="flex:1">✅ Aprovar</button>
+            <button type="button" class="btn-mini ap-refazer" title="Montar de novo com imagens novas (aproveita a narração)">🎬 Refazer</button>
+            <button type="button" class="btn-mini ap-descartar" title="Não sobe para o YouTube">🗑</button>
+          </div>
+        </div>`;
+      const capa = card.querySelector('.ver-capa');
+      if (capa) capa.onclick = (e) => (e.preventDefault(), window.api.abrir.link(i.thumbnailUrl));
+      const acao = async (nome, msg, bt) => {
+        bt.disabled = true;
+        try {
+          await window.api.fabrica.acao({ id: i.id, acao: nome });
+          avisar(msg);
+          card.remove();
+          const resto = q('#aprovarLista').children.length;
+          marcarContagem(resto);
+          if (!resto) q('#aprovarLista').innerHTML = '<p class="nota">Nenhum vídeo esperando aprovação. 👍</p>';
+        } catch (e) {
+          bt.disabled = false;
+          avisar(msgErro(e), true);
+        }
+      };
+      card.querySelector('.ap-ok').onclick = (e) => acao('video-aprovar', `Aprovado: "${i.titulo}" sobe para o YouTube no horário marcado`, e.currentTarget);
+      card.querySelector('.ap-refazer').onclick = (e) => {
+        if (!confirm(`Refazer "${i.titulo}" com imagens novas?\nQuando ficar pronto, ele volta para esta lista.`)) return;
+        acao('refazer-documentario', 'Refazendo: quando ficar pronto, volta para a aba ✅ Aprovar', e.currentTarget);
+      };
+      card.querySelector('.ap-descartar').onclick = (e) => {
+        if (!confirm(`Descartar "${i.titulo}"? Ele não vai para o YouTube.`)) return;
+        acao('cancelar', 'Descartado', e.currentTarget);
+      };
+      box.appendChild(card);
+    }
+  }
+  // Selo no botão Biblioteca: confere a cada 5 minutos se tem vídeo novo esperando aprovação
+  setTimeout(contarAprovar, 8000);
+  setInterval(contarAprovar, 5 * 60e3);
 
   let ligado = false;
   function ligar() {
     if (ligado) return;
     ligado = true;
     q('#bibAbas').querySelectorAll('button').forEach((b) => (b.onclick = () => trocarAba(b.dataset.v)));
-    q('#bibAtualizar').onclick = () => (B.aba === 'agenda' ? carregarAgenda() : carregar());
+    q('#bibAtualizar').onclick = () => (B.aba === 'agenda' ? carregarAgenda() : B.aba === 'aprovar' ? carregarAprovar() : carregar());
     q('#bibBusca').oninput = (e) => {
       B.busca = e.target.value;
       renderGrade();

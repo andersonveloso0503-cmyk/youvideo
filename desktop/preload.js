@@ -117,6 +117,7 @@ contextBridge.exposeInMainWorld('api', {
     criar: chamar('fabrica:criar'),
     acao: chamar('fabrica:acao'),
     enviarRede: chamar('redes:enviar'),
+    revisar: chamar('revisar:listar'),
   },
   noticias: {
     listar: chamar('noticias:listar'),

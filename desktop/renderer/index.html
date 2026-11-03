@@ -985,6 +985,7 @@
       <div class="segmentado bib-abas" id="bibAbas">
         <button data-v="biblioteca" class="ativo">Vídeos</button>
         <button data-v="agenda">📅 Agenda</button>
+        <button data-v="aprovar" id="bibAbaAprovar" title="Vídeos prontos de games, política e Noites na História: assista e aprove antes de ir para o YouTube">✅ Aprovar</button>
       </div>
       <input id="bibBusca" type="search" placeholder="Buscar pelo título..." />
       <button class="btn-mini" id="bibAtualizar" title="Buscar de novo no Youvideo">↻ Atualizar</button>
@@ -1046,6 +1047,12 @@
 
     <div class="bib-corpo agenda" id="bibCorpoAgenda" hidden>
       <div class="agenda-lista" id="agendaLista"></div>
+    </div>
+
+    <div class="bib-corpo bib-aprovar" id="bibCorpoAprovar" hidden>
+      <p class="nota" style="margin:0 0 10px">Vídeos prontos de <b>games</b>, <b>política</b> e <b>Noites na História</b>. Nada vai para o YouTube antes de você aprovar.
+        ✅ Aprovar = sobe no horário marcado (se já passou, em 20 min). 🎬 Refazer = monta de novo com imagens novas e volta para cá. 🗑 Descartar = não sobe.</p>
+      <div id="aprovarLista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px"></div>
     </div>
   </dialog>
 

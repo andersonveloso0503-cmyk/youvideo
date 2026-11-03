@@ -1244,6 +1244,7 @@ const Fabrica = (() => {
     if (y.status === 'ok') return `<a class="fab-yt ok" data-link="${esc(y.url || '')}">▶ YouTube agendado ✅</a>`;
     if (y.status === 'erro') return `<a class="fab-yt erro" data-repetir-yt="${esc(i.id)}" title="${esc(y.erro || '')}">▶ YouTube: erro — ${esc(String(y.erro || 'sem detalhe').slice(0, 110))} (clique p/ tentar de novo)</a>`;
     if (y.status === 'enviando') return '<span class="fab-yt">▶ YouTube: subindo pelo PC...</span>';
+    if (y.status === 'revisar') return '<span class="fab-yt" style="color:var(--terracota)">▶ YouTube: esperando você aprovar (📚 Biblioteca → ✅ Aprovar)</span>';
     return '<span class="fab-yt">▶ YouTube: esperando o PC subir</span>';
   }
 

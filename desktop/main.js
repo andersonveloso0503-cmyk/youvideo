@@ -917,6 +917,8 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('fabrica:criar', (_e, dados) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { ...dados, acao: 'criar' } }));
   ipcMain.handle('fabrica:acao', (_e, { id, acao }) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao } }));
+  // Vídeos prontos esperando aprovação antes do YouTube (aba ✅ Aprovar da Biblioteca)
+  ipcMain.handle('revisar:listar', () => Central.chamar(store.ler(), '/api/central/fabrica', { query: { revisar: '1' } }));
   // Botões 📸 Instagram / 📱 TikTok de um vídeo pronto. Vídeo longo ou deitado vira antes um corte EM PÉ de 1 minuto
   // (fundo desfocado, "história completa no YouTube"), porque Reels e TikTok são em pé e curtos.
   ipcMain.handle('redes:enviar', async (_e, { id, rede, videoUrl }) => {

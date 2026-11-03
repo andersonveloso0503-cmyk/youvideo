@@ -684,7 +684,9 @@ export default async function handler(req, res) {
             ...(avisoThumb ? { aviso: avisoThumb } : {}),
             'fabrica.agendaId': agendaId,
             comBotao: check.comBotao === true, // botão de like já gravado na montagem: o PC não põe de novo no YouTube
-            'fabrica.youtube': item.fabrica.redes?.youtube ? { status: 'pendente' } : null,
+            // Games, política e Noites na História: o vídeo pronto espera o dono assistir e aprovar
+            // (aba ✅ Aprovar da Biblioteca do Compilador) antes de ir para o YouTube
+            'fabrica.youtube': item.fabrica.redes?.youtube ? { status: item.games || item.politica || item.documentario ? 'revisar' : 'pendente' } : null,
           });
           // Desenho infantil: o clipe da música vira um Short vertical, que sai no dia seguinte (mesmo horário)
           if (item.infantil && !item.shortMusica && !item.infantil.teste && item.infantil.shortsMusica !== false && item.vozInfantil?.musica?.audioUrl) {

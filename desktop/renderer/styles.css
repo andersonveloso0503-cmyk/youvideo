@@ -881,3 +881,6 @@ span.chip-estilo { cursor: default; }
 .pc-sem-dia.com-erro .s { color: #ff8a7a; opacity: 1; }
 .pc-btn { padding: 5px 10px; font-size: 12px; }
 .pc-sem-acoes { margin-top: 6px; }
+
+/* Aba ✅ Aprovar da Biblioteca */
+#bibCorpoAprovar:not([hidden]) { display: block; overflow: auto; padding: 14px; }
