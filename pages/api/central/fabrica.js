@@ -30,16 +30,7 @@ import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
 export const config = { maxDuration: 300 };
 
-/** Legenda das redes (Instagram/TikTok) de um vídeo da fábrica: título, resumo, chamada e hashtags do canal. */
-function legendaDasRedes(d, conta, corte = false) {
-  const r = d.roteiro || {};
-  const titulo = String(r.titulo || d.tema || '').slice(0, 150);
-  const resumo = String(r.descricao || '').split(/\n\s*\n/).find((p) => p.trim() && p.trim() !== titulo && !/^https?:|inscrev|^imagens:|^fontes|^📷|^⚖️/i.test(p.trim())) || '';
-  const hashtags = [...new Set((r.tags || []).slice(0, 5).map((t) => '#' + String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')).filter((t) => t.length > 2))];
-  const fixas = conta === 'noites' ? ['#noitesnahistoria', '#historia', '#curiosidades'] : ['#proximafase', '#games', '#jogos'];
-  const chamada = corte ? (conta === 'noites' ? '▶ A história completa está no YouTube: Noites na História' : '▶ Vídeo completo no YouTube: Próxima Fase') : conta === 'noites' ? '🌙 Siga para mais' : '🎮 Siga para mais novidades dos games';
-  return { titulo, legenda: [titulo, resumo.trim().slice(0, 600), chamada, [...hashtags, ...fixas].slice(0, 8).join(' ')].filter(Boolean).join('\n\n').slice(0, 2200) };
-} // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
+import { legendaDasRedes } from '../../../lib/instagramLote'; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
 
 const COL = 'youvideo_fila';
 

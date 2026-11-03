@@ -256,6 +256,22 @@ const Fabrica = (() => {
     };
     q('#btnGmDicasCriar').onclick = criarDicas;
     q('#btnGmLancShort').onclick = () => criarLancamentos('short');
+    // Instagram do canal: conectar (página do site) e mandar os prontos de uma vez
+    const igTodos = async (botao, api, nome) => {
+      if (!confirm(`Mandar para o Instagram do ${nome} os Shorts prontos (e já aprovados) que ainda não foram para lá?\nSaem um a cada 40 minutos.`)) return;
+      botao.disabled = true;
+      try {
+        const r = await api({ acao: 'instagram-todos' });
+        avisar(r.agendados ? `${r.agendados} vídeos vão para o Instagram @${r.usuario}, um a cada 40 min (o último por volta de ${new Date(r.ultimo).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})` : 'Nenhum Short pronto faltando no Instagram 👍');
+      } catch (e) {
+        avisar(msgErro(e), true);
+      }
+      botao.disabled = false;
+    };
+    q('#btnGmIgConectar').onclick = () => window.api.abrir.link('https://youvideors2.vercel.app/instagram');
+    q('#btnPlIgConectar').onclick = () => window.api.abrir.link('https://youvideors2.vercel.app/instagram');
+    q('#btnGmIgTodos').onclick = (e) => igTodos(e.currentTarget, window.api.noticias.acao, 'Próxima Fase');
+    q('#btnPlIgTodos').onclick = (e) => igTodos(e.currentTarget, window.api.politica.acao, 'Noites na História');
     q('#btnGmLancLongo').onclick = () => criarLancamentos('longo');
     q('#btnGmNarrar').onclick = () => {
       const caixa = q('#gmNarrarCaixa');

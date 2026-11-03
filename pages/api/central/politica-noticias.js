@@ -113,6 +113,11 @@ export default async function handler(req, res) {
       return res.status(200).json(r);
     }
 
+    // 📸 Enviar prontos ao Instagram do canal (os que ainda não foram, um a cada 40 min)
+    if (b.acao === 'instagram-todos') {
+      const { enviarProntosInstagram } = await import('../../../lib/instagramLote');
+      return res.status(200).json(await enviarProntosInstagram('noites'));
+    }
     if (b.acao === 'descartar') {
       await col.doc(String(b.id)).update({ status: 'descartada', descartadaEm: new Date().toISOString() });
       return res.status(200).json({ ok: true });
