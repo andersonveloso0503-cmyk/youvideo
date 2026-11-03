@@ -10,7 +10,7 @@
 import { getDb } from '../../../lib/firebase-admin';
 import { autorizado } from '../../../lib/central';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
-import { buscarNoticiasPolitica, roteiroVideoPolitica, roteiroExplicador, COLECAO_POLITICA } from '../../../lib/politicaNoticias';
+import { buscarNoticiasPolitica, roteiroVideoPolitica, roteiroExplicador, COLECAO_POLITICA, replanejarMidiasPolitica } from '../../../lib/politicaNoticias';
 
 export const config = { maxDuration: 300 };
 
@@ -187,6 +187,14 @@ export default async function handler(req, res) {
       const d = (await ref.get()).data();
       if (!d?.ep) return res.status(404).json({ erro: 'Roteiro não encontrado.' });
       if (d.status === 'aprovada') return res.status(400).json({ erro: 'Esse roteiro já foi aprovado.' });
+      // Roteiro escrito antes da regra nova (só "vídeo atual" genérico): escolhe a imagem de cada cena pela frase
+      if (!/^@ foto (de|real):/m.test(String(d.ep.texto || ''))) {
+        const novoEp = await replanejarMidiasPolitica(d.ep).catch(() => d.ep);
+        if (novoEp !== d.ep) {
+          d.ep = novoEp;
+          await ref.update({ ep: novoEp }).catch(() => {});
+        }
+      }
       const longo = d.tipo === 'longo' || d.tipo === 'explicador';
       const pedido = b.quando ? new Date(b.quando) : null;
       const quando = await proximoHorario(db, pedido && pedido.getTime() > Date.now() + 30 * 60e3 ? pedido.getTime() : Date.now() + (longo ? 3 : 1.5) * 3600e3);

@@ -24,7 +24,7 @@ import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { EPISODIOS, TODOS_EPISODIOS } from '../../../lib/documentarioEpisodios';
 import { GAMES } from '../../../lib/gamesEpisodios';
 import { COLECAO_NOTICIAS } from '../../../lib/gamesNoticias';
-import { COLECAO_POLITICA } from '../../../lib/politicaNoticias';
+import { COLECAO_POLITICA, replanejarMidiasPolitica } from '../../../lib/politicaNoticias';
 import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora, criarShortDaMusica } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
@@ -1237,6 +1237,14 @@ export default async function handler(req, res) {
       let ep = TODOS_EPISODIOS.find((e) => e.id === d.episodioId);
       if (!ep && d.noticia) ep = (await db.collection(d.politica ? COLECAO_POLITICA : COLECAO_NOTICIAS).doc(String(d.noticia)).get()).data()?.ep || null;
       if (!ep) return res.status(400).json({ erro: 'Não achei o roteiro deste vídeo para refazer.' });
+      // Política: escolhe de novo a imagem de cada cena pela frase (pessoa citada -> foto dela; fato -> foto real)
+      if (d.politica && d.noticia) {
+        const novoEp = await replanejarMidiasPolitica(ep).catch(() => ep);
+        if (novoEp !== ep) {
+          ep = novoEp;
+          await db.collection(COLECAO_POLITICA).doc(String(d.noticia)).update({ ep }).catch(() => {});
+        }
+      }
       const novoRoteiro = roteiroDoEpisodio(ep);
       const antigas = d.roteiro?.cenas || [];
       // Short de games: narra de novo (é curto e barato) para sair com legenda e com os cortes de 3 segundos
