@@ -85,6 +85,7 @@ export default async function handler(req, res) {
             if (codigo === 'FINISHED') {
               const r = await publicarContainerInstagram(creationId, item.conta || '');
               await doc.ref.update({ 'redes.instagram': { status: 'ok', em: new Date().toISOString(), id: r.id, url: null } });
+              console.log(`[instagram-post] publicado: "${String(item.titulo || '').slice(0, 60)}" conta=${item.conta || 'padrao'} id=${r.id}`);
               feitos.push({ id: doc.id, rede, ok: true });
             } else if (codigo === 'IN_PROGRESS') {
               const desde = new Date(st.desde || Date.now()).getTime();
@@ -95,6 +96,7 @@ export default async function handler(req, res) {
             }
           } catch (e) {
             await doc.ref.update({ 'redes.instagram': { status: 'erro', em: new Date().toISOString(), erro: String(e.message).slice(0, 500), tentativas: (st.tentativas || 0) + 1 } });
+            console.log(`[instagram-post] ERRO: "${String(item.titulo || '').slice(0, 60)}" conta=${item.conta || 'padrao'}: ${String(e.message).slice(0, 300)}`);
             feitos.push({ id: doc.id, rede, ok: false, erro: e.message });
           }
           continue;
