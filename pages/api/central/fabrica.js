@@ -1220,6 +1220,8 @@ export default async function handler(req, res) {
         status: 'pendente',
         origem: 'fabrica',
         refeitoDe: ref.id,
+        // Já foi para o Instagram/TikTok: o refeito não manda de novo sozinho
+        ...(d.envios ? { envios: d.envios } : {}),
         criadoEm: new Date().toISOString(),
         fabrica: {
           ativo: true,
@@ -1279,6 +1281,8 @@ export default async function handler(req, res) {
         ...(d.vozId ? { vozId: d.vozId } : {}),
         origem: 'fabrica',
         refeitoDe: ref.id,
+        // Já foi para o Instagram/TikTok: o refeito não manda de novo sozinho
+        ...(d.envios ? { envios: d.envios } : {}),
         criadoEm: new Date().toISOString(),
         ...(temVoz
           ? {
