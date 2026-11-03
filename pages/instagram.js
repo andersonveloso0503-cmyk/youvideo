@@ -110,9 +110,22 @@ export default function ConexaoInstagram() {
                 </div>
                 <div style={caixa}>
                   <h2 style={{ fontSize: 18 }}>3. Conectar</h2>
+                  {(r.repetidas || []).length > 0 &&
+                    linha(false, 'Os dois canais estão ligados à MESMA conta do Instagram. Desconecte o canal errado, saia do Instagram no navegador, entre na conta certa e conecte de novo.')}
                   {r.contas.map((c) => (
                     <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      {linha(c.conectado, `${c.nome}: ${c.conectado ? `conectado (@${c.usuario})` : 'ainda não conectado'}`)}
+                      {linha(c.conectado && !(r.repetidas || []).includes(c.id), `${c.nome}: ${c.conectado ? `conectado (@${c.usuario})` : 'ainda não conectado'}`)}
+                      {c.conectado && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Desconectar o Instagram @${c.usuario} do ${c.nome}?`)) return;
+                            await fetch('/api/central/instagram', { method: 'POST', headers: { 'x-central-token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'desconectar', conta: c.id }) });
+                            conferir();
+                          }}
+                        >
+                          Desconectar
+                        </button>
+                      )}
                       <a href={`/api/auth/instagram?token=${encodeURIComponent(token)}&conta=${c.id}`}>
                         <button disabled={!r.chaves.id}>{c.conectado ? '↻ Conectar de novo' : '🔗 Conectar'}</button>
                       </a>

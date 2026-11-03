@@ -16,6 +16,7 @@ export default async function handler(req, res) {
   const state = randomBytes(16).toString('hex');
   await getDb().collection('youvideo_central').doc('instagram_state').set({ state, conta, em: new Date().toISOString() });
   const params = new URLSearchParams({
+    force_reauth: 'true', // sempre pede o login: assim dá para escolher a conta certa de cada canal
     client_id: id,
     redirect_uri: redirectIg(req.headers.host),
     response_type: 'code',
