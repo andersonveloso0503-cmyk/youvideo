@@ -499,6 +499,7 @@ class Fila extends EventEmitter {
         : await this.capaParaYoutube(job, miniatura || e.arquivo, {
             titulo: e.titulo, descricao: e.descricao, curto: !!e.curto,
             destino: path.join(os.tmpdir(), `youvideo-capa-yt-${job.id}.jpg`),
+            estilo: e.categoria === '25' ? 'politica' : e.categoria === '20' ? 'games' : '', // capa de pergunta em 2 linhas
           });
       if (chamativa) miniatura = chamativa;
       else if (miniatura) {
@@ -841,14 +842,14 @@ class Fila extends EventEmitter {
   }
 
   /** Capa chamativa para o YouTube (frase de efeito grande). Devolve o caminho ou null se falhar. */
-  async capaParaYoutube(job, base, { titulo, descricao, curto, destino }) {
+  async capaParaYoutube(job, base, { titulo, descricao, curto, destino, estilo = '' }) {
     const cfg = this.obterConfig();
     if (cfg.capaChamativa === false || !base || !fs.existsSync(base)) return null;
     this.atualizar(job, { etapa: 'Criando capa chamativa' }, false);
     try {
       const c = await gerarCapaChamativa(base, {
         groqKey: cfg.groqKey, falKey: cfg.falKey, usarIa: cfg.capaIa !== false,
-        titulo, descricao, curto, fontsDir: this.fontsDir, destino,
+        titulo, descricao, curto, fontsDir: this.fontsDir, destino, estilo,
       });
       return c.arquivo;
     } catch {

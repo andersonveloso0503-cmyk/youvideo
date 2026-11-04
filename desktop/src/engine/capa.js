@@ -11,7 +11,7 @@ const Central = require('./central');
 const LIMITE = 2 * 1024 * 1024 - 60 * 1024; // YouTube aceita capa de até 2 MB
 
 /** A IA escreve uma frase curta de impacto + a palavra que vai em destaque (amarelo). */
-async function fraseDeEfeito(groqKey, { titulo, descricao }) {
+async function fraseDeEfeito(groqKey, { titulo, descricao, estilo = '' }) {
   const reserva = () => {
     const VAZIAS = ['DE', 'DA', 'DO', 'DAS', 'DOS', 'NO', 'NA', 'NOS', 'NAS', 'EM', 'E', 'O', 'A', 'OS', 'AS', 'PARA', 'COM', 'UM', 'UMA', 'QUE'];
     let palavras = String(titulo || '').replace(/[#|—–\-:()[\]]/g, ' ').split(/\s+/).filter((w) => w.length > 1).slice(0, 4);
@@ -31,7 +31,20 @@ async function fraseDeEfeito(groqKey, { titulo, descricao }) {
         messages: [
           {
             role: 'system',
-            content:
+            content: estilo === 'politica'
+              ? 'Você cria o TEXTO DA CAPA (thumbnail) de Shorts de um canal brasileiro IMPARCIAL de notícias de política. ' +
+                'Responda só JSON: {"frase": "...", "destaque": "..."}. ' +
+                'frase: de 2 a 4 palavras em CAIXA ALTA, de preferência uma PERGUNTA curta que resume o assunto e dá vontade de clicar, terminando em "?". ' +
+                'Exemplos: "CONTRA O STF?", "VAI SER APROVADA?", "O QUE MUDA?", "QUEM PAGA A CONTA?", "FIM DA ESCALA 6X1?", "VOLTA DA CPMF?". ' +
+                'Nunca acuse, nunca chame ninguém de nada, nunca afirme algo que não está no título; sem emoji, sem aspas, sem nome de partido. ' +
+                'destaque: a ÚLTIMA palavra da frase (com o "?"), que vai sozinha embaixo, grande e em amarelo.'
+              : estilo === 'games'
+              ? 'Você cria o TEXTO DA CAPA (thumbnail) de Shorts de um canal brasileiro de notícias de GAMES. ' +
+                'Responda só JSON: {"frase": "...", "destaque": "..."}. ' +
+                'frase: de 2 a 4 palavras em CAIXA ALTA, empolgante, pergunta ou anúncio curto: "VALE A PENA?", "CHEGOU AO SWITCH 2!", "GRÁTIS NO XBOX", "VOLTOU?", "DATA CONFIRMADA!". ' +
+                'Use o nome curto do jogo só se couber (máx. 4 palavras no total); sem emoji, sem aspas. ' +
+                'destaque: a ÚLTIMA palavra da frase (com a pontuação), que vai sozinha embaixo, grande e em amarelo.'
+              :
               'Você cria o TEXTO DA CAPA (thumbnail) de vídeos do YouTube em português do Brasil, para canais cristãos e de música. ' +
               'Responda só JSON: {"frase": "...", "destaque": "..."}. ' +
               'frase: de 2 a 5 palavras, em CAIXA ALTA, frase de efeito que dá vontade de clicar (curiosidade, emoção, promessa), sem repetir o título inteiro, sem emoji, sem aspas, sem hashtag. ' +
@@ -55,7 +68,7 @@ async function fraseDeEfeito(groqKey, { titulo, descricao }) {
     } catch {
       j = await pedir('llama-3.3-70b-versatile');
     }
-    const frase = String(j.frase || '').replace(/["“”#]/g, '').replace(/\s+/g, ' ').trim().toUpperCase().split(' ').slice(0, 6).join(' ');
+    const frase = String(j.frase || '').replace(/["“”#]/g, '').replace(/\s+/g, ' ').trim().toUpperCase().split(' ').slice(0, estilo ? 5 : 6).join(' ');
     if (!frase) return reserva();
     const destaque = String(j.destaque || '').trim().toUpperCase();
     return { frase, destaque: frase.split(' ').includes(destaque) ? destaque : frase.split(' ').pop() };
@@ -65,16 +78,18 @@ async function fraseDeEfeito(groqKey, { titulo, descricao }) {
 }
 
 /** Nano Banana: deixa a imagem mais dramática e chamativa (sem texto). Devolve o caminho ou null. */
-async function turbinarImagem(falKey, arquivo, curto, destino) {
+async function turbinarImagem(falKey, arquivo, curto, destino, estilo = '') {
   if (!falKey) return null;
   try {
     fal.config({ credentials: falKey });
     const url = await fal.storage.upload(new Blob([fs.readFileSync(arquivo)], { type: 'image/jpeg' }));
     const r = await fal.subscribe('fal-ai/nano-banana/edit', {
       input: {
-        prompt:
-          'Transform this into an eye-catching YouTube thumbnail background: dramatic cinematic lighting, vivid saturated colors, ' +
-          'strong emotion on the main character, move the camera closer to the main character, keep the same characters, setting and art style. ' +
+        prompt: (estilo === 'politica' || estilo === 'games'
+          ? 'Improve this photo for a YouTube thumbnail: cinematic lighting, richer contrast, darker blurred background, move the camera a bit closer to the main person. ' +
+            'This is a REAL person: keep the face, identity, age and facial expression EXACTLY as in the photo; do not change clothes or add objects. '
+          : 'Transform this into an eye-catching YouTube thumbnail background: dramatic cinematic lighting, vivid saturated colors, ' +
+            'strong emotion on the main character, move the camera closer to the main character, keep the same characters, setting and art style. ') +
           (curto ? 'Keep empty space in the upper third for big text. ' : 'Keep empty space on the lower part for big text. ') +
           'Do not add any text, letters, numbers, logos or watermarks.',
         image_urls: [url],
@@ -90,6 +105,37 @@ async function turbinarImagem(falKey, arquivo, curto, destino) {
   } catch {
     return null; // sem crédito / fora do ar: segue com a imagem original
   }
+}
+
+/** Política/games (Short): pergunta em 2 linhas no alto — linha de cima branca, a palavra forte embaixo, maior e amarela. */
+function montarAssDuasLinhas({ W, H, frase, destaque }) {
+  const palavras = frase.split(' ');
+  let i = palavras.lastIndexOf(destaque);
+  if (i < 0) i = palavras.length - 1;
+  // palavra forte muito curta ("2!", "GTA?") leva a anterior junto: "SWITCH 2!"
+  const ini = i > 0 && palavras[i].replace(/[^\p{L}\p{N}]/gu, '').length <= 3 ? i - 1 : i;
+  const cima = palavras.slice(0, ini).concat(palavras.slice(i + 1)).join(' ');
+  const baixo = palavras.slice(ini, i + 1).join(' ');
+  // tamanho pela largura: Montserrat ExtraBold em caixa alta ocupa ~0,5 do tamanho por letra
+  const caber = (t, max) => Math.round(Math.min(max, (W * 0.9) / Math.max(2, t.length * 0.52)));
+  const tamCima = caber(cima, W * 0.2);
+  const tamBaixo = caber(baixo, W * 0.3);
+  const topo = Math.round(H * 0.075);
+  const linhaBaixo = topo + Math.round(tamCima * 1.05);
+  const sombraAlta = Math.round(H * 0.42);
+  return [
+    '[Script Info]', 'ScriptType: v4.00+', `PlayResX: ${W}`, `PlayResY: ${H}`, 'WrapStyle: 2', 'ScaledBorderAndShadow: yes', '',
+    '[V4+ Styles]',
+    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+    `Style: Cima,Montserrat ExtraBold,${tamCima},&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.max(5, Math.round(tamCima / 10))},${Math.max(3, Math.round(tamCima / 16))},8,0,0,0,1`,
+    `Style: Baixo,Montserrat ExtraBold,${tamBaixo},&H0012C8FF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.max(6, Math.round(tamBaixo / 10))},${Math.max(3, Math.round(tamBaixo / 16))},8,0,0,0,1`,
+    `Style: Sombra,Arial,10,&H00000000,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
+    '', '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+    // sombra escura e suave no alto (o texto lê em qualquer foto)
+    `Dialogue: 0,0:00:00.00,0:00:05.00,Sombra,,0,0,0,,{\\pos(0,${-Math.round(H * 0.08)})\\1a&H50&\\blur${Math.round(H * 0.06)}\\p1}m 0 0 l ${W} 0 ${W} ${sombraAlta} 0 ${sombraAlta}{\\p0}`,
+    ...(cima ? [`Dialogue: 1,0:00:00.00,0:00:05.00,Cima,,0,0,0,,{\\an8\\pos(${W / 2},${topo})\\q2}${cima}`] : []),
+    `Dialogue: 1,0:00:00.00,0:00:05.00,Baixo,,0,0,0,,{\\an8\\pos(${W / 2},${cima ? linhaBaixo : topo})\\q2}${baixo}`,
+  ].join('\n');
 }
 
 function montarAss({ W, H, frase, destaque, curto }) {
@@ -127,7 +173,7 @@ function montarAss({ W, H, frase, destaque, curto }) {
  * frase/destaque já prontos pulam a IA do texto; suave = cores naturais, sem vinheta (vídeos de dormir/relaxar).
  */
 async function gerarCapaChamativa(base, opcoes) {
-  const { groqKey, falKey, usarIa = true, titulo, descricao, curto = false, fontsDir, destino, suave = false } = opcoes;
+  const { groqKey, falKey, usarIa = true, titulo, descricao, curto = false, fontsDir, destino, suave = false, estilo = '' } = opcoes;
   const fraseFixa = String(opcoes.frase || '').trim().toUpperCase();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'youvideo-capa-'));
   try {
@@ -141,19 +187,20 @@ async function gerarCapaChamativa(base, opcoes) {
 
     // 2) Nano Banana (opcional) e a frase, ao mesmo tempo
     const [turbinada, { frase, destaque }] = await Promise.all([
-      usarIa ? turbinarImagem(falKey, img, curto, path.join(dir, 'ia.jpg')) : Promise.resolve(null),
+      usarIa ? turbinarImagem(falKey, img, curto, path.join(dir, 'ia.jpg'), estilo) : Promise.resolve(null),
       fraseFixa
         ? Promise.resolve({ frase: fraseFixa, destaque: String(opcoes.destaque || '').trim().toUpperCase() || fraseFixa.split(' ').pop() })
-        : fraseDeEfeito(groqKey, { titulo, descricao }),
+        : fraseDeEfeito(groqKey, { titulo, descricao, estilo }),
     ]);
     if (turbinada) img = turbinada;
 
     // 3) Monta: enquadra, realça cores e escreve a frase
-    fs.writeFileSync(path.join(dir, 'capa.ass'), montarAss({ W, H, frase, destaque, curto }));
+    const duasLinhas = curto && (estilo === 'politica' || estilo === 'games');
+    fs.writeFileSync(path.join(dir, 'capa.ass'), duasLinhas ? montarAssDuasLinhas({ W, H, frase, destaque }) : montarAss({ W, H, frase, destaque, curto }));
     const fontes = path.join(dir, 'fonts');
     fs.mkdirSync(fontes);
     for (const f of fs.readdirSync(fontsDir)) fs.copyFileSync(path.join(fontsDir, f), path.join(fontes, f));
-    const filtro = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,${suave ? 'eq=contrast=1.04:saturation=1.12' : 'eq=contrast=1.08:saturation=1.25,vignette=PI/5'},ass=capa.ass:fontsdir=fonts`;
+    const filtro = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,${suave ? 'eq=contrast=1.04:saturation=1.12' : duasLinhas ? 'eq=contrast=1.1:saturation=1.12,vignette=PI/4.5' : 'eq=contrast=1.08:saturation=1.25,vignette=PI/5'},ass=capa.ass:fontsdir=fonts`;
     for (const q of [2, 4, 7, 11]) {
       await rodar(['-loop', '1', '-t', '1', '-i', path.basename(img) === 'base.jpg' ? 'base.jpg' : img, '-vf', filtro, '-frames:v', '1', '-q:v', String(q), '-y', 'capa.jpg'], { cwd: dir }).promise;
       if (fs.statSync(path.join(dir, 'capa.jpg')).size <= LIMITE) break;
