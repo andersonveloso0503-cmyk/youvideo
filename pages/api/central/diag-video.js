@@ -5,6 +5,8 @@ import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 import { COLECAO } from '../../../lib/montarPc';
 
+export const config = { maxDuration: 120 };
+
 const sem = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 export default async function handler(req, res) {
@@ -54,10 +56,31 @@ export default async function handler(req, res) {
         cenasComIlustracao: cenas.filter((c) => c.ilustracao).length,
         tiposDeIlustracao: cenas.filter((c) => c.ilustracao).map((c) => c.ilustracao.tipo),
         arquivosComIlustracao: arquivos.filter((a) => a.ilustracao).length,
+        infoIlustracoes: d.infoIlustracoes || '(vídeo planejado antes do registro)',
         montagem: resumoPedido,
       });
     }
-    return res.status(200).json({ busca: req.query.q, videos });
+    // ?testar=1: roda agora a IA de ilustração nas 12 primeiras cenas do vídeo mais novo (não muda nada no vídeo)
+    let teste = null;
+    if (req.query.testar && fila[0]) {
+      const { planejarIlustracoes, diagIlustracao, COLECAO_POLITICA } = await import('../../../lib/politicaNoticias');
+      Object.assign(diagIlustracao, { erros: [], sugeridas: 0, aceitas: 0, exemploRecusado: '' });
+      const d = fila[0];
+      let noticia = '';
+      if (d.noticia) {
+        const n = (await db.collection(COLECAO_POLITICA).doc(String(d.noticia)).get()).data() || {};
+        noticia = [n.titulo, n.texto].filter(Boolean).join('\n');
+      }
+      const textos = [];
+      for (const c of d.roteiro?.cenas || []) {
+        const t = String(c.textoNarrado || c.texto || '').replace(/\s+/g, ' ').trim();
+        if (t && textos[textos.length - 1] !== t) textos.push(t);
+      }
+      const t0 = Date.now();
+      const r = await planejarIlustracoes(textos.slice(0, 12).map((texto) => ({ texto })), d.roteiro?.titulo || d.tema || '', noticia).catch((e) => String(e.message || e));
+      teste = { segundos: (Date.now() - t0) / 1000, temTextoDaNoticia: !!noticia, cenasTestadas: Math.min(12, textos.length), resultado: Array.isArray(r) ? r.map((x) => (x ? `${x.tipo}: ${x.titulo}` : '-')) : r, ...diagIlustracao };
+    }
+    return res.status(200).json({ busca: req.query.q, videos, ...(teste ? { teste } : {}) });
   } catch (e) {
     return res.status(500).json({ erro: String(e.message || e).slice(0, 300) });
   }
