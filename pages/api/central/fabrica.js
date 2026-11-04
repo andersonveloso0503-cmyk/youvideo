@@ -30,7 +30,7 @@ import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
 export const config = { maxDuration: 300 };
 
-import { legendaDasRedes } from '../../../lib/instagramLote'; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
+import { legendaDasRedes, proximoHorarioIg } from '../../../lib/instagramLote'; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
 
 const COL = 'youvideo_fila';
 
@@ -1322,8 +1322,11 @@ export default async function handler(req, res) {
         const { igConectado } = await import('../../../lib/instagramLogin');
         if (conta && d.formato === 'short' && d.videoUrl && !d.envios?.instagram && (await igConectado(conta))) {
           const { titulo, legenda } = legendaDasRedes(d, conta);
+          // Mesmo horário do YouTube se for logo; se o YouTube está dias à frente, o Instagram não espera (notícia envelhece):
+          // vai no próximo horário livre, 40 min depois do anterior
           let quando = new Date(d.fabrica?.quandoYoutube || Date.now());
-          if (quando.getTime() < Date.now() + 15 * 60e3) quando = new Date(Date.now() + 15 * 60e3);
+          const livre = new Date(await proximoHorarioIg(db, conta));
+          if (quando.getTime() < livre.getTime() || quando.getTime() > Date.now() + 3 * 3600e3) quando = livre;
           const ag = await db.collection('youvideo_agenda').add({
             titulo, legenda, videoUrl: d.videoUrl, thumbnailUrl: d.thumbnailUrl || null, conta, curto: true,
             quando: quando.toISOString(), redes: { instagram: { status: 'pendente' } }, pendente: true,
