@@ -1,4 +1,5 @@
 // Youvideo Compilador — processo principal (janela, arquivos, fila e YouTube)
+let atualizarPorComando = null; // preenchido quando o app inicia (comando remoto de atualizar)
 const { app, BrowserWindow, WebContentsView, session, ipcMain, dialog, shell, safeStorage, powerSaveBlocker, nativeTheme, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -1027,7 +1028,7 @@ app.whenReady().then(() => {
     try {
       semanaRes = resumoSemanaRemota ? resumoSemanaRemota() : undefined;
     } catch {}
-    await Central.chamar(cfg, '/api/central/pc-filas', { metodo: 'PUT', corpo: { pc, pcNome, jobs, dormir, semana: semanaRes } }).catch(() => {});
+    await Central.chamar(cfg, '/api/central/pc-filas', { metodo: 'PUT', corpo: { pc, pcNome, jobs, dormir, semana: semanaRes, versao: app.getVersion() } }).catch(() => {});
   }
   fila.on('mudou', () => {
     if (tFilaNuvem) return;
@@ -1126,7 +1127,7 @@ app.whenReady().then(() => {
   });
 
   // ---------- Atualização automática ----------
-  ipcMain.handle('app:verificarAtualizacao', async () => {
+  const verificarAtualizacao = async () => {
     try {
       const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30`, { headers: { 'User-Agent': 'youvideo-compilador' } });
       if (!r.ok) return null;
@@ -1149,8 +1150,9 @@ app.whenReady().then(() => {
     } catch {
       return null;
     }
-  });
-  ipcMain.handle('app:atualizar', async (_e, { url, tamanho }) => {
+  };
+  ipcMain.handle('app:verificarAtualizacao', () => verificarAtualizacao());
+  const instalarAtualizacao = async ({ url, tamanho }) => {
     if (!/^https:\/\/github\.com\/andersonveloso0503-cmyk\/youvideo\/releases\/download\//.test(url)) throw new Error('Link de atualização inválido.');
     const destino = path.join(os.tmpdir(), `Youvideo-Compilador-Setup-${Date.now()}.exe`);
     const r = await fetch(url, { headers: { 'User-Agent': 'youvideo-compilador' } });
@@ -1192,7 +1194,15 @@ app.whenReady().then(() => {
     }
     setTimeout(() => app.exit(0), 800);
     return true;
-  });
+  };
+  ipcMain.handle('app:atualizar', (_e, dados) => instalarAtualizacao(dados));
+  // Outro PC pode mandar este se atualizar (comando "atualizar"): baixa a versão nova e instala sozinho
+  atualizarPorComando = async () => {
+    const nova = await verificarAtualizacao();
+    if (!nova) return 'já está na versão mais nova';
+    await instalarAtualizacao(nova);
+    return `atualizando para ${nova.versao}`;
+  };
 
   // ---------- Canais do YouTube ----------
   ipcMain.handle('canais:listar', () => store.canaisParaTela());
@@ -1918,8 +1928,19 @@ app.whenReady().then(() => {
           semana.recusar(i).catch(() => {});
         } else if (c.acao === 'semanaContinuar') {
           semana.rodar().catch(() => {});
+        } else if (c.acao === 'atualizar') {
+          // Atualiza depois que a fila terminar o que está fazendo (não corta vídeo no meio)
+          await Central.chamar(cfg, '/api/central/pc-comandos', { metodo: 'PATCH', corpo: { id: c.id, status: 'feito' } }).catch(() => {});
+          const esperar = async () => {
+            const ocupado = fila.rodando.size > 0; // algo gerando/enviando agora
+
+            if (ocupado) return setTimeout(esperar, 60e3);
+            if (atualizarPorComando) atualizarPorComando().catch(() => {});
+          };
+          esperar();
+          continue;
         }
-        if (Notification.isSupported()) new Notification({ title: 'Sons para dormir', body: `Pedido de ${c.deNome || 'outro PC'}: ${c.acao === 'semanaAprovar' ? 'aprovado' : c.acao === 'semanaRecusar' ? 'fazer outro vídeo' : 'continuar a semana'}` }).show();
+        if (Notification.isSupported() && c.acao !== 'atualizar') new Notification({ title: 'Sons para dormir', body: `Pedido de ${c.deNome || 'outro PC'}: ${c.acao === 'semanaAprovar' ? 'aprovado' : c.acao === 'semanaRecusar' ? 'fazer outro vídeo' : 'continuar a semana'}` }).show();
       } catch (e) {
         erro = e.message;
       }

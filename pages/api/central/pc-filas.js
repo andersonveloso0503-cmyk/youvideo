@@ -61,7 +61,7 @@ export default async function handler(req, res) {
           })),
         };
       } else if (b.semana === null) semana = null;
-      await col.doc(pc).set({ pcNome: txt(b.pcNome, 60), atualizadoEm: Date.now(), jobs, ...(Array.isArray(b.dormir) ? { dormir } : {}), ...(semana !== undefined ? { semana } : {}) }, { merge: true });
+      await col.doc(pc).set({ pcNome: txt(b.pcNome, 60), atualizadoEm: Date.now(), jobs, ...(b.versao ? { versao: txt(b.versao, 12) } : {}), ...(Array.isArray(b.dormir) ? { dormir } : {}), ...(semana !== undefined ? { semana } : {}) }, { merge: true });
       return res.status(200).json({ ok: true });
     }
     return res.status(405).json({ erro: 'Método não permitido.' });

@@ -6,7 +6,7 @@ import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 
 const COL = 'youvideo_pc_comandos';
-const ACOES = ['semanaAprovar', 'semanaRecusar', 'semanaContinuar'];
+const ACOES = ['semanaAprovar', 'semanaRecusar', 'semanaContinuar', 'atualizar']; // atualizar: o PC baixa e instala a versão nova (Compilador 2.5.56+)
 
 export default async function handler(req, res) {
   if (!exigirToken(req, res)) return;

@@ -964,6 +964,8 @@ const ROTULO_STATUS = {
   aguardando: 'Aguardando', separando: 'Separando voz', legenda: 'Legenda', audio: 'Áudio', fundos: 'Fundos',
   renderizando: 'Gerando', publicando: 'Publicando', concluido: 'Pronto', erro: 'Erro', cancelado: 'Cancelado', interrompido: 'Interrompido',
 };
+let APP_VERSAO = ''; // versão deste PC (para oferecer atualizar os outros)
+const versaoMenor = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); return false; };
 let esperarFilaParaAtualizar = null; // 'Atualizar quando a fila terminar'
 const RODANDO = ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'];
 function renderFila() {
@@ -1205,6 +1207,7 @@ async function iniciar() {
 
   window.api.sistema.info().then((i) => {
     $('#versao').textContent = `v${i.versao}`;
+    APP_VERSAO = i.versao;
     document.title = `Youvideo Compilador v${i.versao}`; // a versão aparece sempre na barra da janela
     const nomes = { libx264: 'Processador', h264_qsv: 'Intel Quick Sync', h264_nvenc: 'NVIDIA', h264_amf: 'AMD' };
     $('#chipEncoder').textContent = `⚡ ${nomes[i.encoder] || i.encoder}`;
@@ -1388,7 +1391,24 @@ async function iniciar() {
         const d = document.createElement('div');
         d.className = 'pc-bloco';
         d.innerHTML = `<h3></h3><div class="pc-jobs"></div>`;
-        d.querySelector('h3').textContent = `${aberto ? '🟢' : '⚪'} ${pc.pcNome || pc.pc} · ${aberto ? 'app aberto agora' : `visto há ${min < 60 ? min + ' min' : Math.round(min / 60) + ' h'}`}`;
+        d.querySelector('h3').textContent = `${aberto ? '🟢' : '⚪'} ${pc.pcNome || pc.pc} · ${pc.versao ? `v${pc.versao} · ` : 'versão antiga · '}${aberto ? 'app aberto agora' : `visto há ${min < 60 ? min + ' min' : Math.round(min / 60) + ' h'}`}`;
+        // Atualizar o outro PC à distância (ele precisa já ter o 2.5.56+, que entende o pedido)
+        if (pc.versao && APP_VERSAO && versaoMenor(pc.versao, APP_VERSAO)) {
+          const bt = document.createElement('button');
+          bt.className = 'pc-btn';
+          bt.textContent = `⬆ Atualizar esse PC para v${APP_VERSAO}`;
+          bt.onclick = async () => {
+            bt.disabled = true;
+            try {
+              await window.api.dormir.comandoOutroPc({ pc: pc.pc, acao: 'atualizar' });
+              bt.textContent = '⏳ Pedido enviado — ele atualiza quando terminar o que está fazendo';
+            } catch (e) {
+              bt.disabled = false;
+              bt.textContent = msgErro(e);
+            }
+          };
+          d.appendChild(bt);
+        }
         const lista = d.querySelector('.pc-jobs');
         const jobsPc = (pc.jobs || []).filter((j) => j.tipo !== 'nuvem');
         if (!jobsPc.length) lista.innerHTML = '<p class="nota">Fila vazia.</p>';

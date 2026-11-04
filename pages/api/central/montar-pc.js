@@ -54,6 +54,12 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const snap = await col.where('status', 'in', ['pendente', 'montando']).limit(30).get();
       const agora = Date.now();
+      // Marca quando um PC atualizado (desenha ilustração) passou por aqui; com ele ligado, o PC antigo nunca pega vídeo ilustrado
+      const marca = db.collection('youvideo_config').doc('pc-ilustracao');
+      const pcNovo = desenhaIlustracao(req.query.v);
+      let pcNovoAtivo = pcNovo;
+      if (pcNovo) await marca.set({ visto: agora }, { merge: true }).catch(() => {});
+      else pcNovoAtivo = agora - ((await marca.get().catch(() => null))?.data()?.visto || 0) < 15 * 60e3;
       const pedidos = [];
       for (const doc of snap.docs) {
         const d = doc.data();
@@ -62,7 +68,7 @@ export default async function handler(req, res) {
         try {
           receita = d.receita ? JSON.parse(d.receita) : d.receitaUrl ? await (await fetch(d.receitaUrl)).json() : null;
         } catch {}
-        if (receita && !desenhaIlustracao(req.query.v) && (receita.clipes || []).some((c) => c.ilustracao) && agora - (d.criadoEm || agora) < ESPERA_PC_NOVO) continue;
+        if (receita && !pcNovo && (receita.clipes || []).some((c) => c.ilustracao) && (pcNovoAtivo || agora - (d.criadoEm || agora) < ESPERA_PC_NOVO)) continue;
         if (receita && !aceitaStreaming(req.query.v)) receita = semStreaming(receita);
         // Wikimedia só serve miniaturas em tamanhos padrão (1280, 1920...): 1600px dava "Não consegui baixar (400)" no PC
         if (receita) receita = tamanhoPadraoWikimedia(receita);
