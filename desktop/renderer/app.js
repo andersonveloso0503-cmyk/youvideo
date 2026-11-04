@@ -1205,6 +1205,7 @@ async function iniciar() {
 
   window.api.sistema.info().then((i) => {
     $('#versao').textContent = `v${i.versao}`;
+    document.title = `Youvideo Compilador v${i.versao}`; // a versão aparece sempre na barra da janela
     const nomes = { libx264: 'Processador', h264_qsv: 'Intel Quick Sync', h264_nvenc: 'NVIDIA', h264_amf: 'AMD' };
     $('#chipEncoder').textContent = `⚡ ${nomes[i.encoder] || i.encoder}`;
     $('#encoderDetectado').textContent = `Detectado neste PC: ${nomes[i.encoder] || i.encoder} · ${i.nucleos} núcleos`;
