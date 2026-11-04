@@ -5,6 +5,7 @@
 // POST { acao:'buscar' }                                   -> busca agora
 // POST { acao:'aprovar', id, canalYoutube, quando? }       -> vira Short na Fábrica (sobe no horário pedido ou daqui a ~1h30)
 // POST { acao:'descartar', id }
+// POST { acao:'auto', ligado }                             -> liga/desliga a aprovação automática (padrão: ligada)
 // POST { acao:'video', ids:[...] }                         -> escreve um vídeo de notícias com as marcadas (fica esperando aprovação)
 // POST { acao:'dicas', jogos:[...] }                        -> escreve vídeos de dicas (jogos vazios = mais vendidos da Steam agora)
 import { getDb } from '../../../lib/firebase-admin';
@@ -48,6 +49,77 @@ async function proximoHorario(db, desejado) {
   return new Date(t).toISOString();
 }
 
+/** Manda a notícia aprovada para a Fábrica (Short em ~1h30, vídeo em ~3h, ou no horário pedido). */
+async function aprovarNoticia(db, ref, d, canalYoutube, quandoPedido = null, { limite = null } = {}) {
+  const longo = d.tipo === 'longo' || d.tipo === 'dicas';
+  const pedido = quandoPedido ? new Date(quandoPedido) : null;
+  const quando = await proximoHorario(db, pedido && pedido.getTime() > Date.now() + 30 * 60e3 ? pedido.getTime() : Date.now() + (longo ? 3 : 1.5) * 3600e3);
+  // Aprovação automática: só entra se couber na agenda das próximas horas (a fila não cresce sem fim)
+  if (limite && new Date(quando).getTime() > limite) return null;
+  const fab = db.collection('youvideo_fila').doc();
+  await fab.set({
+    tema: d.ep.titulo,
+    documentario: true, // mesmo motor dos documentários
+    games: true,
+    noticia: ref.id,
+    episodioId: d.ep.id,
+    serie: null,
+    estilo: 'realista',
+    formato: longo ? 'longo' : 'short',
+    animar: false,
+    roteiro: roteiroDoEpisodio(d.ep),
+    status: 'pendente',
+    origem: 'fabrica',
+    criadoEm: new Date().toISOString(),
+    fabrica: {
+      ativo: true,
+      lote: `noticias-${Date.now().toString(36)}`,
+      quando,
+      quandoYoutube: quando,
+      redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
+      canalYoutube,
+    },
+  });
+  await ref.update({ status: 'aprovada', aprovadaEm: new Date().toISOString(), filaId: fab.id, quando, ...(limite ? { automatica: true } : {}) });
+  return { filaId: fab.id, quando };
+}
+
+/** Canal do YouTube do Próxima Fase: o guardado na última aprovação, ou o do último vídeo de games da Fábrica. */
+async function canalDosGames(db, cfgDados) {
+  if (cfgDados?.canalYoutube?.id) return cfgDados.canalYoutube;
+  const snap = await db.collection('youvideo_fila').where('games', '==', true).get();
+  const ultimo = snap.docs
+    .map((x) => x.data())
+    .filter((x) => x.fabrica?.canalYoutube?.id)
+    .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')))[0];
+  return ultimo?.fabrica?.canalYoutube || null;
+}
+
+/**
+ * Aprovação automática (pedido do dono: os vídeos de games estão indo bem, não precisa mais aprovar):
+ * os Shorts de notícia que esperam aprovação vão sozinhos para a Fábrica, os mais novos primeiro,
+ * com 3 h entre um e outro e só os que cabem nas próximas 24 h. Notícia com mais de 2 dias fica de fora (velha).
+ */
+async function aprovarSozinho(db, col, cfgDados) {
+  if (cfgDados?.autoAprovar === false) return { automaticas: 0, motivo: 'desligada' };
+  const canal = await canalDosGames(db, cfgDados);
+  if (!canal) return { automaticas: 0, motivo: 'sem canal do YouTube (aprove uma notícia à mão uma vez)' };
+  const snap = await col.where('status', '==', 'aguardando').get();
+  const velha = Date.now() - 2 * 86400e3;
+  const fila = snap.docs
+    .map((d) => ({ ref: d.ref, d: d.data() }))
+    .filter(({ d }) => (d.tipo || 'short') === 'short' && d.ep && new Date(d.criadoEm || 0).getTime() > velha)
+    .sort((a, b) => String(b.d.data || b.d.criadoEm || '').localeCompare(String(a.d.data || a.d.criadoEm || '')));
+  const limite = Date.now() + 24 * 3600e3;
+  let automaticas = 0;
+  for (const { ref, d } of fila) {
+    const r = await aprovarNoticia(db, ref, d, canal, null, { limite });
+    if (!r) break; // agenda cheia: as outras esperam a próxima busca
+    automaticas++;
+  }
+  return { automaticas };
+}
+
 export default async function handler(req, res) {
   const ehCron =
     (process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`) || /vercel-cron/i.test(req.headers['user-agent'] || '');
@@ -62,7 +134,9 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.auto) {
       const r = await buscarNoticias(db, { quantas: 6 });
       await cfg.set({ ultimaBusca: new Date().toISOString(), fontes: r.fontes }, { merge: true });
-      return res.status(200).json(r);
+      const auto = await aprovarSozinho(db, col, (await cfg.get()).data()).catch((e) => ({ automaticas: 0, erro: String(e.message || e).slice(0, 200) }));
+      if (auto.automaticas) console.log(`[games] ${auto.automaticas} notícia(s) aprovada(s) sozinha(s)`);
+      return res.status(200).json({ ...r, ...auto });
     }
 
     if (req.method === 'GET') {
@@ -91,6 +165,7 @@ export default async function handler(req, res) {
             .join('\n'),
           criadoEm: x.criadoEm,
           aprovadaEm: x.aprovadaEm || null,
+          automatica: !!x.automatica,
         };
       };
       const porData = (a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
@@ -98,6 +173,7 @@ export default async function handler(req, res) {
         aguardando: aguardando.docs.map(resumo).sort(porData),
         aprovadas: aprovadas.docs.map(resumo).sort((a, b) => String(b.aprovadaEm || '').localeCompare(String(a.aprovadaEm || ''))).slice(0, 15),
         ultimaBusca: c.data()?.ultimaBusca || null,
+        autoAprovar: c.data()?.autoAprovar !== false,
         fontes: c.data()?.fontes || [],
       });
     }
@@ -108,7 +184,8 @@ export default async function handler(req, res) {
     if (b.acao === 'buscar') {
       const r = await buscarNoticias(db, { quantas: Math.max(1, Math.min(8, Number(b.quantas) || 6)) });
       await cfg.set({ ultimaBusca: new Date().toISOString(), fontes: r.fontes }, { merge: true });
-      return res.status(200).json(r);
+      const auto = await aprovarSozinho(db, col, (await cfg.get()).data()).catch((e) => ({ automaticas: 0, erro: String(e.message || e).slice(0, 200) }));
+      return res.status(200).json({ ...r, ...auto });
     }
 
     // 📸 Enviar prontos ao Instagram do canal (os que ainda não foram, um a cada 40 min)
@@ -200,36 +277,17 @@ export default async function handler(req, res) {
       const d = (await ref.get()).data();
       if (!d?.ep) return res.status(404).json({ erro: 'Notícia não encontrada.' });
       if (d.status === 'aprovada') return res.status(400).json({ erro: 'Essa notícia já foi aprovada.' });
-      const longo = d.tipo === 'longo' || d.tipo === 'dicas';
-      // Notícia é para já: Short sobe em ~1h30 (tempo de voz, imagens e montagem), vídeo em ~3h, ou no horário escolhido
-      const pedido = b.quando ? new Date(b.quando) : null;
-      const quando = await proximoHorario(db, pedido && pedido.getTime() > Date.now() + 30 * 60e3 ? pedido.getTime() : Date.now() + (longo ? 3 : 1.5) * 3600e3);
-      const fab = db.collection('youvideo_fila').doc();
-      await fab.set({
-        tema: d.ep.titulo,
-        documentario: true, // mesmo motor dos documentários
-        games: true,
-        noticia: ref.id,
-        episodioId: d.ep.id,
-        serie: null,
-        estilo: 'realista',
-        formato: longo ? 'longo' : 'short',
-        animar: false,
-        roteiro: roteiroDoEpisodio(d.ep),
-        status: 'pendente',
-        origem: 'fabrica',
-        criadoEm: new Date().toISOString(),
-        fabrica: {
-          ativo: true,
-          lote: `noticias-${Date.now().toString(36)}`,
-          quando,
-          quandoYoutube: quando,
-          redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
-          canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') },
-        },
-      });
-      await ref.update({ status: 'aprovada', aprovadaEm: new Date().toISOString(), filaId: fab.id, quando });
-      return res.status(200).json({ ok: true, filaId: fab.id, quando });
+      const canal = { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') };
+      // Guarda o canal: é o que a aprovação automática usa
+      await cfg.set({ canalYoutube: canal }, { merge: true });
+      const r = await aprovarNoticia(db, ref, d, canal, b.quando);
+      return res.status(200).json({ ok: true, ...r });
+    }
+
+    // Liga/desliga a aprovação automática das notícias (padrão: ligada)
+    if (b.acao === 'auto') {
+      await cfg.set({ autoAprovar: b.ligado !== false }, { merge: true });
+      return res.status(200).json({ ok: true, autoAprovar: b.ligado !== false });
     }
 
     return res.status(400).json({ erro: 'Ação desconhecida.' });

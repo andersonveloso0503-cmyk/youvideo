@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { rodar, probe } = require('./ffmpeg');
+const { rodar, probe, FFMPEG } = require('./ffmpeg');
 const R = require('./render');
 const Central = require('./central');
 const { filtroEfeitos } = require('./efeitos');
@@ -146,7 +146,7 @@ function organizarCenas(receita) {
   const cenas = [];
   for (const c of clipes) {
     const ultima = cenas[cenas.length - 1];
-    if (ultima && ultima.tipo === 'video' && c.tipo === 'video' && ultima.url === c.url && (ultima.inicio || 0) === (c.inicio || 0) && Math.abs(ultima.start + ultima.length - c.start) < 0.1) {
+    if (ultima && !ultima.ilustracao && !c.ilustracao && ultima.tipo === 'video' && c.tipo === 'video' && ultima.url === c.url && (ultima.inicio || 0) === (c.inicio || 0) && Math.abs(ultima.start + ultima.length - c.start) < 0.1) {
       ultima.length += c.length;
       ultima.repetir = true;
     } else cenas.push({ ...c });
@@ -280,7 +280,24 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
       registrarCancelar && registrarCancelar(r.cancelar);
       await r.promise;
     };
-    try {
+    // Política: ilustração animada desenhada aqui no PC (carimbo, placar, checklist...); se falhar, usa a foto
+    let ilustrada = false;
+    if (c.ilustracao) {
+      try {
+        const Ilu = require('./ilustracao');
+        await Ilu.renderizarIlustracao(c.ilustracao, {
+          W, H, duracao: c.length, fps: FPS, saida, checar,
+          capturar: Ilu.desenhistaElectron(),
+          ffmpeg: FFMPEG,
+        });
+        ilustrada = true;
+        onProgresso && onProgresso((pronto + c.length) / total);
+      } catch (e) {
+        if (e?.message === 'CANCELADO' || e?.discoCheio) throw e;
+        console.warn(`[montagem] ilustração da cena ${i + 1} falhou, usando a foto:`, String(e?.message || e).slice(0, 300));
+      }
+    }
+    if (!ilustrada) try {
       await rodarCena(await montarArgs(c, locais[c.url]));
     } catch (e) {
       if (e?.message === 'CANCELADO' || e?.discoCheio) throw e;

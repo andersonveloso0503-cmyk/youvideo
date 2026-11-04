@@ -146,6 +146,19 @@ export default async function handler(req, res) {
     const lengthFatia = usaTemposExplicitos ? c.length : duracaoPorCena;
     if (!usaTemposExplicitos) inicio += duracaoPorCena;
 
+    // Cena com ilustração animada (política): um clipe só, a ilustração vai junto; a foto/vídeo é o plano B do PC
+    if (c.ilustracao) {
+      return [{
+        asset: c.videoUrl ? { type: 'video', src: c.videoUrl } : { type: 'image', src: c.imageUrl },
+        start,
+        length: lengthFatia,
+        fit: 'cover',
+        ilustracao: c.ilustracao,
+        ...(!c.videoUrl ? { effect: contadorCena % 2 === 0 ? 'zoomIn' : 'zoomOut' } : {}),
+        ...(c.videoUrl && c.imageUrl ? { reserva: c.imageUrl } : {}),
+      }];
+    }
+
     if (!c.videoUrl) {
       // Cena 100% estática: zoom lento (Ken Burns), alternando pra
       // dentro/fora — dá sensação de movimento sem custo.
@@ -218,6 +231,7 @@ export default async function handler(req, res) {
         ...(c.movimento ? { movimento: c.movimento } : {}),
         ...(c.inicio ? { inicio: c.inicio } : {}), // trailer de jogo: começa neste segundo do vídeo
         ...(c.reserva ? { imagem: c.reserva } : {}), // imagem de reserva se o PC não conseguir usar o vídeo
+        ...(c.ilustracao ? { ilustracao: c.ilustracao } : {}), // política: ilustração animada desenhada no PC (Compilador 2.5.51+)
       })),
       palavras: (palavras || [])
         .filter((p) => p && p.start != null && p.end != null)

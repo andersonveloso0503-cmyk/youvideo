@@ -799,9 +799,23 @@ const Fabrica = (() => {
     try {
       const r = await window.api.noticias.listar();
       const falhas = (r.fontes || []).filter((f) => !f.ok).map((f) => f.nome);
-      info.textContent = r.ultimaBusca
-        ? `Última busca: ${quandoTxt(r.ultimaBusca)}${falhas.length ? ` · sem resposta: ${falhas.join(', ')}` : ''}`
-        : 'Ainda não buscou notícias.';
+      const auto = r.autoAprovar !== false;
+      info.innerHTML =
+        esc(r.ultimaBusca ? `Última busca: ${quandoTxt(r.ultimaBusca)}${falhas.length ? ` · sem resposta: ${falhas.join(', ')}` : ''}` : 'Ainda não buscou notícias.') +
+        ` · <b>${auto ? '🤖 Aprovação automática ligada' : '✋ Aprovação manual'}</b> ` +
+        `<button type="button" id="gmAuto" style="font-size:12px;padding:2px 8px">${auto ? 'Desligar' : 'Ligar'}</button>` +
+        (auto ? '<div class="nota">As notícias novas vão sozinhas para a Fábrica (3 h entre vídeos, só o que cabe nas próximas 24 h). Você ainda pode descartar as que estiverem esperando.</div>' : '');
+      const btAuto = q('#gmAuto');
+      if (btAuto)
+        btAuto.onclick = async () => {
+          btAuto.disabled = true;
+          try {
+            await window.api.noticias.acao({ acao: 'auto', ligado: !auto });
+          } catch (e) {
+            alert('Não consegui mudar: ' + msgErro(e));
+          }
+          carregarNoticias();
+        };
       const cartao = (n, aprovada) => `
         <div class="gm-noticia" data-id="${esc(n.id)}" style="display:flex;gap:10px;padding:10px;border:1px solid var(--borda, #333);border-radius:10px;margin:8px 0;align-items:flex-start${aprovada ? ';opacity:.6' : ''}">
           ${aprovada || n.tipo !== 'short' ? '' : `<input type="checkbox" class="gm-marca" value="${esc(n.id)}" title="Marcar para juntar num vídeo" style="margin-top:4px" />`}
@@ -811,7 +825,7 @@ const Fabrica = (() => {
             <div class="nota" style="margin:2px 0">${esc(n.fonte)}${n.oficial ? ' (oficial)' : ''}${n.data ? ' · ' + quandoTxt(n.data) : ''} · ${n.link ? `<a href="${esc(n.link)}" target="_blank">abrir a notícia</a>` : (n.links || []).map((l) => `<a href="${esc(l.link)}" target="_blank" title="${esc(l.titulo)}">fonte</a>`).join(' ')}</div>
             <details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>
           </div>
-          ${aprovada ? `<span class="nota">✅ ${quandoTxt(n.aprovadaEm)}</span>` : `<div style="display:flex;flex-direction:column;gap:6px">
+          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : `<div style="display:flex;flex-direction:column;gap:6px">
             <button type="button" class="gm-aprovar" data-id="${esc(n.id)}">✅ Aprovar</button>
             <button type="button" class="gm-descartar" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
         </div>`;
@@ -926,7 +940,7 @@ const Fabrica = (() => {
             <div class="nota" style="margin:2px 0">${esc(n.fonte)}${n.data ? ' · ' + quandoTxt(n.data) : ''} · ${n.link ? `<a href="${esc(n.link)}" target="_blank">abrir a notícia</a>` : (n.links || []).map((l) => `<a href="${esc(l.link)}" target="_blank" title="${esc(l.titulo)}">fonte</a>`).join(' ')}</div>
             <details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>
           </div>
-          ${aprovada ? `<span class="nota">✅ ${quandoTxt(n.aprovadaEm)}</span>` : `<div style="display:flex;flex-direction:column;gap:6px">
+          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : `<div style="display:flex;flex-direction:column;gap:6px">
             <button type="button" class="btn-primario pl-aprovar" data-id="${esc(n.id)}">✅ Aprovar</button>
             <button type="button" class="btn-mini perigo pl-descartar" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
         </div>`;
