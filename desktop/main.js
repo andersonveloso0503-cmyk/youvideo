@@ -908,6 +908,9 @@ app.whenReady().then(() => {
   }
   setTimeout(trocarCapasFabrica, 40000);
   setInterval(trocarCapasFabrica, 180000);
+  // Capas recusadas pelo limite do YouTube: tenta de novo de hora em hora
+  setTimeout(() => fila.tentarCapasPendentes().catch(() => {}), 5 * 60e3);
+  setInterval(() => fila.tentarCapasPendentes().catch(() => {}), 60 * 60e3);
   ipcMain.handle('fabrica:listar', async () => {
     const r = await Central.chamar(store.ler(), '/api/central/fabrica');
     // Aproveita a mesma resposta para as tarjas da Fila (sem consultar o banco de novo)

@@ -140,6 +140,61 @@ class Fila extends EventEmitter {
       fs.writeFileSync(path.join(this.dirDados, 'fabrica-enviados.json'), JSON.stringify(Object.fromEntries(recentes)));
     } catch {}
   }
+  // ---------- Capas que o YouTube recusou por limite: ficam guardadas e vão de novo de hora em hora (até 3 dias) ----------
+  arquivoCapasPendentes() {
+    return path.join(this.dirCache, 'capas-pendentes.json');
+  }
+  lerCapasPendentes() {
+    try {
+      return JSON.parse(fs.readFileSync(this.arquivoCapasPendentes(), 'utf8'));
+    } catch {
+      return [];
+    }
+  }
+  guardarCapaPendente({ videoId, canalId, arquivo, jobId, titulo }) {
+    try {
+      const dir = path.join(this.dirCache, 'capas-pendentes');
+      fs.mkdirSync(dir, { recursive: true });
+      const copia = path.join(dir, `${videoId}.jpg`);
+      fs.copyFileSync(arquivo, copia);
+      const lista = this.lerCapasPendentes().filter((x) => x.videoId !== videoId);
+      lista.push({ videoId, canalId, arquivo: copia, jobId, titulo: String(titulo || '').slice(0, 100), em: Date.now(), tentativas: 0 });
+      fs.writeFileSync(this.arquivoCapasPendentes(), JSON.stringify(lista));
+    } catch {}
+  }
+  async tentarCapasPendentes() {
+    const lista = this.lerCapasPendentes();
+    if (!lista.length || this.tentandoCapas) return;
+    this.tentandoCapas = true;
+    const cfg = this.obterConfig();
+    const fica = [];
+    try {
+      for (const p of lista) {
+        if (Date.now() - p.em > 3 * 86400e3 || !fs.existsSync(p.arquivo)) continue; // desiste depois de 3 dias
+        const canal = this.obterCanal(p.canalId);
+        if (!canal) {
+          fica.push(p);
+          continue;
+        }
+        try {
+          await YT.trocarCapa({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect, videoId: p.videoId, arquivo: p.arquivo });
+          fs.rmSync(p.arquivo, { force: true });
+          const job = this.jobs.find((j) => j.id === p.jobId);
+          if (job) this.atualizar(job, { aviso: null, etapa: `${job.etapa || 'Agendado'} · capa enviada ✅` });
+        } catch (e) {
+          fica.push({ ...p, tentativas: (p.tentativas || 0) + 1, ultimoErro: String(e.message || e).slice(0, 200) });
+          if (/too many|rate|quota|limit|later/i.test(String(e.message))) {
+            fica.push(...lista.slice(lista.indexOf(p) + 1).filter((x) => !fica.includes(x)));
+            break; // o limite ainda vale: as outras esperam a próxima volta
+          }
+        }
+      }
+      fs.writeFileSync(this.arquivoCapasPendentes(), JSON.stringify(fica));
+    } finally {
+      this.tentandoCapas = false;
+    }
+  }
+
   anotarFabricaEnviado(id, url, capaErro = null) {
     const m = this.fabricaEnviados();
     m[id] = { url: url || '', em: Date.now(), avisado: false, ...(capaErro ? { capaErro } : {}) };
@@ -547,6 +602,12 @@ class Fila extends EventEmitter {
         },
       });
       this.registrarEnvio();
+      // YouTube recusou a capa por limite ("too many thumbnails" / cota): guarda e manda de novo sozinho mais tarde
+      const capaUsada = e.curto && !chamativa && !e.capaManual ? null : miniatura;
+      if (r.miniaturaErro && r.id && capaUsada && /too many|rate|quota|limit|later/i.test(r.miniaturaErro)) {
+        this.guardarCapaPendente({ videoId: r.id, canalId: e.canalId, arquivo: capaUsada, jobId: job.id, titulo: e.titulo });
+        r.miniaturaErro = 'Capa recusada agora pelo limite do YouTube — vou mandar de novo sozinho daqui a pouco (de hora em hora)';
+      }
       if (this.cacheCanal) delete this.cacheCanal[e.canalId]; // o canal mudou: a próxima conferência olha de novo
       this.atualizar(job, {
         status: 'concluido',
