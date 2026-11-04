@@ -11,8 +11,12 @@ const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calend
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const txt = (t, max = 80) => esc(String(t ?? '').replace(/\s+/g, ' ').trim().slice(0, max));
 const num = (v) => {
-  const n = Number(String(v ?? '').replace(/\./g, '').replace(',', '.'));
-  return Number.isFinite(n) ? n : null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  let t = String(v ?? '').trim().replace(/[^\d.,-]/g, '');
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.'); // 1.518,50 -> 1518.50
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, ''); // 1.518 -> 1518
+  const n = Number(t);
+  return t && Number.isFinite(n) ? n : null;
 };
 
 /** Título com a palavra de destaque em dourado. */
@@ -79,21 +83,24 @@ const DESENHOS = {
         )
         .join('')}
       ${d.nota ? `<div style="position:absolute;top:${linhas.length * alt + 10}px;left:0;right:0;text-align:center;font-size:32px;color:var(--mut)">${txt(d.nota, 50)}</div>` : ''}</div>`,
-      anim: `$$('.bar').forEach((b,i)=>{const p=eo(ap(t,(.4+i*1.4)*k,1.1*k));const v=+b.dataset.v;b.style.width=(p*v/${total}*100)+'%';$$('.nv')[i].textContent=Math.round(p*v).toLocaleString('pt-BR');});`,
+      anim: `$$('.bar').forEach((b,i)=>{const p=eo(ap(t,(.4+i*1.4)*k,1.1*k));const v=+b.dataset.v;b.style.width=(p*v/${total}*100)+'%';$$('.nv')[i].textContent=fmtN(p*v,b.dataset.v,'${d.sufixo === '%' ? '%' : ''}');});`,
     };
   },
   versus(d) {
     const a = d.a || {};
     const b = d.b || {};
+    const suf = d.sufixo === '%' ? '%' : '';
+    const maior = Math.max(String(a.valor ?? '').length, String(b.valor ?? '').length) + suf.length;
+    const tam = Math.round(Math.min(200, 360 / Math.max(2, maior * 0.62)));
     return {
       html: `<div style="position:absolute;left:0;right:0;top:120px;text-align:center">
-        <div style="display:flex;justify-content:center;align-items:flex-end;gap:60px">
-          <div><div class="num" id="va" data-v="${num(a.valor) || 0}" style="font-size:200px;line-height:1">0</div><div class="lado" style="font-size:36px;font-weight:800;color:var(--ok);letter-spacing:2px;text-transform:uppercase">${txt(a.rotulo, 18)}</div></div>
+        <div style="display:flex;justify-content:center;align-items:flex-end;gap:40px">
+          <div><div class="num" id="va" data-v="${num(a.valor) || 0}" style="font-size:${tam}px;line-height:1">0</div><div class="lado" style="font-size:34px;font-weight:800;color:var(--ouro);letter-spacing:2px;text-transform:uppercase">${txt(a.rotulo, 18)}</div></div>
           <div style="font-size:90px;color:var(--mut);padding-bottom:70px">×</div>
-          <div><div class="num" id="vb" data-v="${num(b.valor) || 0}" style="font-size:200px;line-height:1;color:var(--mut)">0</div><div class="lado" style="font-size:36px;font-weight:800;color:var(--nao);letter-spacing:2px;text-transform:uppercase">${txt(b.rotulo, 18)}</div></div>
+          <div><div class="num" id="vb" data-v="${num(b.valor) || 0}" style="font-size:${tam}px;line-height:1">0</div><div class="lado" style="font-size:34px;font-weight:800;color:#7fb2ff;letter-spacing:2px;text-transform:uppercase">${txt(b.rotulo, 18)}</div></div>
         </div>
         ${d.nota ? `<div id="vn" style="margin-top:70px;font-size:36px;color:var(--mut);letter-spacing:2px;text-transform:uppercase">${txt(d.nota, 50)}</div>` : ''}</div>`,
-      anim: `const p=eo(ap(t,.2*k,1.2*k));['va','vb'].forEach(id=>{const e=$(id);e.textContent=Math.round(p*e.dataset.v).toLocaleString('pt-BR');});
+      anim: `const p=eo(ap(t,.2*k,1.2*k));['va','vb'].forEach(id=>{const e=$(id);e.textContent=fmtN(p*e.dataset.v,e.dataset.v,'${suf}');});
         $$('.lado').forEach(e=>e.style.opacity=eo(ap(t,1.2*k,.4)));if($('vn'))$('vn').style.opacity=eo(ap(t,1.6*k,.4));`,
     };
   },
@@ -261,6 +268,7 @@ const cl=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));const eo=x=>1-Math.pow(1-cl(x),3
 const back=x=>{x=cl(x);const c=1.9;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
 const ap=(t,s,d=.5)=>cl((t-s)/Math.max(.01,d));const $=id=>document.getElementById(id);const $$=s=>[...document.querySelectorAll(s)];
 const k=${k};
+const fmtN=(x,alvo,suf)=>{const c=Number.isInteger(+alvo)?0:Math.min(2,(String(alvo).split('.')[1]||'').length);return x.toLocaleString('pt-BR',{minimumFractionDigits:c,maximumFractionDigits:c})+(suf||'')};
 function anim(t){${des.anim}}
 window.setT=function(t){
  $('l1').style.transform='translate('+Math.sin(t*.4)*60+'px,'+Math.cos(t*.3)*80+'px)';
