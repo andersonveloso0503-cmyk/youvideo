@@ -53,7 +53,8 @@ async function baixarTudo(receita, dirCache, onProgresso, checar) {
   const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url), receita.musica?.url].filter(Boolean))];
   const locais = {};
   // Vídeos de cena que têm plano B (imagem de reserva ou outra cena): se não baixar, a montagem segue sem eles
-  const comReserva = new Set(receita.clipes.filter((c) => c.tipo === 'video').map((c) => c.url));
+  // (imagens também: uma foto que não baixa vira a cena anterior repetida, em vez de derrubar o vídeo inteiro)
+  const comReserva = new Set(receita.clipes.map((c) => c.url));
   for (let i = 0; i < urls.length; i++) {
     checar && checar();
     try {

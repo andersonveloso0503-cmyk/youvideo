@@ -16,6 +16,14 @@ function aceitaStreaming(v) {
   const [a, b, c] = String(v || '0').split('.').map(Number);
   return a > 2 || (a === 2 && (b > 5 || (b === 5 && (c || 0) >= 24)));
 }
+function tamanhoPadraoWikimedia(receita) {
+  const arruma = (u) => (typeof u === 'string' && /upload\.wikimedia\.org\/.+\/thumb\//.test(u) ? u.replace(/\/(\d{2,4})px-([^/]+)$/, (m, w, nome) => (['1600', '1500', '1400', '1200', '1000', '800'].includes(w) ? `/1280px-${nome}` : m)) : u);
+  return {
+    ...receita,
+    clipes: (receita.clipes || []).map((c) => ({ ...c, url: arruma(c.url), ...(c.imagem ? { imagem: arruma(c.imagem) } : {}) })),
+  };
+}
+
 function semStreaming(receita) {
   if (!(receita.clipes || []).some((c) => ehStreaming(c.url))) return receita;
   const clipes = [];
@@ -47,6 +55,8 @@ export default async function handler(req, res) {
           receita = d.receita ? JSON.parse(d.receita) : d.receitaUrl ? await (await fetch(d.receitaUrl)).json() : null;
         } catch {}
         if (receita && !aceitaStreaming(req.query.v)) receita = semStreaming(receita);
+        // Wikimedia só serve miniaturas em tamanhos padrão (1280, 1920...): 1600px dava "Não consegui baixar (400)" no PC
+        if (receita) receita = tamanhoPadraoWikimedia(receita);
         if (receita) pedidos.push({ id: doc.id, titulo: d.titulo || receita.titulo || '', criadoEm: d.criadoEm, origem: d.origem || '', receita });
       }
       pedidos.sort((a, b) => (a.criadoEm || 0) - (b.criadoEm || 0));
