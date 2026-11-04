@@ -591,7 +591,7 @@ app.whenReady().then(() => {
       const pasta = cfg.ultimoProjeto?.saida?.pasta || app.getPath('videos');
       for (const p of pedidos) {
         if (fila.pedidoNaFila(p.id)) continue;
-        const { ok } = await Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: p.id, acao: 'pegar', pc: os.hostname() } });
+        const { ok } = await Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: p.id, acao: 'pegar', pc: os.hostname(), v: app.getVersion() } });
         if (!ok) continue; // outro PC já pegou
         try {
           const receita = p.receita;

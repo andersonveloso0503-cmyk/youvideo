@@ -35,6 +35,14 @@ function semStreaming(receita) {
   return { ...receita, clipes: clipes.length ? clipes : receita.clipes.filter((c) => !ehStreaming(c.url)) };
 }
 
+// Ilustrações animadas (política) só são desenhadas pelo Compilador 2.5.51 em diante: o pedido com ilustração
+// espera um PC atualizado por até 2 h; depois disso, qualquer PC monta (com as fotos no lugar das ilustrações).
+function desenhaIlustracao(v) {
+  const [a, b, c] = String(v || '0').split('.').map(Number);
+  return a > 2 || (a === 2 && (b > 5 || (b === 5 && (c || 0) >= 51)));
+}
+const ESPERA_PC_NOVO = 2 * 3600e3;
+
 const TEMPO_MAX_MONTANDO = 3 * 3600e3; // PC sumiu no meio: depois de 3 h o pedido volta para a fila
 
 export default async function handler(req, res) {
@@ -54,6 +62,7 @@ export default async function handler(req, res) {
         try {
           receita = d.receita ? JSON.parse(d.receita) : d.receitaUrl ? await (await fetch(d.receitaUrl)).json() : null;
         } catch {}
+        if (receita && !desenhaIlustracao(req.query.v) && (receita.clipes || []).some((c) => c.ilustracao) && agora - (d.criadoEm || agora) < ESPERA_PC_NOVO) continue;
         if (receita && !aceitaStreaming(req.query.v)) receita = semStreaming(receita);
         // Wikimedia só serve miniaturas em tamanhos padrão (1280, 1920...): 1600px dava "Não consegui baixar (400)" no PC
         if (receita) receita = tamanhoPadraoWikimedia(receita);
@@ -76,7 +85,7 @@ export default async function handler(req, res) {
         const agora = Date.now();
         const livre = d.status === 'pendente' || (d.status === 'montando' && agora - (d.atualizadoEm || d.pegoEm || 0) >= TEMPO_MAX_MONTANDO);
         if (!livre) return false;
-        t.update(ref, { status: 'montando', pegoEm: agora, atualizadoEm: agora, progresso: 0, pc: String(req.body.pc || '').slice(0, 60) });
+        t.update(ref, { status: 'montando', pegoEm: agora, atualizadoEm: agora, progresso: 0, pc: String(req.body.pc || '').slice(0, 60), ...(req.body.v ? { versaoPc: String(req.body.v).slice(0, 12) } : {}) });
         return true;
       });
       return res.status(200).json({ ok });
