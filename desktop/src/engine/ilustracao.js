@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
-const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calendario', 'numero', 'lista', 'linhaTempo', 'pergunta'];
+const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calendario', 'numero', 'lista', 'linhaTempo', 'pergunta', 'foto'];
 
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const txt = (t, max = 80) => esc(String(t ?? '').replace(/\s+/g, ' ').trim().slice(0, max));
@@ -199,6 +199,17 @@ const DESENHOS = {
         $$('.ev').forEach((e,i)=>{const p=eo(ap(t,(.2+i*.6)*k,.4));e.style.opacity=p;e.style.transform='translateX('+((1-p)*60)+'px)';});`,
     };
   },
+  // Foto real da cena num cartão (com o nome embaixo): o vídeo inteiro fica no estilo explicador
+  foto(d) {
+    const src = pathToFileURL(d.fotoArquivo).href;
+    return {
+      html: `<div class="cardx" id="fc" style="left:60px;top:0;width:880px;height:${d.legenda ? 700 : 760}px;overflow:hidden;border:4px solid var(--ouro);border-radius:34px;box-shadow:0 30px 80px rgba(0,0,0,.55)">
+        <img id="fi" src="${esc(src)}" style="width:100%;height:100%;object-fit:cover;object-position:50% 22%;transform-origin:50% 30%"></div>
+        ${d.legenda ? `<div id="fl" style="position:absolute;left:0;right:0;top:725px;text-align:center"><span style="background:var(--card);border:2px solid var(--borda);border-radius:40px;padding:12px 34px;font-size:40px;font-weight:800">${txt(d.legenda, 40)}</span></div>` : ''}`,
+      anim: `const p=eo(ap(t,.05,.55));$('fc').style.opacity=p;$('fc').style.transform='translateY('+((1-p)*80)+'px) scale('+(.94+.06*p)+')';
+        $('fi').style.transform='scale('+(1.04+t*.025)+')';if($('fl'))$('fl').style.opacity=eo(ap(t,.4,.4));`,
+    };
+  },
   pergunta(d) {
     return {
       html: `<div id="bon2" style="position:absolute;left:300px;top:260px;transform-origin:bottom center">${boneco('#3a6fd8')}</div>
@@ -224,6 +235,7 @@ function valida(d) {
     case 'lista': return temLista(d.itens, 2);
     case 'linhaTempo': return temLista(d.eventos, 2);
     case 'pergunta': return true;
+    case 'foto': return !!d.fotoArquivo && fs.existsSync(d.fotoArquivo);
     default: return false;
   }
 }
@@ -271,6 +283,7 @@ const k=${k};
 const fmtN=(x,alvo,suf)=>{const c=Number.isInteger(+alvo)?0:Math.min(2,(String(alvo).split('.')[1]||'').length);return x.toLocaleString('pt-BR',{minimumFractionDigits:c,maximumFractionDigits:c})+(suf||'')};
 function anim(t){${des.anim}}
 window.setT=function(t){
+ t+=${d.continua ? 1.2 : 0}; // pedaço seguinte da mesma cena: o cartão já está na tela
  $('l1').style.transform='translate('+Math.sin(t*.4)*60+'px,'+Math.cos(t*.3)*80+'px)';
  $('l2').style.transform='translate('+Math.cos(t*.35)*70+'px,'+Math.sin(t*.45)*60+'px)';
  $('l3').style.transform='translate('+Math.sin(t*.5)*90+'px,0)';
@@ -360,7 +373,7 @@ function desenhistaElectron() {
     });
     win.webContents.setFrameRate(60);
     await win.loadURL(pathToFileURL(pagina).href);
-    await win.webContents.executeJavaScript('document.fonts.ready.then(()=>true)').catch(() => true);
+    await win.webContents.executeJavaScript('document.fonts.ready.then(()=>Promise.all([...document.images].map(i=>i.decode().catch(()=>1))))').catch(() => true);
     const [tw, th] = (await win.webContents.executeJavaScript('[innerWidth, innerHeight]')).map((x) => Math.max(16, Math.floor(x)));
     const pedacos = [];
     for (let y = 0; y < H; y += th) for (let x = 0; x < W; x += tw) pedacos.push({ x, y, w: Math.min(tw, W - x), h: Math.min(th, H - y) });
