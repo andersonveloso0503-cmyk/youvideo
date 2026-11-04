@@ -1200,6 +1200,16 @@ export default async function handler(req, res) {
       const d = (await ref.get()).data();
       if (!d || !d.longo) return res.status(400).json({ erro: 'Só dá para refazer vídeos longos.' });
       const f = d.fabrica || {};
+      let enviosCopiar = d.envios || null;
+      const igAg = d.envios?.instagram?.agendaId;
+      if (igAg) {
+        const ag = await db.collection('youvideo_agenda').doc(igAg).get().catch(() => null);
+        if (ag?.exists && ['pendente', 'erro'].includes(ag.data()?.redes?.instagram?.status)) {
+          await ag.ref.delete().catch(() => {});
+          const { instagram, ...outros } = d.envios;
+          enviosCopiar = Object.keys(outros).length ? outros : null;
+        }
+      }
       const novo = col.doc();
       await novo.set({
         tema: d.tema,
@@ -1212,7 +1222,8 @@ export default async function handler(req, res) {
         origem: 'fabrica',
         refeitoDe: ref.id,
         // Já foi para o Instagram/TikTok: o refeito não manda de novo sozinho
-        ...(d.envios ? { envios: d.envios } : {}),
+        // (Instagram ainda só AGENDADO com o vídeo antigo: cancela lá embaixo e o refeito vai no lugar quando você aprovar)
+        ...(enviosCopiar ? { envios: enviosCopiar } : {}),
         criadoEm: new Date().toISOString(),
         fabrica: {
           ativo: true,
@@ -1257,6 +1268,16 @@ export default async function handler(req, res) {
       const shortGames = d.games && d.formato === 'short';
       const temVoz = !shortGames && !!d.narracao?.audioSegments?.length && antigas.length === novoRoteiro.cenas.length && antigas.every((c) => c.start != null);
       const f = d.fabrica || {};
+      let enviosCopiar = d.envios || null;
+      const igAg = d.envios?.instagram?.agendaId;
+      if (igAg) {
+        const ag = await db.collection('youvideo_agenda').doc(igAg).get().catch(() => null);
+        if (ag?.exists && ['pendente', 'erro'].includes(ag.data()?.redes?.instagram?.status)) {
+          await ag.ref.delete().catch(() => {});
+          const { instagram, ...outros } = d.envios;
+          enviosCopiar = Object.keys(outros).length ? outros : null;
+        }
+      }
       const novo = col.doc();
       await novo.set({
         tema: d.tema,
@@ -1273,7 +1294,8 @@ export default async function handler(req, res) {
         origem: 'fabrica',
         refeitoDe: ref.id,
         // Já foi para o Instagram/TikTok: o refeito não manda de novo sozinho
-        ...(d.envios ? { envios: d.envios } : {}),
+        // (Instagram ainda só AGENDADO com o vídeo antigo: cancela lá embaixo e o refeito vai no lugar quando você aprovar)
+        ...(enviosCopiar ? { envios: enviosCopiar } : {}),
         criadoEm: new Date().toISOString(),
         ...(temVoz
           ? {
