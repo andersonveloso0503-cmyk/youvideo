@@ -29,7 +29,8 @@ async function chamar(cfg, rota, { metodo = 'GET', corpo, query } = {}) {
     throw new Error(`Não consegui falar com o Youvideo (${base(cfg)}). Confira a internet.`);
   }
   const d = await r.json().catch(() => null);
-  if (r.status === 404) throw new Error('A Central ainda não existe nesse endereço — o deploy novo do Youvideo já terminou na Vercel?');
+  // 404 com mensagem do site ("não encontrado") é do item, não da Central: mostra a mensagem do site
+  if (r.status === 404 && !(d?.erro || d?.error)) throw new Error('A Central ainda não existe nesse endereço — o deploy novo do Youvideo já terminou na Vercel?');
   if (!r.ok) throw new Error(d?.erro || d?.error || `Youvideo respondeu ${r.status}`);
   return d;
 }

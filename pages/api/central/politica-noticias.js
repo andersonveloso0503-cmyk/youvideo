@@ -89,6 +89,7 @@ export default async function handler(req, res) {
           ...(x.status === 'escrevendo' ? { tituloVideo: `⏳ Escrevendo: ${x.titulo}` } : x.status === 'falhou' ? { tituloVideo: `⚠️ Falhou: ${x.titulo}` } : {}),
           criadoEm: x.criadoEm,
           aprovadaEm: x.aprovadaEm || null,
+          estado: x.status, // 'escrevendo' / 'falhou': o Compilador não mostra o ✅ Aprovar
         };
       };
       const porData = (a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
@@ -191,7 +192,8 @@ export default async function handler(req, res) {
       if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube de política.' });
       const ref = col.doc(String(b.id));
       const d = (await ref.get()).data();
-      if (!d?.ep) return res.status(404).json({ erro: 'Roteiro não encontrado.' });
+      if (d?.status === 'escrevendo') return res.status(400).json({ erro: 'Esse roteiro ainda está sendo escrito. Espere 1 ou 2 minutos e clique em ↻.' });
+      if (!d?.ep) return res.status(400).json({ erro: 'Esse roteiro não ficou pronto (a pesquisa falhou). Descarte e peça de novo.' });
       if (d.status === 'aprovada') return res.status(400).json({ erro: 'Esse roteiro já foi aprovado.' });
       // Roteiro escrito antes da regra nova (só "vídeo atual" genérico): escolhe a imagem de cada cena pela frase
       if (!/^@ foto (de|real):/m.test(String(d.ep.texto || ''))) {

@@ -965,9 +965,9 @@ const Fabrica = (() => {
             <div class="nota" style="margin:2px 0">${esc(n.fonte)}${n.data ? ' · ' + quandoTxt(n.data) : ''} · ${n.link ? `<a href="${esc(n.link)}" target="_blank">abrir a notícia</a>` : (n.links || []).map((l) => `<a href="${esc(l.link)}" target="_blank" title="${esc(l.titulo)}">fonte</a>`).join(' ')}</div>
             <details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>
           </div>
-          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : `<div style="display:flex;flex-direction:column;gap:6px">
-            <button type="button" class="btn-primario pl-aprovar" data-id="${esc(n.id)}">✅ Aprovar</button>
-            <button type="button" class="btn-mini perigo pl-descartar" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
+          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : n.estado === 'escrevendo' ? '<span class="nota" style="white-space:nowrap">⏳ escrevendo…</span>' : `<div style="display:flex;flex-direction:column;gap:6px;flex:none;width:auto">
+            ${n.estado === 'falhou' ? '' : `<button type="button" class="btn-primario pl-aprovar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">✅ Aprovar</button>`}
+            <button type="button" class="btn-mini perigo pl-descartar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
         </div>`;
       lista.innerHTML =
         (r.aguardando.length ? r.aguardando.map((n) => cartao(n, false)).join('') : '<p class="nota">Nenhum roteiro esperando. Clique em 🔎 Buscar notícias agora ou 💡 Criar explicador.</p>') +
