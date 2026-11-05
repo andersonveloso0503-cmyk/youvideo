@@ -252,6 +252,8 @@ async function completarSeries(db, col) {
   if (novasRefeitas.length) await cfg.set({ refeitas: [...refeitas, ...novasRefeitas].slice(-300) }, { merge: true });
 }
 
+const VAZIAS = new Set('para pra por com sem que sobre apos mais seu sua dos das nos nas uma uns umas'.split(' '));
+
 export default async function handler(req, res) {
   if (!exigirToken(req, res)) return;
   const db = getDb();
@@ -362,6 +364,28 @@ export default async function handler(req, res) {
         const versao = String(req.headers['x-compilador-versao'] || '0.0.0').split('.').map((n) => parseInt(n, 10) || 0);
         const atualizado = versao[0] > 2 || (versao[0] === 2 && (versao[1] > 5 || (versao[1] === 5 && versao[2] >= 43)));
         if (!atualizado) itens = itens.filter((i) => !i.politica && !i.games && !i.documentario);
+        // Notícia repetida (política/games): título parecido com um que já subiu (ou está subindo) no mesmo canal
+        // nos últimos 7 dias não vai para o YouTube — fica marcado como repetido na Fábrica
+        const chave = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/#[\w]+/g, ' ')
+          .split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !VAZIAS.has(w));
+        const parecido = (a, b) => {
+          const A = new Set(chave(a)), B = new Set(chave(b));
+          if (A.size < 3 || B.size < 3) return false;
+          const comum = [...A].filter((w) => B.has(w)).length;
+          return comum / Math.min(A.size, B.size) >= 0.8 || comum / new Set([...A, ...B]).size >= 0.7;
+        };
+        const subidos = itens.filter((i) => (i.politica || i.games) && ['ok', 'enviando'].includes(i.youtube?.status) && agora - new Date(i.quando || 0).getTime() < 7 * 86400e3);
+        const repetidos = [];
+        itens = itens.filter((i) => {
+          if (!(i.politica || i.games) || !['pendente', 'erro'].includes(i.youtube?.status)) return true;
+          const igual = subidos.find((o) => o.id !== i.id && o.canalYoutube?.id === i.canalYoutube?.id && parecido(o.titulo || o.tema, i.titulo || i.tema));
+          if (!igual) return true;
+          repetidos.push({ id: i.id, de: igual.titulo || igual.tema });
+          return false;
+        });
+        for (const r of repetidos) {
+          await col.doc(r.id).update({ 'fabrica.youtube': { status: 'erro', em: Date.now(), erro: `Não subi: repetido de "${String(r.de).slice(0, 80)}", que já está no canal.`, tentativas: 9 } }).catch(() => {});
+        }
         itens = itens.filter(
           (i) =>
             i.status === 'concluido' && i.videoUrl && i.redes?.youtube &&

@@ -717,6 +717,14 @@ app.whenReady().then(() => {
           titulo = IA.comHashtags(titulo.replace(/\s*#[\p{L}\p{N}_]+/gu, '').trim(), ['histórias bíblicas', 'jesus'], true);
         }
         delete seoFalhas[it.id];
+        // Trava: texto que não condiz com o vídeo não sobe (política/games/documentário com título ou descrição de
+        // "história bíblica" — vinha de Compilador antigo). O vídeo fica com erro na Fábrica, sem ir ao YouTube.
+        const naoBiblico = it.politica || it.games || it.documentario || it.infantil || it.marca || it.longo;
+        const original = `${it.titulo || ''} ${it.tema || ''} ${String(it.descricao || '').slice(0, 300)}`;
+        if (naoBiblico && /b[íi]blic|b[íi]blia|historiasbiblicas/i.test(`${titulo} ${descricao}`) && !/b[íi]blic|b[íi]blia/i.test(original)) {
+          await Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id: it.id, acao: 'youtube-erro', erro: 'Não subi: o título/descrição falava de história bíblica e o vídeo é de outro assunto.' } }).catch(() => {});
+          continue;
+        }
         // Série: o título no YouTube sempre mostra a parte, e a descrição lembra de seguir o canal
         const serie = it.serie && it.serie.total > 1 ? it.serie : null;
         if (serie) {

@@ -419,6 +419,26 @@ function mesmoTitulo(lista, titulo) {
   return lista.find((v) => tituloComparavel(v.titulo) === alvo) || null;
 }
 
+/**
+ * Notícia repetida (política/games): título PARECIDO com um que já está no canal — mesmas palavras importantes,
+ * ou um contém o outro ("Flávio Bolsonaro questiona Justiça" x "História ... sobre Flávio Bolsonaro questiona Justiça").
+ */
+const PALAVRAS_VAZIAS = new Set('a o as os de da do das dos e em no na nos nas um uma uns umas para pra por com sem que se ao aos é sobre após apos mais seu sua'.split(' '));
+function palavrasChave(t) {
+  return tituloComparavel(String(t || '').replace(/#[\p{L}\p{N}_]+/gu, ' ')).split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2 && !PALAVRAS_VAZIAS.has(w));
+}
+function tituloParecido(lista, titulo) {
+  const a = new Set(palavrasChave(titulo));
+  if (a.size < 3) return null;
+  return lista.find((v) => {
+    const b = new Set(palavrasChave(v.titulo));
+    if (b.size < 3) return false;
+    const comum = [...a].filter((w) => b.has(w)).length;
+    const menor = Math.min(a.size, b.size);
+    return comum / menor >= 0.8 || comum / new Set([...a, ...b]).size >= 0.7;
+  }) || null;
+}
+
 /** Troca a miniatura (capa) de um vídeo que já está no canal. */
 async function trocarCapa({ credenciais, refreshToken, redirectOriginal, videoId, arquivo }) {
   const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
@@ -717,6 +737,7 @@ async function apagarProgramado({ credenciais, refreshToken, redirectOriginal, i
 }
 
 module.exports = {
+  tituloParecido,
   apagarProgramado,
   publicarAgora,
   agendados,

@@ -492,12 +492,15 @@ class Fila extends EventEmitter {
       if (!e.forcarDuplicado) {
         let ja = null;
         try {
-          ja = YT.mesmoTitulo(await this.ultimosDoCanal(e.canalId), e.titulo);
+          const lista = await this.ultimosDoCanal(e.canalId);
+          ja = YT.mesmoTitulo(lista, e.titulo);
+          // Notícia (política/games): título parecido também é repetido — não sobe
+          if (!ja && ['25', '20'].includes(String(e.categoria || ''))) ja = YT.tituloParecido(lista, e.titulo);
         } catch {
           /* sem conseguir olhar o canal: segue (melhor subir do que travar) */
         }
         if (ja) {
-          const aviso = `Já estava no canal (${ja.url}) — não subi de novo para não duplicar. Se for outro vídeo, mude o título e mande de novo.`;
+          const aviso = `Já estava no canal (${ja.url}${ja.titulo && ja.titulo !== e.titulo ? ` — "${String(ja.titulo).slice(0, 60)}"` : ''}) — não subi de novo para não duplicar. Se for outro vídeo, mude o título e mande de novo.`;
           this.atualizar(job, { status: 'concluido', etapa: 'Já estava no canal', progresso: 1, youtube: { id: ja.id, url: ja.url, jaExistia: true }, aviso, concluidoEm: new Date().toISOString() });
           if (e.fabricaId) {
             this.anotarFabricaEnviado(e.fabricaId, ja.url);
