@@ -822,16 +822,26 @@ export default async function handler(req, res) {
     let roteiros = 0;
     while (Date.now() - inicio < 170e3 && feitos.length < 6) {
       // No máximo 1 roteiro por rodada: a Groq grátis tem limite por minuto
-      const doc = await escolherProximo(docs.filter((d) => !vistos.has(d.id) && !(roteiros >= 1 && d.data().status === 'pendente')));
+      // Vídeo que travou (a função foi cortada pelo tempo no meio do passo: nada salvo, sem erro) vai para o fim da fila,
+      // para não segurar os outros; depois de 6 vezes, fica com erro e para de gastar a fila
+      const travou = (d) => (d.data().passoRodadas || 0) >= 3 && Date.now() - (d.data().passoEm || 0) < 60 * 60e3;
+      const candidatos = docs.filter((d) => !vistos.has(d.id) && !(roteiros >= 1 && d.data().status === 'pendente'));
+      const doc = await escolherProximo([...candidatos.filter((d) => !travou(d)), ...candidatos.filter(travou)]);
       if (!doc) break;
       vistos.add(doc.id);
       const statusAnterior = doc.data().status;
+      if ((doc.data().passoRodadas || 0) >= 6) {
+        await doc.ref.update({ status: 'erro', erro: `Travou: o passo "${statusAnterior}" passou do tempo 6 vezes seguidas. Clique em tentar de novo ou refaça.`, statusAntes: statusAnterior, passoRodadas: 0 }).catch(() => {});
+        continue;
+      }
       if (statusAnterior === 'pendente') roteiros++;
+      await doc.ref.update({ passoRodadas: (doc.data().passoRodadas || 0) + 1, passoEm: Date.now() }).catch(() => {});
       try {
         await passo(doc);
         feitos.push({ id: doc.id, statusAnterior });
-        if (doc.data().tentativas) await doc.ref.update({ tentativas: 0 });
+        await doc.ref.update({ passoRodadas: 0, ...(doc.data().tentativas ? { tentativas: 0 } : {}) }).catch(() => {});
       } catch (err) {
+        await doc.ref.update({ passoRodadas: 0 }).catch(() => {});
         // Limite da Pexels (por hora): não é erro do vídeo — espera a próxima rodada, sem contar tentativa
         if (err?.message === 'LIMITE_PEXELS') {
           await doc.ref.update({ ultimoErro: 'Banco de imagens pediu uma pausa (limite por hora): continua sozinho na próxima rodada' }).catch(() => {});

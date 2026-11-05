@@ -25,6 +25,8 @@ export default async function handler(req, res) {
         status: x.status,
         quando: x.fabrica?.quando || null,
         tentativas: x.tentativas || 0,
+        travadas: x.passoRodadas || 0, // vezes que a função foi cortada pelo tempo neste passo
+        parte: x.status === 'voz_ok' && x.politica && !x.midiasPlanejadas ? (x.midiasFrase ? `ilustrações ${(x.ilusParcial || []).length}/${(x.roteiro?.cenas || []).length}` : 'imagens pela frase') : '',
         ultimoErro: String(x.ultimoErro || x.erro || '').slice(0, 300),
         atualizadoEm: x.atualizadoEm || null,
       }))
