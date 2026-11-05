@@ -790,7 +790,8 @@ export default async function handler(req, res) {
   const inicio = Date.now();
   if (soFabrica) await refazerImagensDocumentarios(db).catch(() => {});
   if (soFabrica) await recuperarErrosDeImagem(db).catch(() => {});
-  if (soFabrica) await (await import('../../lib/politicaMesmoDia')).arrumarFilaPolitica(db).catch(() => {});
+  if (soFabrica) await (await import('../../lib/politicaMesmoDia')).arrumarFilaPolitica(db, 'politica').catch(() => {});
+  if (soFabrica) await (await import('../../lib/politicaMesmoDia')).arrumarFilaPolitica(db, 'games').catch(() => {});
 
   const feitos = [];
   const vistos = new Set();

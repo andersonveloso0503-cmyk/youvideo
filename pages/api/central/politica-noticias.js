@@ -234,7 +234,7 @@ export default async function handler(req, res) {
         },
       });
       await ref.update({ status: 'aprovada', aprovadaEm: new Date().toISOString(), filaId: fab.id, quando });
-      return res.status(200).json({ ok: true, filaId: fab.id, quando });
+      return res.status(200).json({ ok: true, filaId: fab.id, quando, mesmoDia: !fixo });
     }
 
     return res.status(400).json({ erro: 'Ação desconhecida.' });

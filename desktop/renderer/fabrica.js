@@ -843,16 +843,16 @@ const Fabrica = (() => {
         };
       const cartao = (n, aprovada) => `
         <div class="gm-noticia" data-id="${esc(n.id)}" style="display:flex;gap:10px;padding:10px;border:1px solid var(--borda, #333);border-radius:10px;margin:8px 0;align-items:flex-start${aprovada ? ';opacity:.6' : ''}">
-          ${aprovada || n.tipo !== 'short' ? '' : `<input type="checkbox" class="gm-marca" value="${esc(n.id)}" title="Marcar para juntar num vídeo" style="margin-top:4px" />`}
+          ${aprovada || n.tipo !== 'short' ? '' : `<input type="checkbox" class="gm-marca" value="${esc(n.id)}" style="flex:none;width:auto;margin-top:4px" title="Marcar para juntar num vídeo" />`}
           ${n.imagem ? `<img src="${esc(n.imagem)}" style="width:120px;height:68px;object-fit:cover;border-radius:6px;flex-shrink:0" />` : ''}
           <div style="flex:1;min-width:0">
             <div><b>${n.tipo === 'dicas' ? '💡 Dicas: ' : n.tipo === 'longo' ? '📺 Vídeo: ' : '📱 Short: '}${esc(n.tituloVideo || n.titulo)}</b>${n.rumor ? ' <span style="color:#f5a524">· ⚠️ rumor</span>' : ''}</div>
             <div class="nota" style="margin:2px 0">${esc(n.fonte)}${n.oficial ? ' (oficial)' : ''}${n.data ? ' · ' + quandoTxt(n.data) : ''} · ${n.link ? `<a href="${esc(n.link)}" target="_blank">abrir a notícia</a>` : (n.links || []).map((l) => `<a href="${esc(l.link)}" target="_blank" title="${esc(l.titulo)}">fonte</a>`).join(' ')}</div>
             <details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>
           </div>
-          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : `<div style="display:flex;flex-direction:column;gap:6px">
-            <button type="button" class="gm-aprovar" data-id="${esc(n.id)}">✅ Aprovar</button>
-            <button type="button" class="gm-descartar" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
+          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : `<div style="display:flex;flex-direction:column;gap:6px;flex:none;width:auto">
+            <button type="button" class="btn-primario gm-aprovar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">✅ Aprovar</button>
+            <button type="button" class="btn-mini perigo gm-descartar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
         </div>`;
       lista.innerHTML =
         (r.aguardando.length ? r.aguardando.map((n) => cartao(n, false)).join('') : '<p class="nota">Nenhuma notícia esperando. Clique em 🔎 Buscar notícias agora.</p>') +
@@ -886,7 +886,7 @@ const Fabrica = (() => {
     botao.disabled = true;
     try {
       const r = await window.api.noticias.acao({ acao: 'aprovar', id, canalYoutube: canal });
-      avisar(`Aprovada! Vai ao ar ${quandoTxt(r.quando)} no ${canal.titulo}`);
+      avisar(r.mesmoDia ? `Aprovada! Começa a ser produzida agora e vai ao ar no ${canal.titulo} assim que ficar pronta (no mesmo dia).` : `Aprovada! Vai ao ar ${quandoTxt(r.quando)} no ${canal.titulo}`);
       carregarNoticias();
       carregar();
     } catch (e) {
@@ -958,7 +958,7 @@ const Fabrica = (() => {
       const rotulo = (t) => (t === 'explicador' ? '💡 Explicador: ' : t === 'explicador-short' ? '💡 Explicador (Short): ' : t === 'longo' ? '📺 Resumo: ' : '📱 Short: ');
       const cartao = (n, aprovada) => `
         <div class="pl-noticia" style="display:flex;gap:10px;padding:10px;border:1px solid var(--borda, #333);border-radius:10px;margin:8px 0;align-items:flex-start${aprovada ? ';opacity:.6' : ''}">
-          ${aprovada || n.tipo !== 'short' ? '' : `<input type="checkbox" class="pl-marca" value="${esc(n.id)}" title="Marcar para juntar num resumo" style="margin-top:4px" />`}
+          ${aprovada || n.tipo !== 'short' ? '' : `<input type="checkbox" class="pl-marca" value="${esc(n.id)}" style="flex:none;width:auto;margin-top:4px" title="Marcar para juntar num resumo" />`}
           ${n.imagem ? `<img src="${esc(n.imagem)}" style="width:120px;height:68px;object-fit:cover;border-radius:6px;flex-shrink:0" />` : ''}
           <div style="flex:1;min-width:0">
             <div><b>${rotulo(n.tipo)}${esc(n.tituloVideo || n.titulo)}</b></div>
@@ -1005,7 +1005,7 @@ const Fabrica = (() => {
     botao.disabled = true;
     try {
       const r = await window.api.politica.acao({ acao: 'aprovar', id, canalYoutube: canal, vozId: q('#fabPlVoz').value.trim() });
-      avisar(`Aprovado! Vai ao ar ${quandoTxt(r.quando)} no ${canal.titulo}`);
+      avisar(r.mesmoDia ? `Aprovado! Começa a ser produzido agora e vai ao ar no ${canal.titulo} assim que ficar pronto (no mesmo dia).` : `Aprovado! Vai ao ar ${quandoTxt(r.quando)} no ${canal.titulo}`);
       carregarPolitica();
       carregar();
     } catch (e) {

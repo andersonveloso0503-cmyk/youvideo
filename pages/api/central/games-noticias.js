@@ -53,9 +53,9 @@ async function proximoHorario(db, desejado) {
 async function aprovarNoticia(db, ref, d, canalYoutube, quandoPedido = null, { limite = null } = {}) {
   const longo = d.tipo === 'longo' || d.tipo === 'dicas';
   const pedido = quandoPedido ? new Date(quandoPedido) : null;
-  const quando = await proximoHorario(db, pedido && pedido.getTime() > Date.now() + 30 * 60e3 ? pedido.getTime() : Date.now() + (longo ? 3 : 1.5) * 3600e3);
-  // Aprovação automática: só entra se couber na agenda das próximas horas (a fila não cresce sem fim)
-  if (limite && new Date(quando).getTime() > limite) return null;
+  // Horário pedido: respeita. Senão "mesmo dia": produz já e o horário do YouTube é escolhido quando ficar pronto
+  const fixo = pedido && pedido.getTime() > Date.now() + 30 * 60e3;
+  const quando = fixo ? await proximoHorario(db, pedido.getTime()) : new Date(Date.now() + (longo ? 3 : 1.5) * 3600e3).toISOString();
   const fab = db.collection('youvideo_fila').doc();
   await fab.set({
     tema: d.ep.titulo,
@@ -75,14 +75,15 @@ async function aprovarNoticia(db, ref, d, canalYoutube, quandoPedido = null, { l
     fabrica: {
       ativo: true,
       lote: `noticias-${Date.now().toString(36)}`,
-      quando,
+      quando: fixo ? quando : new Date().toISOString(), // produção começa já
       quandoYoutube: quando,
+      ...(fixo ? {} : { mesmoDia: true }),
       redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
       canalYoutube,
     },
   });
   await ref.update({ status: 'aprovada', aprovadaEm: new Date().toISOString(), filaId: fab.id, quando, ...(limite ? { automatica: true } : {}) });
-  return { filaId: fab.id, quando };
+  return { filaId: fab.id, quando, mesmoDia: !fixo };
 }
 
 /** Canal do YouTube do Próxima Fase: o guardado na última aprovação, ou o do último vídeo de games da Fábrica. */
@@ -99,7 +100,7 @@ async function canalDosGames(db, cfgDados) {
 /**
  * Aprovação automática (pedido do dono: os vídeos de games estão indo bem, não precisa mais aprovar):
  * os Shorts de notícia que esperam aprovação vão sozinhos para a Fábrica, os mais novos primeiro,
- * com 3 h entre um e outro e só os que cabem nas próximas 24 h. Notícia com mais de 2 dias fica de fora (velha).
+ * até 8 por dia, produzidos já e publicados no mesmo dia (horário escolhido quando ficam prontos). Notícia com mais de 2 dias fica de fora (velha).
  */
 async function aprovarSozinho(db, col, cfgDados) {
   if (cfgDados?.autoAprovar === false) return { automaticas: 0, motivo: 'desligada' };
@@ -111,14 +112,16 @@ async function aprovarSozinho(db, col, cfgDados) {
     .map((d) => ({ ref: d.ref, d: d.data() }))
     .filter(({ d }) => (d.tipo || 'short') === 'short' && d.ep && new Date(d.criadoEm || 0).getTime() > velha)
     .sort((a, b) => String(b.d.data || b.d.criadoEm || '').localeCompare(String(a.d.data || a.d.criadoEm || '')));
-  const limite = Date.now() + 24 * 3600e3;
+  // Até 8 vídeos de games por dia (mais que isso o canal parece spam); as mais novas primeiro
+  const ultimas24 = (await db.collection('youvideo_fila').where('games', '==', true).get()).docs
+    .filter((x) => Date.now() - new Date(x.data().criadoEm || 0).getTime() < 24 * 3600e3).length;
+  const vagas = Math.max(0, 8 - ultimas24);
   let automaticas = 0;
-  for (const { ref, d } of fila) {
-    const r = await aprovarNoticia(db, ref, d, canal, null, { limite });
-    if (!r) break; // agenda cheia: as outras esperam a próxima busca
+  for (const { ref, d } of fila.slice(0, vagas)) {
+    await aprovarNoticia(db, ref, d, canal, null, { limite: 1 });
     automaticas++;
   }
-  return { automaticas };
+  return { automaticas, vagas };
 }
 
 export default async function handler(req, res) {

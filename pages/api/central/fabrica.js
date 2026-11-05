@@ -364,7 +364,7 @@ export default async function handler(req, res) {
         const agora = Date.now();
         // Política "mesmo dia": quem ficou pronto ganha agora o próximo horário livre
         const { fixarHorariosPolitica } = await import('../../../lib/politicaMesmoDia');
-        const novos = await fixarHorariosPolitica(db, itens).catch(() => ({}));
+        const novos = { ...(await fixarHorariosPolitica(db, itens, 'politica').catch(() => ({}))), ...(await fixarHorariosPolitica(db, itens, 'games').catch(() => ({}))) };
         for (const i of itens) if (novos[i.id]) Object.assign(i, { quando: novos[i.id], quandoYoutube: novos[i.id], horaFixada: true });
         // Compilador antigo (antes da 2.5.43) não sabe que política/games/documentário NÃO são histórias bíblicas
         // e trocava o título e a descrição por "História bíblica curta: ...". Esses vídeos só vão para PC atualizado.
