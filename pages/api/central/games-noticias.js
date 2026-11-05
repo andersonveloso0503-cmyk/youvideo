@@ -112,10 +112,10 @@ async function aprovarSozinho(db, col, cfgDados) {
     .map((d) => ({ ref: d.ref, d: d.data() }))
     .filter(({ d }) => (d.tipo || 'short') === 'short' && d.ep && new Date(d.criadoEm || 0).getTime() > velha)
     .sort((a, b) => String(b.d.data || b.d.criadoEm || '').localeCompare(String(a.d.data || a.d.criadoEm || '')));
-  // Até 8 vídeos de games por dia (mais que isso o canal parece spam); as mais novas primeiro
+  // Até 5 vídeos de games por dia (mais alcance por vídeo e não estoura o limite de capas); as mais novas primeiro
   const ultimas24 = (await db.collection('youvideo_fila').where('games', '==', true).get()).docs
     .filter((x) => Date.now() - new Date(x.data().criadoEm || 0).getTime() < 24 * 3600e3).length;
-  const vagas = Math.max(0, 8 - ultimas24);
+  const vagas = Math.max(0, 5 - ultimas24);
   let automaticas = 0;
   for (const { ref, d } of fila.slice(0, vagas)) {
     await aprovarNoticia(db, ref, d, canal, null, { limite: 1 });
