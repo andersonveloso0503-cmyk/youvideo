@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
-const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calendario', 'numero', 'lista', 'linhaTempo', 'pergunta', 'foto'];
+const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calendario', 'numero', 'lista', 'linhaTempo', 'pergunta', 'foto', 'inscreva'];
 
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const txt = (t, max = 80) => esc(String(t ?? '').replace(/\s+/g, ' ').trim().slice(0, max));
@@ -210,6 +210,25 @@ const DESENHOS = {
         $('fi').style.transform='scale('+(1.04+t*.025)+')';if($('fl'))$('fl').style.opacity=eo(ap(t,.4,.4));`,
     };
   },
+  // Fecho do vídeo: o bonequinho pergunta e "aperta" o botão de se inscrever (botão genérico, sem marca)
+  inscreva(d) {
+    const sino = `<svg viewBox="0 0 24 24" width="54" height="54"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5.5-6.84V3a1.5 1.5 0 0 0-3 0v1.16A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>`;
+    return {
+      html: `<div id="bon3" style="position:absolute;left:70px;top:330px;transform-origin:100px 300px;transform:scale(1.9)">${boneco('#3a6fd8')}</div>
+        <div id="balao" style="position:absolute;left:380px;top:20px;width:580px;background:#fff;color:#111;font-size:48px;font-weight:800;padding:26px 34px;border-radius:36px 36px 36px 8px;line-height:1.15;text-align:center">${txt(d.texto || 'E você, o que acha?', 40)}</div>
+        <div id="bt" style="position:absolute;left:420px;top:330px;width:520px;height:130px;border-radius:70px;background:#e5302f;color:#fff;display:flex;align-items:center;justify-content:center;gap:22px;font-size:50px;font-weight:800;letter-spacing:2px;box-shadow:0 18px 50px rgba(229,48,47,.45)">
+          <span id="btxt">INSCREVER-SE</span></div>
+        <div id="sino" style="position:absolute;left:640px;top:500px;width:100px;height:100px;border-radius:50%;background:var(--card);border:3px solid var(--ouro);color:var(--ouro);display:flex;align-items:center;justify-content:center">${sino}</div>
+        <div id="mao" style="position:absolute;left:0;top:0;font-size:96px;filter:drop-shadow(0 8px 12px rgba(0,0,0,.5))">👆</div>`,
+      anim: `$('bon3').style.opacity=eo(ap(t,0,.4));const br=document.querySelector('#bon3 .braco');br.style.transformOrigin='143px 122px';br.style.transform='rotate('+(-150+Math.sin(t*8)*22)+'deg)';
+        const b=back(ap(t,.25,.45));$('balao').style.transform='scale('+b+')';$('balao').style.opacity=Math.min(1,b);
+        const q=back(ap(t,.6,.45));const clique=ap(t,1.75,.12);const feito=t>1.85;
+        $('bt').style.transform='scale('+(q*(clique>0&&clique<1?.92:1))+')';$('bt').style.opacity=Math.min(1,q);
+        $('bt').style.background=feito?'#3a3f52':'#e5302f';$('bt').style.boxShadow=feito?'none':'0 18px 50px rgba(229,48,47,.45)';$('btxt').textContent=feito?'INSCRITO ✓':'INSCREVER-SE';
+        const m=eo(ap(t,1.0,.75));$('mao').style.opacity=t<1?0:(t>3.4?Math.max(0,1-(t-3.4)*2):1);$('mao').style.transform='translate('+(980-(980-700)*m)+'px,'+(760-(760-400)*m)+'px) scale('+(clique>0&&clique<1?.85:1)+')';
+        $('sino').style.opacity=eo(ap(t,1.9,.3));$('sino').style.transform='rotate('+(t>1.9?Math.sin((t-1.9)*18)*22*Math.max(0,1-(t-1.9)/1.5):0)+'deg)';`,
+    };
+  },
   pergunta(d) {
     return {
       html: `<div id="bon2" style="position:absolute;left:300px;top:260px;transform-origin:bottom center">${boneco('#3a6fd8')}</div>
@@ -235,6 +254,7 @@ function valida(d) {
     case 'lista': return temLista(d.itens, 2);
     case 'linhaTempo': return temLista(d.eventos, 2);
     case 'pergunta': return true;
+    case 'inscreva': return true;
     case 'foto': return !!d.fotoArquivo && fs.existsSync(d.fotoArquivo);
     default: return false;
   }
