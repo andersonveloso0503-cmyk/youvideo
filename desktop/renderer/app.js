@@ -1260,7 +1260,28 @@ async function iniciar() {
     const pior = c.itens.some((i) => i.nivel === 'critico') ? 'critico' : c.itens.some((i) => i.nivel === 'baixo') ? 'baixo' : c.itens.some((i) => i.nivel === 'desconhecido') ? 'desconhecido' : 'ok';
     chip.hidden = pior === 'ok';
     chip.className = `chip chip-creditos ${pior === 'desconhecido' ? 'baixo' : pior}`;
-    chip.textContent = pior === 'critico' ? '⚠ Crédito acabando' : pior === 'baixo' ? '💳 Crédito baixo' : '💳 Confira os créditos';
+    // O chip diz QUAL serviço e quanto sobra (antes era só "Crédito acabando")
+    const nivelPeso = { critico: 3, baixo: 2, desconhecido: 1, ok: 0 };
+    const piorItem = [...c.itens].sort((a, b) => nivelPeso[b.nivel] - nivelPeso[a.nivel])[0];
+    const curto = String(piorItem?.nome || '').replace(/\s*\(.*\)/, '');
+    chip.textContent = pior === 'critico' ? `⚠ ${curto}: ${piorItem.texto}` : pior === 'baixo' ? `💳 ${curto}: ${piorItem.texto}` : '💳 Confira os créditos';
+    // Acabou de verdade: faixa vermelha no alto, impossível não ver
+    let faixa = document.getElementById('faixaCredito');
+    const acabou = c.itens.filter((i) => i.nivel === 'critico' && /ACABOU|\(~0 Shorts\)|^0 /.test(i.texto));
+    if (acabou.length) {
+      if (!faixa) {
+        faixa = document.createElement('div');
+        faixa.id = 'faixaCredito';
+        faixa.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:9999;background:#b3261e;color:#fff;font-weight:700;padding:8px 14px;display:flex;gap:12px;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.4)';
+        document.body.appendChild(faixa);
+      }
+      const links = { elevenlabs: 'https://elevenlabs.io/app/subscription', fal: 'https://fal.ai/dashboard/billing', flux: 'https://dashboard.bfl.ai' };
+      faixa.innerHTML = `⛔ ${acabou.map((i) => i.nome).join(' e ')}: o crédito ACABOU — os vídeos novos ficam parados até recarregar. ` +
+        acabou.map((i) => `<button type="button" data-link="${links[i.servico] || ''}" style="background:#fff;color:#b3261e;border:none;border-radius:8px;padding:4px 10px;font-weight:700;cursor:pointer">Recarregar ${String(i.nome).replace(/\s*\(.*\)/, '')}</button>`).join(' ') +
+        ` <button type="button" id="faixaFechar" style="background:transparent;color:#fff;border:1px solid #fff;border-radius:8px;padding:4px 8px;cursor:pointer">fechar</button>`;
+      faixa.querySelectorAll('[data-link]').forEach((b) => (b.onclick = () => window.api.abrirLink ? window.api.abrirLink(b.dataset.link) : window.open(b.dataset.link)));
+      faixa.querySelector('#faixaFechar').onclick = () => faixa.remove();
+    } else if (faixa) faixa.remove();
     chip.title = c.itens.map((i) => `${i.nivel === 'ok' ? '✓' : '⚠'} ${i.nome}: ${i.texto}`).join('\n');
     chip.onclick = () => alert(`Créditos das IAs:\n\n${chip.title}\n\nfal.ai: fal.ai/dashboard/billing\nFlux: dashboard.bfl.ai\nElevenLabs: elevenlabs.io/app/subscription`);
   };

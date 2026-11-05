@@ -486,8 +486,8 @@ app.whenReady().then(() => {
     let novo = false;
     errosDeCredito.clear();
     for (const it of itens || []) {
-      const erro = String(it.erro || '');
-      if (!/insufficient credits|cr[ée]dito do flux|quota_exceeded|exhausted balance|sem cr[ée]dito|not enough credits/i.test(erro)) continue;
+      const erro = `${it.erro || ''} ${it.ultimoErro || ''}`;
+      if (!/insufficient credits|cr[ée]dito do flux|quota_exceeded|exhausted balance|sem cr[ée]dito|not enough credits|esperando cr[ée]dito/i.test(erro)) continue;
       const servico = /flux|insufficient credits/i.test(erro) ? 'flux' : /quota|elevenlabs/i.test(erro) ? 'elevenlabs' : 'fal';
       const nome = { flux: 'Flux (imagens)', elevenlabs: 'ElevenLabs (voz)', fal: 'fal.ai (animação)' }[servico];
       errosDeCredito.set(servico, { servico, nome });
@@ -815,7 +815,9 @@ app.whenReady().then(() => {
       if (el?.ok && el.saldo != null) {
         const limite = Number(el.limite) || 0;
         const n = el.saldo < 5000 ? 'critico' : el.saldo < Math.max(20000, limite * 0.1) ? 'baixo' : 'ok';
-        add('elevenlabs', 'ElevenLabs (voz)', n, `${Math.round(el.saldo / 1000)} mil caracteres`);
+        // ~1.100 caracteres por Short de 1 minuto: diz para quantos vídeos ainda dá
+        const videos = Math.floor(el.saldo / 1100);
+        add('elevenlabs', 'ElevenLabs (voz)', el.saldo < 1100 ? 'critico' : n, `${el.saldo < 1000 ? Math.round(el.saldo) : Math.round(el.saldo / 1000) + ' mil'} caracteres (~${videos} Short${videos === 1 ? '' : 's'})`);
       }
       // Saldo que não deu para ler (chave sem permissão, serviço fora do ar) também aparece — antes ficava em silêncio
       for (const [chave, nome] of [['fal', 'fal.ai (animação)'], ['flux', 'Flux (imagens)'], ['elevenlabs', 'ElevenLabs (voz)']]) {
@@ -873,7 +875,7 @@ app.whenReady().then(() => {
   setInterval(lembrarPostsCelular, 10 * 60e3);
 
   setTimeout(checarCreditos, 20000);
-  setInterval(checarCreditos, 30 * 60e3);
+  setInterval(checarCreditos, 10 * 60e3); // de 10 em 10 min: a falta de crédito aparece logo
   ipcMain.handle('creditos:ler', async () => {
     if (!ultimosCreditos || Date.now() - ultimosCreditos.em > 5 * 60e3) await checarCreditos();
     return ultimosCreditos;
