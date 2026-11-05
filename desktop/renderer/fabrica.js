@@ -1295,6 +1295,8 @@ const Fabrica = (() => {
   function seloYoutube(i) {
     if (!i.redes?.youtube) return '';
     const y = i.youtube;
+    // "Mesmo dia": o horário do YouTube só é marcado quando o vídeo fica pronto (próximo horário livre, 3 h entre vídeos)
+    if (!y && i.mesmoDia && !i.horaFixada) return `<span class="fab-yt">▶ YouTube: no próximo horário livre quando ficar pronto (hoje até 23h ou amanhã a partir das 7h)</span>`;
     if (!y) return `<span class="fab-yt">▶ YouTube${i.quandoYoutube ? ` ${esc(quandoTxt(i.quandoYoutube))}` : ''}: depois de pronto</span>`;
     if (y.status === 'ok') return `<a class="fab-yt ok" data-link="${esc(y.url || '')}">▶ YouTube agendado ✅</a>`;
     if (y.status === 'erro') return `<a class="fab-yt erro" data-repetir-yt="${esc(i.id)}" title="${esc(y.erro || '')}">▶ YouTube: erro — ${esc(String(y.erro || 'sem detalhe').slice(0, 110))} (clique p/ tentar de novo)</a>`;
