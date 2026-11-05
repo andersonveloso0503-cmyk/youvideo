@@ -11,9 +11,29 @@ const sem = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLo
 
 export default async function handler(req, res) {
   if (!exigirToken(req, res)) return;
+  const db = getDb();
+  // ?fila=1: o que está parado na produção (política e games) e por quê
+  if (req.query.fila) {
+    const ATIVOS = ['pendente', 'roteiro_ok', 'voz_ok', 'imagens_ok', 'animando', 'montando'];
+    const snap = await db.collection('youvideo_fila').where('status', 'in', ATIVOS).limit(300).get();
+    const itens = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((x) => (x.politica || x.games) && x.fabrica?.ativo !== false)
+      .map((x) => ({
+        canal: x.politica ? 'politica' : 'games',
+        titulo: String(x.roteiro?.titulo || x.tema || '').slice(0, 70),
+        status: x.status,
+        quando: x.fabrica?.quando || null,
+        tentativas: x.tentativas || 0,
+        ultimoErro: String(x.ultimoErro || x.erro || '').slice(0, 300),
+        atualizadoEm: x.atualizadoEm || null,
+      }))
+      .sort((a, b) => String(a.quando).localeCompare(String(b.quando)));
+    const cron = (await db.collection('youvideo_config').doc('fila_processar').get().catch(() => null))?.data() || null;
+    return res.status(200).json({ agora: new Date().toISOString(), total: itens.length, itens, cron });
+  }
   const q = sem(req.query.q);
   if (q.length < 3) return res.status(400).json({ erro: 'Passe ?q= com um pedaço do título (3 letras ou mais).' });
-  const db = getDb();
   try {
     const desde = new Date(Date.now() - 4 * 86400e3).toISOString();
     const fila = (await db.collection('youvideo_fila').where('criadoEm', '>=', desde).get()).docs
