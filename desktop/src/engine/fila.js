@@ -560,7 +560,11 @@ class Fila extends EventEmitter {
             estilo: e.categoria === '25' ? 'politica' : e.categoria === '20' ? 'games' : '', // capa de pergunta em 2 linhas
           });
       if (chamativa) miniatura = chamativa;
-      else if (miniatura) {
+      else if (!e.capaManual && this.capaFalhou?.[job.id]) {
+        this.atualizar(job, { aviso: `Capa não foi feita: ${this.capaFalhou[job.id]}` });
+        delete this.capaFalhou[job.id];
+      }
+      if (!chamativa && miniatura) {
         const pronta = path.join(os.tmpdir(), `youvideo-capa-${job.id}.jpg`);
         try {
           await gerarMiniatura(miniatura, pronta, { vertical: !!e.curto });
@@ -916,7 +920,10 @@ class Fila extends EventEmitter {
         titulo, descricao, curto, fontsDir: this.fontsDir, destino, estilo,
       });
       return c.arquivo;
-    } catch {
+    } catch (e) {
+      // Antes falhava em silêncio e o Short subia sem capa: agora o motivo aparece no cartão do vídeo
+      this.capaFalhou = this.capaFalhou || {};
+      this.capaFalhou[job.id] = String(e?.message || e).slice(0, 160);
       return null;
     }
   }
