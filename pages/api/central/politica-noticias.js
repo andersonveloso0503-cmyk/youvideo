@@ -203,7 +203,10 @@ export default async function handler(req, res) {
       }
       const longo = d.tipo === 'longo' || d.tipo === 'explicador';
       const pedido = b.quando ? new Date(b.quando) : null;
-      const quando = await proximoHorario(db, pedido && pedido.getTime() > Date.now() + 30 * 60e3 ? pedido.getTime() : Date.now() + (longo ? 3 : 1.5) * 3600e3);
+      // Horário pedido: respeita. Senão "mesmo dia": produz agora e o horário do YouTube é escolhido quando
+      // o vídeo ficar pronto (próximo horário livre, 2 h entre vídeos) — notícia não espera dias na agenda.
+      const fixo = pedido && pedido.getTime() > Date.now() + 30 * 60e3;
+      const quando = fixo ? await proximoHorario(db, pedido.getTime()) : new Date(Date.now() + (longo ? 3 : 1.5) * 3600e3).toISOString();
       const fab = db.collection('youvideo_fila').doc();
       await fab.set({
         tema: d.ep.titulo,
@@ -223,8 +226,9 @@ export default async function handler(req, res) {
         fabrica: {
           ativo: true,
           lote: `politica-${Date.now().toString(36)}`,
-          quando,
+          quando: fixo ? quando : new Date().toISOString(), // produção começa já
           quandoYoutube: quando,
+          ...(fixo ? {} : { mesmoDia: true }),
           redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
           canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') },
         },

@@ -350,6 +350,9 @@ export default async function handler(req, res) {
           documentario: x.documentario === true,
           games: x.games === true, // canal de games (Próxima Fase): aba própria no Compilador
           politica: x.politica === true, // canal de política: aba própria no Compilador
+          mesmoDia: x.fabrica?.mesmoDia === true, // política: horário do YouTube escolhido quando fica pronto
+          horaFixada: x.fabrica?.horaFixada === true,
+          concluidoEm: x.concluidoEm || x.atualizadoEm || null,
           playlist: x.roteiro?.playlist?.titulo ? x.roteiro.playlist : null, // documentário: entra sozinho na playlist da série (ex.: "Catástrofes do Brasil")
           infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true, shortMusica: x.shortMusica === true, temporada: x.infantil.temporada ? { nome: x.infantil.temporada.nome, numero: x.infantil.temporada.numero, ep: x.infantil.temporada.ep, total: x.infantil.temporada.total } : null } : null,
           comBotao: x.comBotao === true,
@@ -359,6 +362,10 @@ export default async function handler(req, res) {
       });
       if (req.query.youtube === '1') {
         const agora = Date.now();
+        // Política "mesmo dia": quem ficou pronto ganha agora o próximo horário livre
+        const { fixarHorariosPolitica } = await import('../../../lib/politicaMesmoDia');
+        const novos = await fixarHorariosPolitica(db, itens).catch(() => ({}));
+        for (const i of itens) if (novos[i.id]) Object.assign(i, { quando: novos[i.id], quandoYoutube: novos[i.id], horaFixada: true });
         // Compilador antigo (antes da 2.5.43) não sabe que política/games/documentário NÃO são histórias bíblicas
         // e trocava o título e a descrição por "História bíblica curta: ...". Esses vídeos só vão para PC atualizado.
         const versao = String(req.headers['x-compilador-versao'] || '0.0.0').split('.').map((n) => parseInt(n, 10) || 0);
