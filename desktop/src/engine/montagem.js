@@ -283,7 +283,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
     // Política: ilustração animada desenhada aqui no PC (carimbo, placar, checklist...); se falhar, usa a foto
     let ilustrada = false;
     // foto em cartão: precisa da foto da cena (ou a imagem de reserva do vídeo); sem foto, a cena sai normal
-    const fotoCena = c.ilustracao?.tipo === 'foto' ? (c.tipo === 'imagem' ? locais[c.url] : c.imagem ? locais[c.imagem] : null) : null;
+    const fotoCena = ['foto', 'fala'].includes(c.ilustracao?.tipo) ? (c.tipo === 'imagem' ? locais[c.url] : c.imagem ? locais[c.imagem] : null) : null;
     if (c.ilustracao && (c.ilustracao.tipo !== 'foto' || (fotoCena && fs.existsSync(fotoCena)))) {
       try {
         const Ilu = require('./ilustracao');

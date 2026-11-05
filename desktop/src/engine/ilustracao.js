@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
-const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calendario', 'numero', 'lista', 'linhaTempo', 'pergunta', 'foto', 'inscreva'];
+const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calendario', 'numero', 'lista', 'linhaTempo', 'pergunta', 'foto', 'inscreva', 'fluxo', 'icone', 'fala'];
 
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const txt = (t, max = 80) => esc(String(t ?? '').replace(/\s+/g, ' ').trim().slice(0, max));
@@ -210,6 +210,51 @@ const DESENHOS = {
         $('fi').style.transform='scale('+(1.04+t*.025)+')';if($('fl'))$('fl').style.opacity=eo(ap(t,.4,.4));`,
     };
   },
+  // Processo / causa e consequência: caixas em sequência com setas
+  fluxo(d) {
+    const passos = (d.passos || []).slice(0, 4);
+    const alt = passos.length > 3 ? 130 : 160;
+    const gap = passos.length > 3 ? 60 : 80;
+    const topo = Math.max(0, (780 - (passos.length * alt + (passos.length - 1) * gap)) / 2);
+    return {
+      html: passos
+        .map(
+          (p, i) => `<div class="cardx ps" style="left:110px;right:110px;top:${topo + i * (alt + gap)}px;height:${alt}px;display:flex;align-items:center;gap:30px;padding:0 40px;${i === passos.length - 1 ? 'border-color:var(--ouro)' : ''}">
+        <div style="width:64px;height:64px;border-radius:50%;background:var(--ouro);color:#1a1206;font-weight:800;font-size:36px;display:flex;align-items:center;justify-content:center;flex:none">${i + 1}</div>
+        <div style="font-size:${alt * 0.5}px;width:${alt * 0.6}px;text-align:center">${txt(p.icone, 4)}</div>
+        <div style="flex:1;font-size:44px;font-weight:800;line-height:1.15">${txt(p.texto, 30)}</div></div>
+        ${i < passos.length - 1 ? `<div class="sf" style="position:absolute;left:0;right:0;top:${topo + i * (alt + gap) + alt - 4}px;text-align:center;font-size:${gap}px;line-height:${gap + 8}px;color:var(--ouro);font-weight:800">↓</div>` : ''}`
+        )
+        .join(''),
+      anim: `const ps=$$('.ps'),sf=$$('.sf');ps.forEach((e,i)=>{const p=back(ap(t,(.2+i*.75)*k,.45));e.style.opacity=Math.min(1,p);e.style.transform='scale('+(.85+.15*p)+')';});
+        sf.forEach((e,i)=>{const p=eo(ap(t,(.55+i*.75)*k,.3));e.style.opacity=p;e.style.transform='translateY('+((1-p)*-20+Math.sin(t*4)*4)+'px)';});`,
+    };
+  },
+  // Um conceito explicado: desenho grande + frase curta
+  icone(d) {
+    return {
+      html: `<div id="ic" style="position:absolute;left:0;right:0;top:40px;text-align:center;font-size:300px;line-height:1">${txt(d.icone || '💡', 4)}</div>
+        <div id="icb" style="position:absolute;left:300px;right:300px;top:380px;height:10px;border-radius:5px;background:var(--ouro)"></div>
+        <div id="ict" style="position:absolute;left:40px;right:40px;top:430px;text-align:center;font-size:56px;font-weight:800;line-height:1.2">${txt(d.texto, 60)}</div>`,
+      anim: `const p=back(ap(t,.1,.55));$('ic').style.transform='scale('+(p*(1+Math.sin(t*2.5)*.03))+')';$('ic').style.opacity=Math.min(1,p);
+        $('icb').style.transform='scaleX('+eo(ap(t,.5*k,.4))+')';$('ict').style.opacity=eo(ap(t,.7*k,.4));$('ict').style.transform='translateY('+((1-eo(ap(t,.7*k,.4)))*30)+'px)';`,
+    };
+  },
+  // O que a pessoa disse, EM RESUMO: foto real (ou o bonequinho, se não houver foto) + balão
+  fala(d) {
+    const temFoto = d.fotoArquivo && fs.existsSync(d.fotoArquivo);
+    return {
+      html: `<div id="fp" style="position:absolute;left:330px;top:0;width:340px;height:340px;border-radius:50%;overflow:hidden;border:6px solid var(--ouro);background:var(--card);box-shadow:0 20px 60px rgba(0,0,0,.5)">
+          ${temFoto ? `<img src="${esc(pathToFileURL(d.fotoArquivo).href)}" style="width:100%;height:100%;object-fit:cover;object-position:50% 20%">` : `<div style="transform:translate(70px,20px) scale(1.1)">${boneco('#3a6fd8')}</div>`}</div>
+        ${d.nome ? `<div id="fn" style="position:absolute;left:0;right:0;top:355px;text-align:center"><span style="background:var(--ouro);color:#1a1206;border-radius:30px;padding:8px 26px;font-size:34px;font-weight:800">${txt(d.nome, 40)}</span></div>` : ''}
+        <div id="fb" style="position:absolute;left:60px;right:60px;top:440px;background:#fff;color:#111;border-radius:36px;padding:28px 40px 30px">
+          <div style="font-size:24px;font-weight:800;letter-spacing:3px;color:#8a6a1e">EM RESUMO</div>
+          <div style="font-size:46px;font-weight:800;line-height:1.2;margin-top:6px">${txt(d.texto, 90)}</div>
+          <div style="position:absolute;left:470px;top:-30px;width:0;height:0;border-left:30px solid transparent;border-right:30px solid transparent;border-bottom:32px solid #fff"></div></div>`,
+      anim: `const p=back(ap(t,.05,.5));$('fp').style.transform='scale('+p+')';$('fp').style.opacity=Math.min(1,p);if($('fn'))$('fn').style.opacity=eo(ap(t,.4,.3));
+        const b=back(ap(t,.6*k,.45));$('fb').style.transform='scale('+b+')';$('fb').style.transformOrigin='50% 0';$('fb').style.opacity=Math.min(1,b);`,
+    };
+  },
   // Fecho do vídeo: o bonequinho pergunta e "aperta" o botão de se inscrever (botão genérico, sem marca)
   inscreva(d) {
     const sino = `<svg viewBox="0 0 24 24" width="54" height="54"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5.5-6.84V3a1.5 1.5 0 0 0-3 0v1.16A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>`;
@@ -255,6 +300,9 @@ function valida(d) {
     case 'linhaTempo': return temLista(d.eventos, 2);
     case 'pergunta': return true;
     case 'inscreva': return true;
+    case 'fluxo': return temLista(d.passos, 2);
+    case 'icone': return !!d.texto;
+    case 'fala': return !!d.texto;
     case 'foto': return !!d.fotoArquivo && fs.existsSync(d.fotoArquivo);
     default: return false;
   }
