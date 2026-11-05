@@ -104,6 +104,25 @@ async function recuperarErrosDeImagem(db) {
   }
 }
 
+/** Registro de cada volta da Fábrica (o diagnóstico mostra: quando rodou, quanto demorou, o que fez). */
+async function registrarVolta(db, { inicio, docs, feitos, erro }) {
+  const lista = [];
+  for (const f of (feitos || []).slice(0, 12)) {
+    const x = (await db.collection('youvideo_fila').doc(f.id).get().catch(() => null))?.data() || {};
+    lista.push({
+      titulo: String(x.roteiro?.titulo || x.tema || '').slice(0, 50),
+      de: f.statusAnterior,
+      para: x.status,
+      imagens: Array.isArray(x.arquivosParciais) ? `${x.arquivosParciais.length}/${(x.roteiro?.cenas || []).length}` : undefined,
+      pausa: x.pausaMidiaAte && x.pausaMidiaAte > Date.now() ? 'Pexels pediu pausa' : undefined,
+    });
+  }
+  const ref = db.collection('youvideo_config').doc('fila_processar');
+  const antes = (await ref.get().catch(() => null))?.data()?.voltas || [];
+  const volta = { em: new Date(inicio).toISOString(), segundos: Math.round((Date.now() - inicio) / 1000), naFila: docs, feitos: lista, ...(erro ? { erro: String(erro).slice(0, 300) } : {}) };
+  await ref.set({ ultima: volta, voltas: [volta, ...antes].slice(0, 6) });
+}
+
 export default async function handler(req, res) {
   const db = getDb();
   const baseUrl = `https://${req.headers.host}`;
@@ -820,12 +839,12 @@ export default async function handler(req, res) {
 
     // Até ~3 min por chamada, um passo de cada item
     let roteiros = 0;
-    while (Date.now() - inicio < 170e3 && feitos.length < 6) {
+    while (Date.now() - inicio < 170e3 && feitos.length < 12) {
       // No máximo 1 roteiro por rodada: a Groq grátis tem limite por minuto
       // Vídeo que travou (a função foi cortada pelo tempo no meio do passo: nada salvo, sem erro) vai para o fim da fila,
       // para não segurar os outros; depois de 6 vezes, fica com erro e para de gastar a fila
       const travou = (d) => (d.data().passoRodadas || 0) >= 3 && Date.now() - (d.data().passoEm || 0) < 60 * 60e3;
-      const candidatos = docs.filter((d) => !vistos.has(d.id) && !(roteiros >= 1 && d.data().status === 'pendente'));
+      const candidatos = docs.filter((d) => !vistos.has(d.id) && !(roteiros >= 1 && d.data().status === 'pendente') && !((d.data().pausaMidiaAte || 0) > Date.now()));
       const doc = await escolherProximo([...candidatos.filter((d) => !travou(d)), ...candidatos.filter(travou)]);
       if (!doc) break;
       vistos.add(doc.id);
@@ -859,9 +878,11 @@ export default async function handler(req, res) {
       }
       if (!soFabrica) break; // chamada manual: um passo só, como antes
     }
+    if (soFabrica) await registrarVolta(db, { inicio, docs: docs.length, feitos }).catch(() => {});
     if (!feitos.length) return res.status(200).json({ mensagem: 'Só tem vídeo esperando o Youvideo Compilador montar no PC.' });
     return res.status(200).json({ feitos, processado: feitos[0].id, statusAnterior: feitos[0].statusAnterior });
   } catch (err) {
+    if (soFabrica) await registrarVolta(db, { inicio, docs: 0, feitos, erro: err.message }).catch(() => {});
     return res.status(500).json({ error: err.message });
   }
 }

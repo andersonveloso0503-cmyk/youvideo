@@ -26,12 +26,14 @@ export default async function handler(req, res) {
         quando: x.fabrica?.quando || null,
         tentativas: x.tentativas || 0,
         travadas: x.passoRodadas || 0, // vezes que a função foi cortada pelo tempo neste passo
+        imagens: Array.isArray(x.arquivosParciais) ? `${x.arquivosParciais.length}/${(x.roteiro?.cenas || []).length}` : '',
+        pausaAte: x.pausaMidiaAte && x.pausaMidiaAte > Date.now() ? new Date(x.pausaMidiaAte).toISOString() : '',
         parte: x.status === 'voz_ok' && x.politica && !x.midiasPlanejadas ? (x.midiasFrase ? `ilustrações ${(x.ilusParcial || []).length}/${(x.roteiro?.cenas || []).length}` : 'imagens pela frase') : '',
         ultimoErro: String(x.ultimoErro || x.erro || '').slice(0, 300),
         atualizadoEm: x.atualizadoEm || null,
       }))
       .sort((a, b) => String(a.quando).localeCompare(String(b.quando)));
-    const cron = (await db.collection('youvideo_config').doc('fila_processar').get().catch(() => null))?.data() || null;
+    const cron = (await db.collection('youvideo_config').doc('fila_processar').get().catch(() => null))?.data()?.voltas || '(a Fábrica ainda não registrou nenhuma volta)';
     return res.status(200).json({ agora: new Date().toISOString(), total: itens.length, itens, cron });
   }
   const q = sem(req.query.q);
