@@ -255,6 +255,31 @@ const Fabrica = (() => {
       if (!caixa.hidden) caixa.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
     q('#btnGmDicasCriar').onclick = criarDicas;
+    q('#btnGmTema').onclick = () => {
+      const caixa = q('#gmTemaCaixa');
+      caixa.hidden = !caixa.hidden;
+      if (!caixa.hidden) caixa.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    document.querySelectorAll('[data-gm-tema]').forEach((b) => (b.onclick = () => (q('#gmTema').value = b.dataset.gmTema)));
+    q('#btnGmTemaCriar').onclick = async () => {
+      const tema = q('#gmTema').value.trim();
+      if (!tema) return avisar('Escreva o tema (ou clique numa das sugestões).', true);
+      const b = q('#btnGmTemaCriar');
+      b.disabled = true;
+      b.textContent = '🎯 Pesquisando e escrevendo (1 a 2 min)...';
+      try {
+        const r = await window.api.noticias.acao({ acao: 'tema', tema });
+        avisar(`Pronto: "${r.titulo}" está na lista para aprovar.`);
+        q('#gmTema').value = '';
+        q('#gmTemaCaixa').hidden = true;
+        carregarNoticias();
+      } catch (e) {
+        avisar(msgErro(e), true);
+      } finally {
+        b.disabled = false;
+        b.textContent = '🎯 Pesquisar e escrever';
+      }
+    };
     q('#btnGmLancShort').onclick = () => criarLancamentos('short');
     // Instagram do canal: conectar (página do site) e mandar os prontos de uma vez
     const igTodos = async (botao, api, nome) => {

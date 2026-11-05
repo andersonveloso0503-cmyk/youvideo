@@ -672,6 +672,7 @@
           <h3 style="margin:0">📰 Notícias para aprovar</h3>
           <button type="button" class="btn-mini" id="btnGmBuscar">🔎 Buscar notícias agora</button>
           <button type="button" class="btn-mini" id="btnGmVideo">📺 Juntar marcadas num vídeo</button>
+          <button type="button" class="btn-mini" id="btnGmTema">🎯 Short sobre um tema (ilustrado)</button>
           <button type="button" class="btn-mini" id="btnGmDicas">💡 Criar vídeo de dicas</button>
           <button type="button" class="btn-mini" id="btnGmLancShort">🚀 Lançamentos (Short)</button>
           <button type="button" class="btn-mini" id="btnGmLancLongo">📅 Lançamentos (vídeo longo)</button>
@@ -710,6 +711,20 @@
             <button type="button" class="btn-primario" id="btnNarMontar">🎬 Gerar a voz e montar o Short</button>
           </div>
         </div>
+        <div id="gmTemaCaixa" hidden style="margin:8px 0;padding:10px;border:1px dashed var(--borda, #444);border-radius:10px">
+          <label>Tema do Short (pergunta ou curiosidade). Funciona para jogo de console também (não precisa estar na Steam).</label>
+          <input type="text" id="gmTema" maxlength="200" style="width:100%" placeholder="Ex.: Quanto vai custar o GTA 6 no Brasil?" />
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0">
+            <button type="button" class="btn-mini" data-gm-tema="GTA 6: tudo o que já se sabe antes do lançamento">GTA 6: o que já se sabe</button>
+            <button type="button" class="btn-mini" data-gm-tema="Quanto vai custar o GTA 6 no Brasil?">Preço do GTA 6 no Brasil</button>
+            <button type="button" class="btn-mini" data-gm-tema="GTA 6: em quais consoles vai rodar? PS4 e PC ficam de fora?">GTA 6 roda no meu console?</button>
+            <button type="button" class="btn-mini" data-gm-tema="GTA 5 x GTA 6: o que muda de um para o outro">GTA 5 x GTA 6</button>
+            <button type="button" class="btn-mini" data-gm-tema="O mapa do GTA 6: Leonida e Vice City explicados">O mapa do GTA 6</button>
+            <button type="button" class="btn-mini" data-gm-tema="Quem são Lucia e Jason, os protagonistas do GTA 6">Lucia e Jason</button>
+          </div>
+          <button type="button" class="btn-mini" id="btnGmTemaCriar">🎯 Pesquisar e escrever</button>
+          <span class="nota">O Claude pesquisa na web e escreve um Short de 55 a 70 s; cada frase vira uma ilustração animada (preço, data, lista, comparação...) e o final tem o bonequinho do "se inscreve". Leva 1 a 2 minutos. Depois é só aprovar.</span>
+        </div>
         <div id="gmDicasCaixa" hidden style="margin:8px 0;padding:10px;border:1px dashed var(--borda, #444);border-radius:10px">
           <label>Jogos para as dicas (um por linha, até 2 por vez, com o nome como está na Steam). Vazio = os mais vendidos da Steam agora.</label>
           <textarea id="gmDicasJogos" rows="3" style="width:100%" placeholder="Ex.:&#10;Red Dead Redemption 2&#10;Minecraft Dungeons"></textarea>
@@ -739,13 +754,17 @@
           <label>Tema do explicador (curiosidade, em forma de pergunta funciona melhor)</label>
           <input type="text" id="plTema" maxlength="200" style="width:100%" placeholder="Ex.: Como Lula virou no segundo turno de 2026" />
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0">
+            <button type="button" class="btn-mini" data-pl-tema="Entenda: como funcionaria a escala 5x2 e o fim da 6x1">Entenda: escala 5x2 / fim da 6x1</button>
+            <button type="button" class="btn-mini" data-pl-tema="Entenda: quem passa a não pagar Imposto de Renda e quanto você economiza">Entenda: isenção do IR</button>
+            <button type="button" class="btn-mini" data-pl-tema="Quanto custa um deputado federal por mês para o Brasil?">Quanto custa um deputado</button>
+            <button type="button" class="btn-mini" data-pl-tema="Entenda: o que muda no salário mínimo e quem é afetado">Entenda: salário mínimo</button>
             <button type="button" class="btn-mini" data-pl-tema="Como Lula virou no segundo turno de 2026">Como Lula virou no 2º turno</button>
             <button type="button" class="btn-mini" data-pl-tema="Por que Jair Bolsonaro foi preso: a linha do tempo">Por que Bolsonaro foi preso</button>
             <button type="button" class="btn-mini" data-pl-tema="O caso Banco Master e Daniel Vorcaro explicado do começo">Caso Banco Master / Vorcaro</button>
             <button type="button" class="btn-mini" data-pl-tema="Como fica o governo com o PL na maior bancada do Congresso">Como fica o governo agora</button>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select id="plFormato"><option value="longo" selected>Vídeo longo (8 a 10 min)</option><option value="short">Short</option></select>
+            <select id="plFormato"><option value="short" selected>Short ilustrado (55 a 70 s)</option><option value="longo">Vídeo longo (8 a 10 min)</option></select>
             <button type="button" class="btn-mini" id="btnPlExplicadorCriar">💡 Pesquisar e escrever</button>
             <span class="nota">O Claude pesquisa na web em fontes de linhas diferentes e escreve com os dois lados. Leva 1 a 2 minutos.</span>
           </div>

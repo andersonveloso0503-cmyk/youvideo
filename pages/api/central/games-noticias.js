@@ -63,6 +63,7 @@ async function aprovarNoticia(db, ref, d, canalYoutube, quandoPedido = null, { l
     games: true,
     noticia: ref.id,
     episodioId: d.ep.id,
+    ...(d.ilustrado ? { ilustrado: true } : {}), // Short ilustrado (tema): as ilustrações explicam cada frase
     serie: null,
     estilo: 'realista',
     formato: longo ? 'longo' : 'short',
@@ -269,6 +270,27 @@ export default async function handler(req, res) {
       }
       if (!criados.length) return res.status(400).json({ erro: erros.join(' · ') || 'Não consegui escrever as dicas.' });
       return res.status(200).json({ ok: true, criados, erros });
+    }
+
+    // Short ilustrado sobre um tema (ex.: GTA 6): o Claude pesquisa e escreve; as ilustrações explicam cada frase
+    if (b.acao === 'tema') {
+      const tema = String(b.tema || '').trim().slice(0, 200);
+      if (!tema) return res.status(400).json({ erro: 'Escreva o tema do vídeo.' });
+      const { roteiroTemaGames } = await import('../../../lib/gamesDicas');
+      const { ep, fontes } = await roteiroTemaGames(tema);
+      await col.doc(ep.id).set({
+        status: 'aguardando',
+        tipo: 'short',
+        ilustrado: true,
+        titulo: ep.titulo,
+        texto: (ep.fatos || []).join('\n'),
+        fonte: 'Pesquisa na web',
+        links: fontes.slice(0, 6).map((f) => ({ titulo: f.titulo, link: f.url })),
+        imagens: [],
+        ep,
+        criadoEm: new Date().toISOString(),
+      });
+      return res.status(200).json({ ok: true, titulo: ep.titulo });
     }
 
     if (b.acao === 'aprovar') {

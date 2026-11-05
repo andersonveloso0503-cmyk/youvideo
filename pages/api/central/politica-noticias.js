@@ -164,6 +164,7 @@ export default async function handler(req, res) {
             status: 'aguardando',
             tipo,
             titulo: ep.titulo,
+            texto: (ep.fatos || []).join('\n'), // fatos da pesquisa: a conferência das ilustrações compara os números com eles
             fonte: 'Pesquisa na web',
             links: fontes.slice(0, 8).map((f) => ({ titulo: f.titulo, link: f.url })),
             imagens: [],
