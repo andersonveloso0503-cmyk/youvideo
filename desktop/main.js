@@ -486,6 +486,8 @@ app.whenReady().then(() => {
     let novo = false;
     errosDeCredito.clear();
     for (const it of itens || []) {
+      // Só vídeo PARADO agora: erro antigo de um vídeo que já seguiu (pronto, no YouTube) não é falta de crédito hoje
+      if (it.status === 'concluido' || ['ok', 'enviando', 'revisar'].includes(it.youtube?.status)) continue;
       const erro = `${it.erro || ''} ${it.ultimoErro || ''}`;
       if (!/insufficient credits|cr[ée]dito do flux|quota_exceeded|exhausted balance|sem cr[ée]dito|not enough credits|esperando cr[ée]dito/i.test(erro)) continue;
       const servico = /flux|insufficient credits/i.test(erro) ? 'flux' : /quota|elevenlabs/i.test(erro) ? 'elevenlabs' : 'fal';
@@ -825,7 +827,13 @@ app.whenReady().then(() => {
         if (sv && !sv.ok && !/não configurada/i.test(sv.erro || '')) add(chave, nome, 'desconhecido', `não consegui ler o saldo (${String(sv.erro || '').slice(0, 60)})`);
       }
       // Vídeo da Fábrica que parou por falta de crédito: crítico, mesmo que a leitura do saldo diga outra coisa
-      for (const e of errosDeCredito.values()) if (!itens.some((i) => i.servico === e.servico && i.nivel === 'critico')) add(e.servico, e.nome, 'critico', 'ACABOU — um vídeo da Fábrica parou por falta de crédito');
+      // Vídeo parado por crédito: só diz "ACABOU" se o saldo não deu para ler ou está mesmo no fim;
+      // com saldo bom, o saldo é a verdade (o erro pode ser de outro motivo ou antigo)
+      for (const e of errosDeCredito.values()) {
+        const lido = itens.find((i) => i.servico === e.servico && i.nivel !== 'desconhecido');
+        if (lido && lido.nivel !== 'critico') continue;
+        if (!itens.some((i) => i.servico === e.servico && i.nivel === 'critico')) add(e.servico, e.nome, 'critico', 'ACABOU — um vídeo da Fábrica parou por falta de crédito');
+      }
       ultimosCreditos = { itens, em: Date.now() };
       enviar('creditos:status', ultimosCreditos);
       // Notificação do Windows: uma vez por dia para cada serviço baixo/crítico
