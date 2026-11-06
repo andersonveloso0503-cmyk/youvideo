@@ -635,9 +635,10 @@ app.whenReady().then(() => {
       for (const it of itens) {
         const canalId = it.canalYoutube?.id;
         if (!canalId || !store.canal(canalId)) continue; // esse canal está conectado em outro PC
-        if (fila.lista().some((j) => j.envio?.fabricaId === it.id && !['erro', 'cancelado'].includes(j.status))) continue;
+        const deNovo = Number(it.youtubeDeNovo) || 0; // você pediu "subir de novo" (o antigo saiu com texto errado)
+        if (fila.lista().some((j) => j.envio?.fabricaId === it.id && !['erro', 'cancelado'].includes(j.status) && (j.envio?.deNovo || 0) >= deNovo && (!deNovo || j.envio?.deNovo))) continue;
         // Este PC já subiu este vídeo: nunca sobe de novo — só repete o aviso ao site
-        if (fila.fabricaJaEnviado(it.id)) {
+        if (fila.fabricaJaEnviado(it.id) && !(deNovo && deNovo > (fila.fabricaJaEnviado(it.id).em || 0))) {
           await fila.avisarFabricaEnviado(it.id);
           continue;
         }
@@ -756,6 +757,7 @@ app.whenReady().then(() => {
           agendarPara: quando ? quando.toISOString() : null,
           curto: !longo,
           fabricaId: it.id,
+          ...(deNovo ? { deNovo, forcarDuplicado: true } : {}), // o antigo (privado/apagado) não conta como repetido
           tipo: it.oracao ? 'oracao' : 'historias', // categoria "Pessoas e blogs" e idioma português (não "Música")
           ...(it.games ? { categoria: '20', idioma: 'pt-BR' } : {}), // games: categoria "Jogos" do YouTube
           ...(it.politica ? { categoria: '25', idioma: 'pt-BR' } : {}), // política: categoria "Notícias e política"

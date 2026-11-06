@@ -1314,7 +1314,7 @@ const Fabrica = (() => {
     // "Mesmo dia": o horário do YouTube só é marcado quando o vídeo fica pronto (próximo horário livre, 3 h entre vídeos)
     if (!y && i.mesmoDia && !i.horaFixada) return `<span class="fab-yt">▶ YouTube: no próximo horário livre quando ficar pronto (hoje até 23h ou amanhã a partir das 7h)</span>`;
     if (!y) return `<span class="fab-yt">▶ YouTube${i.quandoYoutube ? ` ${esc(quandoTxt(i.quandoYoutube))}` : ''}: depois de pronto</span>`;
-    if (y.status === 'ok') return `<a class="fab-yt ok" data-link="${esc(y.url || '')}">▶ YouTube agendado ✅</a>`;
+    if (y.status === 'ok') return `<a class="fab-yt ok" data-link="${esc(y.url || '')}">▶ YouTube agendado ✅</a>${i.games || i.politica ? ` <a class="fab-yt" data-de-novo-yt="${esc(i.id)}" title="Subiu com texto errado e você deixou privado/apagou? Sobe outra vez com o título e a descrição certos.">⤴ subir de novo</a>` : ''}`;
     if (y.status === 'erro') return `<a class="fab-yt erro" data-repetir-yt="${esc(i.id)}" title="${esc(y.erro || '')}">▶ YouTube: erro — ${esc(String(y.erro || 'sem detalhe').slice(0, 110))} (clique p/ tentar de novo)</a>`;
     if (y.status === 'enviando') return '<span class="fab-yt">▶ YouTube: subindo pelo PC...</span>';
     if (y.status === 'revisar') return '<span class="fab-yt" style="color:var(--terracota)">▶ YouTube: esperando você aprovar (📚 Biblioteca → ✅ Aprovar)</span>';
@@ -1463,6 +1463,12 @@ const Fabrica = (() => {
           carregar();
         });
         l.querySelectorAll('[data-link]').forEach((a) => a.dataset.link && (a.onclick = () => window.api.abrir.link(a.dataset.link)));
+        l.querySelectorAll('[data-de-novo-yt]').forEach((a) => (a.onclick = async () => {
+          if (!confirm('Subir este vídeo de novo no YouTube, com o título e a descrição certos?\n\nAntes, deixe o antigo PRIVADO ou apague no YouTube Studio.')) return;
+          const r = await window.api.fabrica.acao({ id: i.id, acao: 'youtube-de-novo' }).catch((e) => ({ erro: e.message }));
+          if (r?.erro) alert(r.erro);
+          carregar();
+        }));
         l.querySelectorAll('[data-repetir-yt]').forEach((a) => (a.onclick = async () => { await window.api.fabrica.acao({ id: i.id, acao: 'youtube-repetir' }); carregar(); }));
         box.appendChild(l);
       }

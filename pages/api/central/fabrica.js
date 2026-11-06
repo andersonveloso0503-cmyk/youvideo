@@ -350,7 +350,8 @@ export default async function handler(req, res) {
           documentario: x.documentario === true,
           games: x.games === true, // canal de games (Próxima Fase): aba própria no Compilador
           politica: x.politica === true, // canal de política: aba própria no Compilador
-          refeitoDe: x.refeitoDe || null, // vídeo refeito: o antigo com o mesmo título não conta como repetido
+          refeitoDe: x.refeitoDe || null,
+          youtubeDeNovo: x.fabrica?.youtube?.deNovo || null, // pedido para subir de novo (o PC ignora que já subiu) // vídeo refeito: o antigo com o mesmo título não conta como repetido
           mesmoDia: x.fabrica?.mesmoDia === true, // política: horário do YouTube escolhido quando fica pronto
           horaFixada: x.fabrica?.horaFixada === true,
           concluidoEm: x.concluidoEm || x.atualizadoEm || null,
@@ -1210,6 +1211,18 @@ export default async function handler(req, res) {
     if (b.acao === 'youtube-erro') {
       const antes = (await ref.get()).data()?.fabrica?.youtube || {};
       await ref.update({ 'fabrica.youtube': { status: 'erro', em: Date.now(), erro: String(b.erro || '').slice(0, 400), tentativas: (antes.tentativas || 0) + 1 } });
+      return res.status(200).json({ ok: true });
+    }
+    // Subir de novo (vídeo pronto que subiu com texto errado e você deixou privado/apagou): o PC sobe outra vez
+    // com o título e a descrição certos do site, no próximo horário livre (ou agora, se o horário já passou)
+    if (b.acao === 'youtube-de-novo') {
+      const d = (await ref.get()).data() || {};
+      if (d.status !== 'concluido' || !d.videoUrl) return res.status(400).json({ erro: 'Só dá para subir de novo um vídeo pronto.' });
+      const y = d.fabrica?.youtube || {};
+      await ref.update({
+        'fabrica.youtube': { status: 'pendente', em: Date.now(), deNovo: Date.now(), ...(y.url ? { urlAntiga: y.url } : {}) },
+        ...(d.fabrica?.mesmoDia ? { 'fabrica.horaFixada': false } : {}),
+      });
       return res.status(200).json({ ok: true });
     }
     if (b.acao === 'youtube-repetir') {
