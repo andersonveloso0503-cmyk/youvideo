@@ -80,7 +80,41 @@ const ehPredio = (x) => Object.prototype.hasOwnProperty.call(PREDIOS, x);
 
 // ───────── Mascote: apresentador do canal (desenho original) ─────────
 const COR_MASCOTE = { terno: '#24335f', gravata: '#e8b04a', pele: '#f1c095', cabelo: '#3a2618' };
+// Mascote dos games: gamer nerd — óculos grossos, boné virado para trás, moletom e controle na mão
+function mascoteGamerSvg(roupa = {}) {
+  const c = { moletom: '#5b2bd1', bone: '#3cff9a', pele: '#f1c095', cabelo: '#2b1b12', ...roupa };
+  return `<svg viewBox="0 0 240 360" width="240" height="360" style="overflow:visible">
+  <ellipse cx="120" cy="350" rx="70" ry="9" fill="#000" opacity=".35"/>
+  <rect x="86" y="268" width="28" height="76" rx="10" fill="#2b3550"/><rect x="126" y="268" width="28" height="76" rx="10" fill="#2b3550"/>
+  <rect x="78" y="334" width="40" height="16" rx="8" fill="#fff"/><rect x="122" y="334" width="40" height="16" rx="8" fill="#fff"/><rect x="78" y="344" width="40" height="5" fill="#e5484d"/><rect x="122" y="344" width="40" height="5" fill="#e5484d"/>
+  <g id="mbracoE"><rect x="50" y="176" width="28" height="92" rx="14" fill="${c.moletom}"/><circle cx="64" cy="270" r="13" fill="${c.pele}"/></g>
+  <path d="M64 184 q56 -40 112 0 v96 h-112z" fill="${c.moletom}"/>
+  <path d="M92 236 h56 v26 h-56z" fill="rgba(0,0,0,.18)" rx="8"/>
+  <path d="M100 160 q20 22 40 0" stroke="rgba(0,0,0,.25)" stroke-width="10" fill="none"/>
+  <path d="M108 172 v26 M132 172 v26" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <text x="120" y="226" text-anchor="middle" font-size="22" font-weight="800" font-family="Mont,Arial" fill="${c.bone}">PF»</text>
+  <g id="mbracoD"><rect x="162" y="176" width="28" height="92" rx="14" fill="${c.moletom}"/><circle cx="176" cy="270" r="13" fill="${c.pele}"/>
+    <g transform="translate(176 282)"><rect x="-30" y="-12" width="60" height="30" rx="14" fill="#2a2f45"/><circle cx="-14" cy="2" r="5" fill="#9aa4bd"/><circle cx="14" cy="-2" r="4" fill="#3cff9a"/><circle cx="20" cy="6" r="4" fill="#e5484d"/></g></g>
+  <path d="M84 168 q36 22 72 0" stroke="#1b1b1b" stroke-width="8" fill="none"/><circle cx="84" cy="170" r="10" fill="#1b1b1b"/><circle cx="156" cy="170" r="10" fill="#1b1b1b"/>
+  <rect x="108" y="140" width="24" height="26" fill="${c.pele}"/>
+  <g id="mcab">
+    <circle cx="56" cy="100" r="13" fill="${c.pele}"/><circle cx="184" cy="100" r="13" fill="${c.pele}"/>
+    <ellipse cx="120" cy="98" rx="64" ry="64" fill="${c.pele}"/>
+    <path d="M58 88 q4 -18 14 -24 l96 0 q10 8 12 24 q-8 -8 -16 -8 h-90 q-10 0 -16 8z" fill="${c.cabelo}"/>
+    <path d="M74 30 q46 -34 96 -6 l10 -10 q-56 -26 -112 6z" fill="#2fd184"/>
+    <path d="M60 66 q0 -44 60 -44 q60 0 60 44 q-60 -10 -120 0z" fill="${c.bone}"/>
+    <path d="M104 62 q16 -18 32 0z" fill="${c.cabelo}"/><path d="M100 64 h40" stroke="#2fd184" stroke-width="5" stroke-linecap="round"/>
+    <g id="msob"><path d="M78 72 q14 -6 28 0" stroke="${c.cabelo}" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M134 72 q14 -6 28 0" stroke="${c.cabelo}" stroke-width="7" fill="none" stroke-linecap="round"/></g>
+    <g id="molhos"><ellipse cx="92" cy="98" rx="8" ry="9" fill="#1d1d1d"/><ellipse cx="148" cy="98" rx="8" ry="9" fill="#1d1d1d"/><circle cx="95" cy="94" r="2.6" fill="#fff"/><circle cx="151" cy="94" r="2.6" fill="#fff"/></g>
+    <rect x="68" y="80" width="46" height="36" rx="6" fill="rgba(160,220,255,.12)" stroke="#111" stroke-width="7"/><rect x="126" y="80" width="46" height="36" rx="6" fill="rgba(160,220,255,.12)" stroke="#111" stroke-width="7"/><path d="M114 96 h12" stroke="#111" stroke-width="6"/>
+    <ellipse cx="78" cy="126" rx="9" ry="5" fill="#e9967a" opacity=".45"/><ellipse cx="162" cy="126" rx="9" ry="5" fill="#e9967a" opacity=".45"/>
+    <g id="mboca" transform="translate(120 136)"><ellipse id="mbocaA" cx="0" cy="0" rx="15" ry="3" fill="#5a1f1f"/><ellipse id="mling" cx="0" cy="5" rx="8" ry="0" fill="#d9646b"/>
+      <path id="msorr" d="M-16 -2 q16 14 32 0" stroke="#5a1f1f" stroke-width="5" fill="none" stroke-linecap="round"/><rect x="-6" y="-2" width="12" height="6" fill="#fff" opacity=".0"/></g>
+  </g></svg>`;
+}
+
 function mascoteSvg(roupa = {}) {
+  if (roupa.estilo === 'gamer') return mascoteGamerSvg(roupa);
   const c = { ...COR_MASCOTE, ...roupa };
   return `<svg viewBox="0 0 240 360" width="240" height="360" style="overflow:visible">
   <ellipse cx="120" cy="350" rx="70" ry="9" fill="#000" opacity=".35"/>

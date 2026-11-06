@@ -332,7 +332,7 @@ function paginaHtml(d, { W, H, duracao }) {
   return `<!doctype html><html><head><meta charset="utf-8"><style>${fontes()}
 :root{--bg:#0b1020;--ouro:#e8b04a;--ouro2:#f6d38a;--txt:#f3efe6;--mut:#8f97ad;--ok:#3fbf7f;--nao:#e5484d;--card:#151c33;--borda:#2a3354}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{width:${W}px;height:${H}px;overflow:hidden;background:var(--bg);font-family:Mont,"Segoe UI",Arial,sans-serif;color:var(--txt)}
+html,body{width:${W}px;height:${H}px;overflow:hidden;background:${d.sobreJogo ? 'transparent' : 'var(--bg)'};font-family:Mont,"Segoe UI",Arial,sans-serif;color:var(--txt)}
 .luz{position:absolute;border-radius:50%;filter:blur(${Math.round(60 * escala)}px);opacity:.35}
 .tagp{position:absolute;top:${titTop - 80 * escala}px;left:50%;background:linear-gradient(90deg,#c98a2b,var(--ouro));color:#1a1206;font-weight:800;font-size:${28 * escala}px;letter-spacing:${4 * escala}px;padding:${10 * escala}px ${28 * escala}px;border-radius:40px;white-space:nowrap;text-transform:uppercase}
 .tit{position:absolute;top:${titTop}px;left:${W * 0.05}px;right:${W * 0.05}px;text-align:center;font-weight:800;font-size:${titTam}px;line-height:1.05;letter-spacing:-1px}
@@ -343,7 +343,8 @@ html,body{width:${W}px;height:${H}px;overflow:hidden;background:var(--bg);font-f
 .num{font-weight:800;font-variant-numeric:tabular-nums}
 .chk{position:absolute;left:60px;right:60px;height:100px;display:flex;align-items:center;gap:30px;padding:0 34px;font-size:40px;font-weight:700}
 .bol{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:800;flex:none}
-#raiz{position:absolute;left:0;top:0;width:${W}px;height:${H}px;overflow:hidden;background:var(--bg)}
+#raiz{position:absolute;left:0;top:0;width:${W}px;height:${H}px;overflow:hidden;background:${d.sobreJogo ? 'transparent' : 'var(--bg)'}}
+${d.sobreJogo ? '.luz{display:none}.tit{text-shadow:0 6px 24px rgba(0,0,0,.85),0 2px 4px rgba(0,0,0,.9)}' : ''}
 </style></head><body><div id="raiz">
 <div class="luz" id="l1" style="width:${W * 0.5}px;height:${W * 0.5}px;left:${-W * 0.1}px;top:${H * 0.15}px;background:#2b4a9a"></div>
 <div class="luz" id="l2" style="width:${W * 0.4}px;height:${W * 0.4}px;right:${-W * 0.1}px;top:${H * 0.58}px;background:#8a5a14"></div>
