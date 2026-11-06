@@ -85,7 +85,11 @@ async function turbinarImagem(falKey, arquivo, curto, destino, estilo = '') {
     const url = await fal.storage.upload(new Blob([fs.readFileSync(arquivo)], { type: 'image/jpeg' }));
     const r = await fal.subscribe('fal-ai/nano-banana/edit', {
       input: {
-        prompt: (estilo === 'politica' || estilo === 'games'
+        prompt: (estilo === 'games'
+          ? 'This is OFFICIAL key art of a video game. Make it an eye-catching YouTube thumbnail: zoom in so the main character is BIG, ' +
+            'close and filling most of the frame (face and upper body clearly visible), vivid saturated colors, strong contrast, slightly darker blurred background. ' +
+            'Keep the characters, their faces, outfits and the art style EXACTLY as in the image; do not invent new characters. '
+          : estilo === 'politica'
           ? 'Improve this photo for a YouTube thumbnail: cinematic lighting, richer contrast, darker blurred background, move the camera a bit closer to the main person. ' +
             'This is a REAL person: keep the face, identity, age and facial expression EXACTLY as in the photo; do not change clothes or add objects. '
           : 'Transform this into an eye-catching YouTube thumbnail background: dramatic cinematic lighting, vivid saturated colors, ' +
