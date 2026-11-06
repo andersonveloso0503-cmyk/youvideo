@@ -301,6 +301,20 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
           }
           ilu.mascote = { ...ilu.mascote, boca };
         }
+        // Games: cartão POR CIMA da gameplay — os quadros da própria cena (pequenos, 12 por segundo) viram o fundo desfocado
+        if (ilu.sobreJogo && locais[c.url] && fs.existsSync(locais[c.url])) {
+          const dq = path.join(dir, `fundo_jogo_${i}`);
+          fs.mkdirSync(dq, { recursive: true });
+          const ehImg = c.tipo === 'imagem';
+          const a = ehImg
+            ? ['-loop', '1', '-t', L, '-i', locais[c.url]]
+            : ['-ss', String(Math.max(0, Number(c.inicio) || 0)), '-i', locais[c.url], '-t', L];
+          try {
+            await rodar([...a, '-vf', 'fps=12,scale=270:480:force_original_aspect_ratio=increase,crop=270:480', '-q:v', '5', path.join(dq, 'f%04d.jpg')], { modo }).promise;
+            const qs = fs.readdirSync(dq).filter((f) => f.endsWith('.jpg')).sort().map((f) => path.join(dq, f));
+            if (qs.length) ilu.fundoQuadros = qs;
+          } catch {}
+        }
         await Ilu.renderizarIlustracao(ilu, {
           W, H, duracao: c.length, fps: FPS, saida, checar,
           capturar: Ilu.desenhistaElectron(),

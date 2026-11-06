@@ -346,6 +346,9 @@ html,body{width:${W}px;height:${H}px;overflow:hidden;background:${d.sobreJogo ? 
 #raiz{position:absolute;left:0;top:0;width:${W}px;height:${H}px;overflow:hidden;background:${d.sobreJogo ? 'transparent' : 'var(--bg)'}}
 ${d.sobreJogo ? '.luz{display:none}.tit{text-shadow:0 6px 24px rgba(0,0,0,.85),0 2px 4px rgba(0,0,0,.9)}' : ''}
 </style></head><body><div id="raiz">
+${Array.isArray(d.fundoQuadros) && d.fundoQuadros.length ? `<div id="fundoJogo" style="position:absolute;left:-4%;top:-4%;width:108%;height:108%;filter:blur(${Math.round(W / 60)}px) brightness(.55) saturate(1.2)">${d.fundoQuadros
+  .map((f, i) => `<img class="fj" src="${esc(pathToFileURL(f).href)}" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;${i ? 'visibility:hidden' : ''}">`)
+  .join('')}</div>` : ''}
 <div class="luz" id="l1" style="width:${W * 0.5}px;height:${W * 0.5}px;left:${-W * 0.1}px;top:${H * 0.15}px;background:#2b4a9a"></div>
 <div class="luz" id="l2" style="width:${W * 0.4}px;height:${W * 0.4}px;right:${-W * 0.1}px;top:${H * 0.58}px;background:#8a5a14"></div>
 <div class="luz" id="l3" style="width:${W * 0.28}px;height:${W * 0.28}px;left:${W * 0.38}px;top:${-H * 0.04}px;background:#1f6b8f"></div>
@@ -369,6 +372,7 @@ window.setT=function(t){
  $('l3').style.transform='translate('+Math.sin(t*.5)*90+'px,0)';
  if($('tag')){$('tag').style.transform='translateX(-50%) translateY('+((1-eo(ap(t,0,.4)))*-30)+'px)';$('tag').style.opacity=eo(ap(t,0,.3));}
  if($('tit')){$('tit').style.transform='translateY('+((1-eo(ap(t,.05,.5)))*40)+'px)';$('tit').style.opacity=eo(ap(t,.05,.4));}
+ try{const fj=document.getElementsByClassName('fj');if(fj.length){const q=Math.min(fj.length-1,Math.floor((t-${d.continua ? 1.2 : 0})*12));for(let i=0;i<fj.length;i++)fj[i].style.visibility=i===q?'visible':'hidden';}}catch(e){}
  try{anim(t)}catch(e){window.__erro=String(e)}
  try{${MASCOTE_ANIM}}catch(e){window.__erro=String(e)}
 };
