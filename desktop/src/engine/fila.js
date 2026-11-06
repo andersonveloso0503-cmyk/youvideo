@@ -104,6 +104,14 @@ function fundosDaParte(fundos, todas, grupo, i) {
   return girar(fundos, i);
 }
 
+// Canal de games/política: aprende pelos vídeos da Fábrica (main.js guarda os ids em canaisSemBiblia) e pelo nome
+const TEXTO_BIBLICO = /b[íi]blic|b[íi]blia|historiasbiblicas|antigo testamento|novo testamento|f[ée] em a[çc][ãa]o/i;
+function canalSemBiblia(cfg, canalId, titulo, categoria) {
+  if (['25', '20'].includes(String(categoria || ''))) return true;
+  if ((cfg.canaisSemBiblia || []).includes(canalId)) return true;
+  return /games?|pr[óo]xima fase|fofura|pol[ií]tic|not[ií]cia/i.test(String(titulo || ''));
+}
+
 class Fila extends EventEmitter {
   constructor({ dirDados, fontsDir, obterConfig, obterCanal, registrarEnvio, identidade }) {
     super();
@@ -487,6 +495,11 @@ class Fila extends EventEmitter {
     job.cancelado = false;
     job.naoAntesDe = null;
     try {
+      // Trava geral (qualquer caminho: Fábrica, Biblioteca, Subir vídeos): canal de games/política NUNCA recebe
+      // título/descrição de "história bíblica". O vídeo não sobe e fica com erro explicando o motivo.
+      if (!e.forcarBiblico && canalSemBiblia(cfg, e.canalId, this.obterCanal(e.canalId)?.titulo, e.categoria) && TEXTO_BIBLICO.test(`${e.titulo || ''} ${e.descricao || ''}`)) {
+        throw new Error('Não subi: o título/descrição fala de história bíblica e este canal é de games/política. Confira o texto antes de mandar de novo.');
+      }
       // Não sobe duas vezes: se o canal já tem um vídeo com o mesmo título (subido por este ou por outro PC,
       // num "tentar de novo" repetido, por exemplo), não sobe de novo e avisa com o link do que já está lá.
       if (!e.forcarDuplicado) {

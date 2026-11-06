@@ -375,7 +375,9 @@ const Biblioteca = (() => {
         let titulo = i.titulo;
         let descricao = i.descricao || '';
         let tags = [];
-        if (ia) {
+        // Vídeo de games/notícia já vem com título, descrição e fontes certos do site: a IA (feita para histórias
+        // bíblicas) não reescreve — era assim que entravam títulos de 'história bíblica' no canal de games
+        if (ia && !['games', 'politica'].includes(i.categoria) && !i.games && !i.politica) {
           btn.textContent = `✨ Escrevendo ${k + 1} de ${itens.length}...`;
           try {
             const r = await window.api.envio.gerarTextos({

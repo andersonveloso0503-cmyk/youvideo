@@ -629,6 +629,9 @@ app.whenReady().then(() => {
     try {
       await fila.reavisarFabrica(); // avisos de "já subiu" que não chegaram ao site (site fora do ar, limite do banco)
       const { itens = [] } = await Central.chamar(cfg, '/api/central/fabrica', { query: { youtube: '1' } });
+      // Guarda quais canais são de games (política já é barrada pela categoria): nenhum envio (nem da Biblioteca) sobe texto bíblico neles
+      const semBiblia = [...new Set([...(cfg.canaisSemBiblia || []), ...itens.filter((i) => i.games && i.canalYoutube?.id).map((i) => i.canalYoutube.id)])];
+      if (semBiblia.length !== (cfg.canaisSemBiblia || []).length) store.salvar({ canaisSemBiblia: semBiblia });
       for (const it of itens) {
         const canalId = it.canalYoutube?.id;
         if (!canalId || !store.canal(canalId)) continue; // esse canal está conectado em outro PC
