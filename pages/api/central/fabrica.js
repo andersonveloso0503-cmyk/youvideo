@@ -350,6 +350,7 @@ export default async function handler(req, res) {
           documentario: x.documentario === true,
           games: x.games === true, // canal de games (Próxima Fase): aba própria no Compilador
           politica: x.politica === true, // canal de política: aba própria no Compilador
+          refeitoDe: x.refeitoDe || null, // vídeo refeito: o antigo com o mesmo título não conta como repetido
           mesmoDia: x.fabrica?.mesmoDia === true, // política: horário do YouTube escolhido quando fica pronto
           horaFixada: x.fabrica?.horaFixada === true,
           concluidoEm: x.concluidoEm || x.atualizadoEm || null,
@@ -385,7 +386,7 @@ export default async function handler(req, res) {
         const repetidos = [];
         itens = itens.filter((i) => {
           if (!(i.politica || i.games) || !['pendente', 'erro'].includes(i.youtube?.status)) return true;
-          const igual = subidos.find((o) => o.id !== i.id && o.canalYoutube?.id === i.canalYoutube?.id && parecido(o.titulo || o.tema, i.titulo || i.tema));
+          const igual = subidos.find((o) => o.id !== i.id && o.id !== i.refeitoDe && o.refeitoDe !== i.id && o.canalYoutube?.id === i.canalYoutube?.id && parecido(o.titulo || o.tema, i.titulo || i.tema));
           if (!igual) return true;
           repetidos.push({ id: i.id, de: igual.titulo || igual.tema });
           return false;
