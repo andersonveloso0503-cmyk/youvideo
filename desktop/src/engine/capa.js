@@ -41,7 +41,7 @@ async function fraseDeEfeito(groqKey, { titulo, descricao, estilo = '' }) {
               : estilo === 'games'
               ? 'Você cria o TEXTO DA CAPA (thumbnail) de Shorts de um canal brasileiro de notícias de GAMES. ' +
                 'Responda só JSON: {"frase": "...", "destaque": "..."}. ' +
-                'frase: de 2 a 4 palavras em CAIXA ALTA, empolgante, pergunta ou anúncio curto: "VALE A PENA?", "CHEGOU AO SWITCH 2!", "GRÁTIS NO XBOX", "VOLTOU?", "DATA CONFIRMADA!". ' +
+                'frase: de 2 a 3 palavras em CAIXA ALTA (curta = letra GIGANTE na capa), empolgante, pergunta ou anúncio curto: "VALE A PENA?", "25 MUDANÇAS", "SUPER SAIYAJIN DEUS", "GRÁTIS NO XBOX", "VOLTOU?", "DATA CONFIRMADA!". ' +
                 'Use o nome curto do jogo só se couber (máx. 4 palavras no total); sem emoji, sem aspas. ' +
                 'destaque: a ÚLTIMA palavra da frase (com a pontuação), que vai sozinha embaixo, grande e em amarelo.'
               :
@@ -94,7 +94,7 @@ async function turbinarImagem(falKey, arquivo, curto, destino, estilo = '') {
             'This is a REAL person: keep the face, identity, age and facial expression EXACTLY as in the photo; do not change clothes or add objects. '
           : 'Transform this into an eye-catching YouTube thumbnail background: dramatic cinematic lighting, vivid saturated colors, ' +
             'strong emotion on the main character, move the camera closer to the main character, keep the same characters, setting and art style. ') +
-          (curto ? 'Keep empty space in the upper third for big text. ' : 'Keep empty space on the lower part for big text. ') +
+          (curto && estilo !== 'games' ? 'Keep empty space in the upper third for big text. ' : estilo === 'games' ? 'Put the character face in the upper and middle part; keep the lower quarter simpler for big text. ' : 'Keep empty space on the lower part for big text. ') +
           'Do not add any text, letters, numbers, logos or watermarks.',
         image_urls: [url],
         num_images: 1,
@@ -112,33 +112,51 @@ async function turbinarImagem(falKey, arquivo, curto, destino, estilo = '') {
 }
 
 /** Política/games (Short): pergunta em 2 linhas no alto — linha de cima branca, a palavra forte embaixo, maior e amarela. */
-function montarAssDuasLinhas({ W, H, frase, destaque }) {
+// Games: como as capas que mais bombam (Goku "SUPER SAIYAJIN DEUS", Zelda "25 MUDANÇAS"): personagem enorme em cima
+// e o texto EMBAIXO, todo amarelo, contorno preto grosso e um pouquinho inclinado.
+function montarAssDuasLinhas({ W, H, frase, destaque, embaixo = false }) {
   const palavras = frase.split(' ');
   let i = palavras.lastIndexOf(destaque);
   if (i < 0) i = palavras.length - 1;
   // palavra forte muito curta ("2!", "GTA?") leva a anterior junto: "SWITCH 2!"
   const ini = i > 0 && palavras[i].replace(/[^\p{L}\p{N}]/gu, '').length <= 3 ? i - 1 : i;
-  const cima = palavras.slice(0, ini).concat(palavras.slice(i + 1)).join(' ');
-  const baixo = palavras.slice(ini, i + 1).join(' ');
+  let cima = palavras.slice(0, ini).concat(palavras.slice(i + 1)).join(' ');
+  let baixo = palavras.slice(ini, i + 1).join(' ');
+  if (embaixo && palavras.length > 2) {
+    // Games: duas linhas do mesmo tamanho (as duas grandes), quebrando no meio da frase
+    let melhor = 1;
+    for (let k = 1; k < palavras.length; k++) {
+      const dif = (k2) => Math.abs(palavras.slice(0, k2).join(' ').length - palavras.slice(k2).join(' ').length);
+      if (dif(k) < dif(melhor)) melhor = k;
+    }
+    cima = palavras.slice(0, melhor).join(' ');
+    baixo = palavras.slice(melhor).join(' ');
+  }
   // tamanho pela largura: Montserrat ExtraBold em caixa alta ocupa ~0,5 do tamanho por letra
   const caber = (t, max) => Math.round(Math.min(max, (W * 0.9) / Math.max(2, t.length * 0.52)));
-  const tamCima = caber(cima, W * 0.2);
+  const tamCima = caber(cima, W * (embaixo ? 0.26 : 0.2));
   const tamBaixo = caber(baixo, W * 0.3);
-  const topo = Math.round(H * 0.075);
+  const alturaTexto = (cima ? Math.round(tamCima * 1.05) : 0) + tamBaixo;
+  const topo = embaixo ? Math.round(H * 0.86) - alturaTexto : Math.round(H * 0.075);
   const linhaBaixo = topo + Math.round(tamCima * 1.05);
   const sombraAlta = Math.round(H * 0.42);
+  const corCima = embaixo ? '&H0012C8FF' : '&H00FFFFFF';
+  const borda = (t) => Math.max(embaixo ? 8 : 5, Math.round(t / (embaixo ? 7 : 10)));
+  const giro = embaixo ? '\\frz3' : '';
   return [
     '[Script Info]', 'ScriptType: v4.00+', `PlayResX: ${W}`, `PlayResY: ${H}`, 'WrapStyle: 2', 'ScaledBorderAndShadow: yes', '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    `Style: Cima,Montserrat ExtraBold,${tamCima},&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.max(5, Math.round(tamCima / 10))},${Math.max(3, Math.round(tamCima / 16))},8,0,0,0,1`,
-    `Style: Baixo,Montserrat ExtraBold,${tamBaixo},&H0012C8FF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.max(6, Math.round(tamBaixo / 10))},${Math.max(3, Math.round(tamBaixo / 16))},8,0,0,0,1`,
+    `Style: Cima,Montserrat ExtraBold,${tamCima},${corCima},&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${borda(tamCima)},${Math.max(3, Math.round(tamCima / 16))},8,0,0,0,1`,
+    `Style: Baixo,Montserrat ExtraBold,${tamBaixo},&H0012C8FF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${borda(tamBaixo)},${Math.max(3, Math.round(tamBaixo / 16))},8,0,0,0,1`,
     `Style: Sombra,Arial,10,&H00000000,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
     '', '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
     // sombra escura e suave no alto (o texto lê em qualquer foto)
-    `Dialogue: 0,0:00:00.00,0:00:05.00,Sombra,,0,0,0,,{\\pos(0,${-Math.round(H * 0.08)})\\1a&H50&\\blur${Math.round(H * 0.06)}\\p1}m 0 0 l ${W} 0 ${W} ${sombraAlta} 0 ${sombraAlta}{\\p0}`,
-    ...(cima ? [`Dialogue: 1,0:00:00.00,0:00:05.00,Cima,,0,0,0,,{\\an8\\pos(${W / 2},${topo})\\q2}${cima}`] : []),
-    `Dialogue: 1,0:00:00.00,0:00:05.00,Baixo,,0,0,0,,{\\an8\\pos(${W / 2},${cima ? linhaBaixo : topo})\\q2}${baixo}`,
+    embaixo
+      ? `Dialogue: 0,0:00:00.00,0:00:05.00,Sombra,,0,0,0,,{\\pos(0,${H - sombraAlta + Math.round(H * 0.08)})\\1a&H50&\\blur${Math.round(H * 0.06)}\\p1}m 0 0 l ${W} 0 ${W} ${sombraAlta} 0 ${sombraAlta}{\\p0}`
+      : `Dialogue: 0,0:00:00.00,0:00:05.00,Sombra,,0,0,0,,{\\pos(0,${-Math.round(H * 0.08)})\\1a&H50&\\blur${Math.round(H * 0.06)}\\p1}m 0 0 l ${W} 0 ${W} ${sombraAlta} 0 ${sombraAlta}{\\p0}`,
+    ...(cima ? [`Dialogue: 1,0:00:00.00,0:00:05.00,Cima,,0,0,0,,{\\an8\\pos(${W / 2},${topo})${giro}\\q2}${cima}`] : []),
+    `Dialogue: 1,0:00:00.00,0:00:05.00,Baixo,,0,0,0,,{\\an8\\pos(${W / 2},${cima ? linhaBaixo : topo})${giro}\\q2}${baixo}`,
   ].join('\n');
 }
 
@@ -200,7 +218,7 @@ async function gerarCapaChamativa(base, opcoes) {
 
     // 3) Monta: enquadra, realça cores e escreve a frase
     const duasLinhas = curto && (estilo === 'politica' || estilo === 'games');
-    fs.writeFileSync(path.join(dir, 'capa.ass'), duasLinhas ? montarAssDuasLinhas({ W, H, frase, destaque }) : montarAss({ W, H, frase, destaque, curto }));
+    fs.writeFileSync(path.join(dir, 'capa.ass'), duasLinhas ? montarAssDuasLinhas({ W, H, frase, destaque, embaixo: estilo === 'games' }) : montarAss({ W, H, frase, destaque, curto }));
     const fontes = path.join(dir, 'fonts');
     fs.mkdirSync(fontes);
     for (const f of fs.readdirSync(fontsDir)) fs.copyFileSync(path.join(fontsDir, f), path.join(fontes, f));
