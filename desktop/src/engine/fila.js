@@ -588,13 +588,13 @@ class Fila extends EventEmitter {
       if (chamativa) {
         miniatura = chamativa;
         // Short: o YouTube NÃO mostra capa personalizada de Short no feed/lista (usa um quadro do próprio vídeo).
-        // Então a capa vira o 1º instante do Short (0,8 s): é o que aparece de miniatura e é o gancho do 1º segundo.
+        // Então a capa vira o 1º instante do Short (1,2 s): é o que aparece de miniatura e é o gancho do 1º segundo.
         if (e.curto && ['20', '25'].includes(String(e.categoria || '')) && !e.capaNoVideo) {
           try {
             this.atualizar(job, { etapa: 'Colocando a capa no começo do Short' }, false);
             const comCapa = path.join(os.tmpdir(), `youvideo-comcapa-${job.id}.mp4`);
-            await rodar(['-y', '-i', e.arquivo, '-loop', '1', '-t', '1', '-i', chamativa,
-              '-filter_complex', "[1:v][0:v]scale2ref[c][v];[c]setsar=1[c2];[v][c2]overlay=enable='lt(t,0.8)':eof_action=pass,format=yuv420p[o]",
+            await rodar(['-y', '-i', e.arquivo, '-loop', '1', '-t', '1.3', '-i', chamativa,
+              '-filter_complex', "[1:v][0:v]scale2ref[c][v];[c]setsar=1[c2];[v][c2]overlay=enable='lt(t,1.2)':eof_action=pass,format=yuv420p[o]",
               '-map', '[o]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-c:a', 'copy', '-movflags', '+faststart', comCapa]).promise;
             if (fs.existsSync(comCapa) && fs.statSync(comCapa).size > 100000) e.arquivo = comCapa;
           } catch (errCapa) {
