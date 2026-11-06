@@ -500,6 +500,10 @@ class Fila extends EventEmitter {
       if (!e.forcarBiblico && canalSemBiblia(cfg, e.canalId, this.obterCanal(e.canalId)?.titulo, e.categoria) && TEXTO_BIBLICO.test(`${e.titulo || ''} ${e.descricao || ''}`)) {
         throw new Error('Não subi: o título/descrição fala de história bíblica e este canal é de games/política. Confira o texto antes de mandar de novo.');
       }
+      // Trava: vídeo de política (categoria 25) NUNCA sobe no canal dos games
+      if (String(e.categoria || '') === '25' && ((cfg.canaisSemBiblia || []).includes(e.canalId) || /games?|pr[óo]xima fase|fofura/i.test(String(this.obterCanal(e.canalId)?.titulo || '')))) {
+        throw new Error('Não subi: vídeo de POLÍTICA marcado para o canal dos games. O site vai trocar para o canal de política; se continuar, aprove de novo escolhendo o Noites na História.');
+      }
       // Não sobe duas vezes: se o canal já tem um vídeo com o mesmo título (subido por este ou por outro PC,
       // num "tentar de novo" repetido, por exemplo), não sobe de novo e avisa com o link do que já está lá.
       if (!e.forcarDuplicado) {

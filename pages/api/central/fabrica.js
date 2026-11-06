@@ -366,14 +366,14 @@ export default async function handler(req, res) {
       if (req.query.youtube === '1') {
         const agora = Date.now();
         // Política "mesmo dia": quem ficou pronto ganha agora o próximo horário livre
-        const { fixarHorariosPolitica, canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
+        const { fixarHorariosPolitica, canalDosGamesId, canalDaPolitica, ehCanalDeGames } = await import('../../../lib/politicaMesmoDia');
         // Canal errado: vídeo de política marcado no canal dos games (o seletor de política vinha no canal errado).
         // Antes de subir, troca para o canal da política; sem saber qual é, não sobe (fica com erro explicando).
         const canalGames = await canalDosGamesId(db);
-        if (canalGames) {
+        {
           let canalPol;
           for (const i of itens) {
-            if (!i.politica || i.canalYoutube?.id !== canalGames || !['pendente', 'erro'].includes(i.youtube?.status)) continue;
+            if (!i.politica || !ehCanalDeGames(i.canalYoutube, canalGames) || !['pendente', 'erro'].includes(i.youtube?.status)) continue;
             if (canalPol === undefined) canalPol = await canalDaPolitica(db, canalGames).catch(() => null);
             if (canalPol) {
               await col.doc(i.id).update({ 'fabrica.canalYoutube': canalPol }).catch(() => {});
