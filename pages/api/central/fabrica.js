@@ -1315,6 +1315,8 @@ export default async function handler(req, res) {
         documentario: true,
         ...(d.games ? { games: true } : {}),
         ...(d.politica ? { politica: true } : {}),
+        ...(d.desafio ? { desafio: true } : {}),
+        ...(d.ilustrado ? { ilustrado: true } : {}),
         ...(d.noticia ? { noticia: d.noticia } : {}),
         episodioId: d.episodioId,
         serie: null,

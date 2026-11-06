@@ -7,6 +7,7 @@
 // POST { acao:'descartar', id }
 // POST { acao:'auto', ligado }                             -> liga/desliga a aprovação automática (padrão: ligada)
 // POST { acao:'video', ids:[...] }                         -> escreve um vídeo de notícias com as marcadas (fica esperando aprovação)
+// POST { acao:'desafio' }                                 -> escreve o desafio "adivinhe o jogo" (sai sozinho 1 por semana no cron)
 // POST { acao:'dicas', jogos:[...] }                        -> escreve vídeos de dicas (jogos vazios = mais vendidos da Steam agora)
 import { getDb } from '../../../lib/firebase-admin';
 import { autorizado } from '../../../lib/central';
@@ -64,6 +65,7 @@ async function aprovarNoticia(db, ref, d, canalYoutube, quandoPedido = null, { l
     noticia: ref.id,
     episodioId: d.ep.id,
     ...(d.ilustrado ? { ilustrado: true } : {}), // Short ilustrado (tema): as ilustrações explicam cada frase
+    ...(d.desafio ? { desafio: true } : {}), // Desafio "adivinhe o jogo": imagens pixeladas de propósito
     serie: null,
     estilo: 'realista',
     formato: longo ? 'longo' : 'short',
@@ -124,6 +126,35 @@ async function aprovarSozinho(db, col, cfgDados) {
   return { automaticas, vagas };
 }
 
+/** Desafio "Adivinhe o jogo pela imagem": escreve e deixa na lista (a aprovação automática manda para a Fábrica). */
+async function criarDesafio(db, col, cfg) {
+  const { roteiroDesafio } = await import('../../../lib/gamesDesafio');
+  const jaUsados = (await cfg.get()).data()?.desafioJogos || [];
+  const { ep, jogos } = await roteiroDesafio(jaUsados);
+  await col.doc(ep.id).set({
+    status: 'aguardando',
+    tipo: 'short',
+    desafio: true,
+    titulo: ep.titulo,
+    fonte: 'Desafio da semana',
+    oficial: true,
+    links: [],
+    imagens: [],
+    ep,
+    criadoEm: new Date().toISOString(),
+  });
+  await cfg.set({ ultimoDesafio: new Date().toISOString(), desafioJogos: [...jaUsados, ...jogos].slice(-120) }, { merge: true });
+  console.log(`[desafio] criado: ${jogos.join(', ')}`);
+  return { titulo: ep.titulo, jogos };
+}
+
+/** 1 desafio por semana (pedido do dono): o cron cria quando o último tem 7 dias ou mais. */
+async function desafioDaSemana(db, col, cfg) {
+  const ultimo = (await cfg.get()).data()?.ultimoDesafio;
+  if (ultimo && Date.now() - new Date(ultimo).getTime() < 7 * 86400e3 - 3 * 3600e3) return null;
+  return criarDesafio(db, col, cfg);
+}
+
 export default async function handler(req, res) {
   const ehCron =
     (process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`) || /vercel-cron/i.test(req.headers['user-agent'] || '');
@@ -138,9 +169,10 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.auto) {
       const r = await buscarNoticias(db, { quantas: 6 });
       await cfg.set({ ultimaBusca: new Date().toISOString(), fontes: r.fontes }, { merge: true });
+      const desafio = await desafioDaSemana(db, col, cfg).catch((e) => console.log(`[desafio] falhou: ${String(e.message || e).slice(0, 200)}`));
       const auto = await aprovarSozinho(db, col, (await cfg.get()).data()).catch((e) => ({ automaticas: 0, erro: String(e.message || e).slice(0, 200) }));
       if (auto.automaticas) console.log(`[games] ${auto.automaticas} notícia(s) aprovada(s) sozinha(s)`);
-      return res.status(200).json({ ...r, ...auto });
+      return res.status(200).json({ ...r, ...auto, ...(desafio ? { desafio } : {}) });
     }
 
     if (req.method === 'GET') {
@@ -196,6 +228,10 @@ export default async function handler(req, res) {
     if (b.acao === 'instagram-todos') {
       const { enviarProntosInstagram } = await import('../../../lib/instagramLote');
       return res.status(200).json(await enviarProntosInstagram('games'));
+    }
+    if (b.acao === 'desafio') {
+      const r = await criarDesafio(db, col, cfg);
+      return res.status(200).json({ ok: true, ...r });
     }
     if (b.acao === 'descartar') {
       await col.doc(String(b.id)).update({ status: 'descartada', descartadaEm: new Date().toISOString() });

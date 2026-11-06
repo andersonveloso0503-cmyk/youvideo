@@ -281,6 +281,22 @@ const Fabrica = (() => {
       }
     };
     q('#btnGmLancShort').onclick = () => criarLancamentos('short');
+    q('#btnGmDesafio').onclick = async () => {
+      const b = q('#btnGmDesafio');
+      const rotulo = b.textContent;
+      b.disabled = true;
+      b.textContent = '🎯 Escolhendo os jogos e pixelando as imagens...';
+      try {
+        const r = await window.api.noticias.acao({ acao: 'desafio' });
+        avisar(`Desafio pronto (${r.jogos.join(', ')}) — está na lista`);
+        carregarNoticias();
+      } catch (e) {
+        avisar(msgErro(e), true);
+      } finally {
+        b.disabled = false;
+        b.textContent = rotulo;
+      }
+    };
     // Instagram do canal: conectar (página do site) e mandar os prontos de uma vez
     const igTodos = async (botao, api, nome) => {
       if (!confirm(`Mandar para o Instagram do ${nome} os Shorts prontos (e já aprovados) que ainda não foram para lá?\nSaem um a cada 40 minutos.`)) return;
