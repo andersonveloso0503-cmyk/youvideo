@@ -190,6 +190,15 @@ export default async function handler(req, res) {
 
     if (b.acao === 'aprovar') {
       if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube de política.' });
+      {
+        // Nunca no canal dos games; o canal certo fica guardado (corrige depois quem foi marcado errado)
+        const { canalDosGamesId } = await import('../../../lib/politicaMesmoDia');
+        const canalGames = await canalDosGamesId(db);
+        if (canalGames && String(b.canalYoutube.id) === canalGames) {
+          return res.status(400).json({ erro: `"${b.canalYoutube.titulo || 'Esse canal'}" é o canal dos games. Escolha o canal de política em "Canal do YouTube" e aprove de novo.` });
+        }
+        await db.collection('youvideo_config').doc('politica_canal').set({ canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') }, em: new Date().toISOString() }, { merge: true }).catch(() => {});
+      }
       const ref = col.doc(String(b.id));
       const d = (await ref.get()).data();
       if (d?.status === 'escrevendo') return res.status(400).json({ erro: 'Esse roteiro ainda está sendo escrito. Espere 1 ou 2 minutos e clique em ↻.' });

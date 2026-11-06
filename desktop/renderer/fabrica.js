@@ -178,13 +178,17 @@ const Fabrica = (() => {
     const proxima = lista.find((c) => /pr[óo]xima fase|games?/i.test(c.titulo || '')) || lista.find((c) => /planeta fofura|fofura/i.test(c.titulo || '')); // canal renomeado: ainda pode aparecer com o nome antigo
     if (proxima) q('#fabGmCanal').value = proxima.id;
     // Política: já vem marcado o canal de política (se estiver conectado)
-    const pol = lista.find((c) => /pol[ií]tic|not[ií]cia|bras[ií]lia|planalto/i.test(c.titulo || ''));
+    // (a política sai no Noites na História; nunca fica no canal que sobrou da última escolha, que podia ser o dos games)
+    const pol = lista.find((c) => /pol[ií]tic|not[ií]cia|bras[ií]lia|planalto/i.test(c.titulo || '')) || noites;
     if (pol) q('#fabPlCanal').value = pol.id;
     // O canal que você escolheu em cada aba vale mais que tudo (fica lembrado de uma vez para a outra)
     const escolhidos = config.fabricaCanais || {};
     for (const [id, canalId] of Object.entries(escolhidos)) {
       const sel = q(id);
-      if (sel && lista.some((c) => c.id === canalId)) sel.value = canalId;
+      if (!sel || !lista.some((c) => c.id === canalId)) continue;
+      // Política nunca fica marcada no canal dos games, mesmo que tenha sido escolhido sem querer
+      if (id === '#fabPlCanal' && canalId === q('#fabGmCanal').value) continue;
+      sel.value = canalId;
     }
   }
 

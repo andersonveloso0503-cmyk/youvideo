@@ -366,7 +366,24 @@ export default async function handler(req, res) {
       if (req.query.youtube === '1') {
         const agora = Date.now();
         // Política "mesmo dia": quem ficou pronto ganha agora o próximo horário livre
-        const { fixarHorariosPolitica } = await import('../../../lib/politicaMesmoDia');
+        const { fixarHorariosPolitica, canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
+        // Canal errado: vídeo de política marcado no canal dos games (o seletor de política vinha no canal errado).
+        // Antes de subir, troca para o canal da política; sem saber qual é, não sobe (fica com erro explicando).
+        const canalGames = await canalDosGamesId(db);
+        if (canalGames) {
+          let canalPol;
+          for (const i of itens) {
+            if (!i.politica || i.canalYoutube?.id !== canalGames || !['pendente', 'erro'].includes(i.youtube?.status)) continue;
+            if (canalPol === undefined) canalPol = await canalDaPolitica(db, canalGames).catch(() => null);
+            if (canalPol) {
+              await col.doc(i.id).update({ 'fabrica.canalYoutube': canalPol }).catch(() => {});
+              i.canalYoutube = canalPol;
+            } else {
+              await col.doc(i.id).update({ 'fabrica.youtube': { status: 'erro', em: Date.now(), erro: 'Não subi: vídeo de política marcado no canal dos games. Aprove de novo escolhendo o canal de política.', tentativas: 9 } }).catch(() => {});
+              i.youtube = { status: 'erro', tentativas: 9 };
+            }
+          }
+        }
         const novos = { ...(await fixarHorariosPolitica(db, itens, 'politica').catch(() => ({}))), ...(await fixarHorariosPolitica(db, itens, 'games').catch(() => ({}))) };
         for (const i of itens) if (novos[i.id]) Object.assign(i, { quando: novos[i.id], quandoYoutube: novos[i.id], horaFixada: true });
         // Compilador antigo (antes da 2.5.43) não sabe que política/games/documentário NÃO são histórias bíblicas
