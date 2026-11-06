@@ -91,10 +91,12 @@ async function turbinarImagem(falKey, arquivo, curto, destino, estilo = '') {
             'Keep the characters, their faces, outfits and the art style EXACTLY as in the image; do not invent new characters. '
           : estilo === 'politica'
           ? 'Improve this photo for a YouTube thumbnail: cinematic lighting, richer contrast, darker blurred background, move the camera a bit closer to the main person. ' +
-            'This is a REAL person: keep the face, identity, age and facial expression EXACTLY as in the photo; do not change clothes or add objects. '
+            'Zoom in so the main person is BIG and close (face and shoulders filling the upper half). This is a REAL person: keep the face, identity, age and facial expression EXACTLY as in the photo; do not change clothes or add objects. '
           : 'Transform this into an eye-catching YouTube thumbnail background: dramatic cinematic lighting, vivid saturated colors, ' +
             'strong emotion on the main character, move the camera closer to the main character, keep the same characters, setting and art style. ') +
-          (curto && estilo !== 'games' ? 'Keep empty space in the upper third for big text. ' : estilo === 'games' ? 'Put the character face in the upper and middle part; keep the lower quarter simpler for big text. ' : 'Keep empty space on the lower part for big text. ') +
+          (estilo === 'games' ? 'Put the character face in the upper and middle part; keep the lower quarter simpler for big text. '
+            : estilo === 'politica' ? 'Put the person face BIG in the upper and middle part; keep the lower quarter simpler for big text. '
+            : curto ? 'Keep empty space in the upper third for big text. ' : 'Keep empty space on the lower part for big text. ') +
           'Do not add any text, letters, numbers, logos or watermarks.',
         image_urls: [url],
         num_images: 1,
@@ -218,7 +220,7 @@ async function gerarCapaChamativa(base, opcoes) {
 
     // 3) Monta: enquadra, realça cores e escreve a frase
     const duasLinhas = curto && (estilo === 'politica' || estilo === 'games');
-    fs.writeFileSync(path.join(dir, 'capa.ass'), duasLinhas ? montarAssDuasLinhas({ W, H, frase, destaque, embaixo: estilo === 'games' }) : montarAss({ W, H, frase, destaque, curto }));
+    fs.writeFileSync(path.join(dir, 'capa.ass'), duasLinhas ? montarAssDuasLinhas({ W, H, frase, destaque, embaixo: estilo === 'games' || estilo === 'politica' }) : montarAss({ W, H, frase, destaque, curto }));
     const fontes = path.join(dir, 'fonts');
     fs.mkdirSync(fontes);
     for (const f of fs.readdirSync(fontsDir)) fs.copyFileSync(path.join(fontsDir, f), path.join(fontes, f));
