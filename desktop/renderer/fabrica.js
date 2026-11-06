@@ -974,7 +974,23 @@ const Fabrica = (() => {
     try {
       const r = await window.api.politica.listar();
       const falhas = (r.fontes || []).filter((f) => !f.ok).map((f) => f.nome);
-      info.textContent = r.ultimaBusca ? `Última busca: ${quandoTxt(r.ultimaBusca)}${falhas.length ? ` · sem resposta: ${falhas.join(', ')}` : ''}` : 'Ainda não buscou notícias.';
+      const auto = r.autoAprovar !== false;
+      info.innerHTML =
+        esc(r.ultimaBusca ? `Última busca: ${quandoTxt(r.ultimaBusca)}${falhas.length ? ` · sem resposta: ${falhas.join(', ')}` : ''}` : 'Ainda não buscou notícias.') +
+        ` · <b>${auto ? '🤖 Aprovação automática ligada' : '✋ Aprovação manual'}</b> ` +
+        `<button type="button" id="plAuto" style="font-size:12px;padding:2px 8px">${auto ? 'Desligar' : 'Ligar'}</button>` +
+        (auto ? '<div class="nota">As notícias mais novas vão sozinhas para a Fábrica (até 5 por dia, 3 h entre vídeos, no canal de política). Notícia com mais de 2 dias sai sozinha. Explicador LONGO e 📺 Resumo continuam esperando você aprovar.</div>' : '');
+      const btAuto = q('#plAuto');
+      if (btAuto)
+        btAuto.onclick = async () => {
+          btAuto.disabled = true;
+          try {
+            await window.api.politica.acao({ acao: 'auto', ligado: !auto });
+          } catch (e) {
+            alert('Não consegui mudar: ' + msgErro(e));
+          }
+          carregarPolitica();
+        };
       const rotulo = (t) => (t === 'explicador' ? '💡 Explicador: ' : t === 'explicador-short' ? '💡 Explicador (Short): ' : t === 'longo' ? '📺 Resumo: ' : '📱 Short: ');
       const cartao = (n, aprovada) => `
         <div class="pl-noticia" style="display:flex;gap:10px;padding:10px;border:1px solid var(--borda, #333);border-radius:10px;margin:8px 0;align-items:flex-start${aprovada ? ';opacity:.6' : ''}">

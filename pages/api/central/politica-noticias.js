@@ -42,6 +42,89 @@ async function proximoHorario(db, desejado) {
   return new Date(t).toISOString();
 }
 
+/** Notícia aprovada vira vídeo na Fábrica (mesmo dia: produz já, horário do YouTube escolhido quando fica pronto). */
+async function aprovarPolitica(db, ref, d, canal, opcoes = {}) {
+    // Roteiro escrito antes da regra nova (só "vídeo atual" genérico): escolhe a imagem de cada cena pela frase
+    if (!/^@ foto (de|real):/m.test(String(d.ep.texto || ''))) {
+      const novoEp = await replanejarMidiasPolitica(d.ep).catch(() => d.ep);
+      if (novoEp !== d.ep) {
+        d.ep = novoEp;
+        await ref.update({ ep: novoEp }).catch(() => {});
+      }
+    }
+    const longo = d.tipo === 'longo' || d.tipo === 'explicador';
+    const pedido = opcoes.quando ? new Date(opcoes.quando) : null;
+    // Horário pedido: respeita. Senão "mesmo dia": produz agora e o horário do YouTube é escolhido quando
+    // o vídeo ficar pronto (próximo horário livre, 2 h entre vídeos) — notícia não espera dias na agenda.
+    const fixo = pedido && pedido.getTime() > Date.now() + 30 * 60e3;
+    const quando = fixo ? await proximoHorario(db, pedido.getTime()) : new Date(Date.now() + (longo ? 3 : 1.5) * 3600e3).toISOString();
+    const fab = db.collection('youvideo_fila').doc();
+    await fab.set({
+      tema: d.ep.titulo,
+      documentario: true, // mesmo motor dos documentários (imagens reais, capítulos, capa com texto)
+      politica: true,
+      noticia: ref.id,
+      episodioId: d.ep.id,
+      serie: null,
+      estilo: 'realista',
+      formato: longo ? 'longo' : 'short',
+      animar: false,
+      ...(opcoes.vozId ? { vozId: String(opcoes.vozId).trim() } : {}),
+      roteiro: roteiroDoEpisodio(d.ep),
+      status: 'pendente',
+      origem: 'fabrica',
+      criadoEm: new Date().toISOString(),
+      fabrica: {
+        ativo: true,
+        lote: `politica-${Date.now().toString(36)}`,
+        quando: fixo ? quando : new Date().toISOString(), // produção começa já
+        quandoYoutube: quando,
+        ...(fixo ? {} : { mesmoDia: true }),
+        redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
+        canalYoutube: { id: String(canal.id), titulo: String(canal.titulo || '') },
+      },
+    });
+    await ref.update({ status: 'aprovada', aprovadaEm: new Date().toISOString(), filaId: fab.id, quando, ...(opcoes.automatica ? { automatica: true } : {}) });
+    return { filaId: fab.id, quando, mesmoDia: !fixo };
+}
+
+/**
+ * Aprovação automática (pedido do dono, igual aos games): as notícias esperando vão sozinhas para a Fábrica,
+ * as mais novas primeiro, até 5 por dia. Notícia com mais de 2 dias é velha: sai da lista sem virar vídeo.
+ * Explicador Short que você pediu entra também; os LONGOS (explicador longo, "📺 Resumo") esperam você aprovar (são caros).
+ */
+async function aprovarSozinhoPolitica(db, col, cfgDados) {
+  if (cfgDados?.autoAprovar === false) return { automaticas: 0, motivo: 'desligada' };
+  const snap = await col.where('status', '==', 'aguardando').get();
+  const agora = Date.now();
+  const idade = (x) => agora - new Date(x.data || x.criadoEm || 0).getTime();
+  let velhas = 0;
+  for (const doc of snap.docs) {
+    const x = doc.data();
+    if (!String(x.tipo || 'short').startsWith('explicador') && x.tipo !== 'longo' && idade(x) > 2 * 86400e3) {
+      await doc.ref.update({ status: 'descartada', descartadaEm: new Date().toISOString(), motivo: 'Notícia velha (mais de 2 dias): saiu sozinha.' }).catch(() => {});
+      velhas++;
+    }
+  }
+  const { canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
+  const canal = await canalDaPolitica(db, await canalDosGamesId(db));
+  if (!canal) return { automaticas: 0, velhas, motivo: 'sem canal do YouTube (aprove uma notícia à mão uma vez)' };
+  const fila = snap.docs
+    .map((doc) => ({ ref: doc.ref, d: doc.data() }))
+    .filter(({ d }) => d.ep && d.tipo !== 'longo' && d.tipo !== 'explicador' && (d.tipo === 'explicador-short' || idade(d) <= 2 * 86400e3))
+    // explicadores que você pediu primeiro; depois as notícias mais novas
+    .sort((a, b) => (String(b.d.tipo || '').startsWith('explicador') ? 1 : 0) - (String(a.d.tipo || '').startsWith('explicador') ? 1 : 0) || String(b.d.data || b.d.criadoEm || '').localeCompare(String(a.d.data || a.d.criadoEm || '')));
+  const ultimas24 = (await db.collection('youvideo_fila').where('politica', '==', true).get()).docs
+    .filter((x) => agora - new Date(x.data().criadoEm || 0).getTime() < 24 * 3600e3 && !x.data().refeitoDe).length;
+  const vagas = Math.max(0, 5 - ultimas24);
+  let automaticas = 0;
+  for (const { ref, d } of fila.slice(0, vagas)) {
+    await aprovarPolitica(db, ref, d, canal, { automatica: true });
+    automaticas++;
+  }
+  return { automaticas, vagas, velhas };
+}
+
 export default async function handler(req, res) {
   const ehCron =
     (process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`) || /vercel-cron/i.test(req.headers['user-agent'] || '');
@@ -56,10 +139,19 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.auto) {
       const r = await buscarNoticiasPolitica(db, { quantas: 5 });
       await cfg.set({ ultimaBusca: new Date().toISOString(), fontes: r.fontes }, { merge: true });
-      return res.status(200).json(r);
+      const auto = await aprovarSozinhoPolitica(db, col, (await cfg.get()).data()).catch((e) => ({ automaticas: 0, erro: String(e.message || e).slice(0, 200) }));
+      return res.status(200).json({ ...r, ...auto });
     }
 
     if (req.method === 'GET') {
+      // Abriu a aba: aprova sozinho o que estiver esperando (no máximo uma vez a cada 10 min)
+      {
+        const cd = (await cfg.get()).data() || {};
+        if (!cd.autoEm || Date.now() - cd.autoEm > 10 * 60e3) {
+          await cfg.set({ autoEm: Date.now() }, { merge: true });
+          await aprovarSozinhoPolitica(db, col, cd).catch(() => {});
+        }
+      }
       const [aguardando, aprovadas, c, escrevendo, falhou] = await Promise.all([
         col.where('status', '==', 'aguardando').get(),
         col.where('status', '==', 'aprovada').get(),
@@ -89,6 +181,7 @@ export default async function handler(req, res) {
           ...(x.status === 'escrevendo' ? { tituloVideo: `⏳ Escrevendo: ${x.titulo}` } : x.status === 'falhou' ? { tituloVideo: `⚠️ Falhou: ${x.titulo}` } : {}),
           criadoEm: x.criadoEm,
           aprovadaEm: x.aprovadaEm || null,
+          automatica: !!x.automatica,
           estado: x.status, // 'escrevendo' / 'falhou': o Compilador não mostra o ✅ Aprovar
         };
       };
@@ -102,6 +195,7 @@ export default async function handler(req, res) {
         aprovadas: aprovadas.docs.map(resumo).sort((a, b) => String(b.aprovadaEm || '').localeCompare(String(a.aprovadaEm || ''))).slice(0, 15),
         ultimaBusca: c.data()?.ultimaBusca || null,
         fontes: c.data()?.fontes || [],
+        autoAprovar: c.data()?.autoAprovar !== false,
       });
     }
 
@@ -119,6 +213,11 @@ export default async function handler(req, res) {
       const { enviarProntosInstagram } = await import('../../../lib/instagramLote');
       return res.status(200).json(await enviarProntosInstagram('noites'));
     }
+    if (b.acao === 'auto') {
+      await cfg.set({ autoAprovar: b.ligado !== false }, { merge: true });
+      return res.status(200).json({ ok: true, autoAprovar: b.ligado !== false });
+    }
+
     if (b.acao === 'descartar') {
       await col.doc(String(b.id)).update({ status: 'descartada', descartadaEm: new Date().toISOString() });
       return res.status(200).json({ ok: true });
@@ -204,48 +303,7 @@ export default async function handler(req, res) {
       if (d?.status === 'escrevendo') return res.status(400).json({ erro: 'Esse roteiro ainda está sendo escrito. Espere 1 ou 2 minutos e clique em ↻.' });
       if (!d?.ep) return res.status(400).json({ erro: 'Esse roteiro não ficou pronto (a pesquisa falhou). Descarte e peça de novo.' });
       if (d.status === 'aprovada') return res.status(400).json({ erro: 'Esse roteiro já foi aprovado.' });
-      // Roteiro escrito antes da regra nova (só "vídeo atual" genérico): escolhe a imagem de cada cena pela frase
-      if (!/^@ foto (de|real):/m.test(String(d.ep.texto || ''))) {
-        const novoEp = await replanejarMidiasPolitica(d.ep).catch(() => d.ep);
-        if (novoEp !== d.ep) {
-          d.ep = novoEp;
-          await ref.update({ ep: novoEp }).catch(() => {});
-        }
-      }
-      const longo = d.tipo === 'longo' || d.tipo === 'explicador';
-      const pedido = b.quando ? new Date(b.quando) : null;
-      // Horário pedido: respeita. Senão "mesmo dia": produz agora e o horário do YouTube é escolhido quando
-      // o vídeo ficar pronto (próximo horário livre, 2 h entre vídeos) — notícia não espera dias na agenda.
-      const fixo = pedido && pedido.getTime() > Date.now() + 30 * 60e3;
-      const quando = fixo ? await proximoHorario(db, pedido.getTime()) : new Date(Date.now() + (longo ? 3 : 1.5) * 3600e3).toISOString();
-      const fab = db.collection('youvideo_fila').doc();
-      await fab.set({
-        tema: d.ep.titulo,
-        documentario: true, // mesmo motor dos documentários (imagens reais, capítulos, capa com texto)
-        politica: true,
-        noticia: ref.id,
-        episodioId: d.ep.id,
-        serie: null,
-        estilo: 'realista',
-        formato: longo ? 'longo' : 'short',
-        animar: false,
-        ...(b.vozId ? { vozId: String(b.vozId).trim() } : {}),
-        roteiro: roteiroDoEpisodio(d.ep),
-        status: 'pendente',
-        origem: 'fabrica',
-        criadoEm: new Date().toISOString(),
-        fabrica: {
-          ativo: true,
-          lote: `politica-${Date.now().toString(36)}`,
-          quando: fixo ? quando : new Date().toISOString(), // produção começa já
-          quandoYoutube: quando,
-          ...(fixo ? {} : { mesmoDia: true }),
-          redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
-          canalYoutube: { id: String(b.canalYoutube.id), titulo: String(b.canalYoutube.titulo || '') },
-        },
-      });
-      await ref.update({ status: 'aprovada', aprovadaEm: new Date().toISOString(), filaId: fab.id, quando });
-      return res.status(200).json({ ok: true, filaId: fab.id, quando, mesmoDia: !fixo });
+      return res.status(200).json({ ok: true, ...(await aprovarPolitica(db, ref, d, b.canalYoutube, { quando: b.quando, vozId: b.vozId })) });
     }
 
     return res.status(400).json({ erro: 'Ação desconhecida.' });
