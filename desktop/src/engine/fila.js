@@ -505,11 +505,20 @@ class Fila extends EventEmitter {
       if (!e.forcarDuplicado) {
         let ja = null;
         try {
-          const lista = await this.ultimosDoCanal(e.canalId);
+          let lista = await this.ultimosDoCanal(e.canalId);
+          if (e.deNovo) {
+            // "Subir de novo": o antigo (texto errado) tem que estar PRIVADO ou apagado — senão ficariam dois no canal
+            const idAntigo = String(e.urlAntiga || '').match(/(?:youtu\.be\/|v=|shorts\/)([\w-]{11})/)?.[1];
+            const antigo = idAntigo && lista.find((v) => v.id === idAntigo && !v.privado);
+            if (antigo) throw new Error(`Não subi de novo: o vídeo antigo ainda está público/agendado no canal (${antigo.url}). Deixe ele PRIVADO no YouTube Studio e clique em "subir de novo" outra vez.`);
+            // Privados e os de título bíblico (os errados) não contam; um certo que já está no ar conta, e aí não sobe
+            lista = lista.filter((v) => !v.privado && !TEXTO_BIBLICO.test(v.titulo));
+          }
           ja = YT.mesmoTitulo(lista, e.titulo);
           // Notícia (política/games): título parecido também é repetido — não sobe
           if (!ja && ['25', '20'].includes(String(e.categoria || ''))) ja = YT.tituloParecido(lista, e.titulo);
-        } catch {
+        } catch (errCanal) {
+          if (/^Não subi de novo/.test(errCanal.message)) throw errCanal;
           /* sem conseguir olhar o canal: segue (melhor subir do que travar) */
         }
         if (ja) {

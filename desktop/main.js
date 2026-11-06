@@ -757,7 +757,7 @@ app.whenReady().then(() => {
           agendarPara: quando ? quando.toISOString() : null,
           curto: !longo,
           fabricaId: it.id,
-          ...(deNovo ? { deNovo, forcarDuplicado: true } : {}), // o antigo (privado/apagado) não conta como repetido
+          ...(deNovo ? { deNovo, urlAntiga: it.youtubeUrlAntiga || '' } : {}), // subir de novo: confere o canal (antigo privado, sem repetir o que está certo)
           tipo: it.oracao ? 'oracao' : 'historias', // categoria "Pessoas e blogs" e idioma português (não "Música")
           ...(it.games ? { categoria: '20', idioma: 'pt-BR' } : {}), // games: categoria "Jogos" do YouTube
           ...(it.politica ? { categoria: '25', idioma: 'pt-BR' } : {}), // política: categoria "Notícias e política"

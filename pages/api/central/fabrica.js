@@ -351,6 +351,7 @@ export default async function handler(req, res) {
           games: x.games === true, // canal de games (Próxima Fase): aba própria no Compilador
           politica: x.politica === true, // canal de política: aba própria no Compilador
           refeitoDe: x.refeitoDe || null,
+          youtubeUrlAntiga: x.fabrica?.youtube?.urlAntiga || '',
           youtubeDeNovo: x.fabrica?.youtube?.deNovo || null, // pedido para subir de novo (o PC ignora que já subiu) // vídeo refeito: o antigo com o mesmo título não conta como repetido
           mesmoDia: x.fabrica?.mesmoDia === true, // política: horário do YouTube escolhido quando fica pronto
           horaFixada: x.fabrica?.horaFixada === true,

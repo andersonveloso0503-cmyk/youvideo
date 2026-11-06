@@ -399,17 +399,19 @@ async function ultimosDoCanal({ credenciais, refreshToken, redirectOriginal }, m
   // A lista de "uploads" ainda traz vídeo apagado, recusado pelo YouTube (ex.: "envio duplicado") ou que falhou no
   // processamento — esses NÃO contam como "já está no canal". Confere o estado real de cada um.
   const validos = new Set();
+  const privados = new Set(); // privado de verdade (não é agendamento: agendado também é "private", mas tem data)
   try {
     for (let i = 0; i < saida.length; i += 50) {
       const r = await yt.videos.list({ part: ['status'], id: saida.slice(i, i + 50).map((v) => v.id), maxResults: 50 });
       for (const v of r.data.items || []) {
         if (!['rejected', 'failed', 'deleted'].includes(v.status?.uploadStatus)) validos.add(v.id);
+        if (v.status?.privacyStatus === 'private' && !v.status?.publishAt) privados.add(v.id);
       }
     }
   } catch {
     return saida; // sem conseguir conferir: fica com a lista como veio
   }
-  return saida.filter((v) => validos.has(v.id));
+  return saida.filter((v) => validos.has(v.id)).map((v) => (privados.has(v.id) ? { ...v, privado: true } : v));
 }
 
 /** O vídeo com o mesmo título que já está no canal (ou null). */
