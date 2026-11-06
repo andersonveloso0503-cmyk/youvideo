@@ -50,7 +50,7 @@ async function baixarStreaming(url, destino) {
 
 /** Baixa tudo o que a receita usa (cada link uma vez só). */
 async function baixarTudo(receita, dirCache, onProgresso, checar) {
-  const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url), receita.musica?.url].filter(Boolean))];
+  const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url), ...receita.clipes.flatMap((c) => (c.ilustracao?.fotos || []).map((f) => f?.url)), receita.musica?.url].filter(Boolean))];
   const locais = {};
   // Vídeos de cena que têm plano B (imagem de reserva ou outra cena): se não baixar, a montagem segue sem eles
   // (imagens também: uma foto que não baixa vira a cena anterior repetida, em vez de derrubar o vídeo inteiro)
@@ -287,7 +287,21 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
     if (c.ilustracao && (c.ilustracao.tipo !== 'foto' || (fotoCena && fs.existsSync(fotoCena)))) {
       try {
         const Ilu = require('./ilustracao');
-        await Ilu.renderizarIlustracao(fotoCena ? { ...c.ilustracao, fotoArquivo: fotoCena } : c.ilustracao, {
+        let ilu = fotoCena ? { ...c.ilustracao, fotoArquivo: fotoCena } : { ...c.ilustracao };
+        // quadro de fotos: as fotos baixadas de cada pessoa (sem foto, a silhueta com o nome)
+        if (Array.isArray(ilu.fotos)) ilu.fotos = ilu.fotos.map((f) => ({ nome: f.nome, ...(f.url && locais[f.url] ? { arquivo: locais[f.url] } : {}) }));
+        // mascote: a boca abre e fecha nas palavras que estão sendo faladas neste trecho (12 valores por segundo)
+        if (ilu.mascote) {
+          const ini = c.start - (ilu.continua ? 1.2 : 0); // pedaço seguinte: a página anda 1,2 s à frente
+          const n = Math.ceil(c.length * 12) + 2;
+          const boca = new Array(n).fill(0);
+          for (const p of receita.palavras || []) {
+            if (p.end < c.start || p.start > c.start + c.length) continue;
+            for (let q = Math.max(0, Math.floor((p.start - ini) * 12)); q < Math.min(n, Math.ceil((p.end - ini) * 12)); q++) boca[q] = 0.45 + 0.55 * Math.abs(Math.sin(q * 1.9 + p.start));
+          }
+          ilu.mascote = { ...ilu.mascote, boca };
+        }
+        await Ilu.renderizarIlustracao(ilu, {
           W, H, duracao: c.length, fps: FPS, saida, checar,
           capturar: Ilu.desenhistaElectron(),
           ffmpeg: FFMPEG,

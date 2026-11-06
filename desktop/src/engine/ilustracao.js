@@ -7,6 +7,8 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calendario', 'numero', 'lista', 'linhaTempo', 'pergunta', 'foto', 'inscreva', 'fluxo', 'icone', 'fala'];
+const { EXTRA, TIPOS_EXTRA, validaExtra, mascoteSvg, MASCOTE_ANIM } = require('./ilustracaoExtra');
+TIPOS.push(...TIPOS_EXTRA);
 
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const txt = (t, max = 80) => esc(String(t ?? '').replace(/\s+/g, ' ').trim().slice(0, max));
@@ -284,6 +286,8 @@ const DESENHOS = {
   },
 };
 
+Object.assign(DESENHOS, EXTRA);
+
 /** A ilustração tem o mínimo para ser desenhada? (o site já confere; aqui é a última trava) */
 function valida(d) {
   if (!d || typeof d !== 'object' || !TIPOS.includes(d.tipo)) return false;
@@ -304,7 +308,7 @@ function valida(d) {
     case 'icone': return !!d.texto;
     case 'fala': return !!d.texto;
     case 'foto': return !!d.fotoArquivo && fs.existsSync(d.fotoArquivo);
-    default: return false;
+    default: return validaExtra(d);
   }
 }
 
@@ -314,8 +318,13 @@ function paginaHtml(d, { W, H, duracao }) {
   const vertical = H > W;
   // Short: título no alto, desenho no meio, espaço livre embaixo para a legenda (24% de baixo)
   // Vídeo deitado: título no alto e desenho menor no meio (legenda nos 10% de baixo)
-  const escala = vertical ? W / 1080 : (H * 0.62) / 780;
+  // Mascote apresentador no canto de baixo à esquerda: a ilustração fica um pouco menor e à direita
+  const masc = !!d.mascote && !['inscreva', 'pergunta'].includes(d.tipo);
+  const escala = (vertical ? W / 1080 : (H * 0.62) / 780) * (masc && vertical ? 0.8 : 1);
   const caixaW = 1000 * escala;
+  const iluLeft = masc ? (vertical ? W - caixaW - W * 0.03 : (W - caixaW) / 2 + W * 0.06) : (W - caixaW) / 2;
+  const mascH = vertical ? H * 0.2 : H * 0.45;
+  const mascEsc = mascH / 360;
   const iluTop = vertical ? H * 0.29 : H * 0.29;
   const titTop = vertical ? H * 0.155 : H * 0.11;
   const titTam = (vertical ? 92 : 64) * (vertical ? W / 1080 : H / 1080);
@@ -328,7 +337,7 @@ html,body{width:${W}px;height:${H}px;overflow:hidden;background:var(--bg);font-f
 .tagp{position:absolute;top:${titTop - 80 * escala}px;left:50%;background:linear-gradient(90deg,#c98a2b,var(--ouro));color:#1a1206;font-weight:800;font-size:${28 * escala}px;letter-spacing:${4 * escala}px;padding:${10 * escala}px ${28 * escala}px;border-radius:40px;white-space:nowrap;text-transform:uppercase}
 .tit{position:absolute;top:${titTop}px;left:${W * 0.05}px;right:${W * 0.05}px;text-align:center;font-weight:800;font-size:${titTam}px;line-height:1.05;letter-spacing:-1px}
 .tit em{font-style:normal;color:var(--ouro)}
-.ilu{position:absolute;top:${iluTop}px;left:${(W - caixaW) / 2}px;width:1000px;height:780px;transform-origin:0 0;transform:scale(${escala})}
+.ilu{position:absolute;top:${iluTop}px;left:${iluLeft}px;width:1000px;height:780px;transform-origin:0 0;transform:scale(${escala})}
 .cardx{position:absolute;background:var(--card);border:2px solid var(--borda);border-radius:28px}
 .carimbo{position:absolute;border:8px solid;font-weight:800;font-size:78px;letter-spacing:5px;padding:10px 34px;border-radius:16px;background:rgba(11,16,32,.85);white-space:nowrap}
 .num{font-weight:800;font-variant-numeric:tabular-nums}
@@ -341,7 +350,8 @@ html,body{width:${W}px;height:${H}px;overflow:hidden;background:var(--bg);font-f
 <div class="luz" id="l3" style="width:${W * 0.28}px;height:${W * 0.28}px;left:${W * 0.38}px;top:${-H * 0.04}px;background:#1f6b8f"></div>
 ${d.etiqueta ? `<div class="tagp" id="tag">${txt(d.etiqueta, 24)}</div>` : ''}
 ${d.titulo ? `<div class="tit" id="tit">${tituloHtml(d.titulo, d.destaque)}</div>` : ''}
-<div class="ilu">${des.html}</div></div>
+<div class="ilu">${des.html}</div>
+${masc ? `<div id="masc" style="position:absolute;left:${vertical ? W * 0.01 : W * 0.03}px;top:${(vertical ? H * 0.765 : H * 0.9) - mascH}px;width:240px;height:360px;transform-origin:0 0"><div style="transform:scale(${mascEsc});transform-origin:0 0">${mascoteSvg(d.mascote.roupa)}</div></div>` : ''}</div>
 <div id="marca" style="position:fixed;left:0;top:0;width:2px;height:2px;background:rgb(0,0,77);z-index:99"></div>
 <script>
 const cl=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));const eo=x=>1-Math.pow(1-cl(x),3);
@@ -349,6 +359,7 @@ const back=x=>{x=cl(x);const c=1.9;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1
 const ap=(t,s,d=.5)=>cl((t-s)/Math.max(.01,d));const $=id=>document.getElementById(id);const $$=s=>[...document.querySelectorAll(s)];
 const k=${k};
 const fmtN=(x,alvo,suf)=>{const c=Number.isInteger(+alvo)?0:Math.min(2,(String(alvo).split('.')[1]||'').length);return x.toLocaleString('pt-BR',{minimumFractionDigits:c,maximumFractionDigits:c})+(suf||'')};
+window.BOCA=${masc ? JSON.stringify((d.mascote.boca || []).map((x) => Math.round(x * 100) / 100)) : '[]'};window.MASC_HUMOR=${JSON.stringify(masc ? d.mascote.humor || 'normal' : '')};window.MASC_CONT=${d.continua ? 'true' : 'false'};
 function anim(t){${des.anim}}
 window.setT=function(t){
  t+=${d.continua ? 1.2 : 0}; // pedaço seguinte da mesma cena: o cartão já está na tela
@@ -358,6 +369,7 @@ window.setT=function(t){
  if($('tag')){$('tag').style.transform='translateX(-50%) translateY('+((1-eo(ap(t,0,.4)))*-30)+'px)';$('tag').style.opacity=eo(ap(t,0,.3));}
  if($('tit')){$('tit').style.transform='translateY('+((1-eo(ap(t,.05,.5)))*40)+'px)';$('tit').style.opacity=eo(ap(t,.05,.4));}
  try{anim(t)}catch(e){window.__erro=String(e)}
+ try{${MASCOTE_ANIM}}catch(e){window.__erro=String(e)}
 };
 setT(0);
 </script></body></html>`;
