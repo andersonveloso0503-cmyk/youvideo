@@ -50,7 +50,7 @@ async function baixarStreaming(url, destino) {
 
 /** Baixa tudo o que a receita usa (cada link uma vez só). */
 async function baixarTudo(receita, dirCache, onProgresso, checar) {
-  const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url), ...receita.clipes.flatMap((c) => (c.ilustracao?.fotos || []).map((f) => f?.url)), receita.musica?.url].filter(Boolean))];
+  const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url), ...receita.clipes.flatMap((c) => [...(c.ilustracao?.fotos || []).map((f) => f?.url), c.ilustracao?.fotoUrl]), receita.musica?.url].filter(Boolean))];
   const locais = {};
   // Vídeos de cena que têm plano B (imagem de reserva ou outra cena): se não baixar, a montagem segue sem eles
   // (imagens também: uma foto que não baixa vira a cena anterior repetida, em vez de derrubar o vídeo inteiro)
@@ -284,7 +284,9 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
     // Política: ilustração animada desenhada aqui no PC (carimbo, placar, checklist...); se falhar, usa a foto
     let ilustrada = false;
     // foto em cartão: precisa da foto da cena (ou a imagem de reserva do vídeo); sem foto, a cena sai normal
-    const fotoCena = ['foto', 'fala'].includes(c.ilustracao?.tipo) ? (c.tipo === 'imagem' ? locais[c.url] : c.imagem ? locais[c.imagem] : null) : null;
+    const fotoCena = ['foto', 'fala'].includes(c.ilustracao?.tipo)
+      ? (c.ilustracao.fotoUrl && locais[c.ilustracao.fotoUrl]) || (c.tipo === 'imagem' ? locais[c.url] : c.imagem ? locais[c.imagem] : null)
+      : null;
     if (c.ilustracao && (c.ilustracao.tipo !== 'foto' || (fotoCena && fs.existsSync(fotoCena)))) {
       try {
         const Ilu = require('./ilustracao');

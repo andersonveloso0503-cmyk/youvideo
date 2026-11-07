@@ -593,8 +593,12 @@ class Fila extends EventEmitter {
           try {
             this.atualizar(job, { etapa: 'Colocando a capa no começo do Short' }, false);
             const comCapa = path.join(os.tmpdir(), `youvideo-comcapa-${job.id}.mp4`);
-            await rodar(['-y', '-i', e.arquivo, '-loop', '1', '-t', '1.3', '-i', chamativa,
-              '-filter_complex', "[1:v][0:v]scale2ref[c][v];[c]setsar=1[c2];[v][c2]overlay=enable='lt(t,1.2)':eof_action=pass,format=yuv420p[o]",
+            // A miniatura automática do YouTube costuma ser o quadro do MEIO do vídeo: a capa aparece também
+            // por meio segundo bem no meio (além do começo), para virar a miniatura do Short
+            const dur = Number((await probe(e.arquivo).catch(() => null))?.duracao) || 0;
+            const meio = dur > 8 ? `+between(t,${(dur / 2 - 0.3).toFixed(2)},${(dur / 2 + 0.3).toFixed(2)})` : '';
+            await rodar(['-y', '-i', e.arquivo, '-loop', '1', '-i', chamativa,
+              '-filter_complex', `[1:v][0:v]scale2ref[c][v];[c]setsar=1[c2];[v][c2]overlay=enable='lt(t,1.2)${meio}':shortest=1,format=yuv420p[o]`,
               '-map', '[o]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-c:a', 'copy', '-movflags', '+faststart', comCapa]).promise;
             if (fs.existsSync(comCapa) && fs.statSync(comCapa).size > 100000) e.arquivo = comCapa;
           } catch (errCapa) {
