@@ -1062,6 +1062,9 @@ class Fila extends EventEmitter {
         assArquivo = path.join(dir, 'legenda.ass');
         // a manchete fica o vídeo todo (as ilustrações perdem o título e ela ocupa o lugar); só some no fecho "Se inscreve!"
         const ocultar = (rc.clipes || []).filter((c) => c.ilustracao?.tipo === 'inscreva').map((c) => [Number(c.start) || 0, (Number(c.start) || 0) + (Number(c.length) || 0)]);
+        // o botão "Inscreva-se" do canal aparece no alto aos 5 s e a cada 30 s (5 s cada): a manchete dá lugar para ele
+        // (embaixo o próprio app do YouTube cobre com o nome do canal e a descrição)
+        if (curto) for (let t = 5; t < (rc.duracao || 0); t += 30) ocultar.push([t - 0.2, t + 5.2]);
         fs.writeFileSync(assArquivo, M.gerarAssNarracao({ W, H, palavras: rc.legenda === false ? [] : rc.palavras, duracao: rc.duracao, marca: rc.marca, curto, cta: rc.cta, textos: rc.textos, manchete: rc.manchete, ocultar }));
         const fontsTmp = path.join(dir, 'fonts');
         fs.mkdirSync(fontsTmp, { recursive: true });
