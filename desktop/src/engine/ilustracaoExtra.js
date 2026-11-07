@@ -8,7 +8,13 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const txt = (t, max = 80) => esc(String(t ?? '').replace(/\s+/g, ' ').trim().slice(0, max));
+const txt = (t, max = 80) => {
+  const x = String(t ?? '').replace(/\s+/g, ' ').trim();
+  if (x.length <= max) return esc(x);
+  const c = x.slice(0, max);
+  const e = c.lastIndexOf(' ');
+  return esc(e > max * 0.5 ? c.slice(0, e) : c); // corta em palavra inteira
+};
 
 let mapasCache = null;
 function mapas() {
@@ -238,7 +244,7 @@ const EXTRA = {
         .map(
           (e, i) => `<div class="cam" style="position:absolute;left:${i * larg}px;top:120px;width:${larg}px;text-align:center">
           <div style="width:${Math.min(320, larg - 24)}px;margin:0 auto;${i === atual ? 'filter:drop-shadow(0 0 18px rgba(232,176,74,.7))' : ''}">${PREDIOS[e.lugar] || `<div style="font-size:120px">${txt(e.icone || '🏛️', 4)}</div>`}</div>
-          <div style="font-size:${et.length > 3 ? 36 : 46}px;font-weight:800;margin-top:14px;line-height:1.1;${i === atual ? 'color:var(--ouro)' : ''}">${txt(e.texto, 24)}</div>
+          <div style="font-size:${String(e.texto || '').length > 16 ? (et.length > 3 ? 28 : 34) : et.length > 3 ? 36 : 46}px;font-weight:800;margin-top:14px;line-height:1.1;padding:0 10px;${i === atual ? 'color:var(--ouro)' : ''}">${txt(e.texto, 34)}</div>
           ${e.status ? `<div style="display:inline-block;margin-top:12px;padding:8px 22px;border-radius:24px;font-size:32px;font-weight:800;background:${/n[aã]o|rejeit|barr/i.test(e.status) ? 'var(--nao)' : /aprov|ok|feito|sim/i.test(e.status) ? 'var(--ok)' : '#5b6582'};color:#fff">${txt(e.status, 16)}</div>` : ''}</div>
           ${i < et.length - 1 ? `<div class="cseta" style="position:absolute;left:${(i + 1) * larg - 34}px;top:${120 + Math.min(320, larg - 24) * 0.33}px;font-size:64px;color:var(--ouro);font-weight:800">➜</div>` : ''}`
         )
