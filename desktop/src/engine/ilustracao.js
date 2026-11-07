@@ -360,8 +360,8 @@ ${Array.isArray(d.fundoQuadros) && d.fundoQuadros.length ? `<div id="fundoJogo" 
 <div class="luz" id="l1" style="width:${W * 0.5}px;height:${W * 0.5}px;left:${-W * 0.1}px;top:${H * 0.15}px;background:#2b4a9a"></div>
 <div class="luz" id="l2" style="width:${W * 0.4}px;height:${W * 0.4}px;right:${-W * 0.1}px;top:${H * 0.58}px;background:#8a5a14"></div>
 <div class="luz" id="l3" style="width:${W * 0.28}px;height:${W * 0.28}px;left:${W * 0.38}px;top:${-H * 0.04}px;background:#1f6b8f"></div>
-${d.etiqueta ? `<div class="tagp" id="tag">${txt(d.etiqueta, 24)}</div>` : ''}
-${d.titulo ? `<div class="tit" id="tit">${tituloHtml(d.titulo, d.destaque)}</div>` : ''}
+${d.etiqueta && !d.semTitulo ? `<div class="tagp" id="tag">${txt(d.etiqueta, 24)}</div>` : ''}
+${d.titulo && !d.semTitulo ? `<div class="tit" id="tit">${tituloHtml(d.titulo, d.destaque)}</div>` : ''}
 <div class="ilu">${des.html}</div>
 ${masc ? `<div id="masc" style="position:absolute;left:${vertical ? W * 0.01 : W * 0.03}px;top:${(vertical ? H * 0.765 : H * 0.9) - mascH}px;width:240px;height:360px;transform-origin:0 0"><div style="transform:scale(${mascEsc});transform-origin:0 0">${mascoteSvg(d.mascote.roupa)}</div></div>` : ''}</div>
 <div id="marca" style="position:fixed;left:0;top:0;width:2px;height:2px;background:rgb(0,0,77);z-index:99"></div>

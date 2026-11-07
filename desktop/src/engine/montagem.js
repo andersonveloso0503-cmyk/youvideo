@@ -291,6 +291,8 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
       try {
         const Ilu = require('./ilustracao');
         let ilu = fotoCena ? { ...c.ilustracao, fotoArquivo: fotoCena } : { ...c.ilustracao };
+        // Short com manchete fixa no alto: a manchete ocupa o lugar do título da ilustração (o fecho mantém o "Se inscreve!")
+        if (receita.manchete && H > W && !['inscreva'].includes(ilu.tipo)) ilu.semTitulo = true;
         // quadro de fotos: as fotos baixadas de cada pessoa (sem foto, a silhueta com o nome)
         if (Array.isArray(ilu.fotos)) ilu.fotos = ilu.fotos.map((f) => ({ nome: f.nome, ...(f.url && locais[f.url] ? { arquivo: locais[f.url] } : {}) }));
         // mascote: a boca abre e fecha nas palavras que estão sendo faladas neste trecho (12 valores por segundo)
@@ -380,7 +382,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
 }
 
 /** Legenda estilo karaokê: blocos de palavras em caixa alta, a palavra falada em destaque. */
-function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos }) {
+function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, manchete, ocultar = [] }) {
   const tempo = (s) => {
     s = Math.max(0, s);
     const h = Math.floor(s / 3600);
@@ -410,6 +412,23 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos }
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
   ];
   if (marca) linhas.push(`Dialogue: 1,${tempo(0)},${tempo(duracao)},Marca,,0,0,0,,${limpar(marca)}`);
+  // Manchete fixa no alto (Short): a frase da capa, grande, amarela com contorno preto, o vídeo todo — qualquer quadro
+  // que o YouTube escolher de miniatura mostra o assunto. Some nas ilustrações (que já têm título) e na capa do começo.
+  if (manchete && curto && duracao > 4) {
+    const tamM = Math.round(menor * 0.12);
+    linhas.splice(linhas.indexOf('[Events]') - 1, 0,
+      `Style: Manchete,Montserrat ExtraBold,${tamM},&H0012C8FF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.round(tamM / 7)},${Math.round(tamM / 16)},8,${Math.round(W * 0.04)},${Math.round(W * 0.04)},${Math.round(H * 0.06)},1`);
+    const fora = [[0, 1.25], ...ocultar].filter((x) => x[1] > x[0]).sort((a, b) => a[0] - b[0]);
+    let t = 0;
+    const trechos = [];
+    for (const [a, b] of fora) {
+      if (a > t + 0.6) trechos.push([t, a]);
+      t = Math.max(t, b);
+    }
+    if (duracao > t + 0.6) trechos.push([t, duracao]);
+    const txt = limpar(manchete).slice(0, 48);
+    for (const [a, b] of trechos) linhas.push(`Dialogue: 3,${tempo(a)},${tempo(b)},Manchete,,0,0,0,,{\\fad(150,150)}${txt}`);
+  }
   // Chamada da empresa (ex.: WhatsApp) em destaque nos últimos segundos, numa faixa no alto da tela
   if (cta && duracao > 6) {
     const tamCta = Math.round(menor * (curto ? 0.07 : 0.06));

@@ -218,6 +218,7 @@ export default async function handler(req, res) {
       ...(req.body.encaixar ? { encaixar: req.body.encaixar === 'video-cheio' ? 'video-cheio' : true } : {}), // games: mídia deitada inteira no vídeo em pé, com fundo desfocado
       // Documentário: quadrinhos explicativos na tela e música de fundo
       ...(Array.isArray(req.body.textos) && req.body.textos.length ? { textos: req.body.textos.slice(0, 200) } : {}),
+      ...(req.body.manchete ? { manchete: String(req.body.manchete).slice(0, 48) } : {}), // Short: manchete fixa no alto
       ...(req.body.musica?.url ? { musica: { url: String(req.body.musica.url), volume: Math.max(0.02, Math.min(0.5, Number(req.body.musica.volume) || 0.1)) } } : {}),
       audio: temAudioSegments
         ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length, ...(s.volume != null ? { volume: s.volume } : {}), ...(s.fade ? { fade: s.fade } : {}) }))
