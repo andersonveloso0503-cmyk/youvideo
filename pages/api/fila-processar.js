@@ -153,7 +153,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}), ...(semBotao ? { semBotao: true } : {}), ...(textos?.length ? { textos } : {}), ...(musica?.url ? { musica } : {}), ...(encaixar ? { encaixar: true } : {}) }
+        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}), ...(semBotao ? { semBotao: true } : {}), ...(textos?.length ? { textos } : {}), ...(musica?.url ? { musica } : {}), ...(encaixar ? { encaixar } : {}) }
       ),
     });
     const data = await r.json();
@@ -557,7 +557,7 @@ export default async function handler(req, res) {
             // Documentário: sem legenda (não acorda quem dorme); infantil: criança pequena não lê, a tela fica limpa
             ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}), // conteúdo para crianças: sem botão de like/inscrever gravado
-            ...(item.games || item.politica ? { encaixar: true } : {}), // games: mídia deitada inteira no Short, com fundo desfocado
+            ...(item.games ? { encaixar: 'video-cheio' } : item.politica ? { encaixar: true } : {}), // games: gameplay em tela cheia; imagem/arte inteira com fundo desfocado // games: mídia deitada inteira no Short, com fundo desfocado
             // Documentário: quadrinho explicando o lugar que aparece e música baixinha por baixo da narração
             ...(item.documentario ? { textos: quadrinhosDoDocumentario(item.arquivos), musica: item.musicaUrl ? { url: item.musicaUrl, volume: 0.1 } : null } : {}),
           });
@@ -653,7 +653,7 @@ export default async function handler(req, res) {
             cta: item.marca ? empresa(item.marca)?.cta : '',
             ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}),
-            ...(item.games || item.politica ? { encaixar: true } : {}),
+            ...(item.games ? { encaixar: 'video-cheio' } : item.politica ? { encaixar: true } : {}), // games: gameplay em tela cheia; imagem/arte inteira com fundo desfocado
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
         } else {

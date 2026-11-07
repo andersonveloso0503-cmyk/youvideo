@@ -212,7 +212,8 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
     let encaixar = false;
     let fw = W;
     let fh = Math.round((W * 9) / 16 / 2) * 2;
-    if (receita.encaixar && H > W) {
+    // Games: VÍDEO (gameplay/trailer) enche a tela inteira; só imagem (capa, arte com nome do jogo) fica inteira no meio
+    if (receita.encaixar && H > W && !(receita.encaixar === 'video-cheio' && c.tipo === 'video')) {
       const dim = await probe(arq).catch(() => null);
       encaixar = !!dim && dim.largura > dim.altura * 0.7; // só a mídia já quase em pé (9:16) enche a tela inteira
       if (encaixar) {
