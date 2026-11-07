@@ -674,16 +674,25 @@ export default async function handler(req, res) {
           const primeiraImagem = (item.arquivos || []).find((x) => x.imageUrl)?.imageUrl || null;
           let thumbnailUrl = primeiraImagem;
           let avisoThumb = null;
-          if (item.infantil && !item.shortMusica) {
+          // Games e política: o Compilador escreve o texto grande da capa; aqui vai só a IMAGEM LIMPA do assunto
+          // (antes a imagem já ia com texto e a capa saía com dois textos): games = arte oficial do jogo;
+          // política = foto da pessoa principal (cartão "fala"/quadro de fotos/foto de pessoa), senão a 1ª imagem
+          const fotoPessoa =
+            (item.roteiro?.cenas || []).map((c) => c.ilustracao?.fotoUrl || c.ilustracao?.fotos?.find((f) => f?.url)?.url).find(Boolean) ||
+            (item.arquivos || []).find((x) => /^wp/.test(String(x.midiaId || '')) && x.imageUrl)?.imageUrl ||
+            null;
+          if (item.games || item.politica) {
+            thumbnailUrl = item.games ? item.capaUrl || primeiraImagem : fotoPessoa || primeiraImagem;
+          } else if (item.infantil && !item.shortMusica) {
             // Desenho infantil: o personagem grande e alegre (o Compilador põe o título por cima, se quiser)
             thumbnailUrl = (await thumbInfantil({ avisar: (m) => { avisoThumb = `A thumbnail com título não saiu (${m}) — foi uma imagem sem texto. Use 🎨 na Fábrica para refazer.`; }, personagem: item.infantil.personagem, referencia: item.infantil.refUrl, titulo: item.roteiro.titulo, thumbnailTitulo: item.roteiro.thumbnailTitulo, cena: (item.roteiro.cenas || []).find((c) => c.bloco === 'antes' && !/close-up/i.test(c.descricao))?.descricao || '' }).catch(() => null)) || primeiraImagem;
-          } else if (item.games) {
-            // Canal de games: imagem oficial do jogo + texto curto gigante (branco e verde neon)
+          } else if (false && item.games) {
+            // (desligado: o Compilador faz a capa dos games) imagem oficial do jogo + texto curto gigante
             const { thumbGames } = await import('../../lib/capaGames');
             thumbnailUrl =
               (await thumbGames({ fotoUrl: item.capaUrl || primeiraImagem, texto: item.roteiro.thumbnailTitulo, subtitulo: item.roteiro.thumbnailSubtitulo }).catch(() => null)) ||
               primeiraImagem;
-          } else if (item.documentario) {
+          } else if (item.documentario && !item.politica) {
             // Documentário: foto real escurecida + a pergunta da capa
             // Episódios criados antes da capa pintada: pega título, subtítulo e pintura do episódio escrito
             const ep = EPISODIOS.find((e) => e.id === item.episodioId) || {};

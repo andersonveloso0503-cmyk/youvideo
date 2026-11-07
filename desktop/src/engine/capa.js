@@ -34,14 +34,15 @@ async function fraseDeEfeito(groqKey, { titulo, descricao, estilo = '' }) {
             content: estilo === 'politica'
               ? 'Você cria o TEXTO DA CAPA (thumbnail) de Shorts de um canal brasileiro IMPARCIAL de notícias de política. ' +
                 'Responda só JSON: {"frase": "...", "destaque": "..."}. ' +
-                'frase: de 2 a 4 palavras em CAIXA ALTA, de preferência uma PERGUNTA curta que resume o assunto e dá vontade de clicar, terminando em "?". ' +
-                'Exemplos: "CONTRA O STF?", "VAI SER APROVADA?", "O QUE MUDA?", "QUEM PAGA A CONTA?", "FIM DA ESCALA 6X1?", "VOLTA DA CPMF?". ' +
+                'frase: de 3 a 5 palavras em CAIXA ALTA que cria CURIOSIDADE: a pessoa precisa assistir para saber a resposta. Diga O ASSUNTO (quem ou o quê) e deixe a resposta no ar, de preferência como pergunta. ' +
+                'Bons: "STF BARRA AS BETS?", "QUEM PAGA ESSA CONTA?", "O QUE O TSE DECIDIU?", "LULA PERDE NO SENADO?", "FIM DA ESCALA 6X1?". Ruins (genéricos, sem assunto): "O QUE MUDA?", "VEJA ISSO". ' +
                 'Nunca acuse, nunca chame ninguém de nada, nunca afirme algo que não está no título; sem emoji, sem aspas, sem nome de partido. ' +
                 'destaque: a ÚLTIMA palavra da frase (com o "?"), que vai sozinha embaixo, grande e em amarelo.'
               : estilo === 'games'
               ? 'Você cria o TEXTO DA CAPA (thumbnail) de Shorts de um canal brasileiro de notícias de GAMES. ' +
                 'Responda só JSON: {"frase": "...", "destaque": "..."}. ' +
-                'frase: de 2 a 3 palavras em CAIXA ALTA (curta = letra GIGANTE na capa), empolgante, pergunta ou anúncio curto: "VALE A PENA?", "25 MUDANÇAS", "SUPER SAIYAJIN DEUS", "GRÁTIS NO XBOX", "VOLTOU?", "DATA CONFIRMADA!". ' +
+                'frase: de 2 a 4 palavras em CAIXA ALTA que cria CURIOSIDADE e diz o assunto (jogo ou fato): a pessoa precisa assistir para saber. ' +
+                'Bons: "GTA 6 NO PS4?", "ZELDA MUDOU TUDO", "GRÁTIS NO XBOX!", "SUPER SAIYAJIN DEUS", "O FIM DO FORTNITE?". Ruins (genéricos): "VALE A PENA?", "VEJA ISSO". ' +
                 'Use o nome curto do jogo só se couber (máx. 4 palavras no total); sem emoji, sem aspas. ' +
                 'destaque: a ÚLTIMA palavra da frase (com a pontuação), que vai sozinha embaixo, grande e em amarelo.'
               :
@@ -142,7 +143,7 @@ function montarAssDuasLinhas({ W, H, frase, destaque, embaixo = false }) {
   const topo = embaixo ? Math.round(H * 0.86) - alturaTexto : Math.round(H * 0.075);
   const linhaBaixo = topo + Math.round(tamCima * 1.05);
   const sombraAlta = Math.round(H * 0.42);
-  const corCima = embaixo ? '&H0012C8FF' : '&H00FFFFFF';
+  const corCima = '&H00FFFFFF'; // duas cores: 1ª linha BRANCA, 2ª AMARELA
   const borda = (t) => Math.max(embaixo ? 8 : 5, Math.round(t / (embaixo ? 7 : 10)));
   const giro = embaixo ? '\\frz3' : '';
   return [

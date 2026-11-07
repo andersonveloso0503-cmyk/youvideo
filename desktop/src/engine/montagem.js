@@ -415,7 +415,7 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, 
   // Manchete fixa no alto (Short): a frase da capa, grande, amarela com contorno preto, o vídeo todo — qualquer quadro
   // que o YouTube escolher de miniatura mostra o assunto. Some nas ilustrações (que já têm título) e na capa do começo.
   if (manchete && curto && duracao > 4) {
-    const tamM = Math.round(menor * 0.12);
+    const tamM = Math.round(menor * 0.15);
     linhas.splice(linhas.indexOf('[Events]') - 1, 0,
       `Style: Manchete,Montserrat ExtraBold,${tamM},&H0012C8FF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.round(tamM / 7)},${Math.round(tamM / 16)},8,${Math.round(W * 0.04)},${Math.round(W * 0.04)},${Math.round(H * 0.06)},1`);
     const fora = [[0, 1.25], ...ocultar].filter((x) => x[1] > x[0]).sort((a, b) => a[0] - b[0]);
@@ -426,7 +426,10 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, 
       t = Math.max(t, b);
     }
     if (duracao > t + 0.6) trechos.push([t, duracao]);
-    const txt = limpar(manchete).slice(0, 48);
+    // duas cores, como a capa: 1ª metade branca, 2ª metade amarela
+    const pals = limpar(manchete).slice(0, 48).split(' ').filter(Boolean);
+    const corte = Math.max(1, Math.ceil(pals.length / 2));
+    const txt = pals.length > 1 ? `{\\c&H00FFFFFF&}${pals.slice(0, corte).join(' ')}\\N{\\c&H0012C8FF&}${pals.slice(corte).join(' ')}` : pals.join(' ');
     for (const [a, b] of trechos) linhas.push(`Dialogue: 3,${tempo(a)},${tempo(b)},Manchete,,0,0,0,,{\\fad(150,150)}${txt}`);
   }
   // Chamada da empresa (ex.: WhatsApp) em destaque nos últimos segundos, numa faixa no alto da tela
