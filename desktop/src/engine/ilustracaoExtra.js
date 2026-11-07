@@ -84,6 +84,41 @@ const PREDIOS = {
 };
 const ehPredio = (x) => Object.prototype.hasOwnProperty.call(PREDIOS, x);
 
+
+// ───────── Figuras pequenas que acompanham números, listas e comparações (desenho próprio) ─────────
+const FIGURAS = {
+  martelo: `<svg viewBox="0 0 200 150"><g transform="rotate(-30 100 70)"><rect x="60" y="40" width="80" height="34" rx="8" fill="#c9a26a"/><rect x="52" y="34" width="16" height="46" rx="5" fill="#8a6a3a"/><rect x="132" y="34" width="16" height="46" rx="5" fill="#8a6a3a"/><rect x="94" y="74" width="12" height="70" rx="5" fill="#8a6a3a"/></g><rect x="40" y="126" width="120" height="14" rx="6" fill="#2a3354"/></svg>`,
+  relogio: `<svg viewBox="0 0 200 150"><circle cx="100" cy="75" r="58" fill="#e8f0ff" stroke="#e8b04a" stroke-width="10"/><path class="ponteiro" d="M100 75 V35" stroke="#1b2236" stroke-width="8" stroke-linecap="round"/><path d="M100 75 L128 88" stroke="#e5484d" stroke-width="6" stroke-linecap="round"/><circle cx="100" cy="75" r="7" fill="#1b2236"/></svg>`,
+  grafico: `<svg viewBox="0 0 200 150"><rect x="30" y="20" width="140" height="110" rx="10" fill="#1d2647"/><rect x="48" y="90" width="22" height="30" fill="#8fa3cf"/><rect x="80" y="70" width="22" height="50" fill="#8fa3cf"/><rect x="112" y="50" width="22" height="70" fill="#e8b04a"/><path d="M44 96 L90 62 L118 72 L160 34" stroke="#3fbf7f" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M150 32 h14 v14" stroke="#3fbf7f" stroke-width="7" fill="none" stroke-linecap="round"/></svg>`,
+  alerta: `<svg viewBox="0 0 200 150"><path d="M100 18 L172 134 H28z" fill="#e8b04a" stroke="#1b2236" stroke-width="6" stroke-linejoin="round"/><rect x="93" y="58" width="14" height="44" rx="6" fill="#1b2236"/><circle cx="100" cy="116" r="8" fill="#1b2236"/></svg>`,
+  globo: `<svg viewBox="0 0 200 150"><circle cx="100" cy="75" r="60" fill="#3a6fd8"/><path d="M60 50 q20 -10 30 6 q10 18 -8 26 q-14 8 -6 28 M120 30 q20 10 18 30 q-4 18 14 26" stroke="#3fbf7f" stroke-width="14" fill="none" stroke-linecap="round"/><circle cx="100" cy="75" r="60" fill="none" stroke="#c9d2ea" stroke-width="5"/></svg>`,
+  controle: `<svg viewBox="0 0 200 150"><path d="M50 50 h100 q34 0 38 46 q4 34 -22 34 q-16 0 -26 -20 h-80 q-10 20 -26 20 q-26 0 -22 -34 q4 -46 38 -46z" fill="#2a2f45" stroke="#5b2bd1" stroke-width="5"/><rect x="58" y="74" width="34" height="10" rx="4" fill="#c9d2ea"/><rect x="70" y="62" width="10" height="34" rx="4" fill="#c9d2ea"/><circle cx="132" cy="70" r="8" fill="#3cff9a"/><circle cx="150" cy="86" r="8" fill="#e5484d"/><circle cx="116" cy="86" r="8" fill="#3a6fd8"/><circle cx="132" cy="102" r="8" fill="#e8b04a"/></svg>`,
+  cadeado: `<svg viewBox="0 0 200 150"><path d="M70 66 v-18 a30 30 0 0 1 60 0 v18" stroke="#c9d2ea" stroke-width="12" fill="none"/><rect x="54" y="64" width="92" height="72" rx="12" fill="#e8b04a"/><circle cx="100" cy="96" r="10" fill="#1b2236"/><rect x="96" y="100" width="8" height="20" fill="#1b2236"/></svg>`,
+};
+const MAPA_FIGURAS = [
+  [/r\$|milh|bilh|\breais?\b|dinheiro|imposto|tribut|pagar|pago|cust|sal[aá]rio|or[cç]amento|pre[cç]o|desconto|gr[aá]tis/i, 'dinheiro'],
+  [/\bstf\b|\btse\b|\bstj\b|justi[cç]a|juiz|ju[ií]za|tribunal|julg|senten|liminar|ministro do supremo|supremo|decis/i, 'martelo'],
+  [/pres[oa]s?\b|pris[aã]o|cadeia|deten|bloque|apreen/i, 'cadeado'],
+  [/pol[ií]cia|\bpf\b|opera[cç][aã]o|investiga|crime|tr[aá]fico/i, 'policia'],
+  [/c[aâ]mara|deputad|senad|congresso|\bpec\b|projeto de lei|\blei\b|vota[cç][aã]o|votar/i, 'camara'],
+  [/presidente|planalto|governo|minist[eé]rio|ministr[oa]/i, 'planalto'],
+  [/elei[cç]|\bvoto|turno|eleitor|urna|candidat/i, 'urna'],
+  [/prazo|\bdias?\b|\bhoras?\b|\bat[eé] \d|\bano\b|anos\b|data|quando|semana|m[eê]s/i, 'relogio'],
+  [/%|por cento|aument|queda|caiu|subiu|cresc|pesquisa|alta\b|recorde/i, 'grafico'],
+  [/risco|alerta|perigo|amea[cç]|crise/i, 'alerta'],
+  [/\beua\b|estados unidos|mundo|pa[ií]s|internacional|trump|china|r[uú]ssia|argentina|paraguai/i, 'globo'],
+  [/jog|console|ps5|ps4|xbox|switch|nintendo|playstation|steam|game/i, 'controle'],
+  [/escola|aluno|educa|professor/i, 'escola'],
+  [/sa[uú]de|hospital|sus\b|m[eé]dic/i, 'hospital'],
+  [/pessoas|popula|brasileir|trabalhador|fam[ií]lia|cidad[aã]/i, 'povo'],
+];
+/** Figura desenhada que combina com o texto (ou null). */
+function figuraPara(...textos) {
+  const t = textos.filter(Boolean).join(' ');
+  for (const [re, nome] of MAPA_FIGURAS) if (re.test(t)) return FIGURAS[nome] || PREDIOS[nome] || null;
+  return null;
+}
+
 // ───────── Mascote: apresentador do canal (desenho original) ─────────
 const COR_MASCOTE = { terno: '#24335f', gravata: '#e8b04a', pele: '#f1c095', cabelo: '#3a2618' };
 // Mascote dos games: gamer nerd — óculos grossos, boné virado para trás, moletom e controle na mão
@@ -267,4 +302,4 @@ function validaExtra(d) {
   }
 }
 
-module.exports = { EXTRA, TIPOS_EXTRA: Object.keys(EXTRA), validaExtra, mascoteSvg, MASCOTE_ANIM, PREDIOS, acharLugar };
+module.exports = { EXTRA, TIPOS_EXTRA: Object.keys(EXTRA), validaExtra, mascoteSvg, MASCOTE_ANIM, PREDIOS, acharLugar, figuraPara };

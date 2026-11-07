@@ -7,7 +7,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calendario', 'numero', 'lista', 'linhaTempo', 'pergunta', 'foto', 'inscreva', 'fluxo', 'icone', 'fala'];
-const { EXTRA, TIPOS_EXTRA, validaExtra, mascoteSvg, MASCOTE_ANIM } = require('./ilustracaoExtra');
+const { EXTRA, TIPOS_EXTRA, validaExtra, mascoteSvg, MASCOTE_ANIM, figuraPara } = require('./ilustracaoExtra');
 TIPOS.push(...TIPOS_EXTRA);
 
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -136,6 +136,7 @@ const DESENHOS = {
       html: `${lados
         .map(
           (l, i) => `<div class="cardx lado" style="${i ? 'right' : 'left'}:20px;width:470px;top:60px;height:560px;padding:40px">
+        ${figuraPara(l.nome, l.texto) ? `<div style="width:150px;margin-bottom:6px">${figuraPara(l.nome, l.texto)}</div>` : ''}
         <div style="font-size:30px;font-weight:800;letter-spacing:2px;color:${cores[i]};text-transform:uppercase;line-height:1.2">${txt(l.nome, 34)}</div>
         <div style="font-size:${String(l.grande || '').length > 6 ? 80 : 130}px;font-weight:800;margin-top:24px;line-height:1.05">${txt(l.grande, 14)}</div>
         <div style="font-size:36px;color:var(--mut);margin-top:18px;line-height:1.25">${txt(l.texto, 70)}</div></div>`
@@ -167,7 +168,8 @@ const DESENHOS = {
   numero(d) {
     const alvo = num(d.valor);
     return {
-      html: `<div style="position:absolute;left:0;right:0;top:${d.antes ? 40 : 140}px;text-align:center">
+      html: `${!d.antes && figuraPara(d.texto, d.sufixo, d.prefixo, d.titulo) ? `<div id="nfig" style="position:absolute;left:350px;top:0;width:300px">${figuraPara(d.texto, d.sufixo, d.prefixo, d.titulo)}</div>` : ''}
+        <div style="position:absolute;left:0;right:0;top:${d.antes ? 40 : figuraPara(d.texto, d.sufixo, d.prefixo, d.titulo) ? 250 : 140}px;text-align:center">
         ${d.antes ? `<div id="na" style="font-size:120px;font-weight:800;color:var(--mut);position:relative;display:inline-block">${txt(d.antes, 14)}<div id="risco" style="position:absolute;left:-10px;top:50%;height:12px;width:0;background:var(--nao);border-radius:6px;transform:rotate(-8deg)"></div></div>
         <div style="font-size:70px;color:var(--ouro);line-height:1.2">↓</div>` : ''}
         <div class="num" id="nn" style="font-size:${String(d.prefixo || '').length + String(d.valor || '').length + String(d.sufixo || '').length > 9 ? 130 : 190}px;line-height:1.05;color:var(--ouro2)">${esc(String(d.prefixo || '').slice(0, 6)).replace(/ /g, '&nbsp;')}<span id="nv" data-final="${alvo != null ? esc(alvo.toLocaleString('pt-BR')) : ''}">${alvo != null ? 0 : txt(d.valor, 14)}</span>${/^[A-Za-zÀ-ÿ]/.test(String(d.sufixo || '')) ? '&nbsp;' : ''}${esc(String(d.sufixo || '').slice(0, 12)).replace(/ /g, '&nbsp;')}</div>
@@ -175,7 +177,8 @@ const DESENHOS = {
       anim: `const r=$('risco');if(r)r.style.width=(eo(ap(t,.5*k,.4))*110)+'%';
         const n=$('nn');const p=back(ap(t,(${d.antes ? 0.9 : 0.1})*k,.5));n.style.transform='scale('+p+')';n.style.opacity=Math.min(1,p);
         ${alvo != null ? `const c=eo(ap(t,(${d.antes ? 0.9 : 0.1})*k,1.2*k));const v=${alvo}*c;$('nv').textContent=(${Number.isInteger(alvo)}?Math.round(v):Number(v.toFixed(1))).toLocaleString('pt-BR');` : ''}
-        $('nt').style.opacity=eo(ap(t,1.3*k,.4));`,
+        $('nt').style.opacity=eo(ap(t,1.3*k,.4));
+        if($('nfig')){const f=back(ap(t,0,.45));$('nfig').style.opacity=Math.min(1,f);$('nfig').style.transform='scale('+(.4+.6*f)+') translateY('+(Math.sin(t*2.5)*6)+'px)';}`,
     };
   },
   lista(d) {
@@ -185,7 +188,7 @@ const DESENHOS = {
       html: itens
         .map(
           (it, i) => `<div class="cardx it" style="left:40px;right:40px;top:${30 + i * (alt + 20)}px;height:${alt}px;display:flex;align-items:center;gap:36px;padding:0 44px">
-        <div style="font-size:${alt * 0.5}px;width:${alt * 0.6}px;text-align:center">${txt(it.icone, 4)}</div><div style="flex:1;font-size:46px;font-weight:800;line-height:1.15">${txt(it.texto, 34)}</div>
+        <div style="font-size:${alt * 0.5}px;width:${alt * 0.9}px;text-align:center;flex:none">${figuraPara(it.texto, it.selo) ? `<div style="width:${alt * 0.9}px">${figuraPara(it.texto, it.selo)}</div>` : txt(it.icone, 4)}</div><div style="flex:1;font-size:46px;font-weight:800;line-height:1.15">${txt(it.texto, 34)}</div>
         ${it.selo ? `<div style="font-size:28px;font-weight:800;letter-spacing:2px;padding:10px 20px;border-radius:30px;background:var(--ouro);color:#1a1206;text-transform:uppercase;white-space:nowrap">${txt(it.selo, 12)}</div>` : ''}</div>`
         )
         .join(''),
@@ -328,12 +331,12 @@ function paginaHtml(d, { W, H, duracao }) {
   // Vídeo deitado: título no alto e desenho menor no meio (legenda nos 10% de baixo)
   // Mascote apresentador no canto de baixo à esquerda: a ilustração fica um pouco menor e à direita
   const masc = !!d.mascote && !['inscreva', 'pergunta'].includes(d.tipo);
-  const escala = (vertical ? W / 1080 : (H * 0.62) / 780) * (masc && vertical ? 0.93 : 1);
+  const escala = (vertical ? W / 1080 : (H * 0.62) / 780) * (masc && vertical ? (d.semTitulo ? 0.98 : 0.93) : 1);
   const caixaW = 1000 * escala;
   const iluLeft = masc ? (vertical ? W - caixaW - W * 0.03 : (W - caixaW) / 2 + W * 0.06) : (W - caixaW) / 2;
   const mascH = vertical ? H * 0.16 : H * 0.45;
   const mascEsc = mascH / 360;
-  const iluTop = vertical ? H * 0.29 : H * 0.29;
+  const iluTop = vertical ? H * (d.semTitulo ? 0.255 : 0.29) : H * 0.29; // sem título (manchete no alto): sobe e cresce
   const titTop = vertical ? H * 0.155 : H * 0.11;
   const titTam = (vertical ? 92 : 64) * (vertical ? W / 1080 : H / 1080);
   const k = Math.max(0.45, Math.min(1, duracao / 4)); // cena curta: anima mais rápido
@@ -357,6 +360,7 @@ ${d.sobreJogo ? '.luz{display:none}.tit{text-shadow:0 6px 24px rgba(0,0,0,.85),0
 ${Array.isArray(d.fundoQuadros) && d.fundoQuadros.length ? `<div id="fundoJogo" style="position:absolute;left:-4%;top:-4%;width:108%;height:108%;filter:blur(${Math.round(W / 60)}px) brightness(.55) saturate(1.2)">${d.fundoQuadros
   .map((f, i) => `<img class="fj" src="${esc(pathToFileURL(f).href)}" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;${i ? 'visibility:hidden' : ''}">`)
   .join('')}</div>` : ''}
+<div id="fundoAnim" style="position:absolute;left:-60px;top:-60px;width:${W + 120}px;height:${H + 120}px;opacity:.10;background-image:radial-gradient(circle,#c9d2ea 2px,transparent 2.5px);background-size:46px 46px"></div>
 <div class="luz" id="l1" style="width:${W * 0.5}px;height:${W * 0.5}px;left:${-W * 0.1}px;top:${H * 0.15}px;background:#2b4a9a"></div>
 <div class="luz" id="l2" style="width:${W * 0.4}px;height:${W * 0.4}px;right:${-W * 0.1}px;top:${H * 0.58}px;background:#8a5a14"></div>
 <div class="luz" id="l3" style="width:${W * 0.28}px;height:${W * 0.28}px;left:${W * 0.38}px;top:${-H * 0.04}px;background:#1f6b8f"></div>
@@ -380,8 +384,14 @@ window.setT=function(t){
  $('l3').style.transform='translate('+Math.sin(t*.5)*90+'px,0)';
  if($('tag')){$('tag').style.transform='translateX(-50%) translateY('+((1-eo(ap(t,0,.4)))*-30)+'px)';$('tag').style.opacity=eo(ap(t,0,.3));}
  if($('tit')){$('tit').style.transform='translateY('+((1-eo(ap(t,.05,.5)))*40)+'px)';$('tit').style.opacity=eo(ap(t,.05,.4));}
+ try{const fa=$('fundoAnim');if(fa)fa.style.transform='translate('+((t*14)%46)+'px,'+((t*9)%46)+'px)';}catch(e){}
  if(!window.__fitOk){window.__fitOk=1;try{
    const tt=$('tit');if(tt){let s=parseFloat(getComputedStyle(tt).fontSize);const max=${Math.round(iluTop - titTop - 14)};while(tt.scrollHeight>max&&s>34){s-=3;tt.style.fontSize=s+'px';}}
+   // Encaixe: o desenho cresce e fica centralizado no espaço livre (entre a manchete e o mascote/legenda) — sem sobrar vazio
+   ${['inscreva', 'pergunta'].includes(d.tipo) ? '' : `const il=document.querySelector('.ilu');if(il){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;il.querySelectorAll('*').forEach(e=>{const r=e.getBoundingClientRect();if(r.width<2||r.height<2||r.width>${W * 1.2})return;x0=Math.min(x0,r.left);y0=Math.min(y0,r.top);x1=Math.max(x1,r.right);y1=Math.max(y1,r.bottom);});
+     if(x1>x0&&y1>y0){const s=${escala},L0=${iluLeft},T0=${iluTop};const lx=(x0-L0)/s,ly=(y0-T0)/s,lw=(x1-x0)/s,lh=(y1-y0)/s;
+       const ax=${vertical ? W * 0.03 : masc ? W * 0.2 : W * 0.06},aw=${vertical ? W * 0.94 : masc ? W * 0.74 : W * 0.88},ay=T0,ah=${vertical ? H * (masc ? 0.595 : 0.68) : H * 0.9}-T0;
+       const s2=Math.min(aw/lw,ah/lh,s*1.5);if(s2>s*1.04||s2<s){il.style.left=(ax+(aw-lw*s2)/2-lx*s2)+'px';il.style.top=(ay+(ah-lh*s2)/2-ly*s2)+'px';il.style.transform='scale('+s2+')';}}}`}
    const nn=$('nn'),nv=$('nv');if(nn&&nv){const o=nv.textContent;if(nv.dataset.final)nv.textContent=nv.dataset.final;nn.style.whiteSpace='nowrap';nn.style.display='inline-block';let s=parseFloat(getComputedStyle(nn).fontSize);while(nn.scrollWidth>930&&s>50){s-=6;nn.style.fontSize=s+'px';}nv.textContent=o;}
  }catch(e){}}
  try{const fj=document.getElementsByClassName('fj');if(fj.length){const q=Math.min(fj.length-1,Math.floor((t-${d.continua ? 1.2 : 0})*12));for(let i=0;i<fj.length;i++)fj[i].style.visibility=i===q?'visible':'hidden';}}catch(e){}
