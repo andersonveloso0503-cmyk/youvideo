@@ -267,7 +267,14 @@ export default async function handler(req, res) {
     // GET ?revisar=1 -> vídeos prontos esperando o dono assistir e aprovar antes do YouTube
     if (req.method === 'GET' && req.query.revisar === '1') {
       const snap = await col.where('fabrica.youtube.status', '==', 'revisar').get();
+      // Refeitos esperando aprovação: o original já foi aprovado — vão sozinhos para o YouTube (pedido do dono)
+      for (const d of snap.docs) {
+        if (d.data().refeitoDe && d.data().fabrica?.ativo !== false) {
+          await d.ref.update({ 'fabrica.youtube': { status: 'pendente', aprovadoEm: new Date().toISOString(), aprovadoSozinho: 'refeito' } }).catch(() => {});
+        }
+      }
       const itens = snap.docs
+        .filter((d) => !d.data().refeitoDe)
         .filter((d) => d.data().fabrica?.ativo !== false) // refeito ou cancelado: não aparece mais
         .map((d) => {
           const x = d.data();
