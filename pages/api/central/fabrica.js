@@ -365,6 +365,14 @@ export default async function handler(req, res) {
       });
       if (req.query.youtube === '1') {
         const agora = Date.now();
+        // Vídeo refeito: o PC precisa saber o link do antigo (que já está no YouTube) para não confundir com "já subiu"
+        for (const i of itens) {
+          if (!i.refeitoDe || i.youtubeUrlAntiga || i.youtube?.status !== 'pendente') continue;
+          const velho = (await col.doc(String(i.refeitoDe)).get().catch(() => null))?.data();
+          const url = velho?.fabrica?.youtube?.url || '';
+          if (url) i.youtubeUrlAntiga = url;
+          i.refeito = true;
+        }
         // Política "mesmo dia": quem ficou pronto ganha agora o próximo horário livre
         const { fixarHorariosPolitica, canalDosGamesId, canalDaPolitica, ehCanalDeGames } = await import('../../../lib/politicaMesmoDia');
         // Canal errado: vídeo de política marcado no canal dos games (o seletor de política vinha no canal errado).

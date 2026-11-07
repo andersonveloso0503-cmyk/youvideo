@@ -635,7 +635,8 @@ app.whenReady().then(() => {
       for (const it of itens) {
         const canalId = it.canalYoutube?.id;
         if (!canalId || !store.canal(canalId)) continue; // esse canal está conectado em outro PC
-        const deNovo = Number(it.youtubeDeNovo) || 0; // você pediu "subir de novo" (o antigo saiu com texto errado)
+        // "subir de novo" (o antigo saiu com texto errado) ou vídeo REFEITO: o antigo tem que estar privado/apagado no YouTube
+        const deNovo = Number(it.youtubeDeNovo) || (it.refeitoDe ? 1 : 0);
         if (fila.lista().some((j) => j.envio?.fabricaId === it.id && !['erro', 'cancelado'].includes(j.status) && (j.envio?.deNovo || 0) >= deNovo && (!deNovo || j.envio?.deNovo))) continue;
         // Este PC já subiu este vídeo: nunca sobe de novo — só repete o aviso ao site
         if (fila.fabricaJaEnviado(it.id) && !(deNovo && deNovo > (fila.fabricaJaEnviado(it.id).em || 0))) {
