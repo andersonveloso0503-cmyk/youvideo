@@ -226,8 +226,17 @@ async function gerarCapaChamativa(base, opcoes) {
     fs.mkdirSync(fontes);
     for (const f of fs.readdirSync(fontsDir)) fs.copyFileSync(path.join(fontsDir, f), path.join(fontes, f));
     const filtro = `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,${suave ? 'eq=contrast=1.04:saturation=1.12' : duasLinhas ? 'eq=contrast=1.1:saturation=1.12,vignette=PI/4.5' : 'eq=contrast=1.08:saturation=1.25,vignette=PI/5'},ass=capa.ass:fontsdir=fonts`;
+    // Games com imagem DEITADA (cena do jogo, sem a arte do personagem): a imagem aparece GRANDE e INTEIRA num quadro
+    // na parte de cima, com ela mesma desfocada atrás — em vez de cortar as laterais e sobrar só o meio
+    const dimImg = await probe(img).catch(() => null);
+    const deitada = curto && estilo === 'games' && dimImg?.largura && dimImg?.altura && dimImg.largura > dimImg.altura * 1.15;
+    const altQ = Math.round(H * 0.4);
+    const filtroB = `[0]split[a][b];[a]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},boxblur=28:2,eq=brightness=-0.22:saturation=1.2[bg];` +
+      `[b]scale=-2:${altQ},crop='min(iw,${W - 40})':${altQ},eq=contrast=1.08:saturation=1.25,pad=iw+12:ih+12:6:6:color=white[fg];` +
+      `[bg][fg]overlay=(W-w)/2:${Math.round(H * 0.13)},setsar=1,ass=capa.ass:fontsdir=fonts[o]`;
     for (const q of [2, 4, 7, 11]) {
-      await rodar(['-loop', '1', '-t', '1', '-i', path.basename(img) === 'base.jpg' ? 'base.jpg' : img, '-vf', filtro, '-frames:v', '1', '-q:v', String(q), '-y', 'capa.jpg'], { cwd: dir }).promise;
+      const ent = path.basename(img) === 'base.jpg' ? 'base.jpg' : img;
+      await rodar(['-loop', '1', '-t', '1', '-i', ent, ...(deitada ? ['-filter_complex', filtroB, '-map', '[o]'] : ['-vf', filtro]), '-frames:v', '1', '-q:v', String(q), '-y', 'capa.jpg'], { cwd: dir }).promise;
       if (fs.statSync(path.join(dir, 'capa.jpg')).size <= LIMITE) break;
     }
     fs.mkdirSync(path.dirname(destino), { recursive: true });
