@@ -11,7 +11,15 @@ const { EXTRA, TIPOS_EXTRA, validaExtra, mascoteSvg, MASCOTE_ANIM } = require('.
 TIPOS.push(...TIPOS_EXTRA);
 
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const txt = (t, max = 80) => esc(String(t ?? '').replace(/\s+/g, ' ').trim().slice(0, max));
+// Corta sem quebrar palavra no meio ("bets i" virava título): volta até o último espaço
+const corta = (t, max) => {
+  const x = String(t ?? '').replace(/\s+/g, ' ').trim();
+  if (x.length <= max) return x;
+  const c = x.slice(0, max);
+  const e = c.lastIndexOf(' ');
+  return (e > max * 0.5 ? c.slice(0, e) : c).replace(/[\s,;:–—-]+$/, '');
+};
+const txt = (t, max = 80) => esc(corta(t, max));
 const num = (v) => {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
   let t = String(v ?? '').trim().replace(/[^\d.,-]/g, '');
@@ -23,7 +31,7 @@ const num = (v) => {
 
 /** Título com a palavra de destaque em dourado. */
 function tituloHtml(titulo, destaque) {
-  const t = txt(titulo, 60);
+  const t = txt(titulo, 90);
   const d = txt(destaque, 40);
   if (!d || !t.includes(d)) return t;
   return t.replace(d, `<em>${d}</em>`);
@@ -162,7 +170,7 @@ const DESENHOS = {
       html: `<div style="position:absolute;left:0;right:0;top:${d.antes ? 40 : 140}px;text-align:center">
         ${d.antes ? `<div id="na" style="font-size:120px;font-weight:800;color:var(--mut);position:relative;display:inline-block">${txt(d.antes, 14)}<div id="risco" style="position:absolute;left:-10px;top:50%;height:12px;width:0;background:var(--nao);border-radius:6px;transform:rotate(-8deg)"></div></div>
         <div style="font-size:70px;color:var(--ouro);line-height:1.2">↓</div>` : ''}
-        <div class="num" id="nn" style="font-size:${String(d.prefixo || '').length + String(d.valor || '').length + String(d.sufixo || '').length > 9 ? 130 : 190}px;line-height:1.05;color:var(--ouro2)">${esc(String(d.prefixo || '').slice(0, 6)).replace(/ /g, '&nbsp;')}<span id="nv">${alvo != null ? 0 : txt(d.valor, 14)}</span>${esc(String(d.sufixo || '').slice(0, 12)).replace(/ /g, '&nbsp;')}</div>
+        <div class="num" id="nn" style="font-size:${String(d.prefixo || '').length + String(d.valor || '').length + String(d.sufixo || '').length > 9 ? 130 : 190}px;line-height:1.05;color:var(--ouro2)">${esc(String(d.prefixo || '').slice(0, 6)).replace(/ /g, '&nbsp;')}<span id="nv" data-final="${alvo != null ? esc(alvo.toLocaleString('pt-BR')) : ''}">${alvo != null ? 0 : txt(d.valor, 14)}</span>${/^[A-Za-zÀ-ÿ]/.test(String(d.sufixo || '')) ? '&nbsp;' : ''}${esc(String(d.sufixo || '').slice(0, 12)).replace(/ /g, '&nbsp;')}</div>
         <div id="nt" style="margin:30px 60px 0;font-size:44px;font-weight:700;line-height:1.25">${txt(d.texto, 70)}</div></div>`,
       anim: `const r=$('risco');if(r)r.style.width=(eo(ap(t,.5*k,.4))*110)+'%';
         const n=$('nn');const p=back(ap(t,(${d.antes ? 0.9 : 0.1})*k,.5));n.style.transform='scale('+p+')';n.style.opacity=Math.min(1,p);
@@ -261,13 +269,13 @@ const DESENHOS = {
   inscreva(d) {
     const sino = `<svg viewBox="0 0 24 24" width="54" height="54"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5.5-6.84V3a1.5 1.5 0 0 0-3 0v1.16A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>`;
     return {
-      html: `<div id="bon3" style="position:absolute;left:70px;top:330px;transform-origin:100px 300px;transform:scale(1.9)">${boneco('#3a6fd8')}</div>
-        <div id="balao" style="position:absolute;left:380px;top:20px;width:580px;background:#fff;color:#111;font-size:48px;font-weight:800;padding:26px 34px;border-radius:36px 36px 36px 8px;line-height:1.15;text-align:center">${txt(d.texto || 'E você, o que acha?', 40)}</div>
+      html: `${d.mascote ? `<div id="masc" style="position:absolute;left:20px;top:190px;width:240px;height:360px"><div style="transform:scale(1.6);transform-origin:0 0">${mascoteSvg(d.mascote.roupa)}</div></div>` : `<div id="bon3" style="position:absolute;left:70px;top:330px;transform-origin:100px 300px;transform:scale(1.9)">${boneco('#3a6fd8')}</div>`}
+        <div id="balao" style="position:absolute;left:380px;top:20px;width:580px;background:#fff;color:#111;font-size:${String(d.texto || '').length > 40 ? 40 : 48}px;font-weight:800;padding:26px 34px;border-radius:36px 36px 36px 8px;line-height:1.15;text-align:center">${txt(d.texto || 'E você, o que acha?', 70)}</div>
         <div id="bt" style="position:absolute;left:420px;top:330px;width:520px;height:130px;border-radius:70px;background:#e5302f;color:#fff;display:flex;align-items:center;justify-content:center;gap:22px;font-size:50px;font-weight:800;letter-spacing:2px;box-shadow:0 18px 50px rgba(229,48,47,.45)">
           <span id="btxt">INSCREVER-SE</span></div>
         <div id="sino" style="position:absolute;left:640px;top:500px;width:100px;height:100px;border-radius:50%;background:var(--card);border:3px solid var(--ouro);color:var(--ouro);display:flex;align-items:center;justify-content:center">${sino}</div>
         <div id="mao" style="position:absolute;left:0;top:0;font-size:96px;filter:drop-shadow(0 8px 12px rgba(0,0,0,.5))">👆</div>`,
-      anim: `$('bon3').style.opacity=eo(ap(t,0,.4));const br=document.querySelector('#bon3 .braco');br.style.transformOrigin='143px 122px';br.style.transform='rotate('+(-150+Math.sin(t*8)*22)+'deg)';
+      anim: `if($('bon3')){$('bon3').style.opacity=eo(ap(t,0,.4));const br=document.querySelector('#bon3 .braco');br.style.transformOrigin='143px 122px';br.style.transform='rotate('+(-150+Math.sin(t*8)*22)+'deg)';}
         const b=back(ap(t,.25,.45));$('balao').style.transform='scale('+b+')';$('balao').style.opacity=Math.min(1,b);
         const q=back(ap(t,.6,.45));const clique=ap(t,1.75,.12);const feito=t>1.85;
         $('bt').style.transform='scale('+(q*(clique>0&&clique<1?.92:1))+')';$('bt').style.opacity=Math.min(1,q);
@@ -278,9 +286,9 @@ const DESENHOS = {
   },
   pergunta(d) {
     return {
-      html: `<div id="bon2" style="position:absolute;left:300px;top:260px;transform-origin:bottom center">${boneco('#3a6fd8')}</div>
-        <div id="perg" style="position:absolute;left:520px;top:180px;max-width:460px;background:#fff;color:#111;font-size:50px;font-weight:800;padding:24px 34px;border-radius:34px 34px 34px 6px;line-height:1.15">${txt(d.texto || 'E você?', 40)}</div>`,
-      anim: `$('bon2').style.opacity=eo(ap(t,0,.4));const b=document.querySelector('#bon2 .braco');b.style.transformOrigin='143px 122px';b.style.transform='rotate('+(-150+Math.sin(t*8)*20)+'deg)';
+      html: `${d.mascote ? `<div id="masc" style="position:absolute;left:150px;top:230px;width:240px;height:360px"><div style="transform:scale(1.5);transform-origin:0 0">${mascoteSvg(d.mascote.roupa)}</div></div>` : `<div id="bon2" style="position:absolute;left:300px;top:260px;transform-origin:bottom center">${boneco('#3a6fd8')}</div>`}
+        <div id="perg" style="position:absolute;left:520px;top:180px;max-width:460px;background:#fff;color:#111;font-size:${String(d.texto || '').length > 40 ? 42 : 50}px;font-weight:800;padding:24px 34px;border-radius:34px 34px 34px 6px;line-height:1.15">${txt(d.texto || 'E você?', 70)}</div>`,
+      anim: `if($('bon2')){$('bon2').style.opacity=eo(ap(t,0,.4));const b=document.querySelector('#bon2 .braco');b.style.transformOrigin='143px 122px';b.style.transform='rotate('+(-150+Math.sin(t*8)*20)+'deg)';}
         const r=back(ap(t,.6*k,.4));$('perg').style.transform='scale('+r+')';$('perg').style.opacity=Math.min(1,r);`,
     };
   },
@@ -363,7 +371,7 @@ const back=x=>{x=cl(x);const c=1.9;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1
 const ap=(t,s,d=.5)=>cl((t-s)/Math.max(.01,d));const $=id=>document.getElementById(id);const $$=s=>[...document.querySelectorAll(s)];
 const k=${k};
 const fmtN=(x,alvo,suf)=>{const c=Number.isInteger(+alvo)?0:Math.min(2,(String(alvo).split('.')[1]||'').length);return x.toLocaleString('pt-BR',{minimumFractionDigits:c,maximumFractionDigits:c})+(suf||'')};
-window.BOCA=${masc ? JSON.stringify((d.mascote.boca || []).map((x) => Math.round(x * 100) / 100)) : '[]'};window.MASC_HUMOR=${JSON.stringify(masc ? d.mascote.humor || 'normal' : '')};window.MASC_CONT=${d.continua ? 'true' : 'false'};
+window.BOCA=${d.mascote ? JSON.stringify((d.mascote.boca || []).map((x) => Math.round(x * 100) / 100)) : '[]'};window.MASC_HUMOR=${JSON.stringify(d.mascote ? d.mascote.humor || 'normal' : '')};window.MASC_CONT=${d.continua ? 'true' : 'false'};
 function anim(t){${des.anim}}
 window.setT=function(t){
  t+=${d.continua ? 1.2 : 0}; // pedaço seguinte da mesma cena: o cartão já está na tela
@@ -372,6 +380,10 @@ window.setT=function(t){
  $('l3').style.transform='translate('+Math.sin(t*.5)*90+'px,0)';
  if($('tag')){$('tag').style.transform='translateX(-50%) translateY('+((1-eo(ap(t,0,.4)))*-30)+'px)';$('tag').style.opacity=eo(ap(t,0,.3));}
  if($('tit')){$('tit').style.transform='translateY('+((1-eo(ap(t,.05,.5)))*40)+'px)';$('tit').style.opacity=eo(ap(t,.05,.4));}
+ if(!window.__fitOk){window.__fitOk=1;try{
+   const tt=$('tit');if(tt){let s=parseFloat(getComputedStyle(tt).fontSize);const max=${Math.round(iluTop - titTop - 14)};while(tt.scrollHeight>max&&s>34){s-=3;tt.style.fontSize=s+'px';}}
+   const nn=$('nn'),nv=$('nv');if(nn&&nv){const o=nv.textContent;if(nv.dataset.final)nv.textContent=nv.dataset.final;nn.style.whiteSpace='nowrap';nn.style.display='inline-block';let s=parseFloat(getComputedStyle(nn).fontSize);while(nn.scrollWidth>930&&s>50){s-=6;nn.style.fontSize=s+'px';}nv.textContent=o;}
+ }catch(e){}}
  try{const fj=document.getElementsByClassName('fj');if(fj.length){const q=Math.min(fj.length-1,Math.floor((t-${d.continua ? 1.2 : 0})*12));for(let i=0;i<fj.length;i++)fj[i].style.visibility=i===q?'visible':'hidden';}}catch(e){}
  try{anim(t)}catch(e){window.__erro=String(e)}
  try{${MASCOTE_ANIM}}catch(e){window.__erro=String(e)}
