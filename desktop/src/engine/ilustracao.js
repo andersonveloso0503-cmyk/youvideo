@@ -367,6 +367,7 @@ ${Array.isArray(d.fundoQuadros) && d.fundoQuadros.length ? `<div id="fundoJogo" 
 ${d.etiqueta && !d.semTitulo ? `<div class="tagp" id="tag">${txt(d.etiqueta, 24)}</div>` : ''}
 ${d.titulo && !d.semTitulo ? `<div class="tit" id="tit">${tituloHtml(d.titulo, d.destaque)}</div>` : ''}
 <div class="ilu">${des.html}</div>
+${d.fonte && vertical ? `<div id="fonte" style="position:absolute;top:${H * (masc ? 0.607 : 0.688)}px;left:${masc ? W * 0.24 : W * 0.06}px;right:${W * 0.05}px;text-align:center;white-space:nowrap;overflow:hidden;font-weight:600;font-size:${Math.round(27 * W / 1080)}px;letter-spacing:.5px;color:#aab3c9;opacity:0">Fonte: ${txt(d.fonte, 42)}</div>` : ''}
 ${masc ? `<div id="masc" style="position:absolute;left:${vertical ? W * 0.01 : W * 0.03}px;top:${(vertical ? H * 0.765 : H * 0.9) - mascH}px;width:240px;height:360px;transform-origin:0 0"><div style="transform:scale(${mascEsc});transform-origin:0 0">${mascoteSvg(d.mascote.roupa)}</div></div>` : ''}</div>
 <div id="marca" style="position:fixed;left:0;top:0;width:2px;height:2px;background:rgb(0,0,77);z-index:99"></div>
 <script>
@@ -384,13 +385,14 @@ window.setT=function(t){
  $('l3').style.transform='translate('+Math.sin(t*.5)*90+'px,0)';
  if($('tag')){$('tag').style.transform='translateX(-50%) translateY('+((1-eo(ap(t,0,.4)))*-30)+'px)';$('tag').style.opacity=eo(ap(t,0,.3));}
  if($('tit')){$('tit').style.transform='translateY('+((1-eo(ap(t,.05,.5)))*40)+'px)';$('tit').style.opacity=eo(ap(t,.05,.4));}
+ if($('fonte'))$('fonte').style.opacity=.9*eo(ap(t,.35,.5));
  try{const fa=$('fundoAnim');if(fa)fa.style.transform='translate('+((t*14)%46)+'px,'+((t*9)%46)+'px)';}catch(e){}
  if(!window.__fitOk){window.__fitOk=1;try{
    const tt=$('tit');if(tt){let s=parseFloat(getComputedStyle(tt).fontSize);const max=${Math.round(iluTop - titTop - 14)};while(tt.scrollHeight>max&&s>34){s-=3;tt.style.fontSize=s+'px';}}
    // Encaixe: o desenho cresce e fica centralizado no espaço livre (entre a manchete e o mascote/legenda) — sem sobrar vazio
    ${['inscreva', 'pergunta'].includes(d.tipo) ? '' : `const il=document.querySelector('.ilu');if(il){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;il.querySelectorAll('*').forEach(e=>{const r=e.getBoundingClientRect();if(r.width<2||r.height<2||r.width>${W * 1.2})return;x0=Math.min(x0,r.left);y0=Math.min(y0,r.top);x1=Math.max(x1,r.right);y1=Math.max(y1,r.bottom);});
      if(x1>x0&&y1>y0){const s=${escala},L0=${iluLeft},T0=${iluTop};const lx=(x0-L0)/s,ly=(y0-T0)/s,lw=(x1-x0)/s,lh=(y1-y0)/s;
-       const ax=${vertical ? W * 0.03 : masc ? W * 0.2 : W * 0.06},aw=${vertical ? W * 0.94 : masc ? W * 0.74 : W * 0.88},ay=T0,ah=${vertical ? H * (masc ? 0.595 : 0.68) : H * 0.9}-T0;
+       const ax=${vertical ? W * 0.03 : masc ? W * 0.2 : W * 0.06},aw=${vertical ? W * 0.94 : masc ? W * 0.74 : W * 0.88},ay=T0,ah=${vertical ? H * (masc ? (d.fonte ? 0.585 : 0.595) : d.fonte ? 0.67 : 0.68) : H * 0.9}-T0;
        const s2=Math.min(aw/lw,ah/lh,s*1.5);if(s2>s*1.04||s2<s){il.style.left=(ax+(aw-lw*s2)/2-lx*s2)+'px';il.style.top=(ay+(ah-lh*s2)/2-ly*s2)+'px';il.style.transform='scale('+s2+')';}}}`}
    const nn=$('nn'),nv=$('nv');if(nn&&nv){const o=nv.textContent;if(nv.dataset.final)nv.textContent=nv.dataset.final;nn.style.whiteSpace='nowrap';nn.style.display='inline-block';let s=parseFloat(getComputedStyle(nn).fontSize);while(nn.scrollWidth>930&&s>50){s-=6;nn.style.fontSize=s+'px';}nv.textContent=o;}
  }catch(e){}}
