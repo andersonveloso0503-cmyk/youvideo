@@ -336,7 +336,7 @@ function paginaHtml(d, { W, H, duracao }) {
   const iluLeft = masc ? (vertical ? W - caixaW - W * 0.03 : (W - caixaW) / 2 + W * 0.06) : (W - caixaW) / 2;
   const mascH = vertical ? H * 0.16 : H * 0.45;
   const mascEsc = mascH / 360;
-  const iluTop = vertical ? H * (d.semTitulo ? 0.255 : 0.29) : H * 0.29; // sem título (manchete no alto): sobe e cresce
+  const iluTop = vertical ? H * (d.semTitulo ? 0.3 : 0.29) : H * 0.29; // sem título (manchete no alto): sobe e cresce
   const titTop = vertical ? H * 0.155 : H * 0.11;
   const titTam = (vertical ? 92 : 64) * (vertical ? W / 1080 : H / 1080);
   const k = Math.max(0.45, Math.min(1, duracao / 4)); // cena curta: anima mais rápido

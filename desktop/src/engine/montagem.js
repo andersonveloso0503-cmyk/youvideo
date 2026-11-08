@@ -415,9 +415,32 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, 
   // Manchete fixa no alto (Short): a frase da capa, grande, amarela com contorno preto, o vídeo todo — qualquer quadro
   // que o YouTube escolher de miniatura mostra o assunto. Some nas ilustrações (que já têm título) e na capa do começo.
   if (manchete && curto && duracao > 4) {
-    const tamM = Math.round(menor * 0.15);
+    // Abaixo da barra do app do YouTube (voltar / lupa / ⋯ e a etiqueta "Programado") e longe das laterais,
+    // onde ficam os ícones: a letra diminui para a linha mais comprida caber inteira, sem nada por cima.
+    const palsM = limpar(manchete).slice(0, 48).split(' ').filter(Boolean);
+    // Divide em 1, 2 ou 3 linhas equilibradas e fica com a que deixa a letra maior, sem passar da largura
+    // (76% da tela) nem da altura reservada no alto (20% da tela)
+    const dividir = (n) => {
+      const total = palsM.join(' ').length;
+      const ls = [[]];
+      for (const p of palsM) {
+        const atual = ls[ls.length - 1].join(' ').length;
+        if (ls.length < n && atual && atual + 1 + p.length / 2 > total / n) ls.push([]);
+        ls[ls.length - 1].push(p);
+      }
+      return ls.map((l) => l.join(' ')).filter(Boolean);
+    };
+    let melhor = null;
+    for (const n of [1, 2, 3]) {
+      if (n > palsM.length) break;
+      const ls = dividir(n);
+      const maior = Math.max(...ls.map((l) => l.length));
+      const fs = Math.min(menor * 0.13, (W * 0.76) / (maior * 0.5), (H * 0.2) / (ls.length * 1.05));
+      if (!melhor || fs > melhor.fs * 1.08) melhor = { fs, ls };
+    }
+    const tamM = Math.round(melhor ? melhor.fs : menor * 0.1);
     linhas.splice(linhas.indexOf('[Events]') - 1, 0,
-      `Style: Manchete,Montserrat ExtraBold,${tamM},&H0012C8FF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.round(tamM / 7)},${Math.round(tamM / 16)},8,${Math.round(W * 0.04)},${Math.round(W * 0.04)},${Math.round(H * 0.06)},1`);
+      `Style: Manchete,Montserrat ExtraBold,${tamM},&H0012C8FF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.round(tamM / 7)},${Math.round(tamM / 16)},8,${Math.round(W * 0.1)},${Math.round(W * 0.1)},${Math.round(H * 0.105)},1`);
     const fora = [[0, 1.25], ...ocultar].filter((x) => x[1] > x[0]).sort((a, b) => a[0] - b[0]);
     let t = 0;
     const trechos = [];
@@ -426,10 +449,18 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, 
       t = Math.max(t, b);
     }
     if (duracao > t + 0.6) trechos.push([t, duracao]);
-    // duas cores, como a capa: 1ª metade branca, 2ª metade amarela
-    const pals = limpar(manchete).slice(0, 48).split(' ').filter(Boolean);
-    const corte = Math.max(1, Math.ceil(pals.length / 2));
-    const txt = pals.length > 1 ? `{\\c&H00FFFFFF&}${pals.slice(0, corte).join(' ')}\\N{\\c&H0012C8FF&}${pals.slice(corte).join(' ')}` : pals.join(' ');
+    // duas cores, como a capa: começo branco, fim amarelo
+    const lsM = melhor ? melhor.ls : [palsM.join(' ')];
+    const branco = '{\\c&H00FFFFFF&}';
+    const amarelo = '{\\c&H0012C8FF&}';
+    let txt;
+    if (lsM.length === 1) {
+      const corte = Math.max(1, Math.ceil(palsM.length / 2));
+      txt = palsM.length > 1 ? `${branco}${palsM.slice(0, corte).join(' ')} ${amarelo}${palsM.slice(corte).join(' ')}` : palsM.join(' ');
+    } else {
+      const corte = Math.ceil(lsM.length / 2) - (lsM.length === 3 ? 1 : 0); // 2 linhas: 1 branca; 3 linhas: 1 branca, 2 amarelas
+      txt = lsM.map((l, i) => (i < Math.max(1, corte) ? branco : amarelo) + l).join('\\N');
+    }
     for (const [a, b] of trechos) linhas.push(`Dialogue: 3,${tempo(a)},${tempo(b)},Manchete,,0,0,0,,{\\fad(150,150)}${txt}`);
   }
   // Chamada da empresa (ex.: WhatsApp) em destaque nos últimos segundos, numa faixa no alto da tela
