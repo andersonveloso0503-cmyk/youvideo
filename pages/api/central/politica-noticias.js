@@ -141,6 +141,42 @@ export default async function handler(req, res) {
   const cfg = db.collection('youvideo_config').doc('politica_noticias');
 
   try {
+    // Vídeo LONGO da semana (2 por semana, quarta e sábado): junta as notícias de maior nota dos últimos dias
+    if (req.method === 'GET' && req.query.auto === 'longo') {
+      const cd = (await cfg.get()).data() || {};
+      if (cd.ultimoLongo && Date.now() - new Date(cd.ultimoLongo).getTime() < 40 * 3600e3) return res.status(200).json({ pulou: 'já fez um longo há pouco' });
+      const desde = Date.now() - 4 * 86400e3;
+      const snap = await col.where('status', 'in', ['aguardando', 'aprovada']).get();
+      const candidatas = snap.docs
+        .map((doc) => ({ doc, x: doc.data() }))
+        .filter(({ x }) => x.texto && (x.tipo || 'short') === 'short' && !x.usadaEmLongo && new Date(x.data || x.criadoEm || 0).getTime() > desde)
+        .sort((a, b) => (Number(b.x.potencial) || 5) - (Number(a.x.potencial) || 5) || String(b.x.data || '').localeCompare(String(a.x.data || '')))
+        .slice(0, 5);
+      if (candidatas.length < 3) return res.status(200).json({ pulou: `poucas notícias boas (${candidatas.length})` });
+      const noticias = candidatas.map(({ x }) => ({ titulo: x.titulo, link: x.link, fonteNome: x.fonte, data: x.data, texto: x.texto, imagens: x.imagens || [] }));
+      const ep = await roteiroVideoPolitica(noticias);
+      const ref = col.doc(ep.id);
+      const d = {
+        status: 'aguardando',
+        tipo: 'longo',
+        titulo: ep.titulo,
+        fonte: [...new Set(noticias.map((n) => n.fonteNome))].join(', '),
+        links: noticias.map((n) => ({ titulo: n.titulo, link: n.link })),
+        imagens: noticias.flatMap((n) => n.imagens).slice(0, 1),
+        texto: noticias.map((n) => n.texto).join('\n\n').slice(0, 9000),
+        ep,
+        semanal: true,
+        criadoEm: new Date().toISOString(),
+      };
+      await ref.set(d);
+      await Promise.all(candidatas.map(({ doc }) => doc.ref.update({ usadaEmLongo: ep.id }).catch(() => {})));
+      await cfg.set({ ultimoLongo: new Date().toISOString() }, { merge: true });
+      const { canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
+      const canal = await canalDaPolitica(db, await canalDosGamesId(db));
+      const aprovado = canal ? await aprovarPolitica(db, ref, d, canal, { automatica: true }) : null;
+      return res.status(200).json({ ok: true, id: ep.id, titulo: ep.titulo, noticias: noticias.length, aprovado });
+    }
+
     if (req.method === 'GET' && req.query.auto) {
       const r = await buscarNoticiasPolitica(db, { quantas: 5 });
       await cfg.set({ ultimaBusca: new Date().toISOString(), fontes: r.fontes }, { merge: true });

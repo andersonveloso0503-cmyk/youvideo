@@ -19,6 +19,14 @@
     {
       "path": "/api/central/politica-noticias?auto=1",
       "schedule": "45 */3 * * *"
+    },
+    {
+      "path": "/api/central/politica-noticias?auto=longo",
+      "schedule": "0 13 * * 3,6"
+    },
+    {
+      "path": "/api/central/games-noticias?auto=longo",
+      "schedule": "20 13 * * 3,6"
     }
   ]
 }
