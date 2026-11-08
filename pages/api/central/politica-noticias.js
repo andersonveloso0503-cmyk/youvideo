@@ -112,8 +112,8 @@ async function aprovarSozinhoPolitica(db, col, cfgDados) {
   const fila = snap.docs
     .map((doc) => ({ ref: doc.ref, d: doc.data() }))
     .filter(({ d }) => d.ep && d.tipo !== 'longo' && d.tipo !== 'explicador' && (d.tipo === 'explicador-short' || idade(d) <= 2 * 86400e3))
-    // explicadores que você pediu primeiro; depois as notícias mais novas
-    .sort((a, b) => (String(b.d.tipo || '').startsWith('explicador') ? 1 : 0) - (String(a.d.tipo || '').startsWith('explicador') ? 1 : 0) || String(b.d.data || b.d.criadoEm || '').localeCompare(String(a.d.data || a.d.criadoEm || '')));
+    // explicadores que você pediu primeiro; depois as de mais potencial (em alta, bolso, polêmica, Trump); empate: a mais nova
+    .sort((a, b) => (String(b.d.tipo || '').startsWith('explicador') ? 1 : 0) - (String(a.d.tipo || '').startsWith('explicador') ? 1 : 0) || (Number(b.d.potencial) || 5) - (Number(a.d.potencial) || 5) || String(b.d.data || b.d.criadoEm || '').localeCompare(String(a.d.data || a.d.criadoEm || '')));
   const ultimas24 = (await db.collection('youvideo_fila').where('politica', '==', true).get()).docs
     .filter((x) => agora - new Date(x.data().criadoEm || 0).getTime() < 24 * 3600e3 && !x.data().refeitoDe).length;
   const vagas = Math.max(0, 5 - ultimas24);
