@@ -92,10 +92,11 @@ async function turbinarImagem(falKey, arquivo, curto, destino, estilo = '', cont
             'close and filling most of the frame (face and upper body clearly visible), vivid saturated colors, strong contrast, slightly darker blurred background. ' +
             'Keep the characters, their faces, outfits and the art style EXACTLY as in the image; do not invent new characters. '
           : estilo === 'politica'
-          ? 'Turn this photo into a vertical news-channel thumbnail portrait. This is a REAL person: keep the face, identity, age, hair, expression and clothes EXACTLY as in the photo. ' +
-            'Frame the person centered, from the chest up, BIG (head and shoulders filling the middle of the frame), facing the camera, sharp and detailed. ' +
+          ? 'Turn this photo into a vertical news-channel thumbnail. The main subject is what the photo shows: ' +
+            'IF it is a person, this is a REAL person: keep the face, identity, age, hair, expression and clothes EXACTLY as in the photo, and frame them centered, from the chest up, BIG (head and shoulders filling the middle of the frame). ' +
+            'IF it is an object, building or place, keep it real and recognizable and make it BIG and centered, filling the middle of the frame. Sharp and detailed. ' +
             `Background: a dark navy official backdrop, softly out of focus, with the national flag of the country of this news (news title: "${String(contexto || '').slice(0, 120)}") draped at the side. ` +
-            'Cinematic studio lighting, rich contrast, serious tone. Do not invent an event: no crowds, no other people, no podium signs. '
+            'Cinematic lighting, rich contrast, serious tone. Do not invent an event: no crowds, no other people, no podium signs. '
           : 'Transform this into an eye-catching YouTube thumbnail background: dramatic cinematic lighting, vivid saturated colors, ' +
             'strong emotion on the main character, move the camera closer to the main character, keep the same characters, setting and art style. ') +
           (estilo === 'games' ? 'Put the character face in the upper and middle part; keep the lower quarter simpler for big text. '

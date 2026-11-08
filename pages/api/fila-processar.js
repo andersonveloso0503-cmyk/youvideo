@@ -680,6 +680,8 @@ export default async function handler(req, res) {
           const fotoPessoa =
             (item.roteiro?.cenas || []).map((c) => c.ilustracao?.fotoUrl || c.ilustracao?.fotos?.find((f) => f?.url)?.url).find(Boolean) ||
             (item.arquivos || []).find((x) => /^wp/.test(String(x.midiaId || '')) && x.imageUrl)?.imageUrl ||
+            // sem pessoa: a foto real do assunto (objeto, lugar, prédio) que a IA conferiu com a frase
+            (item.arquivos || []).find((x) => /^wc/.test(String(x.midiaId || '')) && x.imageUrl)?.imageUrl ||
             null;
           if (item.games || item.politica) {
             thumbnailUrl = item.games ? item.capaUrl || primeiraImagem : fotoPessoa || primeiraImagem;
