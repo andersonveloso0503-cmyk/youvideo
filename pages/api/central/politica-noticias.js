@@ -117,8 +117,13 @@ async function aprovarSozinhoPolitica(db, col, cfgDados) {
   const ultimas24 = (await db.collection('youvideo_fila').where('politica', '==', true).get()).docs
     .filter((x) => agora - new Date(x.data().criadoEm || 0).getTime() < 24 * 3600e3 && !x.data().refeitoDe).length;
   const vagas = Math.max(0, 5 - ultimas24);
+  // Só sobe sozinho o que tem NOTA BOA (7+). Nota 5-6 só completa o dia se até as 15h saíram menos de 3; abaixo de 5, só à mão.
+  const hora = Number(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }));
+  const nota = (d) => (d.potencial == null ? 6 : Number(d.potencial));
+  const boas = fila.filter(({ d }) => String(d.tipo || '').startsWith('explicador') || nota(d) >= 7);
+  const medias = ultimas24 + boas.length < 3 && hora >= 15 ? fila.filter(({ d }) => !boas.some((b) => b.d === d) && nota(d) >= 5) : [];
   let automaticas = 0;
-  for (const { ref, d } of fila.slice(0, vagas)) {
+  for (const { ref, d } of [...boas, ...medias].slice(0, vagas)) {
     await aprovarPolitica(db, ref, d, canal, { automatica: true });
     automaticas++;
   }
