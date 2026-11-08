@@ -44,6 +44,8 @@ function desenhaIlustracao(v, minimo = 51) {
 // Mascote, mapa, documento, caminho, quadro de fotos e cartão sobre a gameplay: Compilador 2.5.82 em diante
 const NOVOS = ['mapa', 'documento', 'caminho', 'quadroFotos'];
 const precisaNovo = (receita) => (receita?.clipes || []).some((c) => c.ilustracao && (c.ilustracao.mascote || c.ilustracao.sobreJogo || NOVOS.includes(c.ilustracao.tipo)));
+const MECANISMO = ['dinheiro', 'divisao', 'conexao', 'plenario'];
+const precisaMecanismo = (receita) => (receita?.clipes || []).some((c) => MECANISMO.includes(c.ilustracao?.tipo));
 const ESPERA_PC_NOVO = 2 * 3600e3;
 
 const TEMPO_MAX_MONTANDO = 3 * 3600e3; // PC sumiu no meio: depois de 3 h o pedido volta para a fila
@@ -74,6 +76,8 @@ export default async function handler(req, res) {
         if (receita && !pcNovo && (receita.clipes || []).some((c) => c.ilustracao) && (pcNovoAtivo || agora - (d.criadoEm || agora) < ESPERA_PC_NOVO)) continue;
         // ilustração nova num PC que ainda não atualizou: espera (ele se atualiza sozinho em minutos), até 2 h
         if (receita && precisaNovo(receita) && !desenhaIlustracao(req.query.v, 82) && agora - (d.criadoEm || agora) < ESPERA_PC_NOVO) continue;
+        // desenhos do mecanismo (dinheiro, divisão, conexão, plenário): Compilador 2.5.97 em diante
+        if (receita && precisaMecanismo(receita) && !desenhaIlustracao(req.query.v, 97) && agora - (d.criadoEm || agora) < ESPERA_PC_NOVO) continue;
         if (receita && !aceitaStreaming(req.query.v)) receita = semStreaming(receita);
         // Wikimedia só serve miniaturas em tamanhos padrão (1280, 1920...): 1600px dava "Não consegui baixar (400)" no PC
         if (receita) receita = tamanhoPadraoWikimedia(receita);
