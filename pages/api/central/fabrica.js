@@ -362,6 +362,7 @@ export default async function handler(req, res) {
           youtubeDeNovo: x.fabrica?.youtube?.deNovo || null, // pedido para subir de novo (o PC ignora que já subiu) // vídeo refeito: o antigo com o mesmo título não conta como repetido
           mesmoDia: x.fabrica?.mesmoDia === true, // política: horário do YouTube escolhido quando fica pronto
           horaFixada: x.fabrica?.horaFixada === true,
+          urgente: x.fabrica?.urgente === true,
           concluidoEm: x.concluidoEm || x.atualizadoEm || null,
           playlist: x.roteiro?.playlist?.titulo ? x.roteiro.playlist : null, // documentário: entra sozinho na playlist da série (ex.: "Catástrofes do Brasil")
           infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true, shortMusica: x.shortMusica === true, temporada: x.infantil.temporada ? { nome: x.infantil.temporada.nome, numero: x.infantil.temporada.numero, ep: x.infantil.temporada.ep, total: x.infantil.temporada.total } : null } : null,

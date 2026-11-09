@@ -80,6 +80,7 @@ async function aprovarPolitica(db, ref, d, canal, opcoes = {}) {
         quando: fixo ? quando : new Date().toISOString(), // produção começa já
         quandoYoutube: quando,
         ...(fixo ? {} : { mesmoDia: true }),
+        ...(opcoes.urgente ? { urgente: true } : {}), // notícia quente: sobe assim que ficar pronta
         redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
         canalYoutube: { id: String(canal.id), titulo: String(canal.titulo || '') },
       },
@@ -122,12 +123,17 @@ async function aprovarSozinhoPolitica(db, col, cfgDados) {
   const nota = (d) => (d.potencial == null ? 6 : Number(d.potencial));
   const boas = fila.filter(({ d }) => String(d.tipo || '').startsWith('explicador') || nota(d) >= 7);
   const medias = ultimas24 + boas.length < 3 && hora >= 15 ? fila.filter(({ d }) => !boas.some((b) => b.d === d) && nota(d) >= 5) : [];
+  // Notícia QUENTE (saiu há menos de 3 h e tem nota 8+): sobe na hora, mesmo passando das 5 do dia (até 7)
+  const quente = (d) => !String(d.tipo || '').startsWith('explicador') && nota(d) >= 8 && idade(d) < 3 * 3600e3;
+  const quentes = fila.filter(({ d }) => quente(d));
+  const extras = Math.max(0, Math.min(quentes.length, 7 - ultimas24) - vagas);
+  const ordem = [...quentes, ...[...boas, ...medias].filter((x) => !quentes.includes(x))];
   let automaticas = 0;
-  for (const { ref, d } of [...boas, ...medias].slice(0, vagas)) {
-    await aprovarPolitica(db, ref, d, canal, { automatica: true });
+  for (const { ref, d } of ordem.slice(0, vagas + extras)) {
+    await aprovarPolitica(db, ref, d, canal, { automatica: true, urgente: quente(d) });
     automaticas++;
   }
-  return { automaticas, vagas, velhas };
+  return { automaticas, vagas, velhas, quentes: quentes.length };
 }
 
 export default async function handler(req, res) {

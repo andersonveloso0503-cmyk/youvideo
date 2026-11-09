@@ -83,7 +83,7 @@ export default async function handler(req, res) {
         if (receita) receita = tamanhoPadraoWikimedia(receita);
         if (receita) pedidos.push({ id: doc.id, titulo: d.titulo || receita.titulo || '', criadoEm: d.criadoEm, origem: d.origem || '', receita });
       }
-      pedidos.sort((a, b) => (a.criadoEm || 0) - (b.criadoEm || 0));
+      pedidos.sort((a, b) => (b.receita?.urgente ? 1 : 0) - (a.receita?.urgente ? 1 : 0) || (a.criadoEm || 0) - (b.criadoEm || 0)); // notícia quente primeiro
       return res.status(200).json({ pedidos });
     }
 

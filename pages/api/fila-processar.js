@@ -146,14 +146,14 @@ export default async function handler(req, res) {
     return lista;
   };
 
-  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta, legenda, semBotao, textos, musica, encaixar, manchete }) => {
+  const iniciarMontagemViaApi = async ({ audioUrl, audioSegments, cenas, formato, palavras, titulo, marca, cta, legenda, semBotao, textos, musica, encaixar, manchete, urgente }) => {
     // Um pedaço só e sem palavras (Short da música): manda o pedaço com a duração, senão a montagem não sabe o tamanho
     const temVariosPedacos = (audioSegments || []).length > 1 || ((audioSegments || []).length === 1 && !(palavras || []).length);
     const r = await fetch(`${baseUrl}/api/assemble-video`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}), ...(semBotao ? { semBotao: true } : {}), ...(textos?.length ? { textos } : {}), ...(musica?.url ? { musica } : {}), ...(encaixar ? { encaixar } : {}), ...(manchete ? { manchete } : {}) }
+        { ...(temVariosPedacos ? { audioSegments } : { audioUrl }), cenas, formato, palavras, titulo, origem: 'fila', ...(marca ? { marca } : {}), ...(cta ? { cta } : {}), ...(legenda === false ? { legenda: false } : {}), ...(semBotao ? { semBotao: true } : {}), ...(textos?.length ? { textos } : {}), ...(musica?.url ? { musica } : {}), ...(encaixar ? { encaixar } : {}), ...(manchete ? { manchete } : {}), ...(urgente ? { urgente: true } : {}) }
       ),
     });
     const data = await r.json();
@@ -559,7 +559,8 @@ export default async function handler(req, res) {
             ...(item.infantil ? { semBotao: true } : {}), // conteúdo para crianças: sem botão de like/inscrever gravado
             ...(item.games || item.politica ? { encaixar: true } : {}), // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
             // Manchete fixa no alto do Short (a frase da capa): qualquer quadro que vire miniatura mostra o assunto
-            ...((item.games || item.politica) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}), // games: mídia deitada inteira no Short, com fundo desfocado
+            ...((item.games || item.politica) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}),
+            ...(item.fabrica?.urgente ? { urgente: true } : {}), // notícia quente: o PC monta antes das outras // games: mídia deitada inteira no Short, com fundo desfocado
             // Documentário: quadrinho explicando o lugar que aparece e música baixinha por baixo da narração
             ...(item.documentario ? { textos: quadrinhosDoDocumentario(item.arquivos), musica: item.musicaUrl ? { url: item.musicaUrl, volume: 0.1 } : null } : {}),
           });
@@ -658,6 +659,7 @@ export default async function handler(req, res) {
             ...(item.games || item.politica ? { encaixar: true } : {}), // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
             // Manchete fixa no alto do Short (a frase da capa): qualquer quadro que vire miniatura mostra o assunto
             ...((item.games || item.politica) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}),
+            ...(item.fabrica?.urgente ? { urgente: true } : {}), // notícia quente: o PC monta antes das outras
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
         } else {

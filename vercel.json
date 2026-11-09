@@ -18,7 +18,7 @@
     },
     {
       "path": "/api/central/politica-noticias?auto=1",
-      "schedule": "45 */3 * * *"
+      "schedule": "15,45 * * * *"
     },
     {
       "path": "/api/central/politica-noticias?auto=longo",
