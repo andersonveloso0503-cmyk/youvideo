@@ -1979,6 +1979,53 @@ app.whenReady().then(() => {
     }
     if (comandos.length) setTimeout(mandarFilaParaNuvem, 3000);
   }
+  // Comentários dos canais de games e política: traz os novos (a IA da Central sugere a resposta, você aprova no
+  // celular em /comentarios) e publica as respostas aprovadas como o canal. Busca a cada 15 min; publica a cada minuto.
+  let ultimaBuscaComentarios = 0;
+  let mexendoComentarios = false;
+  async function cuidarComentarios() {
+    const cfg = store.ler();
+    if (!cfg.centralToken || !cfg.google || mexendoComentarios) return;
+    mexendoComentarios = true;
+    try {
+      const { pc } = identidadePc();
+      const meus = store.canais();
+      if (!meus.length) return;
+      const r = await Central.chamar(cfg, '/api/central/comentarios', { query: { pc, tem: meus.map((c) => c.id).join(',') } });
+      for (const a of r.responder || []) {
+        const canal = meus.find((c) => c.id === a.canalId);
+        if (!canal) {
+          await Central.chamar(cfg, '/api/central/comentarios', { metodo: 'PATCH', corpo: { id: a.id, status: 'liberar' } }).catch(() => {});
+          continue;
+        }
+        try {
+          await YT.responderComentario({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect, parentId: a.parentId, texto: a.texto });
+          await Central.chamar(cfg, '/api/central/comentarios', { metodo: 'PATCH', corpo: { id: a.id, status: 'respondido' } }).catch(() => {});
+        } catch (e) {
+          const msg = /insufficient|permission|scope/i.test(String(e.message)) ? 'O canal precisa ser conectado de novo no Compilador (permissão de comentários).' : String(e.message || e);
+          await Central.chamar(cfg, '/api/central/comentarios', { metodo: 'PATCH', corpo: { id: a.id, status: 'erro', erro: msg } }).catch(() => {});
+        }
+      }
+      if (Date.now() - ultimaBuscaComentarios < 15 * 60e3) return;
+      ultimaBuscaComentarios = Date.now();
+      for (const v of r.canais || []) {
+        const canal = meus.find((c) => c.id === v.id);
+        if (!canal) continue;
+        try {
+          const itens = await YT.comentariosSemResposta({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect, canalId: canal.id });
+          if (itens.length) await Central.chamar(cfg, '/api/central/comentarios', { metodo: 'POST', corpo: { pc, canalId: canal.id, itens } });
+        } catch (e) {
+          console.warn('[comentarios]', canal.titulo, String(e.message || e).slice(0, 200));
+        }
+      }
+    } catch (e) {
+      console.warn('[comentarios]', String(e.message || e).slice(0, 200));
+    } finally {
+      mexendoComentarios = false;
+    }
+  }
+  setInterval(() => cuidarComentarios(), 60000);
+
   setTimeout(() => {
     buscarComandosRemotos();
     fazerPreviasRemotas();

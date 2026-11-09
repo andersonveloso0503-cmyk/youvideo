@@ -738,7 +738,49 @@ async function apagarProgramado({ credenciais, refreshToken, redirectOriginal, i
   return { apagado: true };
 }
 
+/**
+ * Comentários novos do canal que ainda não têm resposta do próprio canal (os mais recentes primeiro).
+ * Custa 1 unidade da cota por página de 50.
+ */
+async function comentariosSemResposta({ credenciais, refreshToken, redirectOriginal, canalId, maximo = 50 }) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const r = await yt.commentThreads.list({ part: ['snippet', 'replies'], allThreadsRelatedToChannelId: canalId, order: 'time', maxResults: Math.min(100, maximo), textFormat: 'plainText' });
+  const itens = [];
+  for (const t of r.data.items || []) {
+    const top = t.snippet?.topLevelComment;
+    const sn = top?.snippet || {};
+    if (!top?.id || sn.authorChannelId?.value === canalId) continue; // comentário do próprio canal
+    const jaRespondeu = (t.replies?.comments || []).some((c) => c.snippet?.authorChannelId?.value === canalId);
+    if (jaRespondeu) continue;
+    itens.push({
+      id: top.id,
+      videoId: sn.videoId || t.snippet?.videoId || '',
+      autor: String(sn.authorDisplayName || '').slice(0, 80),
+      texto: String(sn.textOriginal || sn.textDisplay || '').slice(0, 1500),
+      curtidas: Number(sn.likeCount) || 0,
+      publicadoEm: sn.publishedAt || '',
+    });
+  }
+  // título dos vídeos (1 unidade por 50 vídeos), para a IA saber do que se trata
+  const ids = [...new Set(itens.map((i) => i.videoId).filter(Boolean))].slice(0, 50);
+  if (ids.length) {
+    const v = await yt.videos.list({ part: ['snippet'], id: ids }).catch(() => null);
+    const titulos = Object.fromEntries((v?.data?.items || []).map((x) => [x.id, x.snippet?.title || '']));
+    for (const i of itens) i.videoTitulo = String(titulos[i.videoId] || '').slice(0, 150);
+  }
+  return itens;
+}
+
+/** Responde um comentário como o canal (custa 50 unidades da cota). */
+async function responderComentario({ credenciais, refreshToken, redirectOriginal, parentId, texto }) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const r = await yt.comments.insert({ part: ['snippet'], requestBody: { snippet: { parentId, textOriginal: String(texto).slice(0, 1000) } } });
+  return { id: r.data.id };
+}
+
 module.exports = {
+  comentariosSemResposta,
+  responderComentario,
   tituloParecido,
   apagarProgramado,
   publicarAgora,

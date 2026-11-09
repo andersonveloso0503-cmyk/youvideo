@@ -600,13 +600,18 @@ class Fila extends EventEmitter {
             const VW = info?.largura || 1080;
             const VH = info?.altura || 1920;
             const meio = dur > 8 ? `+between(t,${(dur / 2 - 0.3).toFixed(2)},${(dur / 2 + 0.3).toFixed(2)})` : '';
+            // TESTE A/B (games): metade abre com a capa (A), metade abre direto na gameplay (B, a capa só no meio).
+            // A etiqueta "pf-abertura-a/b" vai nas tags do vídeo para comparar quantos ficam assistindo em cada versão.
+            const direto = String(e.categoria) === '20' && [...String(e.titulo || '')].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % 2 === 1;
+            if (String(e.categoria) === '20') e.tags = [...(e.tags || []).filter((t) => !/^pf-abertura-/.test(t)), direto ? 'pf-abertura-b' : 'pf-abertura-a'];
+            const quando = direto ? meio.replace(/^\+/, '') : `lt(t,1.2)${meio}`;
             // Começo com impacto: a capa entra "dando um soco" — começa 25% mais perto e afasta em 0,35 s, com um tremidinho
             const zoom = `'if(lt(t,0.35),1.25-0.25*t/0.35,1)'`;
             const treme = `'if(lt(t,0.5),6*sin(t*90),0)'`;
             await rodar(['-y', '-i', e.arquivo, '-loop', '1', '-framerate', '30', '-i', chamativa,
               '-filter_complex',
               `[1:v]scale=${VW}:${VH},setsar=1,scale=w='${VW}*${zoom.slice(1, -1)}':h='${VH}*${zoom.slice(1, -1)}':eval=frame,crop=${VW}:${VH}:'(iw-${VW})/2+${treme.slice(1, -1)}':'(ih-${VH})/2',setsar=1[c2];` +
-                `[0:v][c2]overlay=enable='lt(t,1.2)${meio}':shortest=1,format=yuv420p[o]`,
+                `[0:v][c2]overlay=enable='${quando || '0'}':shortest=1,format=yuv420p[o]`,
               '-map', '[o]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-c:a', 'copy', '-movflags', '+faststart', comCapa]).promise;
             if (fs.existsSync(comCapa) && fs.statSync(comCapa).size > 100000) e.arquivo = comCapa;
           } catch (errCapa) {

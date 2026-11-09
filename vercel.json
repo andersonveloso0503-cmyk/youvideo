@@ -31,6 +31,14 @@
     {
       "path": "/api/central/brasil-inacreditavel?auto=1",
       "schedule": "35 * * * *"
+    },
+    {
+      "path": "/api/central/games-noticias?auto=serie&tipo=epic-gratis",
+      "schedule": "40 20 * * 4"
+    },
+    {
+      "path": "/api/central/games-noticias?auto=serie&tipo=steam-top",
+      "schedule": "10 15 * * 1"
     }
   ]
 }

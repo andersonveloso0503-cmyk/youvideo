@@ -15,6 +15,7 @@ import { roteiroDoEpisodio } from '../../../lib/documentario';
 import { buscarNoticias, roteiroVideo, COLECAO_NOTICIAS } from '../../../lib/gamesNoticias';
 import { roteiroDicas, jogosEmAlta } from '../../../lib/gamesDicas';
 import { roteiroLancamentos } from '../../../lib/gamesLancamentos';
+import { criarSerieGames } from '../../../lib/gamesSeries';
 
 export const config = { maxDuration: 300 };
 
@@ -172,6 +173,16 @@ export default async function handler(req, res) {
   const cfg = db.collection('youvideo_config').doc('games_noticias');
 
   try {
+    // Séries fixas (Short): jogos grátis da Epic (quinta) e mais vendidos da Steam no Brasil com preço em reais (segunda)
+    if (req.method === 'GET' && req.query.auto === 'serie') {
+      const r = await criarSerieGames(db, String(req.query.tipo || ''));
+      if (r.pulou) return res.status(200).json(r);
+      const cfgG = (await db.collection('youvideo_config').doc('games_noticias').get().catch(() => null))?.data?.() || {};
+      const canal = await canalDosGames(db, cfgG);
+      const aprovado = canal ? await aprovarNoticia(db, r.ref, r.d, canal, null, { limite: true }) : null;
+      return res.status(200).json({ ok: true, titulo: r.d.titulo, aprovado });
+    }
+
     // Vídeo LONGO da semana (2 por semana, quarta e sábado): as notícias de games de maior nota dos últimos dias
     if (req.method === 'GET' && req.query.auto === 'longo') {
       const cfgL = db.collection('youvideo_config').doc('games_longo');

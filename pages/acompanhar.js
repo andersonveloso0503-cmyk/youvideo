@@ -259,6 +259,14 @@ export default function Acompanhar() {
             <div style={{ fontSize: 12.5, fontWeight: 400, opacity: 0.85, marginTop: 4 }}>Assista e aprove antes de ir para o YouTube e o Instagram</div>
           </a>
 
+          <a
+            href="/comentarios"
+            style={{ display: 'block', textDecoration: 'none', background: '#1b1b28', color: '#fff', borderRadius: 12, padding: '14px 16px', marginBottom: 12, fontSize: 16, fontWeight: 700 }}
+          >
+            💬 Responder comentários <span style={{ float: 'right' }}>›</span>
+            <div style={{ fontSize: 12.5, fontWeight: 400, opacity: 0.85, marginTop: 4 }}>Games e política, com a resposta já sugerida</div>
+          </a>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
             {[
               ['Produzindo', produzindo.length, '#ffc94d', 'andamento'],
