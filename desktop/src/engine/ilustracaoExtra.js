@@ -176,6 +176,7 @@ function mascoteSvg(roupa = {}) {
     <g id="molhos"><ellipse cx="92" cy="96" rx="8" ry="9" fill="#1d1d1d"/><ellipse cx="148" cy="96" rx="8" ry="9" fill="#1d1d1d"/><circle cx="95" cy="92" r="2.6" fill="#fff"/><circle cx="151" cy="92" r="2.6" fill="#fff"/></g>
     <rect x="72" y="80" width="40" height="32" rx="12" fill="rgba(255,255,255,.08)" stroke="#1d1d1d" stroke-width="4"/><rect x="128" y="80" width="40" height="32" rx="12" fill="rgba(255,255,255,.08)" stroke="#1d1d1d" stroke-width="4"/><path d="M112 94 h16" stroke="#1d1d1d" stroke-width="4"/>
     <ellipse cx="78" cy="122" rx="9" ry="5" fill="#e9967a" opacity=".45"/><ellipse cx="162" cy="122" rx="9" ry="5" fill="#e9967a" opacity=".45"/>
+    <path id="mlag" d="M88 112 q-5 8 0 12 q5 -4 0 -12z" fill="#7fc4ff" opacity="0"/>
     <g id="mboca" transform="translate(120 132)"><ellipse id="mbocaA" cx="0" cy="0" rx="15" ry="3" fill="#5a1f1f"/><ellipse id="mling" cx="0" cy="5" rx="8" ry="0" fill="#d9646b"/>
       <path id="msorr" d="M-16 -2 q16 12 32 0" stroke="#5a1f1f" stroke-width="5" fill="none" stroke-linecap="round"/></g>
   </g></svg>`;
@@ -189,7 +190,10 @@ const MASCOTE_ANIM = `
   const fala=v>.08;$('mbocaA').setAttribute('ry',fala?(3+v*15):2.5);$('mbocaA').setAttribute('rx',fala?(12+v*4):12);$('mling').setAttribute('ry',fala?Math.max(0,v*6-1):0);
   $('msorr').style.opacity=fala?0:1;$('mbocaA').style.opacity=fala?1:0;
   const pisc=(t%3.3)<.12;$('molhos').style.transform='translateY('+(pisc?6:0)+'px) scaleY('+(pisc?.12:1)+')';$('molhos').style.transformOrigin='120px 96px';
-  const humor=window.MASC_HUMOR||'normal';$('msob').style.transform='translateY('+(humor==='surpreso'?-8:humor==='serio'?3:Math.sin(t*1.7)*1.5)+'px)';
+  const humor=window.MASC_HUMOR||'normal';$('msob').style.transform='translateY('+(humor==='surpreso'?-8:humor==='serio'?3:humor==='triste'?-2:Math.sin(t*1.7)*1.5)+'px)';
+  // notícia ruim: sobrancelhas caídas para fora, boca para baixo e uma lágrima
+  if(humor==='triste'){const sb=$('msob').children;if(sb[0]){sb[0].style.transformOrigin='92px 72px';sb[0].style.transform='rotate(-16deg)';}if(sb[1]){sb[1].style.transformOrigin='148px 72px';sb[1].style.transform='rotate(16deg)';}
+    $('msorr').setAttribute('d','M-14 6 q14 -11 28 0');if($('mlag')){const u=(t%2.2)/2.2;$('mlag').style.opacity=u<.85?1:0;$('mlag').setAttribute('transform','translate(0 '+(u*26)+')');}}
   $('mcab').style.transformOrigin='120px 150px';$('mcab').style.transform='rotate('+(Math.sin(t*1.6)*3+(fala?v*2:0))+'deg)';
   const ap2=eo(ap(t,.5,.5));$('mbracoD').style.transformOrigin='177px 182px';$('mbracoD').style.transform='rotate('+(-(118*ap2)+Math.sin(t*2.4)*8)+'deg)';
   $('mbracoE').style.transformOrigin='63px 182px';$('mbracoE').style.transform='rotate('+(Math.sin(t*1.9+1)*6)+'deg)';

@@ -176,7 +176,7 @@ const DESENHOS = {
         <div id="nt" style="margin:30px 60px 0;font-size:44px;font-weight:700;line-height:1.25">${txt(d.texto, 70)}</div></div>`,
       anim: `const r=$('risco');if(r)r.style.width=(eo(ap(t,.5*k,.4))*110)+'%';
         const n=$('nn');const p=back(ap(t,(${d.antes ? 0.9 : 0.1})*k,.5));n.style.transform='scale('+p+')';n.style.opacity=Math.min(1,p);
-        ${alvo != null ? `const c=eo(ap(t,(${d.antes ? 0.9 : 0.1})*k,1.2*k));const v=${alvo}*c;$('nv').textContent=(${Number.isInteger(alvo)}?Math.round(v):Number(v.toFixed(1))).toLocaleString('pt-BR');` : ''}
+        ${alvo != null ? `const c=eo(ap(t,(${d.antes ? 0.9 : 0.1})*k,1.2*k));const v=${alvo}*c;const cs=${(String(d.valor).match(/[.,](\d+)\s*$/) || ['', ''])[1].length};$('nv').textContent=c>=.999?${JSON.stringify(esc(String(d.valor)))}:v.toLocaleString('pt-BR',{minimumFractionDigits:cs,maximumFractionDigits:cs});` : ''}
         $('nt').style.opacity=eo(ap(t,1.3*k,.4));
         if($('nfig')){const f=back(ap(t,0,.45));$('nfig').style.opacity=Math.min(1,f);$('nfig').style.transform='scale('+(.4+.6*f)+') translateY('+(Math.sin(t*2.5)*6)+'px)';}`,
     };
@@ -367,6 +367,7 @@ ${Array.isArray(d.fundoQuadros) && d.fundoQuadros.length ? `<div id="fundoJogo" 
 ${d.etiqueta && !d.semTitulo ? `<div class="tagp" id="tag">${txt(d.etiqueta, 24)}</div>` : ''}
 ${d.titulo && !d.semTitulo ? `<div class="tit" id="tit">${tituloHtml(d.titulo, d.destaque)}</div>` : ''}
 <div class="ilu">${des.html}</div>
+${(d.clima === 'ruim' || d.clima === 'bom') && masc && vertical ? `<svg id="clima" viewBox="0 0 100 100" style="position:absolute;right:${W * 0.05}px;top:${H * 0.627}px;width:${Math.round(W * 0.1)}px;opacity:0;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))"><circle cx="50" cy="50" r="46" fill="#ffcc4d" stroke="#e0a020" stroke-width="4"/><ellipse cx="35" cy="42" rx="6" ry="8" fill="#3a2a10"/><ellipse cx="65" cy="42" rx="6" ry="8" fill="#3a2a10"/>${d.clima === 'ruim' ? '<path d="M30 74 q20 -18 40 0" stroke="#3a2a10" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M24 30 l14 -6 M76 30 l-14 -6" stroke="#3a2a10" stroke-width="5" stroke-linecap="round"/><path id="clag" d="M30 52 q-6 10 0 14 q6 -4 0 -14z" fill="#5ab0ff"/>' : '<path d="M28 62 q22 22 44 0" stroke="#3a2a10" stroke-width="6" fill="none" stroke-linecap="round"/>'}</svg>` : ''}
 ${d.fonte && vertical ? `<div id="fonte" style="position:absolute;top:${H * (masc ? 0.607 : 0.688)}px;left:${masc ? W * 0.24 : W * 0.06}px;right:${W * 0.05}px;text-align:center;white-space:nowrap;overflow:hidden;font-weight:600;font-size:${Math.round(27 * W / 1080)}px;letter-spacing:.5px;color:#aab3c9;opacity:0">Fonte: ${txt(d.fonte, 42)}</div>` : ''}
 ${masc ? `<div id="masc" style="position:absolute;left:${vertical ? W * 0.01 : W * 0.03}px;top:${(vertical ? H * 0.765 : H * 0.9) - mascH}px;width:240px;height:360px;transform-origin:0 0"><div style="transform:scale(${mascEsc});transform-origin:0 0">${mascoteSvg(d.mascote.roupa)}</div></div>` : ''}</div>
 <div id="marca" style="position:fixed;left:0;top:0;width:2px;height:2px;background:rgb(0,0,77);z-index:99"></div>
@@ -386,6 +387,7 @@ window.setT=function(t){
  if($('tag')){$('tag').style.transform='translateX(-50%) translateY('+((1-eo(ap(t,0,.4)))*-30)+'px)';$('tag').style.opacity=eo(ap(t,0,.3));}
  if($('tit')){$('tit').style.transform='translateY('+((1-eo(ap(t,.05,.5)))*40)+'px)';$('tit').style.opacity=eo(ap(t,.05,.4));}
  if($('fonte'))$('fonte').style.opacity=.9*eo(ap(t,.35,.5));
+ if($('clima')){const q=back(ap(t,.6,.45));$('clima').style.opacity=Math.min(1,q);$('clima').style.transform='scale('+q+') rotate('+(Math.sin(t*2.5)*6)+'deg)';if($('clag')){const u=(t%1.8)/1.8;$('clag').setAttribute('transform','translate(0 '+(u*16)+')');$('clag').style.opacity=u<.8?1:0;}}
  try{const fa=$('fundoAnim');if(fa)fa.style.transform='translate('+((t*14)%46)+'px,'+((t*9)%46)+'px)';}catch(e){}
  if(!window.__fitOk){window.__fitOk=1;try{
    const tt=$('tit');if(tt){let s=parseFloat(getComputedStyle(tt).fontSize);const max=${Math.round(iluTop - titTop - 14)};while(tt.scrollHeight>max&&s>34){s-=3;tt.style.fontSize=s+'px';}}
