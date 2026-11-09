@@ -12,7 +12,7 @@
 import { getDb } from '../../../lib/firebase-admin';
 import { autorizado } from '../../../lib/central';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
-import { PAUTAS, pautaPorId, roteiroBrasil, proximoHorarioBrasil, COLECAO_BRASIL, CONFIG_BRASIL, NOME_CANAL } from '../../../lib/brasilInacreditavel';
+import { PAUTAS, pautaPorId, pesquisarBrasil, escreverBrasil, proximoHorarioBrasil, COLECAO_BRASIL, CONFIG_BRASIL, NOME_CANAL } from '../../../lib/brasilInacreditavel';
 
 export const config = { maxDuration: 300 };
 
@@ -90,16 +90,55 @@ async function proximoTrabalho(db, col) {
   return null;
 }
 
-/** Escreve o roteiro (marcador "escrevendo" enquanto o Claude pesquisa) e, na automação, já manda para a Fábrica. */
-async function escrever(db, col, pauta, formato, { autoAprovarCanal = null } = {}) {
+/**
+ * Escreve em DUAS etapas, cada uma numa chamada própria da Vercel (cada chamada tem no máximo 5 minutos):
+ *   1) pesquisa na web (guarda os fatos no marcador) e chama a etapa 2;
+ *   2) escreve o roteiro com os fatos e, na automação, já manda para a Fábrica.
+ * Se a chamada da etapa 2 não sair, o cron de hora em hora continua de onde parou.
+ */
+async function etapaPesquisa(db, col, pauta, formato, { autoAprovarCanal = null, base = '' } = {}) {
   const marcador = col.doc();
-  await marcador.set({ status: 'escrevendo', tipo: formato, pautaId: pauta.id, titulo: pauta.titulo, criadoEm: new Date().toISOString() });
+  await marcador.set({ status: 'escrevendo', fase: 'pesquisando', tipo: formato, pautaId: pauta.id, titulo: pauta.titulo, criadoEm: new Date().toISOString(), atualizadoEm: new Date().toISOString(), ...(autoAprovarCanal ? { autoCanal: autoAprovarCanal } : {}) });
   try {
-    const { ep, fontes } = await roteiroBrasil(pauta, formato);
+    const { pesquisa, fontes } = await pesquisarBrasil(pauta);
+    await marcador.update({ fase: 'pesquisado', pesquisa, fontes: fontes.slice(0, 12), atualizadoEm: new Date().toISOString() });
+  } catch (e) {
+    await marcador.update({ status: 'falhou', erro: String(e.message || e).slice(0, 300), falhouEm: new Date().toISOString() }).catch(() => {});
+    throw e;
+  }
+  await chamarEtapa2(base, marcador.id);
+  return { id: marcador.id };
+}
+
+async function chamarEtapa2(base, id) {
+  if (!base || !process.env.CENTRAL_TOKEN) return; // o cron continua
+  try {
+    await fetch(`${base}/api/central/brasil-inacreditavel`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-central-token': process.env.CENTRAL_TOKEN },
+      body: JSON.stringify({ acao: 'continuar', id }),
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch {
+    /* o cron continua */
+  }
+}
+
+async function etapaEscrita(db, col, marcadorRef) {
+  const m = (await marcadorRef.get()).data();
+  if (!m || m.status !== 'escrevendo' || m.fase !== 'pesquisado') return null;
+  const pauta = pautaPorId(m.pautaId);
+  if (!pauta) {
+    await marcadorRef.update({ status: 'falhou', erro: 'Pauta não encontrada.' });
+    return null;
+  }
+  await marcadorRef.update({ fase: 'escrevendo', atualizadoEm: new Date().toISOString() });
+  try {
+    const { ep, fontes } = await escreverBrasil(pauta, m.tipo, m.pesquisa, m.fontes || []);
     const ref = col.doc(ep.id);
     const d = {
       status: 'aguardando',
-      tipo: formato,
+      tipo: m.tipo,
       pautaId: pauta.id,
       titulo: ep.titulo,
       fatos: ep.fatos || [],
@@ -108,14 +147,17 @@ async function escrever(db, col, pauta, formato, { autoAprovarCanal = null } = {
       criadoEm: new Date().toISOString(),
     };
     await ref.set(d);
-    await marcador.delete();
-    if (autoAprovarCanal) await aprovar(db, ref, d, autoAprovarCanal, { automatica: true });
+    await marcadorRef.delete();
+    if (m.autoCanal?.id) await aprovar(db, ref, d, m.autoCanal, { automatica: true });
     return { id: ep.id, titulo: ep.titulo };
   } catch (e) {
-    await marcador.update({ status: 'falhou', erro: String(e.message || e).slice(0, 300), falhouEm: new Date().toISOString() }).catch(() => {});
+    await marcadorRef.update({ status: 'falhou', erro: String(e.message || e).slice(0, 300), falhouEm: new Date().toISOString() }).catch(() => {});
     throw e;
   }
 }
+
+// Domínio de produção primeiro (o endereço próprio de cada deploy pode estar protegido por senha da Vercel)
+const baseDe = (req) => (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : req.headers.host ? `https://${req.headers.host}` : '');
 
 /** Roda em segundo plano na Vercel (a pesquisa leva 1 a 3 minutos). */
 async function emSegundoPlano(res, trabalho, resposta) {
@@ -148,7 +190,11 @@ export default async function handler(req, res) {
       const escrevendo = (await col.where('status', '==', 'escrevendo').get()).docs;
       let ocupado = false;
       for (const x of escrevendo) {
-        if (Date.now() - new Date(x.data().criadoEm || 0).getTime() > 15 * 60e3) await x.ref.update({ status: 'falhou', erro: 'A pesquisa demorou demais e parou. Vai tentar de novo sozinho.', falhouEm: new Date().toISOString() }).catch(() => {});
+        const xd = x.data();
+        const parado = Date.now() - new Date(xd.atualizadoEm || xd.criadoEm || 0).getTime();
+        // Pesquisa pronta e a escrita não começou (a chamada da etapa 2 não saiu): continua daqui
+        if (xd.fase === 'pesquisado' && parado > 5 * 60e3) return emSegundoPlano(res, etapaEscrita(db, col, x.ref), { continuando: xd.titulo });
+        if (parado > 12 * 60e3) await x.ref.update({ status: 'falhou', erro: 'A pesquisa ou a escrita demorou demais e parou. Vai tentar de novo sozinho.', falhouEm: new Date().toISOString() }).catch(() => {});
         else ocupado = true;
       }
       if (ocupado) return res.status(200).json({ pulou: 'já está escrevendo um roteiro' });
@@ -166,7 +212,7 @@ export default async function handler(req, res) {
       const falhas = (await col.where('pautaId', '==', trabalho.pauta.id).get()).docs.filter((x) => x.data().status === 'falhou' && x.data().tipo === trabalho.formato).length;
       if (falhas >= 3) return res.status(200).json({ aprovados, pulou: `"${trabalho.pauta.titulo}" falhou 3 vezes: tente à mão no Compilador` });
       await cfgRef.set({ ultimaGeracao: new Date().toISOString() }, { merge: true });
-      return emSegundoPlano(res, escrever(db, col, trabalho.pauta, trabalho.formato, { autoAprovarCanal: cfg.canalYoutube }), { aprovados, escrevendo: trabalho.pauta.titulo, formato: trabalho.formato });
+      return emSegundoPlano(res, etapaPesquisa(db, col, trabalho.pauta, trabalho.formato, { autoAprovarCanal: cfg.canalYoutube, base: baseDe(req) }), { aprovados, escrevendo: trabalho.pauta.titulo, formato: trabalho.formato });
     }
 
     if (req.method === 'GET') {
@@ -226,7 +272,15 @@ export default async function handler(req, res) {
         if (!pauta) return res.status(400).json({ erro: 'Todas as pautas já têm roteiro. Peça novas pautas.' });
       }
       if (formato === 'short' && pauta.lista) return res.status(400).json({ erro: 'A lista dos 10 mistérios não vira Short.' });
-      return emSegundoPlano(res, escrever(db, col, pauta, formato), { ok: true, escrevendo: pauta.titulo, formato });
+      // Escrito à mão: na automação ligada, também vai sozinho para a Fábrica
+      const cfgG = await lerConfig(db);
+      const autoCanal = cfgG.autoAprovar !== false && cfgG.canalYoutube?.id ? cfgG.canalYoutube : null;
+      return emSegundoPlano(res, etapaPesquisa(db, col, pauta, formato, { autoAprovarCanal: autoCanal, base: baseDe(req) }), { ok: true, escrevendo: pauta.titulo, formato });
+    }
+    if (b.acao === 'continuar') {
+      // Etapa 2 (escrita), chamada pela própria etapa 1 depois da pesquisa
+      const ref = col.doc(String(b.id || ''));
+      return emSegundoPlano(res, etapaEscrita(db, col, ref), { ok: true });
     }
     if (b.acao === 'aprovar' || b.acao === 'descartar') {
       const ref = col.doc(String(b.id || ''));
