@@ -158,29 +158,46 @@ export default async function handler(req, res) {
         .filter(({ x }) => x.texto && (x.tipo || 'short') === 'short' && !x.usadaEmLongo && new Date(x.data || x.criadoEm || 0).getTime() > desde)
         .sort((a, b) => (Number(b.x.potencial) || 5) - (Number(a.x.potencial) || 5) || String(b.x.data || '').localeCompare(String(a.x.data || '')))
         .slice(0, 5);
-      if (candidatas.length < 3) return res.status(200).json({ pulou: `poucas notícias boas (${candidatas.length})` });
-      const noticias = candidatas.map(({ x }) => ({ titulo: x.titulo, link: x.link, fonteNome: x.fonte, data: x.data, texto: x.texto, imagens: x.imagens || [] }));
-      const ep = await roteiroVideoPolitica(noticias);
-      const ref = col.doc(ep.id);
-      const d = {
-        status: 'aguardando',
-        tipo: 'longo',
-        titulo: ep.titulo,
-        fonte: [...new Set(noticias.map((n) => n.fonteNome))].join(', '),
-        links: noticias.map((n) => ({ titulo: n.titulo, link: n.link })),
-        imagens: noticias.flatMap((n) => n.imagens).slice(0, 1),
-        texto: noticias.map((n) => n.texto).join('\n\n').slice(0, 9000),
-        ep,
-        semanal: true,
-        criadoEm: new Date().toISOString(),
-      };
-      await ref.set(d);
-      await Promise.all(candidatas.map(({ doc }) => doc.ref.update({ usadaEmLongo: ep.id }).catch(() => {})));
+      if (!candidatas.length) return res.status(200).json({ pulou: 'nenhuma notícia boa nos últimos dias' });
+      // UM assunto explicado a fundo (o mais quente da semana): é o que o pessoal procura no YouTube e no Google por meses
+      const top = candidatas[0];
+      const tema = `${top.x.titulo} — explicado do começo ao fim: o que aconteceu, por que importa, quem ganha e quem perde e o que muda para o brasileiro`;
+      const marcador = col.doc();
+      await marcador.set({ status: 'escrevendo', tipo: 'explicador', titulo: top.x.titulo, fonte: 'Pesquisa na web', imagens: [], semanal: true, criadoEm: new Date().toISOString() });
       await cfg.set({ ultimoLongo: new Date().toISOString() }, { merge: true });
-      const { canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
-      const canal = await canalDaPolitica(db, await canalDosGamesId(db));
-      const aprovado = canal ? await aprovarPolitica(db, ref, d, canal, { automatica: true }) : null;
-      return res.status(200).json({ ok: true, id: ep.id, titulo: ep.titulo, noticias: noticias.length, aprovado });
+      const trabalho = (async () => {
+        try {
+          const { ep, fontes } = await roteiroExplicador(tema, 'longo');
+          const ref = col.doc(ep.id);
+          const d = {
+            status: 'aguardando',
+            tipo: 'explicador',
+            titulo: ep.titulo,
+            texto: [(ep.fatos || []).join('\n'), top.x.texto || ''].join('\n\n').slice(0, 9000),
+            fonte: 'Pesquisa na web',
+            links: fontes.slice(0, 8).map((f) => ({ titulo: f.titulo, link: f.url })),
+            imagens: top.x.imagens || [],
+            ep,
+            semanal: true,
+            criadoEm: new Date().toISOString(),
+          };
+          await ref.set(d);
+          await marcador.delete();
+          await top.doc.ref.update({ usadaEmLongo: ep.id }).catch(() => {});
+          const { canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
+          const canal = await canalDaPolitica(db, await canalDosGamesId(db));
+          if (canal) await aprovarPolitica(db, ref, d, canal, { automatica: true });
+        } catch (e) {
+          await marcador.update({ status: 'falhou', erro: String(e.message || e).slice(0, 300), falhouEm: new Date().toISOString() }).catch(() => {});
+        }
+      })();
+      const ctxV = globalThis[Symbol.for('@vercel/request-context')]?.get?.();
+      if (ctxV?.waitUntil) {
+        ctxV.waitUntil(trabalho);
+        return res.status(200).json({ ok: true, tema: top.x.titulo, emSegundoPlano: true });
+      }
+      await trabalho;
+      return res.status(200).json({ ok: true, tema: top.x.titulo });
     }
 
     if (req.method === 'GET' && req.query.auto) {
