@@ -109,23 +109,27 @@ async function aprovarSozinho(db, col, cfgDados) {
   const canal = await canalDosGames(db, cfgDados);
   if (!canal) return { automaticas: 0, motivo: 'sem canal do YouTube (aprove uma notícia à mão uma vez)' };
   const snap = await col.where('status', '==', 'aguardando').get();
-  const velha = Date.now() - 2 * 86400e3;
+  // Só notícia ATUAL: até 36 h desde que saiu; a nota cai 1 ponto a cada 12 h (a de hoje passa na frente da de ontem)
+  const idade = (d) => Date.now() - new Date(d.data || d.criadoEm || 0).getTime();
+  const pontos = (d) => (d.ep?.potencial || 5) - idade(d) / (12 * 3600e3);
   const fila = snap.docs
     .map((d) => ({ ref: d.ref, d: d.data() }))
-    .filter(({ d }) => (d.tipo || 'short') === 'short' && d.ep && new Date(d.criadoEm || 0).getTime() > velha)
-    // Primeiro as que mais param o feed (curiosidade, fato estranho, franquia gigante); empate: a mais nova.
-    // Notícia fraca (nota 3 ou menos) só entra se não houver nada melhor esperando.
-    .sort((a, b) => (b.d.ep?.potencial || 5) - (a.d.ep?.potencial || 5) || String(b.d.data || b.d.criadoEm || '').localeCompare(String(a.d.data || a.d.criadoEm || '')));
+    .filter(({ d }) => (d.tipo || 'short') === 'short' && d.ep && idade(d) < 36 * 3600e3)
+    .sort((a, b) => pontos(b.d) - pontos(a.d));
   // Até 5 vídeos de games por dia (mais alcance por vídeo e não estoura o limite de capas); as mais novas primeiro
   const ultimas24 = (await db.collection('youvideo_fila').where('games', '==', true).get()).docs
     .filter((x) => Date.now() - new Date(x.data().criadoEm || 0).getTime() < 24 * 3600e3).length;
   const vagas = Math.max(0, 5 - ultimas24);
+  // Notícia QUENTE (saiu há menos de 3 h, nota 8+): entra mesmo passando das 5 do dia (até 7)
+  const quentes = fila.filter(({ d }) => (d.ep?.potencial || 5) >= 8 && idade(d) < 3 * 3600e3);
+  const extras = Math.max(0, Math.min(quentes.length, 7 - ultimas24) - vagas);
+  const ordem = [...quentes, ...fila.filter((x) => !quentes.includes(x))];
   let automaticas = 0;
-  for (const { ref, d } of fila.slice(0, vagas)) {
+  for (const { ref, d } of ordem.slice(0, vagas + extras)) {
     await aprovarNoticia(db, ref, d, canal, null, { limite: 1 });
     automaticas++;
   }
-  return { automaticas, vagas };
+  return { automaticas, vagas, quentes: quentes.length };
 }
 
 /** Desafio "Adivinhe o jogo pela imagem": escreve e deixa na lista (a aprovação automática manda para a Fábrica). */

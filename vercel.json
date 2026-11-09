@@ -14,7 +14,7 @@
     },
     {
       "path": "/api/central/games-noticias?auto=1",
-      "schedule": "15 */2 * * *"
+      "schedule": "5 * * * *"
     },
     {
       "path": "/api/central/politica-noticias?auto=1",
