@@ -78,13 +78,15 @@ async function proximoTrabalho(db, col) {
   const shortsFuturos = m.shorts.filter((t) => t > agora).length + valendo.filter((x) => x.tipo === 'short' && ['escrevendo', 'aguardando'].includes(x.status)).length;
   const comLongo = new Set(valendo.filter((x) => x.tipo !== 'short').map((x) => x.pautaId));
   const comShort = new Set(valendo.filter((x) => x.tipo === 'short').map((x) => x.pautaId));
+  // Pauta que falhou 3 vezes nas últimas 24 h fica de lado e a automação segue para a próxima
+  const falhas = (id, tipo) => docs.filter((x) => x.pautaId === id && (x.tipo || 'longo') === tipo && x.status === 'falhou' && agora - new Date(x.falhouEm || x.criadoEm || 0).getTime() < 86400e3).length;
   if (longosFuturos < ESTOQUE_LONGOS) {
-    const pauta = PAUTAS.find((p) => !comLongo.has(p.id));
+    const pauta = PAUTAS.find((p) => !comLongo.has(p.id) && falhas(p.id, 'longo') < 3);
     if (pauta) return { pauta, formato: 'longo' };
   }
   if (shortsFuturos < ESTOQUE_SHORTS) {
     // Short das histórias que já têm o longo (a lista dos 10 mistérios não vira Short)
-    const pauta = PAUTAS.find((p) => !p.lista && comLongo.has(p.id) && !comShort.has(p.id));
+    const pauta = PAUTAS.find((p) => !p.lista && comLongo.has(p.id) && !comShort.has(p.id) && falhas(p.id, 'short') < 3);
     if (pauta) return { pauta, formato: 'short' };
   }
   return null;
@@ -209,8 +211,6 @@ export default async function handler(req, res) {
       // Pauta que falhou 3 vezes sai da automação (aparece no Compilador para tentar à mão)
       const trabalho = await proximoTrabalho(db, col);
       if (!trabalho) return res.status(200).json({ aprovados, pulou: 'agenda cheia ou pautas acabaram' });
-      const falhas = (await col.where('pautaId', '==', trabalho.pauta.id).get()).docs.filter((x) => x.data().status === 'falhou' && x.data().tipo === trabalho.formato).length;
-      if (falhas >= 3) return res.status(200).json({ aprovados, pulou: `"${trabalho.pauta.titulo}" falhou 3 vezes: tente à mão no Compilador` });
       await cfgRef.set({ ultimaGeracao: new Date().toISOString() }, { merge: true });
       return emSegundoPlano(res, etapaPesquisa(db, col, trabalho.pauta, trabalho.formato, { autoAprovarCanal: cfg.canalYoutube, base: baseDe(req) }), { aprovados, escrevendo: trabalho.pauta.titulo, formato: trabalho.formato });
     }
