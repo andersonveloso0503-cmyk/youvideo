@@ -614,6 +614,7 @@
       <button type="button" data-marca="documentario">🌙 Documentários para dormir</button>
       <button type="button" data-marca="games">🎮 Games</button>
       <button type="button" data-marca="politica">🏛️ Política</button>
+      <button type="button" data-marca="brasil">🇧🇷 Brasil Inacreditável</button>
       <button type="button" data-marca="infantil">🧸 Infantil</button>
       <button type="button" data-marca="cortes">🎬 Cortes</button>
       <button type="button" data-marca="oracao">🙏 Oração do dia</button>
@@ -771,6 +772,20 @@
           </div>
         </div>
         <div id="plLista"></div>
+      </div>
+    </div>
+    <div class="fab-config" id="fabConfigBrasil" hidden>
+      <div class="campo-config"><label>Canal do YouTube</label><select id="fabBiCanal"></select></div>
+      <div class="bi-roteiros" style="grid-column:1 / -1;width:100%;margin-top:14px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <h3 style="margin:0">🇧🇷 Roteiros do Brasil Inacreditável</h3>
+          <button type="button" class="btn-mini" id="btnBiGerar">✍️ Escrever a próxima história agora</button>
+          <button type="button" class="btn-mini" id="btnBiAtualizar" title="Atualizar">↻</button>
+          <span class="nota" id="biInfo" style="margin:0"></span>
+        </div>
+        <p class="nota" style="margin:6px 0">Tudo sozinho: o Claude <b>pesquisa na web</b> cada história do banco de pautas, escreve o roteiro <b>só com o que achou nas fontes</b>, passa a <b>revisão de ortografia</b> e o vídeo é feito com fotos reais de arquivo (ilustração só onde não existe foto). Longos às <b>segundas, quartas e sextas às 19h</b> e um <b>Short por dia às 12h30</b>. <b>Nada vai ao YouTube sem você assistir e aprovar</b> em 📚 Biblioteca → ✅ Aprovar.</p>
+        <div id="biLista"></div>
+        <details style="margin-top:10px"><summary class="nota" style="cursor:pointer">📋 Banco de pautas</summary><div id="biPautas"></div></details>
       </div>
     </div>
     <div class="fab-config" id="fabConfigInfantil" hidden>

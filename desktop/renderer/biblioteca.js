@@ -606,7 +606,7 @@ const Biblioteca = (() => {
   }
 
   // ───────── ✅ Aprovar: assiste o vídeo pronto antes de ir para o YouTube ─────────
-  const TIPO_APROVAR = { games: '🎮 Games', politica: '🏛️ Política', documentario: '🌙 Noites na História' };
+  const TIPO_APROVAR = { games: '🎮 Games', politica: '🏛️ Política', documentario: '🌙 Noites na História', brasil: '🇧🇷 Brasil Inacreditável' };
   function marcarContagem(n) {
     q('#bibAbaAprovar').textContent = n ? `✅ Aprovar (${n})` : '✅ Aprovar';
     const topo = q('#btnBiblioteca');

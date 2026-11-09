@@ -6,13 +6,14 @@ const Fabrica = (() => {
   let ligado = false;
   let marca = ''; // '' = histórias bíblicas; 'cortes' = cortes de filme e cômicos; 'oracao' = oração do dia; 'lcs' = vídeos de divulgação da LCS
   // Em qual aba cada vídeo da fábrica aparece
-  const abaDe = (i) => i.marca || (i.infantil ? 'infantil' : i.politica ? 'politica' : i.games ? 'games' : i.documentario ? 'documentario' : i.oracao ? 'oracao' : i.corte ? 'cortes' : i.longo ? 'longos' : '');
+  const abaDe = (i) => i.marca || (i.infantil ? 'infantil' : i.brasil ? 'brasil' : i.politica ? 'politica' : i.games ? 'games' : i.documentario ? 'documentario' : i.oracao ? 'oracao' : i.corte ? 'cortes' : i.longo ? 'longos' : '');
   const NOTAS = {
     '': 'A IA escolhe os temas, o site cria roteiro, voz e imagens, o seu PC monta, e cada vídeo é agendado sozinho nas redes. Alterna <b>história animada</b> e <b>narrado realista</b>, sem repetir tema.',
     longos: '<b>Vídeos longos</b> (cerca de 12 minutos) no estilo <b>mistério</b>: o título faz uma pergunta (ex.: "O que aconteceu com Jesus nos 3 dias no túmulo?"), o vídeo vai revelando detalhes e só responde no final. Thumbnail com a frase grande. São os vídeos que trazem <b>inscritos</b> e monetização. Vão para o <b>YouTube</b> (e Facebook, se marcar), com imagens em zoom para caber no orçamento.',
     documentario: '<b>Documentários para dormir</b> (canal Noites na História): os <b>roteiros já estão escritos</b> (vikings, castelo medieval, caravelas, Egito, gaúchos, Pompeia, monges, imigrantes italianos, pirâmides e iglus). O site narra <b>devagar, com pausas</b>, usa <b>vídeos e fotos reais</b> (Pexels e Wikimedia) conferidos pela IA para combinar com a fala e com a época (quando nenhum serve, pinta a cena), faz a <b>capa pintada</b> com o título em letra medieval e coloca os <b>capítulos</b> na descrição. O seu PC monta e sobe <b>1 por dia</b> no YouTube.',
     games: '<b>Canal de games</b> (Próxima Fase). <b>Notícias:</b> o site busca sozinho as notícias reais e escreve os Shorts — você lê e aprova logo abaixo. <b>Listas e especiais:</b> os <b>roteiros já estão escritos</b> (GTA 6: tudo que sabemos; 10 jogos parecidos com GTA). O site narra no <b>ritmo de notícia</b>, usa só <b>imagens e trailers oficiais</b> dos jogos (IGDB e página do jogo na Steam — nunca gameplay de outros canais), faz a <b>capa</b> com o texto grande em branco e verde neon e coloca os <b>capítulos</b> e os créditos na descrição. O seu PC monta e sobe no YouTube.',
     politica: '<b>Canal de política</b>: notícias, bastidores e curiosidades (como a eleição foi decidida, os grandes casos, o que muda agora). O site busca notícias reais de agências públicas e de jornais de linhas diferentes, escreve o roteiro <b>mostrando os dois lados</b> e você <b>lê e aprova</b> cada um logo abaixo. O <b>💡 Explicador</b> pesquisa na web e escreve um vídeo sobre o tema que você pedir. Imagens: só <b>fotos reais</b> das agências públicas e vídeos reais do Pexels — nunca IA imitando político. O seu PC monta e sobe no YouTube na categoria Notícias e política.',
+    brasil: '<b>Brasil Inacreditável</b>: histórias reais do Brasil que parecem mentira (mistérios, sobreviventes, lugares proibidos, cidades que sumiram, crimes famosos). <b>Tudo automático</b>: o Claude pesquisa cada história na web, escreve só com o que achou nas fontes e revisa a ortografia; o site faz voz e imagens reais, o seu PC monta. Longos às segundas, quartas e sextas e um Short por dia. <b>Você só aprova o vídeo pronto</b> em 📚 Biblioteca → ✅ Aprovar.',
     infantil: '<b>Desenho infantil</b> com um personagem fixo (começa com o <b>Pingo</b>): episódios de <b>4 a 5 minutos</b>, todo animado, com uma <b>música chiclete nova</b> no meio de cada episódio (o refrão volta no final). A IA escreve a historinha com uma lição, narra, compõe e canta a música (Estúdio de Música), cria as imagens sempre com o mesmo personagem, anima, o seu PC monta e sobe no <b>YouTube</b> marcado como <b>conteúdo para crianças</b>, na playlist do personagem.',
     cortes: 'Cenas curtas em <b>diálogo</b>, com uma voz para cada personagem. <b>Corte de filme</b>: cena bíblica dramática, com imagem realista (cerca de 45 s). <b>Corte cômico</b>: situação engraçada em desenho animado (cerca de 1 min). A IA escolhe as cenas sem repetir, escreve as falas, o seu PC monta, e cada corte é agendado sozinho nas redes.',
     oracao: 'Um Short de <b>oração por dia</b> (cerca de 1 minuto), com a data no título — por exemplo "Oração da Manhã de 7 de Outubro" —, que é como as pessoas procuram oração no YouTube. A IA escreve a oração (um assunto diferente por dia), narra com imagens calmas, o seu PC monta, e ela é publicada sozinha no horário.',
@@ -29,7 +30,7 @@ const Fabrica = (() => {
     for (const id of ['#fabLinhaCriar', '#fabErro', '#fabTopoLista', '#fabLista']) q(id).hidden = musica;
     q('#modalFabrica .fab-redes').hidden = musica;
     if (musica) {
-      ['#fabConfigLcs', '#fabConfigOracao', '#fabConfigCortes', '#fabConfigBiblia', '#fabConfigLongos', '#fabConfigDoc', '#fabConfigGames', '#fabConfigPolitica', '#fabConfigInfantil'].forEach((id) => (q(id).hidden = true));
+      ['#fabConfigLcs', '#fabConfigOracao', '#fabConfigCortes', '#fabConfigBiblia', '#fabConfigLongos', '#fabConfigDoc', '#fabConfigGames', '#fabConfigPolitica', '#fabConfigBrasil', '#fabConfigInfantil'].forEach((id) => (q(id).hidden = true));
       FabMusica.mostrar();
       return;
     }
@@ -40,9 +41,10 @@ const Fabrica = (() => {
     q('#fabConfigDoc').hidden = marca !== 'documentario';
     q('#fabConfigGames').hidden = marca !== 'games';
     q('#fabConfigPolitica').hidden = marca !== 'politica';
-    q('#fabLinhaCriar').hidden = marca === 'politica'; // política: tudo nasce das notícias e explicadores aprovados
+    q('#fabConfigBrasil').hidden = marca !== 'brasil';
+    q('#fabLinhaCriar').hidden = marca === 'politica' || marca === 'brasil'; // política e Brasil Inacreditável: tudo nasce dos roteiros
     q('#fabConfigInfantil').hidden = marca !== 'infantil';
-    const soYoutube = marca === 'longos' || marca === 'documentario' || marca === 'games' || marca === 'politica' || marca === 'infantil';
+    const soYoutube = marca === 'longos' || marca === 'documentario' || marca === 'games' || marca === 'politica' || marca === 'brasil' || marca === 'infantil';
     if (marca === 'games' && !q('#fabGmInicio').value) {
       const d = new Date(Date.now() + 2 * 86400e3);
       q('#fabGmInicio').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -56,7 +58,7 @@ const Fabrica = (() => {
     document.querySelectorAll('#modalFabrica .so-biblia').forEach((el) => (el.hidden = marca === 'lcs'));
     // Longos: só YouTube (sempre) e Facebook. Instagram, TikTok e Kwai são para vídeo curto.
     q('#fabInstagram').parentElement.hidden = soYoutube;
-    q('#fabFacebook').parentElement.hidden = marca === 'documentario' || marca === 'games' || marca === 'politica'; // infantil: YouTube + Página do Planeta Fofura
+    q('#fabFacebook').parentElement.hidden = marca === 'documentario' || marca === 'games' || marca === 'politica' || marca === 'brasil'; // infantil: YouTube + Página do Planeta Fofura
     for (const id of ['#fabTiktok', '#fabKwai']) q(id).parentElement.hidden = marca === 'lcs' || soYoutube;
     q('#fabYoutube').disabled = soYoutube;
     if (soYoutube) q('#fabYoutube').checked = true;
@@ -64,6 +66,7 @@ const Fabrica = (() => {
     carregar();
     if (marca === 'games') carregarNoticias();
     if (marca === 'politica') carregarPolitica();
+    if (marca === 'brasil') carregarBrasil();
   }
 
   const ETAPA = {
@@ -164,7 +167,7 @@ const Fabrica = (() => {
   function preencherCanais() {
     const lista = typeof canais !== 'undefined' ? canais : [];
     const p = prefs();
-    for (const id of ['#fabCanal', '#fabOrCanal', '#fabCtCanal', '#fabLgCanal', '#fabDocCanal', '#fabGmCanal', '#fabPlCanal', '#fabIfCanal']) {
+    for (const id of ['#fabCanal', '#fabOrCanal', '#fabCtCanal', '#fabLgCanal', '#fabDocCanal', '#fabGmCanal', '#fabPlCanal', '#fabBiCanal', '#fabIfCanal']) {
       const sel = q(id);
       sel.innerHTML = lista.length
         ? lista.map((c) => `<option value="${esc(c.id)}">${esc(c.titulo)}</option>`).join('')
@@ -181,6 +184,9 @@ const Fabrica = (() => {
     // (a política sai no Noites na História; nunca fica no canal que sobrou da última escolha, que podia ser o dos games)
     const pol = lista.find((c) => /pol[ií]tic|not[ií]cia|bras[ií]lia|planalto/i.test(c.titulo || '')) || noites;
     if (pol) q('#fabPlCanal').value = pol.id;
+    // Brasil Inacreditável: já vem marcado o canal com esse nome (ou o antigo Aqui Tem Música, que foi renomeado)
+    const bi = lista.find((c) => /inacredit/i.test(c.titulo || '')) || lista.find((c) => /aqui tem m[uú]sica/i.test(c.titulo || ''));
+    if (bi) q('#fabBiCanal').value = bi.id;
     // O canal que você escolheu em cada aba vale mais que tudo (fica lembrado de uma vez para a outra)
     const escolhidos = config.fabricaCanais || {};
     for (const [id, canalId] of Object.entries(escolhidos)) {
@@ -193,7 +199,7 @@ const Fabrica = (() => {
   }
 
   function lembrarCanais() {
-    for (const id of ['#fabOrCanal', '#fabCtCanal', '#fabLgCanal', '#fabDocCanal', '#fabGmCanal', '#fabPlCanal', '#fabIfCanal']) {
+    for (const id of ['#fabOrCanal', '#fabCtCanal', '#fabLgCanal', '#fabDocCanal', '#fabGmCanal', '#fabPlCanal', '#fabBiCanal', '#fabIfCanal']) {
       const sel = q(id);
       if (!sel) continue;
       sel.addEventListener('change', () => {
@@ -341,6 +347,9 @@ const Fabrica = (() => {
     };
     document.querySelectorAll('[data-pl-tema]').forEach((b) => (b.onclick = () => (q('#plTema').value = b.dataset.plTema)));
     q('#btnPlExplicadorCriar').onclick = criarExplicador;
+    q('#btnBiGerar').onclick = gerarBrasil;
+    q('#btnBiAtualizar').onclick = () => carregarBrasil();
+    q('#fabBiCanal').addEventListener('change', salvarCanalBrasil);
   }
 
   async function criar() {
@@ -964,6 +973,139 @@ const Fabrica = (() => {
     return canal ? { id: canal.id, titulo: canal.titulo } : null;
   }
 
+  // ───────── 🇧🇷 Brasil Inacreditável ─────────
+  function canalBrasil() {
+    const canalId = q('#fabBiCanal').value;
+    const canal = (typeof canais !== 'undefined' ? canais : []).find((c) => c.id === canalId);
+    return canal ? { id: canal.id, titulo: canal.titulo } : null;
+  }
+
+  // O canal escolhido aqui vale para a automação na nuvem (é para onde os vídeos sobem)
+  async function salvarCanalBrasil() {
+    const canal = canalBrasil();
+    if (!canal || !config.temCentral) return;
+    try {
+      await window.api.brasil.acao({ acao: 'canal', canalYoutube: canal });
+      avisar(`Brasil Inacreditável vai subir no canal ${canal.titulo}`);
+      carregarBrasil();
+    } catch (e) {
+      avisar(msgErro(e), true);
+    }
+  }
+
+  const ESTADO_BI = { escrevendo: '⏳ pesquisando e escrevendo…', aguardando: '📝 roteiro pronto', aprovada: '✅ na Fábrica', falhou: '⚠ falhou', descartada: '🗑 descartado' };
+
+  async function carregarBrasil() {
+    const lista = q('#biLista');
+    const info = q('#biInfo');
+    if (!config.temCentral) {
+      lista.innerHTML = '<p class="nota">Cadastre a senha da Central em Configurações.</p>';
+      return;
+    }
+    try {
+      const r = await window.api.brasil.listar();
+      const auto = r.autoAprovar !== false;
+      const semCanal = !r.canalYoutube?.id;
+      info.innerHTML =
+        (semCanal ? '<b style="color:var(--terracota)">⚠ Escolha o canal ao lado para a automação começar.</b> ' : `Canal: <b>${esc(r.canalYoutube.titulo)}</b> · `) +
+        `<b>${auto ? '🤖 Automático ligado' : '✋ Automático desligado'}</b> ` +
+        `<button type="button" id="biAuto" style="font-size:12px;padding:2px 8px">${auto ? 'Desligar' : 'Ligar'}</button>` +
+        (r.ultimaGeracao ? ` · último roteiro: ${quandoTxt(r.ultimaGeracao)}` : '');
+      // Canal salvo na nuvem aparece marcado aqui (se estiver conectado neste PC)
+      if (r.canalYoutube?.id && (typeof canais !== 'undefined' ? canais : []).some((c) => c.id === r.canalYoutube.id)) q('#fabBiCanal').value = r.canalYoutube.id;
+      // Primeira vez: o canal marcado aqui vai para a nuvem
+      else if (semCanal && canalBrasil()) salvarCanalBrasil();
+      const btAuto = q('#biAuto');
+      btAuto.onclick = async () => {
+        btAuto.disabled = true;
+        try {
+          await window.api.brasil.acao({ acao: 'auto', ligado: !auto });
+        } catch (e) {
+          alert('Não consegui mudar: ' + msgErro(e));
+        }
+        carregarBrasil();
+      };
+      const cartao = (n, aprovada) => `
+        <div style="display:flex;gap:10px;padding:10px;border:1px solid var(--borda, #333);border-radius:10px;margin:8px 0;align-items:flex-start${aprovada ? ';opacity:.6' : ''}">
+          <div style="flex:1;min-width:0">
+            <div><b>${n.tipo === 'short' ? '📱 Short: ' : '📺 Longo: '}${esc(n.titulo)}</b></div>
+            <div class="nota" style="margin:2px 0">${esc(ESTADO_BI[n.estado] || n.estado)}${n.quando ? ` · vai ao ar ${quandoTxt(n.quando)}` : ''}${(n.links || []).length ? ' · ' + n.links.slice(0, 6).map((l) => `<a href="#" data-link="${esc(l.link)}" title="${esc(l.titulo)}">fonte</a>`).join(' ') : ''}</div>
+            ${n.erro ? `<div class="nota alerta">${esc(n.erro)}</div>` : ''}
+            ${n.roteiro ? `<details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>` : ''}
+          </div>
+          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : n.estado === 'aguardando' ? `<div style="display:flex;flex-direction:column;gap:6px;flex:none;width:auto">
+            <button type="button" class="btn-primario bi-aprovar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">✅ Mandar para a Fábrica</button>
+            <button type="button" class="btn-mini perigo bi-descartar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">❌ Descartar</button></div>` : ''}
+        </div>`;
+      lista.innerHTML =
+        (r.aguardando.length ? r.aguardando.map((n) => cartao(n, false)).join('') : `<p class="nota">${auto && !semCanal ? 'Nenhum roteiro esperando: a automação escreve sozinha quando faltar vídeo na agenda (confere de hora em hora).' : 'Nenhum roteiro esperando. Clique em ✍️ Escrever a próxima história agora.'}</p>`) +
+        (r.aprovadas.length ? `<details style="margin-top:8px"><summary class="nota" style="cursor:pointer">Mandados para a Fábrica (${r.aprovadas.length})</summary>${r.aprovadas.map((n) => cartao(n, true)).join('')}</details>` : '');
+      lista.querySelectorAll('[data-link]').forEach((a) => (a.onclick = (e) => (e.preventDefault(), window.api.abrir.link(a.dataset.link))));
+      lista.querySelectorAll('.bi-aprovar').forEach((b) => (b.onclick = () => aprovarBrasil(b.dataset.id, b)));
+      lista.querySelectorAll('.bi-descartar').forEach((b) => (b.onclick = () => descartarBrasil(b.dataset.id, b)));
+      const selo = (st) => (st === 'aprovada' ? '✅' : st === 'aguardando' ? '📝' : st === 'escrevendo' ? '⏳' : st === 'nao-tem' ? '—' : '·');
+      q('#biPautas').innerHTML =
+        '<p class="nota">✅ na Fábrica · 📝 roteiro pronto · ⏳ escrevendo · · ainda não feito. Escreva uma história fora da ordem com ✍️.</p>' +
+        (r.pautas || [])
+          .map((p) => `<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--borda, #333)">
+            <span style="flex:1">${esc(p.titulo)}</span>
+            <span class="nota" title="Vídeo longo">📺 ${selo(p.longo)}</span><span class="nota" title="Short">📱 ${selo(p.short)}</span>
+            ${p.longo ? '' : `<button type="button" class="btn-mini bi-pauta" data-pauta="${esc(p.id)}" data-formato="longo">✍️ longo</button>`}
+            ${p.longo && !p.short ? `<button type="button" class="btn-mini bi-pauta" data-pauta="${esc(p.id)}" data-formato="short">✍️ Short</button>` : ''}
+          </div>`)
+          .join('');
+      q('#biPautas').querySelectorAll('.bi-pauta').forEach((b) => (b.onclick = () => gerarBrasil(null, b.dataset.pauta, b.dataset.formato, b)));
+    } catch (e) {
+      lista.innerHTML = /RESOURCE_EXHAUSTED|Quota exceeded/i.test(msgErro(e))
+        ? '<p class="nota alerta">⚠ O banco de dados do Youvideo (Firebase) passou do limite grátis de hoje: volta sozinho de madrugada.</p>'
+        : `<p class="nota">Não consegui carregar os roteiros: ${esc(msgErro(e))}</p>`;
+    }
+  }
+
+  async function gerarBrasil(_ev, pautaId = null, formato = 'longo', botao = null) {
+    const b = botao || q('#btnBiGerar');
+    const texto = b.textContent;
+    b.disabled = true;
+    b.textContent = '⏳ Pesquisando...';
+    try {
+      const r = await window.api.brasil.acao({ acao: 'gerar', ...(pautaId ? { pautaId } : {}), formato });
+      avisar(`Escrevendo "${r.escrevendo}" (${r.formato === 'short' ? 'Short' : 'vídeo longo'}): leva de 1 a 3 minutos. Clique em ↻ depois.`);
+      setTimeout(carregarBrasil, 4000);
+    } catch (e) {
+      avisar(msgErro(e), true);
+    } finally {
+      b.disabled = false;
+      b.textContent = texto;
+    }
+  }
+
+  async function aprovarBrasil(id, botao) {
+    const canal = canalBrasil();
+    if (!canal) return avisar('Escolha o canal do Brasil Inacreditável (Canal do YouTube) antes.', true);
+    botao.disabled = true;
+    try {
+      const r = await window.api.brasil.acao({ acao: 'aprovar', id, canalYoutube: canal });
+      avisar(`Mandado para a Fábrica: vai ao ar ${quandoTxt(r.quando)} no ${canal.titulo}, depois que você aprovar o vídeo pronto.`);
+      carregarBrasil();
+      carregar();
+    } catch (e) {
+      botao.disabled = false;
+      avisar(msgErro(e), true);
+    }
+  }
+
+  async function descartarBrasil(id, botao) {
+    if (!confirm('Descartar este roteiro?')) return;
+    botao.disabled = true;
+    try {
+      await window.api.brasil.acao({ acao: 'descartar', id });
+      carregarBrasil();
+    } catch (e) {
+      botao.disabled = false;
+      avisar(msgErro(e), true);
+    }
+  }
+
   async function carregarPolitica() {
     const lista = q('#plLista');
     const info = q('#plInfo');
@@ -1377,7 +1519,7 @@ const Fabrica = (() => {
         l.className = `fab-item st-${i.status}`;
         l.innerHTML = `
           <span class="hora">${esc(new Date(i.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))}</span>
-          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.infantil ? `Desenho infantil${i.infantil.musica ? ` · música: ${i.infantil.musica}` : ''}` : i.oracao ? 'Oração do dia' : i.politica ? 'Vídeo de política' : i.games ? 'Vídeo de games (Próxima Fase)' : i.documentario ? 'Documentário para dormir' : i.longo ? 'Vídeo longo (mistério)' : `${i.corte ? (i.corte.tipo === 'comico' ? 'Corte cômico · ' : 'Corte de filme · ') : ''}${i.animar ? 'Animado' : 'Imagens com zoom'}`}">${i.marca ? '🏢' : i.infantil ? '🧸' : i.oracao ? '🙏' : i.politica ? '🏛️' : i.games ? '🎮' : i.documentario ? '🌙' : i.longo ? '📺' : i.corte ? (i.corte.tipo === 'comico' ? '😂' : '🎬') : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
+          <span class="tipo" title="${i.marca ? 'Divulgação da empresa' : i.infantil ? `Desenho infantil${i.infantil.musica ? ` · música: ${i.infantil.musica}` : ''}` : i.oracao ? 'Oração do dia' : i.brasil ? 'Brasil Inacreditável' : i.politica ? 'Vídeo de política' : i.games ? 'Vídeo de games (Próxima Fase)' : i.documentario ? 'Documentário para dormir' : i.longo ? 'Vídeo longo (mistério)' : `${i.corte ? (i.corte.tipo === 'comico' ? 'Corte cômico · ' : 'Corte de filme · ') : ''}${i.animar ? 'Animado' : 'Imagens com zoom'}`}">${i.marca ? '🏢' : i.infantil ? '🧸' : i.oracao ? '🙏' : i.brasil ? '🇧🇷' : i.politica ? '🏛️' : i.games ? '🎮' : i.documentario ? '🌙' : i.longo ? '📺' : i.corte ? (i.corte.tipo === 'comico' ? '😂' : '🎬') : i.estilo === 'desenho' ? '🎨' : '🎥'}${i.animar && !i.marca ? '✨' : ''}</span>
           <span class="txt"><b></b><small></small></span>
           <span class="acoes"></span>`;
         l.querySelector('b').textContent = i.titulo || (i.serie ? `${i.serie.nome} (Parte ${i.serie.parte}/${i.serie.total})` : i.tema);
@@ -1432,7 +1574,7 @@ const Fabrica = (() => {
           carregar();
         });
         // Redes dos canais: 📸 Instagram (publica sozinho) e 📱 TikTok (chega como rascunho), no Noites na História e no Próxima Fase
-        const contaRedes = i.games ? 'games' : i.documentario || i.politica ? 'noites' : ''; // política sai no canal Noites na História
+        const contaRedes = i.brasil ? '' : i.games ? 'games' : i.documentario || i.politica ? 'noites' : ''; // política sai no canal Noites na História
         if (contaRedes && i.status === 'concluido' && i.videoUrl) {
           const redes = [['instagram', '📸', 'Instagram']]; // Noites na História e Próxima Fase
           redes.push(['tiktok', '📱', 'TikTok']);

@@ -1,9 +1,9 @@
-// Aprovar pelo celular: os vídeos prontos de games, política e Noites na História esperam aqui (igual à aba ✅ Aprovar do Compilador).
+// Aprovar pelo celular: os vídeos prontos de games, política, Noites na História e Brasil Inacreditável esperam aqui (igual à aba ✅ Aprovar do Compilador).
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 
 const CHAVE = 'youvideo-central-token';
-const TIPO = { games: '🎮 Games', politica: '🏛️ Política', documentario: '🌙 Noites na História' };
+const TIPO = { games: '🎮 Games', politica: '🏛️ Política', documentario: '🌙 Noites na História', brasil: '🇧🇷 Brasil Inacreditável' };
 
 export default function Aprovar() {
   const [token, setToken] = useState('');

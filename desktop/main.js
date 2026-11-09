@@ -762,6 +762,7 @@ app.whenReady().then(() => {
           tipo: it.oracao ? 'oracao' : 'historias', // categoria "Pessoas e blogs" e idioma português (não "Música")
           ...(it.games ? { categoria: '20', idioma: 'pt-BR' } : {}), // games: categoria "Jogos" do YouTube
           ...(it.politica ? { categoria: '25', idioma: 'pt-BR' } : {}), // política: categoria "Notícias e política"
+          ...(it.brasil ? { categoria: '27', idioma: 'pt-BR' } : {}), // Brasil Inacreditável: categoria "Educação"
           // Desenho infantil: cada personagem é uma série com a sua playlist (ex.: "As Aventuras do Pingo — Historinhas e Músicas")
           playlist: it.oracao
             ? PLAYLISTS_ORACAO[it.oracao.periodo === 'noite' ? 'noite' : 'manha']
@@ -994,6 +995,9 @@ app.whenReady().then(() => {
   ipcMain.handle('noticias:acao', (_e, dados) => Central.chamar(store.ler(), '/api/central/games-noticias', { metodo: 'POST', corpo: dados || {} }));
   ipcMain.handle('politica:listar', () => Central.chamar(store.ler(), '/api/central/politica-noticias'));
   ipcMain.handle('politica:acao', (_e, dados) => Central.chamar(store.ler(), '/api/central/politica-noticias', { metodo: 'POST', corpo: dados || {} }));
+  // Canal Brasil Inacreditável: roteiros pesquisados na web (automação na nuvem; aqui só o canal, liga/desliga e acompanhar)
+  ipcMain.handle('brasil:listar', () => Central.chamar(store.ler(), '/api/central/brasil-inacreditavel'));
+  ipcMain.handle('brasil:acao', (_e, dados) => Central.chamar(store.ler(), '/api/central/brasil-inacreditavel', { metodo: 'POST', corpo: dados || {} }));
   // Narrar gameplay: escolhe a gravação, sobe para a nuvem, o site assiste, escreve a narração e (depois do OK) narra e manda montar aqui
   ipcMain.handle('narrar:escolher', async () => {
     const r = await dialog.showOpenDialog(janela, {

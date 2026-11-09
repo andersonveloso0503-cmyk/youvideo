@@ -557,9 +557,9 @@ export default async function handler(req, res) {
             // Documentário: sem legenda (não acorda quem dorme); infantil: criança pequena não lê, a tela fica limpa
             ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}), // conteúdo para crianças: sem botão de like/inscrever gravado
-            ...(item.games || item.politica ? { encaixar: true } : {}), // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
+            ...(item.games || item.politica || item.brasil ? { encaixar: true } : {}), // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
             // Manchete fixa no alto do Short (a frase da capa): qualquer quadro que vire miniatura mostra o assunto
-            ...((item.games || item.politica) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}),
+            ...((item.games || item.politica || item.brasil) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}),
             ...(item.fabrica?.urgente ? { urgente: true } : {}), // notícia quente: o PC monta antes das outras // games: mídia deitada inteira no Short, com fundo desfocado
             // Documentário: quadrinho explicando o lugar que aparece e música baixinha por baixo da narração
             ...(item.documentario ? { textos: quadrinhosDoDocumentario(item.arquivos), musica: item.musicaUrl ? { url: item.musicaUrl, volume: 0.1 } : null } : {}),
@@ -656,9 +656,9 @@ export default async function handler(req, res) {
             cta: item.marca ? empresa(item.marca)?.cta : '',
             ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}),
-            ...(item.games || item.politica ? { encaixar: true } : {}), // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
+            ...(item.games || item.politica || item.brasil ? { encaixar: true } : {}), // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
             // Manchete fixa no alto do Short (a frase da capa): qualquer quadro que vire miniatura mostra o assunto
-            ...((item.games || item.politica) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}),
+            ...((item.games || item.politica || item.brasil) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}),
             ...(item.fabrica?.urgente ? { urgente: true } : {}), // notícia quente: o PC monta antes das outras
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
@@ -696,6 +696,13 @@ export default async function handler(req, res) {
             thumbnailUrl =
               (await thumbGames({ fotoUrl: item.capaUrl || primeiraImagem, texto: item.roteiro.thumbnailTitulo, subtitulo: item.roteiro.thumbnailSubtitulo }).catch(() => null)) ||
               primeiraImagem;
+          } else if (item.brasil) {
+            // Brasil Inacreditável: longo = foto real do caso + texto gigante branco e amarelo; Short = cena do vídeo (o PC faz a capa)
+            const { thumbBrasil } = await import('../../lib/capaBrasil');
+            thumbnailUrl =
+              item.formato === 'short'
+                ? item.capaUrl || primeiraImagem
+                : (await thumbBrasil({ fotoUrl: item.capaUrl || fotoPessoa || primeiraImagem, texto: item.roteiro.thumbnailTitulo, subtitulo: item.roteiro.thumbnailSubtitulo }).catch(() => null)) || primeiraImagem;
           } else if (item.documentario && !item.politica) {
             // Documentário: foto real escurecida + a pergunta da capa
             // Episódios criados antes da capa pintada: pega título, subtítulo e pintura do episódio escrito

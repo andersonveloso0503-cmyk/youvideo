@@ -25,6 +25,7 @@ import { EPISODIOS, TODOS_EPISODIOS } from '../../../lib/documentarioEpisodios';
 import { GAMES } from '../../../lib/gamesEpisodios';
 import { COLECAO_NOTICIAS } from '../../../lib/gamesNoticias';
 import { COLECAO_POLITICA, replanejarMidiasPolitica } from '../../../lib/politicaNoticias';
+import { COLECAO_BRASIL } from '../../../lib/brasilInacreditavel';
 import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora, criarShortDaMusica } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
@@ -287,7 +288,7 @@ export default async function handler(req, res) {
             quando: x.fabrica?.quandoYoutube || x.fabrica?.quando || null,
             canal: x.fabrica?.canalYoutube?.titulo || '',
             formato: x.formato || 'short',
-            tipo: x.games ? 'games' : x.politica ? 'politica' : 'documentario',
+            tipo: x.games ? 'games' : x.politica ? 'politica' : x.brasil ? 'brasil' : 'documentario',
           };
         })
         .filter((i) => i.videoUrl)
@@ -357,6 +358,7 @@ export default async function handler(req, res) {
           documentario: x.documentario === true,
           games: x.games === true, // canal de games (Próxima Fase): aba própria no Compilador
           politica: x.politica === true, // canal de política: aba própria no Compilador
+          brasil: x.brasil === true, // canal Brasil Inacreditável: aba própria no Compilador
           refeitoDe: x.refeitoDe || null,
           youtubeUrlAntiga: x.fabrica?.youtube?.urlAntiga || '',
           youtubeDeNovo: x.fabrica?.youtube?.deNovo || null, // pedido para subir de novo (o PC ignora que já subiu) // vídeo refeito: o antigo com o mesmo título não conta como repetido
@@ -844,7 +846,7 @@ export default async function handler(req, res) {
         if (!b.canalYoutube?.id) return res.status(400).json({ erro: 'Escolha o canal do YouTube do documentário.' });
         const horarioDoc = hora(b.horarios?.[0], '19:30');
         // Os vídeos do canal de games usam o mesmo motor (documentario: true), mas têm agenda própria
-        const todosDoc = { docs: (await col.where('documentario', '==', true).get()).docs.filter((d) => !d.data().games && !d.data().politica) };
+        const todosDoc = { docs: (await col.where('documentario', '==', true).get()).docs.filter((d) => !d.data().games && !d.data().politica && !d.data().brasil) };
         const jaUsados = new Set(todosDoc.docs.filter((d) => d.data().status !== 'erro' && d.data().fabrica?.ativo !== false).map((d) => d.data().episodioId));
         const livres = EPISODIOS.filter((e) => !jaUsados.has(e.id));
         if (!livres.length) return res.status(400).json({ erro: 'Todos os episódios já escritos estão na fábrica. Peça novos roteiros.' });
@@ -1331,7 +1333,7 @@ export default async function handler(req, res) {
       if (!d?.documentario) return res.status(400).json({ erro: 'Só dá para refazer documentários.' });
       // Notícia e dicas do canal de games: o roteiro está guardado na lista de notícias (não nos episódios escritos)
       let ep = TODOS_EPISODIOS.find((e) => e.id === d.episodioId);
-      if (!ep && d.noticia) ep = (await db.collection(d.politica ? COLECAO_POLITICA : COLECAO_NOTICIAS).doc(String(d.noticia)).get()).data()?.ep || null;
+      if (!ep && d.noticia) ep = (await db.collection(d.politica ? COLECAO_POLITICA : d.brasil ? COLECAO_BRASIL : COLECAO_NOTICIAS).doc(String(d.noticia)).get()).data()?.ep || null;
       if (!ep) return res.status(400).json({ erro: 'Não achei o roteiro deste vídeo para refazer.' });
       // Política: escolhe de novo a imagem de cada cena pela frase (pessoa citada -> foto dela; fato -> foto real)
       if (d.politica && d.noticia) {
@@ -1363,6 +1365,7 @@ export default async function handler(req, res) {
         documentario: true,
         ...(d.games ? { games: true } : {}),
         ...(d.politica ? { politica: true } : {}),
+        ...(d.brasil ? { brasil: true } : {}),
         ...(d.desafio ? { desafio: true } : {}),
         ...(d.ilustrado ? { ilustrado: true } : {}),
         ...(d.noticia ? { noticia: d.noticia } : {}),

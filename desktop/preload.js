@@ -127,6 +127,10 @@ contextBridge.exposeInMainWorld('api', {
     listar: chamar('politica:listar'),
     acao: chamar('politica:acao'),
   },
+  brasil: {
+    listar: chamar('brasil:listar'),
+    acao: chamar('brasil:acao'),
+  },
   narrar: {
     escolher: chamar('narrar:escolher'),
     roteiro: chamar('narrar:roteiro'),
