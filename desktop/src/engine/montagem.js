@@ -50,7 +50,7 @@ async function baixarStreaming(url, destino) {
 
 /** Baixa tudo o que a receita usa (cada link uma vez só). */
 async function baixarTudo(receita, dirCache, onProgresso, checar) {
-  const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url), ...receita.clipes.flatMap((c) => [...(c.ilustracao?.fotos || []).map((f) => f?.url), c.ilustracao?.fotoUrl]), receita.musica?.url].filter(Boolean))];
+  const urls = [...new Set([...(receita.audio || []).map((a) => a.url), ...receita.clipes.map((c) => c.url), ...receita.clipes.flatMap((c) => [...(c.ilustracao?.fotos || []).map((f) => f?.url), c.ilustracao?.fotoUrl, c.ilustracao?.videoUrl]), receita.musica?.url].filter(Boolean))];
   const locais = {};
   // Vídeos de cena que têm plano B (imagem de reserva ou outra cena): se não baixar, a montagem segue sem eles
   // (imagens também: uma foto que não baixa vira a cena anterior repetida, em vez de derrubar o vídeo inteiro)
@@ -287,7 +287,9 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
     const fotoCena = ['foto', 'fala'].includes(c.ilustracao?.tipo)
       ? (c.ilustracao.fotoUrl && locais[c.ilustracao.fotoUrl]) || (c.tipo === 'imagem' ? locais[c.url] : c.imagem ? locais[c.imagem] : null)
       : null;
-    if (c.ilustracao && (c.ilustracao.tipo !== 'foto' || (fotoCena && fs.existsSync(fotoCena)))) {
+    // vídeo livre da pessoa (Commons) dentro do cartão: baixado junto com as outras mídias
+    const videoCena = c.ilustracao?.videoUrl && locais[c.ilustracao.videoUrl] && fs.existsSync(locais[c.ilustracao.videoUrl]) ? locais[c.ilustracao.videoUrl] : null;
+    if (c.ilustracao && (c.ilustracao.tipo !== 'foto' || videoCena || (fotoCena && fs.existsSync(fotoCena)))) {
       try {
         const Ilu = require('./ilustracao');
         let ilu = fotoCena ? { ...c.ilustracao, fotoArquivo: fotoCena } : { ...c.ilustracao };
@@ -305,6 +307,20 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
             for (let q = Math.max(0, Math.floor((p.start - ini) * 12)); q < Math.min(n, Math.ceil((p.end - ini) * 12)); q++) boca[q] = 0.45 + 0.55 * Math.abs(Math.sin(q * 1.9 + p.start));
           }
           ilu.mascote = { ...ilu.mascote, boca };
+        }
+        // Pessoa falando (vídeo livre do Commons) no cartão: os quadros do trecho (12 por segundo, sem som) no lugar da foto parada
+        if (videoCena && ['foto', 'fala'].includes(ilu.tipo)) {
+          const dv = path.join(dir, `video_pessoa_${i}`);
+          fs.mkdirSync(dv, { recursive: true });
+          try {
+            const ini = Math.max(0, Number(c.ilustracao.videoInicio) || 0);
+            await rodar(['-stream_loop', '-1', '-ss', ini.toFixed(2), '-i', videoCena, '-t', L, '-an', '-vf', 'fps=12,scale=720:-2', '-q:v', '4', path.join(dv, 'v%04d.jpg')], { modo }).promise;
+            const qs = fs.readdirSync(dv).filter((f) => f.endsWith('.jpg')).sort().map((f) => path.join(dv, f));
+            if (qs.length >= 6) ilu.videoQuadros = qs;
+          } catch (e) {
+            if (e?.message === 'CANCELADO') throw e;
+            console.warn(`[montagem] vídeo da pessoa (cena ${i + 1}) não abriu, fica a foto:`, String(e?.message || e).slice(0, 200));
+          }
         }
         // Games: cartão POR CIMA da gameplay — os quadros da própria cena (pequenos, 12 por segundo) viram o fundo desfocado
         if (ilu.sobreJogo && locais[c.url] && fs.existsSync(locais[c.url])) {

@@ -214,13 +214,17 @@ const DESENHOS = {
   },
   // Foto real da cena num cartão (com o nome embaixo): o vídeo inteiro fica no estilo explicador
   foto(d) {
-    const src = pathToFileURL(d.fotoArquivo).href;
+    const quadros = Array.isArray(d.videoQuadros) && d.videoQuadros.length ? d.videoQuadros : null;
+    const src = quadros ? '' : pathToFileURL(d.fotoArquivo).href;
     return {
       html: `<div class="cardx" id="fc" style="left:60px;top:0;width:880px;height:${d.legenda ? 700 : 760}px;overflow:hidden;border:4px solid var(--ouro);border-radius:34px;box-shadow:0 30px 80px rgba(0,0,0,.55)">
-        <img id="fi" src="${esc(src)}" style="width:100%;height:100%;object-fit:cover;object-position:50% 22%;transform-origin:50% 30%"></div>
+        ${quadros
+          ? `<div id="fi" style="position:absolute;inset:0">${quadros.map((f, i) => `<img class="vq" src="${esc(pathToFileURL(f).href)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 30%;${i ? 'visibility:hidden' : ''}">`).join('')}</div>
+             <div style="position:absolute;left:22px;top:22px;background:rgba(229,72,77,.92);color:#fff;border-radius:12px;padding:6px 16px;font-size:26px;font-weight:800;letter-spacing:2px">● VÍDEO</div>`
+          : `<img id="fi" src="${esc(src)}" style="width:100%;height:100%;object-fit:cover;object-position:50% 22%;transform-origin:50% 30%">`}</div>
         ${d.legenda ? `<div id="fl" style="position:absolute;left:0;right:0;top:725px;text-align:center"><span style="background:var(--card);border:2px solid var(--borda);border-radius:40px;padding:12px 34px;font-size:40px;font-weight:800">${txt(d.legenda, 40)}</span></div>` : ''}`,
       anim: `const p=eo(ap(t,.05,.55));$('fc').style.opacity=p;$('fc').style.transform='translateY('+((1-p)*80)+'px) scale('+(.94+.06*p)+')';
-        $('fi').style.transform='scale('+(1.04+t*.025)+')';if($('fl'))$('fl').style.opacity=eo(ap(t,.4,.4));`,
+        ${quadros ? '' : `$('fi').style.transform='scale('+(1.04+t*.025)+')';`}if($('fl'))$('fl').style.opacity=eo(ap(t,.4,.4));`,
     };
   },
   // Processo / causa e consequência: caixas em sequência com setas
@@ -258,7 +262,9 @@ const DESENHOS = {
     const temFoto = d.fotoArquivo && fs.existsSync(d.fotoArquivo);
     return {
       html: `<div id="fp" style="position:absolute;left:330px;top:0;width:340px;height:340px;border-radius:50%;overflow:hidden;border:6px solid var(--ouro);background:var(--card);box-shadow:0 20px 60px rgba(0,0,0,.5)">
-          ${temFoto ? `<img src="${esc(pathToFileURL(d.fotoArquivo).href)}" style="width:100%;height:100%;object-fit:cover;object-position:50% 20%">` : `<div style="transform:translate(70px,20px) scale(1.1)">${boneco('#3a6fd8')}</div>`}</div>
+          ${Array.isArray(d.videoQuadros) && d.videoQuadros.length
+            ? d.videoQuadros.map((f, i) => `<img class="vq" src="${esc(pathToFileURL(f).href)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 30%;${i ? 'visibility:hidden' : ''}">`).join('')
+            : temFoto ? `<img src="${esc(pathToFileURL(d.fotoArquivo).href)}" style="width:100%;height:100%;object-fit:cover;object-position:50% 20%">` : `<div style="transform:translate(70px,20px) scale(1.1)">${boneco('#3a6fd8')}</div>`}</div>
         ${d.nome ? `<div id="fn" style="position:absolute;left:0;right:0;top:355px;text-align:center"><span style="background:var(--ouro);color:#1a1206;border-radius:30px;padding:8px 26px;font-size:34px;font-weight:800">${txt(d.nome, 40)}</span></div>` : ''}
         <div id="fb" style="position:absolute;left:60px;right:60px;top:440px;background:#fff;color:#111;border-radius:36px;padding:28px 40px 30px">
           <div style="font-size:24px;font-weight:800;letter-spacing:3px;color:#8a6a1e">EM RESUMO</div>
@@ -318,7 +324,7 @@ function valida(d) {
     case 'fluxo': return temLista(d.passos, 2);
     case 'icone': return !!d.texto;
     case 'fala': return !!d.texto;
-    case 'foto': return !!d.fotoArquivo && fs.existsSync(d.fotoArquivo);
+    case 'foto': return (Array.isArray(d.videoQuadros) && d.videoQuadros.length > 0) || (!!d.fotoArquivo && fs.existsSync(d.fotoArquivo));
     default: return validaExtra(d);
   }
 }
@@ -398,6 +404,7 @@ window.setT=function(t){
        const s2=Math.min(aw/lw,ah/lh,s*1.5);if(s2>s*1.04||s2<s){il.style.left=(ax+(aw-lw*s2)/2-lx*s2)+'px';il.style.top=(ay+(ah-lh*s2)/2-ly*s2)+'px';il.style.transform='scale('+s2+')';}}}`}
    const nn=$('nn'),nv=$('nv');if(nn&&nv){const o=nv.textContent;if(nv.dataset.final)nv.textContent=nv.dataset.final;nn.style.whiteSpace='nowrap';nn.style.display='inline-block';let s=parseFloat(getComputedStyle(nn).fontSize);while(nn.scrollWidth>930&&s>50){s-=6;nn.style.fontSize=s+'px';}nv.textContent=o;}
  }catch(e){}}
+ try{const vq=document.getElementsByClassName('vq');if(vq.length){const q=Math.min(vq.length-1,Math.max(0,Math.floor((t-${d.continua ? 1.2 : 0})*12)));for(let i=0;i<vq.length;i++)vq[i].style.visibility=i===q?'visible':'hidden';}}catch(e){}
  try{const fj=document.getElementsByClassName('fj');if(fj.length){const q=Math.min(fj.length-1,Math.floor((t-${d.continua ? 1.2 : 0})*12));for(let i=0;i<fj.length;i++)fj[i].style.visibility=i===q?'visible':'hidden';}}catch(e){}
  try{anim(t)}catch(e){window.__erro=String(e)}
  try{${MASCOTE_ANIM}}catch(e){window.__erro=String(e)}
