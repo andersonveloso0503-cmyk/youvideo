@@ -269,13 +269,19 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.revisar === '1') {
       const snap = await col.where('fabrica.youtube.status', '==', 'revisar').get();
       // Refeitos esperando aprovação: o original já foi aprovado — vão sozinhos para o YouTube (pedido do dono)
+      // Só quando o ORIGINAL já tinha sido aprovado (subiu ou estava agendado). Refeito de um vídeo que você
+      // ainda não tinha aprovado (refez na tela Aprovar) volta para você conferir de novo.
+      const sozinhos = new Set();
       for (const d of snap.docs) {
-        if (d.data().refeitoDe && d.data().fabrica?.ativo !== false) {
-          await d.ref.update({ 'fabrica.youtube': { status: 'pendente', aprovadoEm: new Date().toISOString(), aprovadoSozinho: 'refeito' } }).catch(() => {});
-        }
+        if (!d.data().refeitoDe || d.data().fabrica?.ativo === false) continue;
+        const orig = await col.doc(String(d.data().refeitoDe)).get().catch(() => null);
+        const yo = orig?.data?.()?.fabrica?.youtube;
+        if (!yo || yo.status === 'revisar') continue;
+        await d.ref.update({ 'fabrica.youtube': { status: 'pendente', aprovadoEm: new Date().toISOString(), aprovadoSozinho: 'refeito' } }).catch(() => {});
+        sozinhos.add(d.id);
       }
       const itens = snap.docs
-        .filter((d) => !d.data().refeitoDe)
+        .filter((d) => !sozinhos.has(d.id))
         .filter((d) => d.data().fabrica?.ativo !== false) // refeito ou cancelado: não aparece mais
         .map((d) => {
           const x = d.data();
