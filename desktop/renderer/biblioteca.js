@@ -718,7 +718,7 @@ const Biblioteca = (() => {
           ${i.thumbnailUrl ? `<a href="#" class="nota ver-capa">🖼 ver a capa</a>` : ''}
           <div style="display:flex;gap:6px;margin-top:auto;flex-wrap:wrap">
             <button type="button" class="btn-primario ap-ok" style="flex:1">✅ Aprovar</button>
-            <button type="button" class="btn-mini ap-refazer" title="Montar de novo com imagens novas (aproveita a narração)">🎬 Refazer</button>
+            <button type="button" class="btn-mini ap-refazer" title="${i.tipo === 'brasil' ? 'Narra de novo com o narrador brasileiro e busca as fotos e vídeos reais do caso' : 'Montar de novo com imagens novas (aproveita a narração)'}">🎬 Refazer</button>
             <button type="button" class="btn-mini ap-descartar" title="Não sobe para o YouTube">🗑</button>
           </div>
         </div>`;
