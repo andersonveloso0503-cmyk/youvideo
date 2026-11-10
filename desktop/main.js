@@ -749,7 +749,8 @@ app.whenReady().then(() => {
           chaveArquivo: `fabrica-${it.id}`,
           capa: null,
           capaUrl: it.thumbnailUrl || null, // Short: cena do vídeo (base da capa chamativa); longo: thumbnail pronta com a frase
-          capaManual: longo, // longo: usa a thumbnail do site como está (já tem o texto grande)
+          // longo: usa a thumbnail do site como está (já tem o texto grande); Short com capa pronta da IA (games/política) também
+          capaManual: longo || !!it.capaIa,
           titulo: titulo.slice(0, 100),
           descricao: longo || /#shorts/i.test(descricao) ? descricao : `${descricao}\n\n#Shorts`.trim(),
           tags,

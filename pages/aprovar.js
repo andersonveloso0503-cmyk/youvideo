@@ -126,6 +126,12 @@ export default function Aprovar() {
                     preload="none"
                     style={{ width: '100%', background: '#000', aspectRatio: curto ? '9/16' : '16/9', maxHeight: curto ? '70vh' : 'none', display: 'block' }}
                   />
+                  {i.thumbnailUrl && curto && (
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px 0' }}>
+                      <img src={i.thumbnailUrl} alt="capa" style={{ width: 72, aspectRatio: '9/16', objectFit: 'cover', borderRadius: 8, border: '1px solid #3a3226' }} />
+                      <span style={{ fontSize: 12, color: '#c9bfae' }}>Capa que vai para o YouTube. Não gostou? Toque em 🎨 para fazer outra.</span>
+                    </div>
+                  )}
                   <div style={{ padding: 12 }}>
                     <div style={{ fontSize: 12, color: '#c9bfae' }}>
                       {TIPO[i.tipo] || ''} · {curto ? 'Short' : 'Vídeo longo'} · {i.canal}
@@ -143,6 +149,27 @@ export default function Aprovar() {
                       >
                         🎬 Refazer
                       </button>
+                      {['games', 'politica'].includes(i.tipo) && curto && (
+                        <button
+                          disabled={!!ocupado}
+                          style={{ ...botao('#2e4a6b'), flex: 0.6 }}
+                          onClick={async () => {
+                            setOcupado(i.id + 'capa');
+                            setAviso('🎨 Fazendo uma capa nova (leva uns 30 segundos)...');
+                            try {
+                              const r = await api('/api/central/fabrica', { id: i.id, acao: 'capa-ia' });
+                              setItens((lista) => lista.map((x) => (x.id === i.id ? { ...x, thumbnailUrl: r.url } : x)));
+                              setAviso('Capa nova pronta — veja no vídeo acima (toque fora do play).');
+                            } catch (e) {
+                              setAviso(`⚠️ ${e.message}`);
+                            } finally {
+                              setOcupado('');
+                            }
+                          }}
+                        >
+                          🎨
+                        </button>
+                      )}
                       <button
                         disabled={!!ocupado}
                         style={{ ...botao('#6b2a22'), flex: 0.5 }}

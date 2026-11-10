@@ -350,6 +350,7 @@ export default async function handler(req, res) {
           videoUrl: x.videoUrl || null,
           envios: x.envios || null, // botões 📸 Instagram / 📱 TikTok
           thumbnailUrl: x.thumbnailUrl || null,
+          capaIa: !!x.capaIa, // Short com capa pronta (estilo IA do YouTube): o Compilador manda como está
           quando: x.fabrica.quando,
           quandoYoutube: x.fabrica.quandoYoutube || null,
           redes: x.fabrica.redes,
@@ -1422,6 +1423,22 @@ export default async function handler(req, res) {
         await ref.delete();
       }
       return res.status(200).json({ ok: true, id: novo.id, aproveitouVoz: temVoz, jaNoYoutube: f.youtube?.status === 'ok' ? f.youtube.url || 'sim' : '' });
+    }
+    if (b.acao === 'capa-ia') {
+      // 🎨 Nova capa (Short de games/política esperando aprovação): faz outra no estilo da IA do YouTube
+      const d = (await ref.get()).data() || {};
+      if (!(d.games || d.politica) || d.formato !== 'short') return res.status(400).json({ erro: 'Capa nova só para Shorts de games e política.' });
+      const { capaShortIa, textoDaCapa } = await import('../../../lib/capaShortIa');
+      const primeira = (d.arquivos || []).find((x) => x.imageUrl)?.imageUrl || null;
+      const url = await capaShortIa({
+        tipo: d.games ? 'games' : 'politica',
+        titulo: d.roteiro?.titulo || d.tema,
+        descricao: d.roteiro?.descricao,
+        texto: String(b.texto || '').trim() || textoDaCapa(d),
+        refUrl: d.games ? d.capaUrl || primeira : null,
+      });
+      await ref.update({ thumbnailUrl: url, capaIa: true });
+      return res.status(200).json({ ok: true, url });
     }
     if (b.acao === 'video-aprovar') {
       // O dono assistiu e aprovou: agora o Compilador sobe para o YouTube no horário marcado

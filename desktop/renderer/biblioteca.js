@@ -715,7 +715,9 @@ const Biblioteca = (() => {
           <span class="nota">${esc(TIPO_APROVAR[i.tipo] || '')} · ${curto ? 'Short' : 'Vídeo longo'} · ${esc(i.canal)}</span>
           <b style="font-size:14px">${esc(i.titulo)}</b>
           <span class="nota">📅 Vai ao ar: ${esc(quando)}</span>
-          ${i.thumbnailUrl ? `<a href="#" class="nota ver-capa">🖼 ver a capa</a>` : ''}
+          ${i.thumbnailUrl && curto && ['games', 'politica'].includes(i.tipo)
+            ? `<div style="display:flex;gap:8px;align-items:center"><img class="ap-capa" src="${esc(i.thumbnailUrl)}" style="width:64px;aspect-ratio:9/16;object-fit:cover;border-radius:6px;border:1px solid var(--borda);cursor:pointer" title="Capa que vai para o YouTube (clique para ver grande)"><button type="button" class="btn-mini ap-capa-nova" title="Fazer outra capa no estilo da IA do YouTube">🎨 Outra capa</button></div>`
+            : i.thumbnailUrl ? `<a href="#" class="nota ver-capa">🖼 ver a capa</a>` : ''}
           <div style="display:flex;gap:6px;margin-top:auto;flex-wrap:wrap">
             <button type="button" class="btn-primario ap-ok" style="flex:1">✅ Aprovar</button>
             <button type="button" class="btn-mini ap-refazer" title="${i.tipo === 'brasil' ? 'Narra de novo com o narrador brasileiro e busca as fotos e vídeos reais do caso' : i.tipo === 'politica' ? 'Narra de novo com a voz nova de jornalista e escolhe as imagens de novo' : 'Montar de novo com imagens novas (aproveita a narração)'}">🎬 Refazer</button>
@@ -724,6 +726,27 @@ const Biblioteca = (() => {
         </div>`;
       const capa = card.querySelector('.ver-capa');
       if (capa) capa.onclick = (e) => (e.preventDefault(), window.api.abrir.link(i.thumbnailUrl));
+      const capaImg = card.querySelector('.ap-capa');
+      if (capaImg) capaImg.onclick = () => window.api.abrir.link(capaImg.src);
+      const capaNova = card.querySelector('.ap-capa-nova');
+      if (capaNova)
+        capaNova.onclick = async () => {
+          capaNova.disabled = true;
+          capaNova.textContent = '🎨 Fazendo (uns 30 s)...';
+          try {
+            const r = await window.api.fabrica.acao({ id: i.id, acao: 'capa-ia' });
+            if (r?.url) {
+              capaImg.src = r.url;
+              card.querySelector('video')?.setAttribute('poster', r.url);
+            }
+            avisar('Capa nova pronta');
+          } catch (e) {
+            avisar(msgErro(e), true);
+          } finally {
+            capaNova.disabled = false;
+            capaNova.textContent = '🎨 Outra capa';
+          }
+        };
       const acao = async (nome, msg, bt) => {
         bt.disabled = true;
         try {

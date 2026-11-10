@@ -685,8 +685,27 @@ export default async function handler(req, res) {
             // sem pessoa: a foto real do assunto (objeto, lugar, prédio) que a IA conferiu com a frase
             (item.arquivos || []).find((x) => /^wc/.test(String(x.midiaId || '')) && x.imageUrl)?.imageUrl ||
             null;
+          let capaIa = false;
           if (item.games || item.politica) {
             thumbnailUrl = item.games ? item.capaUrl || primeiraImagem : fotoPessoa || primeiraImagem;
+            // Short: capa pronta no estilo da IA do YouTube Studio (arte 9:16 + 2-4 palavras gigantes); o Compilador
+            // manda essa capa como está. Desafio "adivinhe o jogo" fica com a capa pixelada (não pode entregar a resposta).
+            if (item.formato === 'short' && !item.desafio) {
+              try {
+                const { capaShortIa, textoDaCapa } = await import('../../lib/capaShortIa');
+                thumbnailUrl = await capaShortIa({
+                  tipo: item.games ? 'games' : 'politica',
+                  titulo: item.roteiro?.titulo || item.tema,
+                  descricao: item.roteiro?.descricao,
+                  texto: textoDaCapa(item),
+                  refUrl: item.games ? item.capaUrl || primeiraImagem : null,
+                });
+                capaIa = true;
+                console.log(`[capa-ia] ${item.games ? 'games' : 'politica'}: ${item.roteiro?.titulo}`);
+              } catch (e) {
+                console.log(`[capa-ia] falhou (${String(e.message || e).slice(0, 160)}) — fica a capa antiga`);
+              }
+            }
           } else if (item.infantil && !item.shortMusica) {
             // Desenho infantil: o personagem grande e alegre (o Compilador põe o título por cima, se quiser)
             thumbnailUrl = (await thumbInfantil({ avisar: (m) => { avisoThumb = `A thumbnail com título não saiu (${m}) — foi uma imagem sem texto. Use 🎨 na Fábrica para refazer.`; }, personagem: item.infantil.personagem, referencia: item.infantil.refUrl, titulo: item.roteiro.titulo, thumbnailTitulo: item.roteiro.thumbnailTitulo, cena: (item.roteiro.cenas || []).find((c) => c.bloco === 'antes' && !/close-up/i.test(c.descricao))?.descricao || '' }).catch(() => null)) || primeiraImagem;
@@ -754,6 +773,7 @@ export default async function handler(req, res) {
             status: 'concluido',
             videoUrl: check.videoUrl,
             thumbnailUrl,
+            capaIa: !!capaIa, // capa pronta (o Compilador não refaz nem põe outra por cima)
             ...(avisoThumb ? { aviso: avisoThumb } : {}),
             'fabrica.agendaId': agendaId,
             comBotao: check.comBotao === true, // botão de like já gravado na montagem: o PC não põe de novo no YouTube
