@@ -1348,7 +1348,7 @@ export default async function handler(req, res) {
       // Short de games: narra de novo (é curto e barato) para sair com legenda e com os cortes de 3 segundos
       const shortGames = d.games && d.formato === 'short';
       // Brasil Inacreditável narrado com a voz antiga (robótica): narra de novo com o narrador brasileiro
-      const vozVelhaBrasil = d.brasil && d.narracao?.vozBrasil !== 2;
+      const vozVelhaBrasil = (d.brasil && d.narracao?.vozBrasil !== 2) || (d.politica && d.narracao?.vozPolitica !== 2);
       const temVoz = !shortGames && !vozVelhaBrasil && !!d.narracao?.audioSegments?.length && antigas.length === novoRoteiro.cenas.length && antigas.every((c) => c.start != null);
       const f = d.fabrica || {};
       let enviosCopiar = d.envios || null;
