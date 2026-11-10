@@ -28,7 +28,7 @@ Write 5 short English search queries (2 to 4 words each) that find beautiful cin
 Reply only JSON: {"buscas": ["...", "...", "...", "...", "..."]}`
     : `I need free stock footage (Pexels) for a calm "sounds to sleep" YouTube video.
 Theme: "${tema}". Scene idea: ${String(prompt || '').slice(0, 500)}
-Write 4 short English search queries (2 to 4 words each) that find calm, beautiful, real nature/ambience footage matching the theme (no people talking, no text). Most specific first.
+Write 4 short English search queries (2 to 4 words each) that find BREATHTAKING, paradise-like, real nature footage matching the theme: cinematic aerial drone shots, golden hour, crystal clear water, lush landscapes, slow and calm camera movement, the kind of scenery that looks like a postcard. No people, no cities, no cars, no text, no shaky handheld. Most specific first (always name the place or landscape).
 Reply only JSON: {"buscas": ["...", "...", "...", "..."]}`;
   try {
     const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -55,19 +55,21 @@ function melhorArquivoPexels(v) {
   return mp4.sort((a, b) => Math.abs(a.width - 1920) - Math.abs(b.width - 1920))[0] || null;
 }
 
-async function pexels(busca, porPagina = 15) {
+// minLargura: Sons para dormir só aceita Full HD ou mais e põe na frente as filmagens originais em 4K (as mais bonitas)
+async function pexels(busca, porPagina = 15, minLargura = 0) {
   const r = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(busca)}&orientation=landscape&size=large&per_page=${porPagina}`, {
     headers: { Authorization: process.env.PEXELS_API_KEY },
   });
   if (!r.ok) throw new Error(`Pexels respondeu ${r.status}`);
   const d = await r.json();
   return (d.videos || [])
-    .filter((v) => (v.duration || 0) >= 8)
+    .filter((v) => (v.duration || 0) >= (minLargura ? 10 : 8))
     .map((v) => {
       const f = melhorArquivoPexels(v);
-      return f && { id: `pexels-${v.id}`, url: f.link, largura: f.width, altura: f.height, duracao: v.duration, fonte: 'Pexels', autor: v.user?.name || '', pagina: v.url || '' };
+      return f && f.width >= minLargura && { id: `pexels-${v.id}`, url: f.link, largura: f.width, altura: f.height, duracao: v.duration, fonte: 'Pexels', autor: v.user?.name || '', pagina: v.url || '', original4k: (v.width || 0) >= 3840 };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((a, b) => (minLargura ? Number(b.original4k) - Number(a.original4k) : 0));
 }
 
 async function pixabay(busca) {
@@ -106,7 +108,7 @@ export default async function handler(req, res) {
     for (const busca of buscas) {
       if (achados.length >= qtd) break;
       const lotes = await Promise.all([
-        process.env.PEXELS_API_KEY ? pexels(busca).catch(() => []) : [],
+        process.env.PEXELS_API_KEY ? (uso === 'dormir' ? pexels(busca, 30, 1920) : pexels(busca)).catch(() => []) : [],
         process.env.PIXABAY_API_KEY ? pixabay(busca).catch(() => []) : [],
       ]);
       let destaBusca = 0;

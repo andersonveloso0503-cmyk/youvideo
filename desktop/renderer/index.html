@@ -425,6 +425,21 @@
         <label>Primeiro dia <input type="date" id="drsInicio" /></label>
         <label>Horário <input type="time" id="drsHora" value="20:00" /></label>
       </div>
+      <div class="cartao" id="drsAuto" style="margin:10px 0;border:1px solid var(--borda, #333)">
+        <label class="interruptor"><input type="checkbox" id="drsAutoLigado" /><span></span> <b>🤖 Automático: 2 vídeos por semana</b></label>
+        <div class="can-linha" style="margin-top:8px">
+          <span class="nota" style="margin:0">Dias:</span>
+          <label><input type="checkbox" class="drs-auto-dia" value="0" /> Dom</label>
+          <label><input type="checkbox" class="drs-auto-dia" value="1" /> Seg</label>
+          <label><input type="checkbox" class="drs-auto-dia" value="2" /> Ter</label>
+          <label><input type="checkbox" class="drs-auto-dia" value="3" checked /> Qua</label>
+          <label><input type="checkbox" class="drs-auto-dia" value="4" /> Qui</label>
+          <label><input type="checkbox" class="drs-auto-dia" value="5" /> Sex</label>
+          <label><input type="checkbox" class="drs-auto-dia" value="6" checked /> Sáb</label>
+          <label>Horário <input type="time" id="drsAutoHora" value="20:00" /></label>
+        </div>
+        <p class="nota" id="drsAutoInfo" style="margin:6px 0 0">Liga e esquece: o Compilador cria sozinho 2 vídeos por semana com <b>paisagens paradisíacas reais em Full HD/4K</b> (cachoeiras, praias, fiordes, Alpes, aurora boreal...), som da natureza e música calma, usando as opções abaixo (canal, duração, músicas). Os temas vão em rodízio, sem repetir. Você só aprova cada vídeo aqui. O PC precisa estar ligado com o app aberto.</p>
+      </div>
       <div class="drs-temas" id="drsTemas"></div>
       <div class="can-linha">
         <label>Duração <select id="drsHoras"><option value="1">1 hora</option><option value="2" selected>2 horas</option><option value="3">3 horas</option><option value="8">8 horas</option><option value="10">10 horas</option></select></label>

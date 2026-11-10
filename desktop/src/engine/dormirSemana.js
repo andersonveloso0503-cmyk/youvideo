@@ -282,15 +282,17 @@ class DormirSemana {
     if (!plano.temas?.length) throw new Error('Marque pelo menos um tema.');
     const [a, m, d] = String(plano.inicio).split('-').map(Number);
     const [hh, mm] = String(plano.hora || '20:00').split(':').map(Number);
-    const primeiro = new Date(a, m - 1, d, hh, mm, 0);
+    // plano.datas (automático, 2 por semana): o dia e a hora de cada vídeo; sem isso, 1 por dia a partir do primeiro
+    const datas = Array.isArray(plano.datas) ? plano.datas.map((x) => new Date(x)) : null;
+    const primeiro = datas?.[0] || new Date(a, m - 1, d, hh, mm, 0);
     if (isNaN(primeiro) || primeiro.getTime() < Date.now() + 60 * 60e3) throw new Error('O primeiro dia precisa ser pelo menos 1 hora no futuro.');
     this.estado = {
       id: Date.now().toString(36),
       criadoEm: new Date().toISOString(),
-      plano: { ...plano, temas: undefined },
+      plano: { ...plano, temas: undefined, datas: undefined },
       dias: plano.temas.map((t, i) => {
-        const quando = new Date(primeiro);
-        quando.setDate(quando.getDate() + i);
+        const quando = datas?.[i] && !isNaN(datas[i]) ? new Date(datas[i]) : new Date(primeiro);
+        if (!datas?.[i]) quando.setDate(quando.getDate() + i);
         return { tema: t, quando: quando.toISOString(), passo: 'cenas', etapa: 'Esperando', erro: '', cenas: [], sons: [], musicas: [], video: null };
       }),
     };

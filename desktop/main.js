@@ -1860,6 +1860,84 @@ app.whenReady().then(() => {
     listarEnvios: () => fila.lista(),
     aoMudar: (estado) => enviar('dormir:semana', estado),
   });
+  // ───── Sons para dormir AUTOMÁTICO: 2 vídeos por semana (dias e hora escolhidos), temas de paisagens em rodízio ─────
+  // Quando a semana atual já está toda agendada e o último vídeo é daqui a menos de 3 dias, cria a próxima sozinho.
+  // Você continua aprovando cada vídeo na tela 🌙 Sons p/ dormir (se "Eu aprovo cada vídeo" estiver ligado).
+  let dormirAutoUltimoRodar = 0;
+  const pad2 = (n) => String(n).padStart(2, '0');
+  function temasDormirAuto() {
+    try {
+      const t = fs.readFileSync(path.join(__dirname, 'renderer', 'dormirTemas.js'), 'utf8');
+      const todos = JSON.parse(t.slice(t.indexOf('['), t.lastIndexOf(']') + 1));
+      // Só paisagens lindas: cachoeiras, cenários do mundo, mar e floresta (as novas primeiro)
+      const paisagens = todos.filter((x) => /^(cach|mundo)-/.test(x.id));
+      const outras = todos.filter((x) => !/^(cach|mundo)-/.test(x.id) && /cachoeira|floresta|mar /i.test(x.nome + ' '));
+      return [...paisagens, ...outras];
+    } catch {
+      return [];
+    }
+  }
+  function proximosHorariosDormir(dias, hora, depoisDe, qtd) {
+    const [hh, mm] = String(hora || '20:00').split(':').map(Number);
+    const inicio = new Date(depoisDe);
+    inicio.setHours(0, 0, 0, 0);
+    const r = [];
+    for (let i = 0; i < 60 && r.length < qtd; i++) {
+      const x = new Date(inicio);
+      x.setDate(inicio.getDate() + i);
+      x.setHours(hh || 0, mm || 0, 0, 0);
+      if (dias.includes(x.getDay()) && x.getTime() > depoisDe) r.push(x);
+    }
+    return r;
+  }
+  async function dormirAutomatico() {
+    const auto = store.ler().dormirAuto;
+    if (!auto?.ligado || !auto.plano?.canalId || semana.rodando) return;
+    const est = semana.paraTela();
+    const dias = (est?.dias || []).filter((d) => !d.tirado);
+    const faltando = dias.filter((d) => d.passo !== 'agendado');
+    if (faltando.length) {
+      if (faltando.some((d) => d.passo === 'aprovar')) return; // esperando você aprovar
+      // Parou no meio (app fechado, erro de rede): continua sozinho, no máximo a cada 2 horas
+      if (Date.now() - dormirAutoUltimoRodar > 2 * 3600e3) {
+        dormirAutoUltimoRodar = Date.now();
+        semana.rodar().catch(() => {});
+      }
+      return;
+    }
+    const ultimo = Math.max(0, ...dias.map((d) => new Date(d.quando).getTime() || 0));
+    if (ultimo - Date.now() > 3 * 86400e3) return; // ainda tem vídeo marcado para os próximos dias
+    const diasSemana = (Array.isArray(auto.dias) && auto.dias.length ? auto.dias : [3, 6]).map(Number);
+    const horarios = proximosHorariosDormir(diasSemana, auto.hora, Math.max(ultimo, Date.now() + 30 * 3600e3), 2);
+    const todos = temasDormirAuto();
+    if (horarios.length < 2 || todos.length < 2) return;
+    let usados = Array.isArray(auto.usados) ? auto.usados : [];
+    let livres = todos.filter((t) => !usados.includes(t.id));
+    if (livres.length < 2) {
+      usados = [];
+      livres = todos;
+    }
+    const temas = livres.slice(0, 2);
+    if (est) semana.limpar();
+    store.salvar({ dormirAuto: { ...auto, usados: [...usados, ...temas.map((t) => t.id)], ultimaSemana: new Date().toISOString() } });
+    const h0 = horarios[0];
+    try {
+      semana
+        .novo({ ...auto.plano, inicio: `${h0.getFullYear()}-${pad2(h0.getMonth() + 1)}-${pad2(h0.getDate())}`, hora: auto.hora || '20:00', datas: horarios.map((h) => h.toISOString()), temas })
+        .catch(() => {});
+    } catch (e) {
+      console.error('[dormir-auto]', e.message);
+    }
+  }
+  setTimeout(() => dormirAutomatico().catch(() => {}), 3 * 60e3);
+  setInterval(() => dormirAutomatico().catch(() => {}), 30 * 60e3);
+  ipcMain.handle('dormir:autoEstado', () => store.ler().dormirAuto || null);
+  ipcMain.handle('dormir:autoSalvar', (_e, a) => {
+    const atual = store.ler().dormirAuto || {};
+    store.salvar({ dormirAuto: { ...atual, ...(a || {}) } });
+    if (a?.ligado) setTimeout(() => dormirAutomatico().catch(() => {}), 2000);
+    return store.ler().dormirAuto;
+  });
   ipcMain.handle('dormir:semanaRecuperar', () => semana.recuperarDaPasta());
   ipcMain.handle('dormir:semanaEstado', () => semana.paraTela());
   ipcMain.handle('dormir:semanaCriar', (_e, plano) => {

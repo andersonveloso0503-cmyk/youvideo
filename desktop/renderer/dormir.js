@@ -699,9 +699,67 @@ const Dormir = (() => {
       }
     }
 
+    // 🤖 Automático: 2 vídeos por semana (guarda as opções da tela como modelo; o PC cria sozinho)
+    function planoAuto() {
+      const canal = q('#drsCanal');
+      return {
+        canalId: canal.value,
+        canalNome: canal.selectedOptions[0]?.textContent || '',
+        horas: Number(q('#drsHoras').value),
+        resolucao: q('#drsRes').value,
+        trocaMin: 25,
+        animar: q('#drsAnimar').checked,
+        fonteCenas: 'gratis',
+        aprovar: q('#drsAprovar').checked,
+        qtdCenas: Math.max(4, Number(q('#drsCenas').value)), // mais cenas: o vídeo fica mais bonito e variado
+        qtdSons: 5,
+        qtdMusicas: Number(q('#drsMusicas').value),
+        motorMusica: q('#drsMotor').value,
+        volAmbiente: Number(q('#drsVolAmb').value),
+        volMusica: Number(q('#drsVolMus').value),
+      };
+    }
+    async function salvarAuto() {
+      const dias = [...document.querySelectorAll('.drs-auto-dia')].filter((x) => x.checked).map((x) => Number(x.value));
+      const ligado = q('#drsAutoLigado').checked;
+      if (ligado && dias.length !== 2) {
+        q('#drsErro').textContent = 'Marque 2 dias da semana para o automático.';
+        q('#drsAutoLigado').checked = false;
+        return;
+      }
+      if (ligado && !q('#drsCanal').value) {
+        q('#drsErro').textContent = 'Escolha o canal do YouTube antes de ligar o automático.';
+        q('#drsAutoLigado').checked = false;
+        return;
+      }
+      q('#drsErro').textContent = '';
+      try {
+        await window.api.dormir.autoSalvar({ ligado, dias, hora: q('#drsAutoHora').value || '20:00', plano: planoAuto() });
+        mostrarAuto();
+      } catch (e) {
+        q('#drsErro').textContent = msgErro(e);
+      }
+    }
+    async function mostrarAuto() {
+      try {
+        const a = await window.api.dormir.autoEstado();
+        if (!a) return;
+        q('#drsAutoLigado').checked = !!a.ligado;
+        if (a.hora) q('#drsAutoHora').value = a.hora;
+        if (Array.isArray(a.dias)) document.querySelectorAll('.drs-auto-dia').forEach((x) => (x.checked = a.dias.includes(Number(x.value))));
+        const nomes = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+        if (a.ligado)
+          q('#drsAutoInfo').innerHTML = `🤖 <b>Ligado</b>: 2 vídeos por semana (${(a.dias || []).map((d) => nomes[d]).join(' e ')} às ${a.hora || '20:00'}) no canal <b>${String(a.plano?.canalNome || '').replace(/[<>&]/g, '')}</b>, com paisagens paradisíacas reais em Full HD/4K. ${(a.usados || []).length} temas já usados no rodízio. Você aprova cada vídeo aqui.`;
+      } catch {}
+    }
+
     function ligarS() {
       if (ligadoS) return;
       ligadoS = true;
+      q('#drsAutoLigado').onchange = salvarAuto;
+      q('#drsAutoHora').onchange = () => q('#drsAutoLigado').checked && salvarAuto();
+      document.querySelectorAll('.drs-auto-dia').forEach((x) => (x.onchange = () => q('#drsAutoLigado').checked && salvarAuto()));
+      mostrarAuto();
       for (const id of ['#drsCanal', '#drsHora', '#drsHoras', '#drsRes', '#drsCenas', '#drsAnimar', '#drsFonte', '#drsAprovar', '#drsMusicas', '#drsMotor']) q(id).onchange = guardar;
       q('#drsInicio').onchange = contar;
       for (const id of ['#drsVolAmb', '#drsVolMus']) {

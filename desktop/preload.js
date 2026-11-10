@@ -71,6 +71,8 @@ contextBridge.exposeInMainWorld('api', {
     semanaVoltarDia: chamar('dormir:semanaVoltarDia'),
     semanaMotor: chamar('dormir:semanaMotor'),
     semanaLimpar: chamar('dormir:semanaLimpar'),
+    autoEstado: chamar('dormir:autoEstado'),
+    autoSalvar: chamar('dormir:autoSalvar'),
     gerar: chamar('dormir:gerar'),
     estado: chamar('dormir:estado'),
     cancelar: chamar('dormir:cancelar'),
