@@ -299,6 +299,9 @@ const EXTRA = {
 // Desenhos que explicam o mecanismo (dinheiro indo e vindo, divisão, sistema ligando órgãos, plenário votando)
 const { criarMecanismo, validaMecanismo } = require('./ilustracaoMecanismo');
 Object.assign(EXTRA, criarMecanismo(PREDIOS));
+// Desenhos "de aplicativo": recibo, tela de transferência, rota de viagem e a frase de impacto
+const { APP, validaApp } = require('./ilustracaoApp');
+Object.assign(EXTRA, APP);
 
 function validaExtra(d) {
   switch (d.tipo) {
@@ -306,7 +309,7 @@ function validaExtra(d) {
     case 'quadroFotos': return Array.isArray(d.fotos) && d.fotos.filter((f) => f && (f.arquivo ? fs.existsSync(f.arquivo) : f.nome)).length >= 2;
     case 'documento': return !!(d.documento || d.orgao) && ((Array.isArray(d.trechos) && d.trechos.length) || !!d.texto);
     case 'caminho': return Array.isArray(d.etapas) && d.etapas.filter((e) => e && (ehPredio(e.lugar) || e.texto)).length >= 2;
-    default: return validaMecanismo(d);
+    default: return validaMecanismo(d) || validaApp(d);
   }
 }
 

@@ -46,6 +46,9 @@ const NOVOS = ['mapa', 'documento', 'caminho', 'quadroFotos'];
 const precisaNovo = (receita) => (receita?.clipes || []).some((c) => c.ilustracao && (c.ilustracao.mascote || c.ilustracao.sobreJogo || NOVOS.includes(c.ilustracao.tipo)));
 const MECANISMO = ['dinheiro', 'divisao', 'conexao', 'plenario'];
 const precisaMecanismo = (receita) => (receita?.clipes || []).some((c) => MECANISMO.includes(c.ilustracao?.tipo));
+// Desenhos "de aplicativo" (recibo, transferência, rota de viagem, frase de impacto): Compilador 2.5.107 em diante
+const APP = ['recibo', 'pix', 'rota', 'impacto'];
+const precisaApp = (receita) => (receita?.clipes || []).some((c) => APP.includes(c.ilustracao?.tipo));
 const ESPERA_PC_NOVO = 2 * 3600e3;
 
 const TEMPO_MAX_MONTANDO = 3 * 3600e3; // PC sumiu no meio: depois de 3 h o pedido volta para a fila
@@ -78,6 +81,7 @@ export default async function handler(req, res) {
         if (receita && precisaNovo(receita) && !desenhaIlustracao(req.query.v, 82) && agora - (d.criadoEm || agora) < ESPERA_PC_NOVO) continue;
         // desenhos do mecanismo (dinheiro, divisão, conexão, plenário): Compilador 2.5.97 em diante
         if (receita && precisaMecanismo(receita) && !desenhaIlustracao(req.query.v, 97) && agora - (d.criadoEm || agora) < ESPERA_PC_NOVO) continue;
+        if (receita && precisaApp(receita) && !desenhaIlustracao(req.query.v, 107) && agora - (d.criadoEm || agora) < ESPERA_PC_NOVO) continue;
         if (receita && !aceitaStreaming(req.query.v)) receita = semStreaming(receita);
         // Wikimedia só serve miniaturas em tamanhos padrão (1280, 1920...): 1600px dava "Não consegui baixar (400)" no PC
         if (receita) receita = tamanhoPadraoWikimedia(receita);
