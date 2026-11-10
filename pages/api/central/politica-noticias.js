@@ -10,7 +10,7 @@
 import { getDb } from '../../../lib/firebase-admin';
 import { autorizado } from '../../../lib/central';
 import { roteiroDoEpisodio } from '../../../lib/documentario';
-import { buscarNoticiasPolitica, roteiroVideoPolitica, roteiroExplicador, COLECAO_POLITICA, replanejarMidiasPolitica } from '../../../lib/politicaNoticias';
+import { buscarNoticiasPolitica, roteiroVideoPolitica, roteiroExplicador, COLECAO_POLITICA, replanejarMidiasPolitica, inscricaoNoFim } from '../../../lib/politicaNoticias';
 
 export const config = { maxDuration: 300 };
 
@@ -70,7 +70,7 @@ async function aprovarPolitica(db, ref, d, canal, opcoes = {}) {
       formato: longo ? 'longo' : 'short',
       animar: false,
       ...(opcoes.vozId ? { vozId: String(opcoes.vozId).trim() } : {}),
-      roteiro: roteiroDoEpisodio(d.ep),
+      roteiro: roteiroDoEpisodio({ ...d.ep, texto: inscricaoNoFim(d.ep.texto) }), // notícias escritas antes da regra também saem com o "se inscreve" por último
       status: 'pendente',
       origem: 'fabrica',
       criadoEm: new Date().toISOString(),
