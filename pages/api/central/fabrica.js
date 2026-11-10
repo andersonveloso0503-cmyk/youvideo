@@ -291,6 +291,7 @@ export default async function handler(req, res) {
             descricao: String(x.roteiro?.descricao || '').slice(0, 1500),
             videoUrl: x.videoUrl || null,
             thumbnailUrl: x.thumbnailUrl || null,
+            capaOpcoes: Array.isArray(x.capaOpcoes) ? x.capaOpcoes : [], // as duas capas (melhor x econômica) para comparar
             quando: x.fabrica?.quandoYoutube || x.fabrica?.quando || null,
             canal: x.fabrica?.canalYoutube?.titulo || '',
             formato: x.formato || 'short',
@@ -1425,18 +1426,31 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, id: novo.id, aproveitouVoz: temVoz, jaNoYoutube: f.youtube?.status === 'ok' ? f.youtube.url || 'sim' : '' });
     }
     if (b.acao === 'capa-ia') {
-      // 🎨 Nova capa (Short de games/política esperando aprovação): faz outra no estilo da IA do YouTube
+      // 🎨 Outra capa (Short de games/política esperando aprovação): faz DUAS no estilo da IA do YouTube para comparar —
+      // a "melhor" (Nano Banana Pro) e a "econômica" (Nano Banana) — e o dono escolhe uma (acao 'capa-escolher')
       const d = (await ref.get()).data() || {};
       if (!(d.games || d.politica) || d.formato !== 'short') return res.status(400).json({ erro: 'Capa nova só para Shorts de games e política.' });
       const { capaShortIa, textoDaCapa } = await import('../../../lib/capaShortIa');
       const primeira = (d.arquivos || []).find((x) => x.imageUrl)?.imageUrl || null;
-      const url = await capaShortIa({
+      const base = {
         tipo: d.games ? 'games' : 'politica',
         titulo: d.roteiro?.titulo || d.tema,
         descricao: d.roteiro?.descricao,
         texto: String(b.texto || '').trim() || textoDaCapa(d),
         refUrl: d.games ? d.capaUrl || primeira : null,
-      });
+      };
+      const [pro, economica] = await Promise.allSettled([capaShortIa({ ...base, modelo: 'pro' }), capaShortIa({ ...base, modelo: 'economica' })]);
+      const opcoes = [
+        pro.status === 'fulfilled' ? { modelo: 'pro', nome: 'Melhor (~R$ 0,75)', url: pro.value } : null,
+        economica.status === 'fulfilled' ? { modelo: 'economica', nome: 'Econômica (~R$ 0,25)', url: economica.value } : null,
+      ].filter(Boolean);
+      if (!opcoes.length) return res.status(500).json({ erro: `Não consegui fazer a capa: ${String(pro.reason?.message || economica.reason?.message || '').slice(0, 200)}` });
+      await ref.update({ capaOpcoes: opcoes });
+      return res.status(200).json({ ok: true, opcoes });
+    }
+    if (b.acao === 'capa-escolher') {
+      const url = String(b.url || '');
+      if (!/^https:\/\//.test(url)) return res.status(400).json({ erro: 'Capa inválida.' });
       await ref.update({ thumbnailUrl: url, capaIa: true });
       return res.status(200).json({ ok: true, url });
     }

@@ -693,13 +693,28 @@ export default async function handler(req, res) {
             if (item.formato === 'short' && !item.desafio) {
               try {
                 const { capaShortIa, textoDaCapa } = await import('../../lib/capaShortIa');
-                thumbnailUrl = await capaShortIa({
+                const base = {
                   tipo: item.games ? 'games' : 'politica',
                   titulo: item.roteiro?.titulo || item.tema,
                   descricao: item.roteiro?.descricao,
                   texto: textoDaCapa(item),
                   refUrl: item.games ? item.capaUrl || primeiraImagem : null,
-                });
+                };
+                // Fase de comparação (até o dono escolher um modelo na Vercel: CAPA_SHORT_MODELO=pro|economica):
+                // faz as duas, a "melhor" vai como capa e a outra fica para ele comparar e trocar no ✅ Aprovar
+                const escolhido = process.env.CAPA_SHORT_MODELO;
+                if (escolhido) {
+                  thumbnailUrl = await capaShortIa({ ...base, modelo: escolhido });
+                } else {
+                  const [pro, eco] = await Promise.allSettled([capaShortIa({ ...base, modelo: 'pro' }), capaShortIa({ ...base, modelo: 'economica' })]);
+                  const opcoes = [
+                    pro.status === 'fulfilled' ? { modelo: 'pro', nome: 'Melhor (~R$ 0,75)', url: pro.value } : null,
+                    eco.status === 'fulfilled' ? { modelo: 'economica', nome: 'Econômica (~R$ 0,25)', url: eco.value } : null,
+                  ].filter(Boolean);
+                  if (!opcoes.length) throw new Error(String(pro.reason?.message || eco.reason?.message || 'sem imagem'));
+                  thumbnailUrl = opcoes[0].url;
+                  await ref.update({ capaOpcoes: opcoes }).catch(() => {});
+                }
                 capaIa = true;
                 console.log(`[capa-ia] ${item.games ? 'games' : 'politica'}: ${item.roteiro?.titulo}`);
               } catch (e) {

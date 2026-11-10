@@ -715,8 +715,8 @@ const Biblioteca = (() => {
           <span class="nota">${esc(TIPO_APROVAR[i.tipo] || '')} · ${curto ? 'Short' : 'Vídeo longo'} · ${esc(i.canal)}</span>
           <b style="font-size:14px">${esc(i.titulo)}</b>
           <span class="nota">📅 Vai ao ar: ${esc(quando)}</span>
-          ${i.thumbnailUrl && curto && ['games', 'politica'].includes(i.tipo)
-            ? `<div style="display:flex;gap:8px;align-items:center"><img class="ap-capa" src="${esc(i.thumbnailUrl)}" style="width:64px;aspect-ratio:9/16;object-fit:cover;border-radius:6px;border:1px solid var(--borda);cursor:pointer" title="Capa que vai para o YouTube (clique para ver grande)"><button type="button" class="btn-mini ap-capa-nova" title="Fazer outra capa no estilo da IA do YouTube">🎨 Outra capa</button></div>`
+          ${curto && ['games', 'politica'].includes(i.tipo)
+            ? `<div class="ap-capas" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"></div><button type="button" class="btn-mini ap-capa-nova" style="align-self:flex-start" title="Fazer as duas capas de novo (melhor e econômica)">🎨 Outras capas</button>`
             : i.thumbnailUrl ? `<a href="#" class="nota ver-capa">🖼 ver a capa</a>` : ''}
           <div style="display:flex;gap:6px;margin-top:auto;flex-wrap:wrap">
             <button type="button" class="btn-primario ap-ok" style="flex:1">✅ Aprovar</button>
@@ -726,25 +726,47 @@ const Biblioteca = (() => {
         </div>`;
       const capa = card.querySelector('.ver-capa');
       if (capa) capa.onclick = (e) => (e.preventDefault(), window.api.abrir.link(i.thumbnailUrl));
-      const capaImg = card.querySelector('.ap-capa');
-      if (capaImg) capaImg.onclick = () => window.api.abrir.link(capaImg.src);
+      // Capas: as opções (melhor x econômica) lado a lado; clicar escolhe a que vai para o YouTube
+      let capaAtual = i.thumbnailUrl;
+      const desenharCapas = (opcoes) => {
+        const box = card.querySelector('.ap-capas');
+        if (!box) return;
+        const lista = opcoes && opcoes.length ? opcoes : capaAtual ? [{ nome: 'Capa', url: capaAtual }] : [];
+        box.innerHTML = lista
+          .map((o) => `<figure style="margin:0;text-align:center;cursor:pointer" data-url="${esc(o.url)}" title="Clique para usar esta capa no YouTube">
+              <img src="${esc(o.url)}" style="width:96px;aspect-ratio:9/16;object-fit:cover;border-radius:6px;border:3px solid ${o.url === capaAtual ? 'var(--acento, #2f8a5b)' : 'transparent'}">
+              <figcaption class="nota" style="font-size:11px">${o.url === capaAtual ? '✅ ' : ''}${esc(o.nome || '')}</figcaption></figure>`)
+          .join('');
+        box.querySelectorAll('figure').forEach((f) => {
+          f.onclick = async () => {
+            if (f.dataset.url === capaAtual) return window.api.abrir.link(f.dataset.url);
+            try {
+              await window.api.fabrica.acao({ id: i.id, acao: 'capa-escolher', url: f.dataset.url });
+              capaAtual = f.dataset.url;
+              card.querySelector('video')?.setAttribute('poster', capaAtual);
+              desenharCapas(opcoes);
+              avisar('Capa escolhida: é essa que vai para o YouTube');
+            } catch (e) {
+              avisar(msgErro(e), true);
+            }
+          };
+        });
+      };
+      desenharCapas(i.capaOpcoes);
       const capaNova = card.querySelector('.ap-capa-nova');
       if (capaNova)
         capaNova.onclick = async () => {
           capaNova.disabled = true;
-          capaNova.textContent = '🎨 Fazendo (uns 30 s)...';
+          capaNova.textContent = '🎨 Fazendo as duas (uns 40 s)...';
           try {
             const r = await window.api.fabrica.acao({ id: i.id, acao: 'capa-ia' });
-            if (r?.url) {
-              capaImg.src = r.url;
-              card.querySelector('video')?.setAttribute('poster', r.url);
-            }
-            avisar('Capa nova pronta');
+            desenharCapas(r?.opcoes || []);
+            avisar('Duas capas novas prontas: clique na que você quer usar');
           } catch (e) {
             avisar(msgErro(e), true);
           } finally {
             capaNova.disabled = false;
-            capaNova.textContent = '🎨 Outra capa';
+            capaNova.textContent = '🎨 Outras capas';
           }
         };
       const acao = async (nome, msg, bt) => {
