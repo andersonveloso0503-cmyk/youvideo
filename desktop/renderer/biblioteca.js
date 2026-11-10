@@ -622,14 +622,75 @@ const Biblioteca = (() => {
       selo.hidden = !n;
     }
   }
-  async function contarAprovar() {
+  // 🌙 Sons p/ dormir: os vídeos ficam neste PC (não passam pela Fábrica), então vêm da semana do próprio app
+  async function dormirAprovar() {
     try {
-      const { itens = [] } = await window.api.fabrica.revisar();
-      marcarContagem(itens.length);
-      return itens;
+      const est = await window.api.dormir.semanaEstado();
+      return (est?.dias || [])
+        .map((d, i) => ({ d, i }))
+        .filter(({ d }) => d.passo === 'aprovar' && !d.aprovado && !d.tirado && d.video?.arquivo)
+        .map(({ d, i }) => ({
+          dormir: true,
+          indice: i,
+          titulo: d.tema?.titulo || d.tema?.nome || 'Sons para dormir',
+          canal: est.plano?.canalNome || '',
+          quando: d.quando,
+          arquivo: d.video.arquivo,
+          capa: d.video.capa || null,
+        }));
     } catch {
-      return null;
+      return [];
     }
+  }
+  async function contarAprovar() {
+    const [nuvem, dormir] = await Promise.all([
+      window.api.fabrica.revisar().then((r) => r.itens || []).catch(() => null),
+      dormirAprovar(),
+    ]);
+    if (!nuvem && !dormir.length) return null;
+    const itens = [...dormir, ...(nuvem || [])];
+    marcarContagem(itens.length);
+    return itens;
+  }
+  function cardDormir(i, box) {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--bg-2);border:1px solid var(--borda);border-radius:10px;overflow:hidden;display:flex;flex-direction:column';
+    const quando = i.quando ? new Date(i.quando).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'sem horário';
+    card.innerHTML = `
+      <video controls preload="metadata" style="width:100%;background:#000;aspect-ratio:16/9;object-fit:contain"></video>
+      <div style="padding:10px;display:flex;flex-direction:column;gap:6px;flex:1">
+        <span class="nota">🌙 Sons p/ dormir · Vídeo longo · ${esc(i.canal)}</span>
+        <b style="font-size:14px">${esc(i.titulo)}</b>
+        <span class="nota">📅 Vai ao ar: ${esc(quando)}</span>
+        <span class="nota">Pule pela barra para ver as paisagens.</span>
+        <div style="display:flex;gap:6px;margin-top:auto;flex-wrap:wrap">
+          <button type="button" class="btn-primario ap-ok" style="flex:1">✅ Aprovar</button>
+          <button type="button" class="btn-mini ap-outro" title="Apaga as cenas e cria paisagens novas (o som e as músicas ficam)">🎬 Outras paisagens</button>
+        </div>
+      </div>`;
+    const v = card.querySelector('video');
+    v.src = urlArquivo(i.arquivo);
+    if (i.capa) v.poster = urlArquivo(i.capa);
+    const acao = async (fn, msg, bt) => {
+      bt.disabled = true;
+      try {
+        await fn(i.indice);
+        avisar(msg);
+        card.remove();
+        const resto = box.children.length;
+        marcarContagem(resto);
+        if (!resto) box.innerHTML = '<p class="nota">Nenhum vídeo esperando aprovação. 👍</p>';
+      } catch (e) {
+        bt.disabled = false;
+        avisar(msgErro(e), true);
+      }
+    };
+    card.querySelector('.ap-ok').onclick = (e) => acao(window.api.dormir.semanaAprovar, `Aprovado: "${i.titulo}" vai para o YouTube no horário marcado`, e.currentTarget);
+    card.querySelector('.ap-outro').onclick = (e) => {
+      if (!confirm(`Trocar as paisagens de "${i.titulo}"?\nO som e as músicas ficam. Quando ficar pronto, volta para esta lista.`)) return;
+      acao(window.api.dormir.semanaRecusar, 'Criando paisagens novas: quando ficar pronto, volta para a aba ✅ Aprovar', e.currentTarget);
+    };
+    box.appendChild(card);
   }
   async function carregarAprovar() {
     const box = q('#aprovarLista');
@@ -639,6 +700,10 @@ const Biblioteca = (() => {
     if (!itens.length) return (box.innerHTML = '<p class="nota">Nenhum vídeo esperando aprovação. 👍</p>');
     box.innerHTML = '';
     for (const i of itens) {
+      if (i.dormir) {
+        cardDormir(i, box);
+        continue;
+      }
       const card = document.createElement('div');
       card.style.cssText = 'background:var(--bg-2);border:1px solid var(--borda);border-radius:10px;overflow:hidden;display:flex;flex-direction:column';
       const curto = i.formato === 'short';
@@ -688,6 +753,17 @@ const Biblioteca = (() => {
   // Selo no botão Biblioteca: confere a cada 5 minutos se tem vídeo novo esperando aprovação
   setTimeout(contarAprovar, 8000);
   setInterval(contarAprovar, 5 * 60e3);
+  // Quando um vídeo de Sons p/ dormir fica pronto (ou é aprovado na outra tela), o selo atualiza na hora
+  let tDormir = null;
+  try {
+    window.api.ao('dormir:semana', () => {
+      if (tDormir) return;
+      tDormir = setTimeout(() => {
+        tDormir = null;
+        contarAprovar();
+      }, 3000);
+    });
+  } catch {}
 
   let ligado = false;
   function ligar() {
