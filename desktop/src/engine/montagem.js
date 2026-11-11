@@ -234,7 +234,12 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
         '-stream_loop', '-1', ...(ini > 0 ? ['-ss', ini.toFixed(2)] : []), '-i', arq, '-t', L,
         '-filter_complex',
         `[0:v]${recorte}fps=${FPS},split[fa][fb];[fa]${cobrir(W, H)},boxblur=24:2,eq=brightness=-0.12[fundo];` +
-          `[fb]scale=${fw}:${fh},setsar=1[frente];[fundo][frente]overlay=(W-w)/2:(H-h)/2,format=yuv420p[saida]`,
+          // Games ('faixa'): a gameplay fica GRANDE (52% da altura) e corta só as bordas dos lados (o dono escolheu
+          // assim: nem o "quadradinho" de antes, nem a tela cheia que cortava personagem e nome)
+          (receita.encaixar === 'faixa'
+            ? `[fb]scale=-2:${Math.round((H * 0.52) / 2) * 2},crop='min(iw,${W})':ih,setsar=1[frente];`
+            : `[fb]scale=${fw}:${fh},setsar=1[frente];`) +
+          `[fundo][frente]overlay=(W-w)/2:(H-h)/2,format=yuv420p[saida]`,
         '-map', '[saida]', ...comum, saida,
       ];
     } else if (encaixar) {

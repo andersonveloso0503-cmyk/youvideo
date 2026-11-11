@@ -557,7 +557,7 @@ export default async function handler(req, res) {
             // Documentário: sem legenda (não acorda quem dorme); infantil: criança pequena não lê, a tela fica limpa
             ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}), // conteúdo para crianças: sem botão de like/inscrever gravado
-            ...(item.games || item.politica || item.brasil ? { encaixar: true } : {}), // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
+            ...(item.games ? { encaixar: 'faixa' } : item.politica || item.brasil ? { encaixar: true } : {}), // games: gameplay grande cortando só as bordas // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
             // Manchete fixa no alto do Short (a frase da capa): qualquer quadro que vire miniatura mostra o assunto
             ...((item.games || item.politica || item.brasil) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}),
             ...(item.fabrica?.urgente ? { urgente: true } : {}), // notícia quente: o PC monta antes das outras // games: mídia deitada inteira no Short, com fundo desfocado
@@ -656,7 +656,7 @@ export default async function handler(req, res) {
             cta: item.marca ? empresa(item.marca)?.cta : '',
             ...((item.documentario && !comLegenda(item)) || item.infantil ? { legenda: false } : {}),
             ...(item.infantil ? { semBotao: true } : {}),
-            ...(item.games || item.politica || item.brasil ? { encaixar: true } : {}), // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
+            ...(item.games ? { encaixar: 'faixa' } : item.politica || item.brasil ? { encaixar: true } : {}), // games: gameplay grande cortando só as bordas // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
             // Manchete fixa no alto do Short (a frase da capa): qualquer quadro que vire miniatura mostra o assunto
             ...((item.games || item.politica || item.brasil) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}),
             ...(item.fabrica?.urgente ? { urgente: true } : {}), // notícia quente: o PC monta antes das outras
