@@ -2072,7 +2072,7 @@ app.whenReady().then(() => {
       if (!meus.length) return;
       const r = await Central.chamar(cfg, '/api/central/comentarios', { query: { pc, tem: meus.map((c) => c.id).join(',') } });
       for (const a of r.responder || []) {
-        const canal = meus.find((c) => c.id === a.canalId);
+        const canal = meus.some((c) => c.id === a.canalId) ? store.canal(a.canalId) : null;
         if (!canal) {
           await Central.chamar(cfg, '/api/central/comentarios', { metodo: 'PATCH', corpo: { id: a.id, status: 'liberar' } }).catch(() => {});
           continue;
@@ -2088,7 +2088,7 @@ app.whenReady().then(() => {
       if (Date.now() - ultimaBuscaComentarios < 15 * 60e3) return;
       ultimaBuscaComentarios = Date.now();
       for (const v of r.canais || []) {
-        const canal = meus.find((c) => c.id === v.id);
+        const canal = meus.some((c) => c.id === v.id) ? store.canal(v.id) : null;
         if (!canal) continue;
         try {
           const itens = await YT.comentariosSemResposta({ credenciais: cfg.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect, canalId: canal.id });
@@ -2104,6 +2104,27 @@ app.whenReady().then(() => {
     }
   }
   setInterval(() => cuidarComentarios(), 60000);
+
+  // Nome e foto dos canais: se você renomeou o canal no YouTube (ex.: Planeta fofura -> Próxima Fase), o Compilador
+  // passa a mostrar o nome novo sozinho (ao abrir e a cada 6 h). Não mexe na autorização.
+  async function atualizarNomesDosCanais() {
+    const cfg = store.ler();
+    if (!cfg.google) return;
+    let mudou = false;
+    for (const c of store.canais()) {
+      try {
+        const cheio = store.canal(c.id);
+        const d = await YT.canalPorToken(cfg.google, cheio.refreshToken, cheio.redirect);
+        if (d.id === c.id && (d.titulo !== c.titulo || (d.thumb && d.thumb !== c.thumb))) {
+          store.atualizarDadosCanal(c.id, { titulo: d.titulo, thumb: d.thumb });
+          mudou = true;
+        }
+      } catch {}
+    }
+    if (mudou) for (const w of BrowserWindow.getAllWindows()) w.webContents.send('canais:mudaram');
+  }
+  setTimeout(() => atualizarNomesDosCanais(), 30000);
+  setInterval(() => atualizarNomesDosCanais(), 6 * 3600e3);
 
   setTimeout(() => {
     buscarComandosRemotos();

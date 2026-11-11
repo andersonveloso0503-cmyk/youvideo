@@ -121,6 +121,12 @@ class Store {
     gravarSeguro(this.arquivoCanais, JSON.stringify(lista, null, 1));
   }
 
+  /** Atualiza nome e foto do canal (o dono renomeou no YouTube) sem mexer na autorização. */
+  atualizarDadosCanal(id, { titulo, thumb }) {
+    const lista = this.canais().map((c) => (c.id === id ? { ...c, ...(titulo ? { titulo } : {}), ...(thumb ? { thumb } : {}) } : c));
+    gravarSeguro(this.arquivoCanais, JSON.stringify(lista, null, 1));
+  }
+
   removerCanal(id) {
     gravarSeguro(this.arquivoCanais, JSON.stringify(this.canais().filter((c) => c.id !== id), null, 1));
   }
