@@ -554,6 +554,26 @@ class Fila extends EventEmitter {
     }
   }
 
+  /** Pergunta ao site se este PC ainda é o dono do envio deste vídeo da Fábrica (e renova a reserva). null = site fora. */
+  async confirmarFabrica(id) {
+    try {
+      const cfg = this.obterConfig();
+      return await Central.chamar(cfg, '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao: 'youtube-confirmar', pc: require('os').hostname() } });
+    } catch {
+      return null; // sem resposta: segue (a conferência pelo título no canal ainda vale)
+    }
+  }
+  /** A cada 10 min: renova a reserva dos vídeos da Fábrica que estão esperando a vez na fila deste PC. */
+  async renovarReservasFabrica() {
+    for (const j of this.jobs || []) {
+      if (!j.envio?.fabricaId || ['concluido', 'erro', 'cancelado'].includes(j.status)) continue;
+      const c = await this.confirmarFabrica(j.envio.fabricaId);
+      if (c && !c.ok && j.status === 'aguardando') {
+        this.atualizar(j, { status: 'concluido', etapa: 'Outro PC cuidou deste', progresso: 1, aviso: `Tirei da fila para não duplicar: ${c.motivo}${c.url ? ` (${c.url})` : ''}`, concluidoEm: new Date().toISOString() });
+      }
+    }
+  }
+
   /** Vídeos recentes do canal (guardados 3 min, para não perguntar ao YouTube a cada envio). */
   async ultimosDoCanal(canalId) {
     this.cacheCanal = this.cacheCanal || {};
@@ -584,9 +604,18 @@ class Fila extends EventEmitter {
       }
       // Não sobe duas vezes: se o canal já tem um vídeo com o mesmo título (subido por este ou por outro PC,
       // num "tentar de novo" repetido, por exemplo), não sobe de novo e avisa com o link do que já está lá.
+      // Vídeo da Fábrica: confirma com o site que este PC ainda é o dono do envio (outro PC pode ter assumido)
+      if (e.fabricaId) {
+        const c = await this.confirmarFabrica(e.fabricaId);
+        if (c && !c.ok) {
+          this.atualizar(job, { status: 'concluido', etapa: 'Outro PC cuidou deste', progresso: 1, aviso: `Não subi para não duplicar: ${c.motivo}${c.url ? ` (${c.url})` : ''}`, concluidoEm: new Date().toISOString() });
+          return;
+        }
+      }
       if (!e.forcarDuplicado) {
         let ja = null;
         try {
+          if (this.cacheCanal) delete this.cacheCanal[e.canalId]; // olha o canal AGORA (outro PC pode ter acabado de subir)
           let lista = await this.ultimosDoCanal(e.canalId);
           if (e.deNovo) {
             // "Subir de novo": o antigo (texto errado) tem que estar PRIVADO ou apagado — senão ficariam dois no canal

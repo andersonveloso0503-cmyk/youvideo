@@ -611,6 +611,8 @@ app.whenReady().then(() => {
       buscandoPedidos = false;
     }
   }
+  // Envio dos vídeos da Fábrica: renova a reserva enquanto esperam na fila (senão, depois de 45 min, outro PC assumiria = duplicado)
+  setInterval(() => fila.renovarReservasFabrica().catch(() => {}), 10 * 60e3);
   setTimeout(buscarPedidosDoSite, 8000);
   setInterval(buscarPedidosDoSite, 45000);
 

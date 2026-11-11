@@ -1207,6 +1207,21 @@ export default async function handler(req, res) {
       });
       return res.status(200).json({ ok });
     }
+    // O PC que pegou o vídeo confirma que ainda é dele (a cada 10 min enquanto espera na fila e logo ANTES de subir).
+    // Renova a reserva; se outro PC já assumiu ou ele já subiu, responde não — e este PC não sobe (nada de duplicado).
+    if (b.acao === 'youtube-confirmar') {
+      const r = await db.runTransaction(async (t) => {
+        const d = await t.get(ref);
+        const y = d.data()?.fabrica?.youtube;
+        if (!y) return { ok: false, motivo: 'sem envio' };
+        if (y.status === 'ok') return { ok: false, motivo: 'já subiu', url: y.url || '' };
+        const meu = String(y.pc || '') === String(b.pc || '').slice(0, 60);
+        if (y.status !== 'enviando' || !meu) return { ok: false, motivo: `outro PC (${y.pc || '?'}) está com ele` };
+        t.update(ref, { 'fabrica.youtube.em': Date.now() });
+        return { ok: true };
+      });
+      return res.status(200).json(r);
+    }
     if (b.acao === 'youtube-feito') {
       const capaErro = b.capaErro ? String(b.capaErro).slice(0, 300) : null;
       await ref.update({
