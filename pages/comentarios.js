@@ -10,6 +10,7 @@ export default function Comentarios() {
   const [token, setToken] = useState('');
   const [digitado, setDigitado] = useState('');
   const [itens, setItens] = useState(null);
+  const [canais, setCanais] = useState([]);
   const [textos, setTextos] = useState({});
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
@@ -23,8 +24,8 @@ export default function Comentarios() {
     }
   }, []);
 
-  async function api(corpo) {
-    const r = await fetch('/api/central/comentarios', {
+  async function api(corpo, forcar = false) {
+    const r = await fetch(`/api/central/comentarios${forcar ? '?forcar=1' : ''}`, {
       method: corpo ? 'POST' : 'GET',
       headers: { 'x-central-token': token, ...(corpo ? { 'Content-Type': 'application/json' } : {}) },
       ...(corpo ? { body: JSON.stringify(corpo) } : {}),
@@ -43,10 +44,11 @@ export default function Comentarios() {
     return d;
   }
 
-  async function carregar() {
+  async function carregar(forcar = false) {
     setErro('');
     try {
-      const d = await api();
+      const d = await api(null, forcar);
+      setCanais(d.canais || []);
       setItens(d.itens || []);
       setTextos(Object.fromEntries((d.itens || []).map((i) => [i.id, i.sugestao || ''])));
     } catch (e) {
@@ -116,6 +118,23 @@ export default function Comentarios() {
             {erro && <p style={{ color: '#ffb3a6' }}>⚠️ {erro}</p>}
             {aviso && <p style={{ background: '#1f2e26', color: '#8fd6c1', padding: 10, borderRadius: 10 }}>{aviso}</p>}
             {itens === null && !erro && <p>Carregando...</p>}
+            {canais.length > 0 && (
+              <div style={{ fontSize: 13, opacity: 0.85, margin: '4px 0 12px', lineHeight: 1.5 }}>
+                {canais.map((c, k) => (
+                  <div key={c.id || k}>
+                    {TIPO[c.tipo] || 'Canal'}:{' '}
+                    {c.erro
+                      ? `⚠️ não consegui ler os comentários (${c.erro})`
+                      : c.em
+                        ? `conferido às ${new Date(c.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${typeof c.achados === 'number' ? ` · ${c.achados} sem resposta no YouTube` : ''}`
+                        : 'ainda não conferido'}
+                  </div>
+                ))}
+                <button onClick={() => carregar(true)} style={{ marginTop: 6, padding: '6px 12px', borderRadius: 10, border: '1px solid #6b5f48', background: 'transparent', color: '#f3ead9' }}>
+                  🔄 Buscar agora
+                </button>
+              </div>
+            )}
             {itens && !itens.length && <p>Nenhum comentário novo esperando resposta. 👍</p>}
             {(itens || []).map((i) => (
               <div key={i.id} style={{ background: '#211d17', border: '1px solid #3a3226', borderRadius: 16, padding: 12, marginBottom: 14 }}>

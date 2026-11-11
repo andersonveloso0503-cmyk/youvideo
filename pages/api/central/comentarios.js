@@ -10,6 +10,7 @@ import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 import { ia } from '../../../lib/gamesNoticias';
 import { canalDosGamesId, canalDaPolitica } from '../../../lib/politicaMesmoDia';
+import { yt } from '../../../lib/radar';
 
 const COL = 'youvideo_comentarios';
 const limpo = (v, n) => String(v ?? '').replace(/[^\w-]/g, '').slice(0, n);
@@ -54,6 +55,100 @@ async function sugerir(tipo, itens) {
   }
 }
 
+/** Guarda os comentários novos (com a resposta sugerida pela IA). Devolve quantos entraram. */
+async function salvarNovos(db, canal, itens) {
+  const col = db.collection(COL);
+  const novos = [];
+  for (const c of itens.slice(0, 60)) {
+    const id = String(c.id || '').replace(/[^\w.-]/g, '').slice(0, 120);
+    if (!id) continue;
+    const ja = await col.doc(id).get();
+    if (ja.exists) continue;
+    novos.push({ ...c, id });
+  }
+  const sug = await sugerir(canal.tipo, novos);
+  await Promise.all(
+    novos.map((c, i) =>
+      col.doc(c.id).set({
+        canalId: canal.id,
+        tipo: canal.tipo,
+        videoId: String(c.videoId || '').slice(0, 30),
+        videoTitulo: String(c.videoTitulo || '').slice(0, 150),
+        autor: String(c.autor || '').slice(0, 80),
+        texto: String(c.texto || '').slice(0, 1500),
+        curtidas: Number(c.curtidas) || 0,
+        publicadoEm: String(c.publicadoEm || ''),
+        sugestao: sug[i].sugestao,
+        // spam/ofensa: nem aparece para você
+        status: sug[i].pular ? 'ignorado' : 'novo',
+        ...(sug[i].pular ? { motivo: 'IA: spam ou ofensa' } : {}),
+        criadoEm: Date.now(),
+      })
+    )
+  );
+  return novos.length;
+}
+
+/** O próprio site lê os comentários PÚBLICOS dos canais (não depende do PC estar ligado). Uns 3 a 5 de cota por canal. */
+async function buscarNoYoutube(canalId) {
+  const threads = [];
+  try {
+    const r = await yt('commentThreads', { part: 'snippet,replies', allThreadsRelatedToChannelId: canalId, order: 'time', maxResults: 100, textFormat: 'plainText' });
+    threads.push(...(r.items || []));
+  } catch (e) {
+    // plano B: os 12 vídeos mais recentes do canal, um por um
+    const up = await yt('playlistItems', { part: 'contentDetails', playlistId: `UU${canalId.slice(2)}`, maxResults: 12 });
+    for (const v of up.items || []) {
+      const videoId = v.contentDetails?.videoId;
+      if (!videoId) continue;
+      const r = await yt('commentThreads', { part: 'snippet,replies', videoId, order: 'time', maxResults: 30, textFormat: 'plainText' }).catch(() => null);
+      threads.push(...(r?.items || []));
+    }
+    if (!threads.length && !(up.items || []).length) throw e;
+  }
+  const itens = [];
+  for (const t of threads) {
+    const top = t.snippet?.topLevelComment;
+    const sn = top?.snippet || {};
+    if (!top?.id || sn.authorChannelId?.value === canalId) continue; // comentário do próprio canal
+    if ((t.replies?.comments || []).some((c) => c.snippet?.authorChannelId?.value === canalId)) continue; // já respondido
+    itens.push({ id: top.id, videoId: sn.videoId || t.snippet?.videoId || '', autor: String(sn.authorDisplayName || '').slice(0, 80), texto: String(sn.textOriginal || sn.textDisplay || '').slice(0, 1500), curtidas: Number(sn.likeCount) || 0, publicadoEm: sn.publishedAt || '' });
+  }
+  const ids = [...new Set(itens.map((i) => i.videoId).filter(Boolean))].slice(0, 50);
+  if (ids.length) {
+    const v = await yt('videos', { part: 'snippet', id: ids.join(',') }).catch(() => null);
+    const titulos = Object.fromEntries((v?.items || []).map((x) => [x.id, x.snippet?.title || '']));
+    for (const i of itens) i.videoTitulo = String(titulos[i.videoId] || '').slice(0, 150);
+  }
+  return itens;
+}
+
+const ESTADO = () => getDb().collection('youvideo_config').doc('comentarios_estado');
+async function marcarEstado(canalId, dados) {
+  await ESTADO().set({ [canalId]: { ...dados, em: Date.now() } }, { merge: true }).catch(() => {});
+}
+
+/** Busca no YouTube no máximo a cada 10 minutos (abrir a página várias vezes não gasta cota). */
+async function atualizarSePreciso(db, forcar = false) {
+  const estado = (await ESTADO().get().catch(() => null))?.data() || {};
+  const canais = await canaisVigiados(db);
+  await Promise.all(
+    canais.map(async (c) => {
+      const ult = estado[c.id]?.em || 0;
+      if (!forcar && Date.now() - ult < 10 * 60e3) return;
+      try {
+        const itens = await buscarNoYoutube(c.id);
+        const n = await salvarNovos(db, c, itens);
+        await marcarEstado(c.id, { tipo: c.tipo, ok: true, achados: itens.length, novos: n, erro: '' });
+      } catch (e) {
+        await marcarEstado(c.id, { tipo: c.tipo, ok: false, erro: String(e.message || e).slice(0, 200) });
+      }
+    })
+  );
+  const final = (await ESTADO().get().catch(() => null))?.data() || {};
+  return canais.map((c) => ({ id: c.id, tipo: c.tipo, ...(final[c.id] || {}) }));
+}
+
 export default async function handler(req, res) {
   if (!exigirToken(req, res)) return;
   const db = getDb();
@@ -83,12 +178,13 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
+      const canaisEstado = await atualizarSePreciso(db, req.query.forcar === '1').catch((e) => [{ erro: String(e.message || e).slice(0, 200) }]);
       const snap = await col.where('status', '==', 'novo').get();
       const itens = snap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .sort((a, b) => String(b.publicadoEm || '').localeCompare(String(a.publicadoEm || '')))
         .slice(0, 80);
-      return res.status(200).json({ itens });
+      return res.status(200).json({ itens, canais: canaisEstado });
     }
 
     if (req.method === 'POST' && Array.isArray(req.body?.itens)) {
@@ -97,35 +193,9 @@ export default async function handler(req, res) {
       const canais = await canaisVigiados(db);
       const canal = canais.find((c) => c.id === canalId);
       if (!canal) return res.status(200).json({ novos: 0, motivo: 'canal fora da lista' });
-      const novos = [];
-      for (const c of b.itens.slice(0, 60)) {
-        const id = String(c.id || '').replace(/[^\w.-]/g, '').slice(0, 120);
-        if (!id) continue;
-        const ja = await col.doc(id).get();
-        if (ja.exists) continue;
-        novos.push({ ...c, id });
-      }
-      const sug = await sugerir(canal.tipo, novos);
-      await Promise.all(
-        novos.map((c, i) =>
-          col.doc(c.id).set({
-            canalId,
-            tipo: canal.tipo,
-            videoId: String(c.videoId || '').slice(0, 30),
-            videoTitulo: String(c.videoTitulo || '').slice(0, 150),
-            autor: String(c.autor || '').slice(0, 80),
-            texto: String(c.texto || '').slice(0, 1500),
-            curtidas: Number(c.curtidas) || 0,
-            publicadoEm: String(c.publicadoEm || ''),
-            sugestao: sug[i].sugestao,
-            // spam/ofensa: nem aparece para você
-            status: sug[i].pular ? 'ignorado' : 'novo',
-            ...(sug[i].pular ? { motivo: 'IA: spam ou ofensa' } : {}),
-            criadoEm: Date.now(),
-          })
-        )
-      );
-      return res.status(200).json({ novos: novos.length });
+      const n = await salvarNovos(db, canal, b.itens);
+      await marcarEstado(canal.id, { tipo: canal.tipo, ok: true, novos: n, erro: '', viaPc: true });
+      return res.status(200).json({ novos: n });
     }
 
     if (req.method === 'POST') {
