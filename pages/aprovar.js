@@ -11,7 +11,16 @@ const mmss = (s) => (s == null ? '' : `${Math.floor(s / 60)}:${String(Math.round
 function Conferencia({ c, deNovo, ocupado }) {
   const [aberta, setAberta] = useState(false);
   if (!c || ['pendente', 'conferindo'].includes(c.status))
-    return <div style={{ fontSize: 13, color: '#c9bfae', marginBottom: 12 }}>🔍 Conferência final: {c ? 'conferindo texto, legenda, cenas e capa...' : 'ainda não conferido'}</div>;
+    return (
+      <div style={{ fontSize: 13, color: '#c9bfae', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span>🔍 Conferência final: {c ? 'conferindo texto, legenda, cenas e capa...' : 'este vídeo ainda não foi conferido'}</span>
+        {!c && (
+          <button onClick={deNovo} disabled={ocupado} style={{ background: '#2f6f4f', color: '#fff', border: 0, borderRadius: 8, padding: '6px 10px', fontSize: 13, flex: 'none' }}>
+            {ocupado ? 'Conferindo...' : '🔍 Conferir agora'}
+          </button>
+        )}
+      </div>
+    );
   const ruins = (c.etapas || []).filter((e) => !e.ok);
   const cor = ruins.length ? '#6b4a1e' : '#1f3d2c';
   return (

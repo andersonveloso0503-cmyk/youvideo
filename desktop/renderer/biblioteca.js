@@ -760,7 +760,21 @@ const Biblioteca = (() => {
         const el = card.querySelector('.ap-conf');
         if (!el) return;
         if (!c || ['pendente', 'conferindo'].includes(c.status)) {
-          el.innerHTML = `<span class="nota">🔍 Conferência final: ${c ? 'conferindo texto, legenda, cenas e capa...' : 'ainda não conferido'}</span>`;
+          el.innerHTML = `<span class="nota">🔍 Conferência final: ${c ? 'conferindo texto, legenda, cenas e capa...' : 'este vídeo ainda não foi conferido'}</span>${c ? '' : ' <button type="button" class="btn-mini ap-conf-de-novo">🔍 Conferir agora</button>'}`;
+          const b0 = el.querySelector('.ap-conf-de-novo');
+          if (b0)
+            b0.onclick = async () => {
+              b0.disabled = true;
+              b0.textContent = '🔍 Conferindo (até 1 min)...';
+              try {
+                const r = await window.api.fabrica.acao({ id: i.id, acao: 'conferir' });
+                desenharConf(r?.conferencia);
+              } catch (e) {
+                avisar(msgErro(e), true);
+                b0.disabled = false;
+                b0.textContent = '🔍 Conferir agora';
+              }
+            };
           return;
         }
         const ruins = (c.etapas || []).filter((e) => !e.ok);
