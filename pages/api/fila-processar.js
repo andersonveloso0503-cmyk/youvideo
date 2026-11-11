@@ -722,7 +722,7 @@ export default async function handler(req, res) {
                 try {
                   const { capaShortGratis, imagensDaCapa } = await import('../../lib/capaShortGratis');
                   const { textoDaCapa } = await import('../../lib/capaShortIa');
-                  const url = await capaShortGratis({ tipo: item.games ? 'games' : 'politica', texto: textoDaCapa(item), imagens: imagensDaCapa(item) });
+                  const url = await capaShortGratis({ tipo: item.games ? 'games' : 'politica', texto: textoDaCapa(item), imagens: await imagensDaCapa(item) });
                   thumbnailUrl = url;
                   capaIa = true;
                   await ref.update({ capaOpcoes: [{ modelo: 'gratis', nome: 'Grátis (foto real)', url }] }).catch(() => {});

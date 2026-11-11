@@ -1444,7 +1444,7 @@ export default async function handler(req, res) {
         capaShortIa({ ...base, modelo: 'pro' }),
         capaShortIa({ ...base, modelo: 'economica' }),
         // grátis: a foto real e livre do assunto (a que já está no vídeo) + o texto gigante — sempre sai, mesmo sem crédito
-        capaShortGratis({ tipo: base.tipo, texto: base.texto, imagens: imagensDaCapa(d) }),
+        capaShortGratis({ tipo: base.tipo, texto: base.texto, imagens: await imagensDaCapa(d) }),
       ]);
       const opcoes = [
         pro.status === 'fulfilled' ? { modelo: 'pro', nome: 'Melhor (~R$ 0,75)', url: pro.value } : null,
