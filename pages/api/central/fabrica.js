@@ -1444,7 +1444,12 @@ export default async function handler(req, res) {
         pro.status === 'fulfilled' ? { modelo: 'pro', nome: 'Melhor (~R$ 0,75)', url: pro.value } : null,
         economica.status === 'fulfilled' ? { modelo: 'economica', nome: 'Econômica (~R$ 0,25)', url: economica.value } : null,
       ].filter(Boolean);
-      if (!opcoes.length) return res.status(500).json({ erro: `Não consegui fazer a capa: ${String(pro.reason?.message || economica.reason?.message || '').slice(0, 200)}` });
+      if (!opcoes.length) {
+        const motivo = String(pro.reason?.message || economica.reason?.message || '');
+        if (/credits are depleted|prepayment|billing|quota|RESOURCE_EXHAUSTED/i.test(motivo))
+          return res.status(402).json({ erro: 'Acabaram os créditos do Gemini (Google AI Studio). Recarregue em aistudio.google.com → Billing e clique de novo.' });
+        return res.status(500).json({ erro: `Não consegui fazer a capa: ${motivo.slice(0, 200)}` });
+      }
       await ref.update({ capaOpcoes: opcoes });
       return res.status(200).json({ ok: true, opcoes });
     }
