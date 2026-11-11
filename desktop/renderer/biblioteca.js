@@ -710,7 +710,7 @@ const Biblioteca = (() => {
       const quando = i.quando ? new Date(i.quando).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'sem horário';
       card.innerHTML = `
         <video src="${esc(i.videoUrl)}" ${i.thumbnailUrl ? `poster="${esc(i.thumbnailUrl)}"` : ''} controls preload="none"
-          style="width:100%;background:#000;${curto ? 'aspect-ratio:9/16;max-height:420px' : 'aspect-ratio:16/9'};object-fit:contain"></video>
+          style="display:block;background:#000;object-fit:contain;${curto ? 'height:min(70vh,560px);aspect-ratio:9/16;width:auto;max-width:100%;margin:0 auto' : 'width:100%;aspect-ratio:16/9'}"></video>
         <div style="padding:10px;display:flex;flex-direction:column;gap:6px;flex:1">
           <span class="nota">${esc(TIPO_APROVAR[i.tipo] || '')} · ${curto ? 'Short' : 'Vídeo longo'} · ${esc(i.canal)}</span>
           <b style="font-size:14px">${esc(i.titulo)}</b>

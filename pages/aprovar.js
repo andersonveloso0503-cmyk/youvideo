@@ -181,7 +181,8 @@ export default function Aprovar() {
                     controls
                     playsInline
                     preload="none"
-                    style={{ width: '100%', background: '#000', aspectRatio: curto ? '9/16' : '16/9', maxHeight: curto ? '70vh' : 'none', display: 'block' }}
+                    // Vídeo INTEIRO na tela: o Short cabe na altura do celular (sem cortar em cima/embaixo nem nos lados)
+                    style={curto ? { display: 'block', height: '72vh', maxHeight: 'calc((100vw - 32px) * 16 / 9)', aspectRatio: '9/16', width: 'auto', maxWidth: '100%', margin: '0 auto', background: '#000', objectFit: 'contain' } : { width: '100%', background: '#000', aspectRatio: '16/9', display: 'block', objectFit: 'contain' }}
                   />
                   {curto && ['games', 'politica'].includes(i.tipo) && (i.capaOpcoes?.length || i.thumbnailUrl) && (
                     <div style={{ padding: '10px 12px 0' }}>
