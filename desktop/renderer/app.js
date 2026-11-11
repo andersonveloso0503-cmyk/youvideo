@@ -987,7 +987,7 @@ const versaoMenor = (a, b) => { const x = String(a).split('.').map(Number), y = 
 let esperarFilaParaAtualizar = null; // 'Atualizar quando a fila terminar'
 const RODANDO = ['separando', 'legenda', 'audio', 'fundos', 'renderizando', 'publicando'];
 function renderFila() {
-  if (esperarFilaParaAtualizar && !jobs.some((j) => RODANDO.includes(j.status) || j.status === 'aguardando')) {
+  if (esperarFilaParaAtualizar && !jobs.some((j) => RODANDO.includes(j.status))) { // só espera o que está rodando AGORA (o que aguarda a vez continua depois)
     const instalar = esperarFilaParaAtualizar;
     esperarFilaParaAtualizar = null;
     setTimeout(instalar, 3000);
@@ -1263,6 +1263,16 @@ async function iniciar() {
       };
       if (!d.open) d.showModal();
     };
+    // Atualiza SOZINHO (pedido do dono: deixa os PCs ligados e eles se atualizam): na hora se a fila está parada;
+    // com vídeo gerando/enviando, espera a fila terminar e aí instala (o app volta e continua de onde parou)
+    const rodandoAgora = jobs.some((j) => RODANDO.includes(j.status));
+    if (!rodandoAgora) {
+      avisar(`Atualizando sozinho para a v${nova.versao}...`);
+      instalar();
+    } else {
+      esperarFilaParaAtualizar = instalar;
+      b.textContent = `⏳ Atualiza para v${nova.versao} quando a fila terminar`;
+    }
   };
   window.api.ao('app:progressoAtualizacao', (p) => { $('#btnAtualizar').textContent = `Baixando ${Math.round(p * 100)}%`; });
   setTimeout(checarAtualizacao, 4000);
@@ -1270,7 +1280,7 @@ async function iniciar() {
   setTimeout(() => window.api.botao.existe('v2-pt').then((f) => f || prepararBotao('pt')).catch(() => {}), 12000);
   // Álbuns em inglês da Fábrica de Música usam o botão em inglês
   setTimeout(() => window.api.botao.existe('v2-en').then((f) => f || prepararBotao('en')).catch(() => {}), 40000);
-  setInterval(checarAtualizacao, 3 * 3600 * 1000);
+  setInterval(checarAtualizacao, 30 * 60 * 1000); // confere a cada 30 min (instala sozinho)
   // Créditos das IAs: chip amarelo/vermelho quando algum está acabando
   const mostrarCreditos = (c) => {
     const chip = $('#chipCreditos');
