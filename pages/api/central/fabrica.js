@@ -292,6 +292,7 @@ export default async function handler(req, res) {
             videoUrl: x.videoUrl || null,
             thumbnailUrl: x.thumbnailUrl || null,
             capaOpcoes: Array.isArray(x.capaOpcoes) ? x.capaOpcoes : [], // as duas capas (melhor x econômica) para comparar
+            conferencia: x.conferencia || null, // linha do tempo da conferência final (texto, legenda, cenas, capa)
             quando: x.fabrica?.quandoYoutube || x.fabrica?.quando || null,
             canal: x.fabrica?.canalYoutube?.titulo || '',
             formato: x.formato || 'short',
@@ -1221,6 +1222,15 @@ export default async function handler(req, res) {
         return { ok: true };
       });
       return res.status(200).json(r);
+    }
+    // Conferência final de novo (ex.: depois de trocar a capa): roda agora e devolve a linha do tempo
+    if (b.acao === 'conferir') {
+      const d = (await ref.get()).data();
+      if (!d) return res.status(404).json({ erro: 'Vídeo não encontrado.' });
+      const { conferirVideo } = await import('../../../lib/conferenciaFinal');
+      const conferencia = await conferirVideo(d);
+      await ref.update({ conferencia });
+      return res.status(200).json({ ok: true, conferencia });
     }
     if (b.acao === 'youtube-feito') {
       const capaErro = b.capaErro ? String(b.capaErro).slice(0, 300) : null;

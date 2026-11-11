@@ -5,6 +5,54 @@ import Head from 'next/head';
 const CHAVE = 'youvideo-central-token';
 const TIPO = { games: '🎮 Games', politica: '🏛️ Política', documentario: '🌙 Noites na História', brasil: '🇧🇷 Brasil Inacreditável' };
 
+const mmss = (s) => (s == null ? '' : `${Math.floor(s / 60)}:${String(Math.round(s) % 60).padStart(2, '0')}`);
+
+/** Linha do tempo da conferência final: texto, áudio, legenda, cada cena, capa e final — ✅ ou ⚠️ com o motivo. */
+function Conferencia({ c, deNovo, ocupado }) {
+  const [aberta, setAberta] = useState(false);
+  if (!c || ['pendente', 'conferindo'].includes(c.status))
+    return <div style={{ fontSize: 13, color: '#c9bfae', marginBottom: 12 }}>🔍 Conferência final: {c ? 'conferindo texto, legenda, cenas e capa...' : 'ainda não conferido'}</div>;
+  const ruins = (c.etapas || []).filter((e) => !e.ok);
+  const cor = ruins.length ? '#6b4a1e' : '#1f3d2c';
+  return (
+    <div style={{ background: cor, borderRadius: 12, padding: 10, marginBottom: 12, fontSize: 13 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <b>{ruins.length ? `⚠️ Conferência: ${ruins.length} ponto(s) para olhar` : '✅ Conferido: texto, legenda, cenas e capa'}</b>
+        <button onClick={deNovo} disabled={ocupado} style={{ background: 'transparent', color: '#f3ead9', border: '1px solid #f3ead9', borderRadius: 8, padding: '4px 8px', fontSize: 12 }}>
+          {ocupado ? '...' : '🔍 De novo'}
+        </button>
+      </div>
+      <div style={{ marginTop: 6, lineHeight: 1.45 }}>
+        {(c.etapas || []).map((e, k) => (
+          <div key={k}>
+            {e.ok ? '✅' : '⚠️'} <b>{e.nome}:</b> {e.detalhe}
+          </div>
+        ))}
+      </div>
+      {(c.cenas || []).length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <button onClick={() => setAberta(!aberta)} style={{ background: 'transparent', color: '#f3ead9', border: 0, padding: 0, textDecoration: 'underline', fontSize: 13 }}>
+            {aberta ? 'Esconder' : 'Ver'} a linha do tempo das cenas ({c.cenas.length})
+          </button>
+          {aberta &&
+            c.cenas.map((x) => (
+              <div key={x.n} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, background: 'rgba(0,0,0,.25)', borderRadius: 8, padding: 6 }}>
+                {x.imageUrl ? <img src={x.imageUrl} alt="" style={{ width: 54, height: 54, objectFit: 'cover', borderRadius: 6, flex: 'none' }} /> : <div style={{ width: 54, height: 54, flex: 'none', borderRadius: 6, background: '#333', display: 'grid', placeItems: 'center' }}>🎨</div>}
+                <div style={{ fontSize: 12 }}>
+                  <div>
+                    {x.ok === false ? '⚠️' : x.ok ? '✅' : '•'} <b>{mmss(x.start)}</b> · {x.midia}
+                  </div>
+                  <div style={{ opacity: 0.85 }}>"{x.fala}"</div>
+                  {x.motivo && <div style={{ color: '#ffd28a' }}>{x.motivo}</div>}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Aprovar() {
   const [token, setToken] = useState('');
   const [digitado, setDigitado] = useState('');
@@ -158,6 +206,23 @@ export default function Aprovar() {
                     </div>
                     <div style={{ fontSize: 16, fontWeight: 700, margin: '6px 0' }}>{i.titulo}</div>
                     <div style={{ fontSize: 13, color: '#c9bfae', marginBottom: 12 }}>📅 Vai ao ar: {quando}</div>
+                    <Conferencia
+                      c={i.conferencia}
+                      ocupado={ocupado === i.id + 'conferir'}
+                      deNovo={async () => {
+                        setOcupado(i.id + 'conferir');
+                        setAviso('🔍 Conferindo tudo de novo (até 1 minuto)...');
+                        try {
+                          const r = await api('/api/central/fabrica', { id: i.id, acao: 'conferir' });
+                          setItens((lista) => lista.map((x) => (x.id === i.id ? { ...x, conferencia: r.conferencia } : x)));
+                          setAviso(r.conferencia?.status === 'ok' ? '✅ Conferido: tudo certo' : '⚠️ Conferido: veja os pontos marcados');
+                        } catch (e) {
+                          setAviso(`⚠️ ${e.message}`);
+                        } finally {
+                          setOcupado('');
+                        }
+                      }}
+                    />
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button disabled={!!ocupado} style={botao('#2f8a5b')} onClick={() => acao(i, 'video-aprovar', `Aprovado: "${i.titulo}"`)}>
                         ✅ Aprovar

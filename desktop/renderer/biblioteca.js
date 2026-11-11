@@ -715,6 +715,7 @@ const Biblioteca = (() => {
           <span class="nota">${esc(TIPO_APROVAR[i.tipo] || '')} · ${curto ? 'Short' : 'Vídeo longo'} · ${esc(i.canal)}</span>
           <b style="font-size:14px">${esc(i.titulo)}</b>
           <span class="nota">📅 Vai ao ar: ${esc(quando)}</span>
+          <div class="ap-conf"></div>
           ${curto && ['games', 'politica'].includes(i.tipo)
             ? `<div class="ap-capas" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"></div><button type="button" class="btn-mini ap-capa-nova" style="align-self:flex-start" title="Fazer as duas capas de novo (melhor e econômica)">🎨 Outras capas</button>`
             : i.thumbnailUrl ? `<a href="#" class="nota ver-capa">🖼 ver a capa</a>` : ''}
@@ -753,6 +754,40 @@ const Biblioteca = (() => {
         });
       };
       desenharCapas(i.capaOpcoes);
+      // Conferência final: linha do tempo (texto, áudio, legenda, cada cena, capa, final) com ✅ / ⚠️
+      const mmss = (x) => (x == null ? '' : `${Math.floor(x / 60)}:${String(Math.round(x) % 60).padStart(2, '0')}`);
+      const desenharConf = (c) => {
+        const el = card.querySelector('.ap-conf');
+        if (!el) return;
+        if (!c || ['pendente', 'conferindo'].includes(c.status)) {
+          el.innerHTML = `<span class="nota">🔍 Conferência final: ${c ? 'conferindo texto, legenda, cenas e capa...' : 'ainda não conferido'}</span>`;
+          return;
+        }
+        const ruins = (c.etapas || []).filter((e) => !e.ok);
+        el.innerHTML = `<div style="border-radius:8px;padding:8px;font-size:12px;line-height:1.45;background:${ruins.length ? 'rgba(214,150,40,.18)' : 'rgba(47,138,91,.18)'}">
+            <div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><b>${ruins.length ? `⚠️ ${ruins.length} ponto(s) para olhar` : '✅ Conferido: texto, legenda, cenas e capa'}</b>
+            <button type="button" class="btn-mini ap-conf-de-novo" title="Conferir tudo de novo (ex.: depois de trocar a capa)">🔍 De novo</button></div>
+            ${(c.etapas || []).map((e) => `<div>${e.ok ? '✅' : '⚠️'} <b>${esc(e.nome)}:</b> ${esc(e.detalhe)}</div>`).join('')}
+            ${(c.cenas || []).length ? `<details style="margin-top:4px"><summary>Linha do tempo das cenas (${c.cenas.length})</summary>
+              ${c.cenas.map((x) => `<div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+                ${x.imageUrl ? `<img src="${esc(x.imageUrl)}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;flex:none">` : '<span style="width:44px;text-align:center;flex:none">🎨</span>'}
+                <div>${x.ok === false ? '⚠️' : x.ok ? '✅' : '•'} <b>${mmss(x.start)}</b> · ${esc(x.midia)}<br><span class="nota">"${esc(x.fala)}"</span>${x.motivo ? `<br><span style="color:#d69628">${esc(x.motivo)}</span>` : ''}</div></div>`).join('')}
+            </details>` : ''}</div>`;
+        el.querySelector('.ap-conf-de-novo').onclick = async (ev) => {
+          const b = ev.currentTarget;
+          b.disabled = true;
+          b.textContent = '🔍 Conferindo...';
+          try {
+            const r = await window.api.fabrica.acao({ id: i.id, acao: 'conferir' });
+            desenharConf(r?.conferencia);
+          } catch (e) {
+            avisar(msgErro(e), true);
+            b.disabled = false;
+            b.textContent = '🔍 De novo';
+          }
+        };
+      };
+      desenharConf(i.conferencia);
       const capaNova = card.querySelector('.ap-capa-nova');
       if (capaNova)
         capaNova.onclick = async () => {

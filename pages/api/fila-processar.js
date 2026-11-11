@@ -806,6 +806,8 @@ export default async function handler(req, res) {
             // (aba ✅ Aprovar da Biblioteca do Compilador) antes de ir para o YouTube
             // Refeito: o original já foi aprovado pelo dono — sobe sozinho (só troca imagens/ilustrações, mesmo texto e voz)
             'fabrica.youtube': item.fabrica.redes?.youtube ? { status: (item.games || item.politica || item.documentario) && !item.refeitoDe ? 'revisar' : 'pendente', ...(item.refeitoDe ? { aprovadoEm: new Date().toISOString(), aprovadoSozinho: 'refeito' } : {}) } : null,
+            // Conferência final antes de você assistir (texto, legenda, cada cena, capa): sai no ✅ Aprovar
+            ...(item.games || item.politica || item.documentario ? { conferencia: { status: 'pendente' } } : {}),
           });
           // Desenho infantil: o clipe da música vira um Short vertical, que sai no dia seguinte (mesmo horário)
           if (item.infantil && !item.shortMusica && !item.infantil.teste && item.infantil.shortsMusica !== false && item.vozInfantil?.musica?.audioUrl) {
@@ -882,6 +884,8 @@ export default async function handler(req, res) {
   if (soFabrica) await (await import('../../lib/politicaMesmoDia')).arrumarFilaPolitica(db, 'politica').catch(() => {});
   if (soFabrica) await (await import('../../lib/politicaMesmoDia')).arrumarFilaPolitica(db, 'games').catch(() => {});
 
+  // Conferência final (texto, legenda, cenas, capa) do vídeo pronto que vai para o ✅ Aprovar: roda junto com a produção
+  const conf = soFabrica ? import('../../lib/conferenciaFinal').then((m) => m.conferirPendentes(db, 1)).catch(() => 0) : Promise.resolve(0);
   const feitos = [];
   const vistos = new Set();
   try {
@@ -905,7 +909,7 @@ export default async function handler(req, res) {
       .filter((d) => !['concluido', 'erro'].includes(d.data().status))
       .filter((d) => (!soFabrica || d.data().fabrica) && (!d.data().fabrica || d.data().status !== 'pendente' || prioridade(d) <= limite))
       .sort((x, y) => prioridade(x).localeCompare(prioridade(y)));
-    if (!docs.length) return res.status(200).json({ mensagem: 'Fila vazia, nada a processar.' });
+    if (!docs.length) { await conf; return res.status(200).json({ mensagem: 'Fila vazia, nada a processar.' }); }
 
     // Até ~3 min por chamada, um passo de cada item
     let roteiros = 0;
@@ -949,10 +953,12 @@ export default async function handler(req, res) {
       if (!soFabrica) break; // chamada manual: um passo só, como antes
     }
     if (soFabrica) await registrarVolta(db, { inicio, docs: docs.length, feitos }).catch(() => {});
-    if (!feitos.length) return res.status(200).json({ mensagem: 'Só tem vídeo esperando o Youvideo Compilador montar no PC.' });
+    if (!feitos.length) { await conf; return res.status(200).json({ mensagem: 'Só tem vídeo esperando o Youvideo Compilador montar no PC.' }); }
+    await conf;
     return res.status(200).json({ feitos, processado: feitos[0].id, statusAnterior: feitos[0].statusAnterior });
   } catch (err) {
     if (soFabrica) await registrarVolta(db, { inicio, docs: 0, feitos, erro: err.message }).catch(() => {});
+    await conf;
     return res.status(500).json({ error: err.message });
   }
 }
