@@ -124,7 +124,13 @@ async function aprovarSozinho(db, col, cfgDados) {
   // Notícia QUENTE (saiu há menos de 3 h, nota 8+): entra mesmo passando das 5 do dia (até 7)
   const quentes = fila.filter(({ d }) => (d.ep?.potencial || 5) >= 8 && idade(d) < 3 * 3600e3);
   const extras = Math.max(0, Math.min(quentes.length, 7 - ultimas24) - vagas);
-  const ordem = [...quentes, ...fila.filter((x) => !quentes.includes(x))];
+  // QUALIDADE antes de quantidade (pedido do dono): sozinho só sobe notícia de NOTA BOA (7+). Nota 5-6 só completa o dia
+  // se até as 15h saíram menos de 3; abaixo de 5, só se você aprovar à mão. O 5 por dia é teto, não meta.
+  const hora = Number(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }));
+  const nota = (d) => Number(d.ep?.potencial ?? 6);
+  const boas = fila.filter(({ d }) => nota(d) >= 7);
+  const medias = ultimas24 + boas.length < 3 && hora >= 15 ? fila.filter(({ d }) => nota(d) >= 5 && nota(d) < 7) : [];
+  const ordem = [...quentes, ...[...boas, ...medias].filter((x) => !quentes.includes(x))];
   // O MESMO JOGO no máximo 1 vez por dia (ex.: 4 notícias do remake de Ocarina of Time no mesmo dia = vídeos repetidos)
   const jogoDe = (d) => {
     const conta = {};
