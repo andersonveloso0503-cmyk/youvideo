@@ -54,6 +54,20 @@ async function trocarCapaStudio({ canalId, videoId, arquivo, limiteMs = 120000 }
   win.webContents.setUserAgent(UA);
   // "Sair do site? As alterações não foram salvas": nunca trava a janela escondida
   win.webContents.on('will-prevent-unload', (ev) => ev.preventDefault());
+  // Janela ESCONDIDA nunca abre a página de login do Google: lá o Google pede chave de acesso/PIN do Windows
+  // (aparecia o pedido de PIN a cada 10 min). Caiu no login = para na hora e avisa para usar o botão 🔑.
+  let foiProLogin = false;
+  const bloquearLogin = (ev, url) => {
+    if (/accounts\.google\.com|ServiceLogin|signin/i.test(String(url))) {
+      foiProLogin = true;
+      try { ev.preventDefault(); } catch {}
+      try { win.webContents.stop(); } catch {}
+    }
+  };
+  win.webContents.on('will-navigate', bloquearLogin);
+  win.webContents.on('will-redirect', bloquearLogin);
+  win.webContents.on('will-frame-navigate', (ev) => bloquearLogin(ev, ev.url));
+  win.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
   const fim = Date.now() + limiteMs;
   const js = (codigo) => win.webContents.executeJavaScript(codigo, true);
   try {
@@ -62,7 +76,7 @@ async function trocarCapaStudio({ canalId, videoId, arquivo, limiteMs = 120000 }
     let estado = '';
     while (Date.now() < fim) {
       const url = win.webContents.getURL();
-      if (/accounts\.google\.com|ServiceLogin|signin/i.test(url)) throw new ErroStudio('LOGIN', 'precisa entrar no YouTube Studio deste canal');
+      if (foiProLogin || /accounts\.google\.com|ServiceLogin|signin/i.test(url)) throw new ErroStudio('LOGIN', 'precisa entrar no YouTube Studio deste canal');
       estado = await js(`(() => {
         if (document.querySelector('input#file-loader')) return 'campo';
         const t = (document.body && document.body.innerText) || '';

@@ -203,7 +203,9 @@ class Fila extends EventEmitter {
       for (const p of lista) {
         if (Date.now() - p.em > 4 * 86400e3 || !fs.existsSync(p.arquivo) || (p.tentativas || 0) >= 12) continue; // desiste
         // espera uns minutos depois do envio (o Studio ainda está processando o vídeo) e não insiste em canal sem login
-        if (Date.now() - p.em < 3 * 60e3 || semLogin.has(p.canalId) || (soCanal && p.canalId !== soCanal)) {
+        // Canal sem login no Studio: NÃO tenta de novo sozinho (cada tentativa fazia o Windows pedir o PIN);
+        // só volta a tentar quando você usa o botão 🔑 Entrar no Studio daquele canal
+        if (Date.now() - p.em < 3 * 60e3 || semLogin.has(p.canalId) || (soCanal && p.canalId !== soCanal) || (p.precisaLogin && soCanal !== p.canalId)) {
           fica.push(p);
           continue;
         }
