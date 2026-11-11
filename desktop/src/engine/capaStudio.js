@@ -22,7 +22,9 @@ function abrirLogin(canalId, titulo = '') {
     webPreferences: { partition: particao(canalId), contextIsolation: true, nodeIntegration: false },
   });
   win.webContents.setUserAgent(UA);
-  win.loadURL(`https://studio.youtube.com/channel/${canalId}`);
+  // Abre direto a tela de login do Google; depois de entrar, cai no Studio do canal
+  const destino = `https://studio.youtube.com/channel/${canalId}`;
+  win.loadURL(`https://accounts.google.com/ServiceLogin?service=youtube&passive=false&continue=${encodeURIComponent(destino)}`);
   return new Promise((resolve) => win.on('closed', () => resolve(true)));
 }
 
@@ -70,7 +72,8 @@ async function trocarCapaStudio({ canalId, videoId, arquivo, limiteMs = 120000 }
       if (estado) break;
       await espera(1500);
     }
-    if (estado === 'sem-acesso') throw new ErroStudio('CANAL', 'a conta logada neste canal não tem acesso a este vídeo');
+    // sem acesso = ainda não entrou, ou entrou com outra conta: tratado como login (o botão 🔑 fica em destaque)
+    if (estado === 'sem-acesso') throw new ErroStudio('LOGIN', 'a conta deste canal não está logada no Studio do Compilador (ou é outra conta)');
     if (estado !== 'campo') throw new ErroStudio('CAMPO', 'o campo da capa não apareceu (vídeo ainda processando?)');
 
     // põe a imagem no campo da capa, como se você tivesse escolhido o arquivo
