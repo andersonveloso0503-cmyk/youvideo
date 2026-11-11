@@ -1199,7 +1199,7 @@ export default async function handler(req, res) {
         if (!y) return false;
         const livre =
           y.status === 'pendente' ||
-          (y.status === 'enviando' && Date.now() - (y.em || 0) > 3 * 3600e3) ||
+          (y.status === 'enviando' && Date.now() - (y.em || 0) > 45 * 60e3) || // PC desligou no meio do envio: outro PC sobe
           (y.status === 'erro' && Date.now() - (y.em || 0) > 6 * 3600e3 && (y.tentativas || 0) < 3);
         if (!livre) return false;
         t.update(ref, { 'fabrica.youtube': { status: 'enviando', em: Date.now(), pc: String(b.pc || '').slice(0, 60), tentativas: y.tentativas || 0 } });

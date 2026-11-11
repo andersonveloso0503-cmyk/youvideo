@@ -51,7 +51,7 @@ const APP = ['recibo', 'pix', 'rota', 'impacto'];
 const precisaApp = (receita) => (receita?.clipes || []).some((c) => APP.includes(c.ilustracao?.tipo));
 const ESPERA_PC_NOVO = 2 * 3600e3;
 
-const TEMPO_MAX_MONTANDO = 3 * 3600e3; // PC sumiu no meio: depois de 3 h o pedido volta para a fila
+const TEMPO_MAX_MONTANDO = 60 * 60e3; // PC sumiu no meio (desligou): 1 h sem nenhum progresso e o pedido volta para a fila (outro PC pega)
 
 export default async function handler(req, res) {
   if (!exigirToken(req, res)) return;
