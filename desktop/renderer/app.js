@@ -933,6 +933,14 @@ function atualizarTudo() {
 }
 
 // ---------- Canais ----------
+let studioSemLogin = [];
+window.api.ao?.('studio:login', (lista) => {
+  studioSemLogin = Array.isArray(lista) ? lista : [];
+  renderCanais();
+});
+window.api.canais.studioPendentes?.().then((r) => {
+  studioSemLogin = r?.semLogin || [];
+}).catch(() => {});
 function renderCanais() {
   $('#qtdCanais').textContent = canais.length;
   if (typeof Subir !== 'undefined') Subir.renderCanais();
@@ -946,9 +954,19 @@ function renderCanais() {
   canais.forEach((c) => {
     const li = document.createElement('li');
     li.className = 'canal';
-    li.innerHTML = `${c.thumb ? `<img src="${c.thumb}" />` : '<span class="sem-foto"></span>'}<span class="info"><b></b><small>conectado em ${new Date(c.conectadoEm).toLocaleDateString('pt-BR')}</small></span><button class="btn-mini destaque" data-arrumar title="Confere os vídeos que já estão no canal: categoria, idioma e títulos fracos">🛠 Arrumar vídeos</button><button class="btn-mini perigo" data-desconectar>Desconectar</button>`;
+    li.innerHTML = `${c.thumb ? `<img src="${c.thumb}" />` : '<span class="sem-foto"></span>'}<span class="info"><b></b><small>conectado em ${new Date(c.conectadoEm).toLocaleDateString('pt-BR')}</small></span><button class="btn-mini destaque" data-arrumar title="Confere os vídeos que já estão no canal: categoria, idioma e títulos fracos">🛠 Arrumar vídeos</button><button class="btn-mini" data-studio title="Entre uma vez na conta Google deste canal: o Compilador usa o YouTube Studio para trocar a capa dos Shorts (pela API o Short não mostra a capa)">🔑 Entrar no Studio</button><button class="btn-mini perigo" data-desconectar>Desconectar</button>`;
     li.querySelector('b').textContent = c.titulo;
     li.querySelector('[data-arrumar]').onclick = () => Arrumar.abrir(c);
+    const bStudio = li.querySelector('[data-studio]');
+    if (studioSemLogin.includes(c.id)) bStudio.classList.add('destaque'), (bStudio.textContent = '🔑 Entrar no Studio (capas esperando)');
+    bStudio.onclick = async () => {
+      bStudio.disabled = true;
+      bStudio.textContent = '🔑 Entre na janela que abriu e feche-a no fim...';
+      await window.api.canais.studioLogin({ id: c.id, titulo: c.titulo }).catch(() => {});
+      bStudio.disabled = false;
+      bStudio.textContent = '🔑 Entrar no Studio';
+      bStudio.classList.remove('destaque');
+    };
     li.querySelector('[data-desconectar]').onclick = async () => {
       if (!confirm(`Desconectar o canal "${c.titulo}" deste app?`)) return;
       canais = await window.api.canais.remover(c.id);

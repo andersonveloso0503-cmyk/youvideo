@@ -148,6 +148,84 @@ class Fila extends EventEmitter {
       fs.writeFileSync(path.join(this.dirDados, 'fabrica-enviados.json'), JSON.stringify(Object.fromEntries(recentes)));
     } catch {}
   }
+  // ---------- Capa dos SHORTS pelo YouTube Studio (a API aceita mas o Short não mostra) ----------
+  arquivoCapasStudio() {
+    return path.join(this.dirCache, 'capas-studio.json');
+  }
+  lerCapasStudio() {
+    try {
+      return JSON.parse(fs.readFileSync(this.arquivoCapasStudio(), 'utf8'));
+    } catch {
+      return [];
+    }
+  }
+  guardarCapaStudio({ videoId, canalId, arquivo, jobId, titulo }) {
+    try {
+      const dir = path.join(this.dirCache, 'capas-studio');
+      fs.mkdirSync(dir, { recursive: true });
+      const copia = path.join(dir, `${videoId}${/\.png$/i.test(arquivo) ? '.png' : '.jpg'}`);
+      fs.copyFileSync(arquivo, copia);
+      const lista = this.lerCapasStudio().filter((x) => x.videoId !== videoId);
+      lista.push({ videoId, canalId, arquivo: copia, jobId, titulo: String(titulo || '').slice(0, 100), em: Date.now(), tentativas: 0 });
+      fs.writeFileSync(this.arquivoCapasStudio(), JSON.stringify(lista));
+    } catch {}
+  }
+  /** Uma vez: os Shorts que já subiram nos últimos 4 dias com capa e ainda não tiveram a capa trocada no Studio. */
+  capasStudioAtrasadas() {
+    try {
+      const marca = path.join(this.dirCache, 'capas-studio-atrasadas.ok');
+      if (fs.existsSync(marca)) return;
+      for (const j of this.jobs || []) {
+        const e = j.envio || {};
+        const id = j.youtube?.id;
+        const quando = Date.parse(j.concluidoEm || '') || 0;
+        if (j.status !== 'concluido' || !e.curto || !id || Date.now() - quando > 4 * 86400e3) continue;
+        if (!['20', '25'].includes(String(e.categoria || ''))) continue;
+        if (e.capa && fs.existsSync(e.capa)) this.guardarCapaStudio({ videoId: id, canalId: e.canalId, arquivo: e.capa, jobId: j.id, titulo: e.titulo });
+      }
+      fs.writeFileSync(marca, String(Date.now()));
+    } catch {}
+  }
+  /** Canais que precisam do login no Studio (para a tela mostrar o botão 🔑). */
+  canaisSemLoginStudio() {
+    return [...new Set(this.lerCapasStudio().filter((x) => x.precisaLogin).map((x) => x.canalId))];
+  }
+  async tentarCapasStudio({ canalId: soCanal = null } = {}) {
+    if (this.tentandoStudio) return;
+    this.capasStudioAtrasadas();
+    const lista = this.lerCapasStudio();
+    if (!lista.length) return;
+    this.tentandoStudio = true;
+    const { trocarCapaStudio } = require('./capaStudio');
+    const fica = [];
+    const semLogin = new Set();
+    try {
+      for (const p of lista) {
+        if (Date.now() - p.em > 4 * 86400e3 || !fs.existsSync(p.arquivo) || (p.tentativas || 0) >= 12) continue; // desiste
+        // espera uns minutos depois do envio (o Studio ainda está processando o vídeo) e não insiste em canal sem login
+        if (Date.now() - p.em < 3 * 60e3 || semLogin.has(p.canalId) || (soCanal && p.canalId !== soCanal)) {
+          fica.push(p);
+          continue;
+        }
+        const job = this.jobs.find((j) => j.id === p.jobId);
+        try {
+          await trocarCapaStudio({ canalId: p.canalId, videoId: p.videoId, arquivo: p.arquivo });
+          fs.rmSync(p.arquivo, { force: true });
+          if (job) this.atualizar(job, { aviso: null, etapa: `${String(job.etapa || 'Enviado').replace(/ · capa.*$/, '')} · capa do Short no Studio ✅` });
+        } catch (e) {
+          const login = e.codigo === 'LOGIN';
+          if (login) semLogin.add(p.canalId);
+          fica.push({ ...p, precisaLogin: login, tentativas: (p.tentativas || 0) + (login ? 0 : 1), ultimoErro: String(e.message || e).slice(0, 200) });
+          if (job) this.atualizar(job, { aviso: login ? 'Capa do Short: entre uma vez no YouTube Studio deste canal (Contas YouTube → 🔑 Entrar no Studio) e ela é trocada sozinha' : `Capa do Short no Studio: ${String(e.message || e).slice(0, 140)} — tento de novo sozinho` });
+        }
+      }
+      fs.writeFileSync(this.arquivoCapasStudio(), JSON.stringify(fica));
+    } finally {
+      this.tentandoStudio = false;
+    }
+    if (this.aoMudarStudio) this.aoMudarStudio(this.canaisSemLoginStudio());
+  }
+
   // ---------- Capas que o YouTube recusou por limite: ficam guardadas e vão de novo de hora em hora (até 3 dias) ----------
   arquivoCapasPendentes() {
     return path.join(this.dirCache, 'capas-pendentes.json');
@@ -672,6 +750,11 @@ class Fila extends EventEmitter {
       if (r.miniaturaErro && r.id && capaUsada && /too many|rate|quota|limit|later/i.test(r.miniaturaErro)) {
         this.guardarCapaPendente({ videoId: r.id, canalId: e.canalId, arquivo: capaUsada, jobId: job.id, titulo: e.titulo });
         r.miniaturaErro = 'Capa recusada agora pelo limite do YouTube — vou mandar de novo sozinho daqui a pouco (de hora em hora)';
+      }
+      // Short: a capa pela API não aparece — troca também pelo YouTube Studio (sozinho, daqui a uns minutos)
+      if (e.curto && capaUsada && r.id) {
+        this.guardarCapaStudio({ videoId: r.id, canalId: e.canalId, arquivo: capaUsada, jobId: job.id, titulo: e.titulo });
+        setTimeout(() => this.tentarCapasStudio().catch(() => {}), 4 * 60e3);
       }
       if (this.cacheCanal) delete this.cacheCanal[e.canalId]; // o canal mudou: a próxima conferência olha de novo
       this.atualizar(job, {

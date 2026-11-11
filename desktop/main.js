@@ -937,6 +937,12 @@ app.whenReady().then(() => {
   // Capas recusadas pelo limite do YouTube: tenta de novo de hora em hora
   setTimeout(() => fila.tentarCapasPendentes().catch(() => {}), 5 * 60e3);
   setInterval(() => fila.tentarCapasPendentes().catch(() => {}), 60 * 60e3);
+  // Capa dos Shorts pelo YouTube Studio: confere a cada 10 min (e avisa a tela se algum canal precisa do login)
+  fila.aoMudarStudio = (semLogin) => {
+    for (const w of BrowserWindow.getAllWindows()) w.webContents.send('studio:login', semLogin);
+  };
+  setTimeout(() => fila.tentarCapasStudio().catch(() => {}), 2 * 60e3);
+  setInterval(() => fila.tentarCapasStudio().catch(() => {}), 10 * 60e3);
   ipcMain.handle('fabrica:listar', async () => {
     const r = await Central.chamar(store.ler(), '/api/central/fabrica');
     // Aproveita a mesma resposta para as tarjas da Fila (sem consultar o banco de novo)
@@ -1308,6 +1314,13 @@ app.whenReady().then(() => {
     if (fila.cacheCanal) delete fila.cacheCanal[canalId]; // o canal mudou: a conferência de título repetido olha de novo
     return r;
   });
+  // Login no YouTube Studio do canal (para a capa dos Shorts). Ao fechar a janela, já tenta trocar as capas pendentes.
+  ipcMain.handle('canais:studioLogin', async (_e, { id, titulo }) => {
+    await require('./src/engine/capaStudio').abrirLogin(id, titulo);
+    fila.tentarCapasStudio({ canalId: id }).catch(() => {});
+    return true;
+  });
+  ipcMain.handle('canais:studioPendentes', () => ({ semLogin: fila.canaisSemLoginStudio(), total: fila.lerCapasStudio().length }));
   ipcMain.handle('canais:remover', (_e, id) => {
     store.removerCanal(id);
     sincronizarDepois();

@@ -86,6 +86,8 @@ contextBridge.exposeInMainWorld('api', {
     corrigir: chamar('canais:corrigir'),
     desprogramar: chamar('canais:desprogramar'),
     apagarProgramado: chamar('canais:apagarProgramado'),
+    studioLogin: chamar('canais:studioLogin'),
+    studioPendentes: chamar('canais:studioPendentes'),
   },
   fila: {
     listar: chamar('fila:listar'),
@@ -141,7 +143,7 @@ contextBridge.exposeInMainWorld('api', {
   creditos: { ler: chamar('creditos:ler') },
   caminhoDoArquivo: (file) => webUtils.getPathForFile(file),
   ao: (canal, fn) => {
-    const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download', 'sync:feito', 'creditos:status', 'abrir:agenda', 'canais:progresso', 'cantor:progresso', 'dormir:progresso', 'dormir:semana', 'estudio:musicas', 'musicaAuto:mudou', 'narrar:progresso', 'redes:progresso'];
+    const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download', 'sync:feito', 'creditos:status', 'abrir:agenda', 'canais:progresso', 'cantor:progresso', 'dormir:progresso', 'dormir:semana', 'estudio:musicas', 'musicaAuto:mudou', 'narrar:progresso', 'redes:progresso', 'studio:login'];
     if (!permitidos.includes(canal)) return;
     ipcRenderer.on(canal, (_e, dados) => fn(dados));
   },
