@@ -1439,19 +1439,26 @@ export default async function handler(req, res) {
         texto: String(b.texto || '').trim() || textoDaCapa(d),
         refUrl: d.games ? d.capaUrl || primeira : null,
       };
-      const [pro, economica] = await Promise.allSettled([capaShortIa({ ...base, modelo: 'pro' }), capaShortIa({ ...base, modelo: 'economica' })]);
+      const { capaShortGratis, imagensDaCapa } = await import('../../../lib/capaShortGratis');
+      const [pro, economica, gratis] = await Promise.allSettled([
+        capaShortIa({ ...base, modelo: 'pro' }),
+        capaShortIa({ ...base, modelo: 'economica' }),
+        // grátis: a foto real e livre do assunto (a que já está no vídeo) + o texto gigante — sempre sai, mesmo sem crédito
+        capaShortGratis({ tipo: base.tipo, texto: base.texto, imagens: imagensDaCapa(d) }),
+      ]);
       const opcoes = [
         pro.status === 'fulfilled' ? { modelo: 'pro', nome: 'Melhor (~R$ 0,75)', url: pro.value } : null,
         economica.status === 'fulfilled' ? { modelo: 'economica', nome: 'Econômica (~R$ 0,25)', url: economica.value } : null,
+        gratis.status === 'fulfilled' ? { modelo: 'gratis', nome: 'Grátis (foto real)', url: gratis.value } : null,
       ].filter(Boolean);
+      const motivo = String(pro.reason?.message || economica.reason?.message || '');
+      const semCredito = /credits are depleted|prepayment|billing|quota|RESOURCE_EXHAUSTED/i.test(motivo);
       if (!opcoes.length) {
-        const motivo = String(pro.reason?.message || economica.reason?.message || '');
-        if (/credits are depleted|prepayment|billing|quota|RESOURCE_EXHAUSTED/i.test(motivo))
-          return res.status(402).json({ erro: 'Acabaram os créditos do Gemini (Google AI Studio). Recarregue em aistudio.google.com → Billing e clique de novo.' });
-        return res.status(500).json({ erro: `Não consegui fazer a capa: ${motivo.slice(0, 200)}` });
+        if (semCredito) return res.status(402).json({ erro: 'Acabaram os créditos do Gemini (Google AI Studio) e a capa grátis também não saiu. Recarregue em aistudio.google.com → Billing.' });
+        return res.status(500).json({ erro: `Não consegui fazer a capa: ${(motivo || String(gratis.reason?.message || '')).slice(0, 200)}` });
       }
       await ref.update({ capaOpcoes: opcoes });
-      return res.status(200).json({ ok: true, opcoes });
+      return res.status(200).json({ ok: true, opcoes, aviso: semCredito ? 'Os créditos do Gemini acabaram: veio só a capa grátis (foto real). Recarregue no Google AI Studio para voltar a ter as capas da IA.' : '' });
     }
     if (b.acao === 'capa-escolher') {
       const url = String(b.url || '');

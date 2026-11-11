@@ -179,7 +179,7 @@ export default function Aprovar() {
                             try {
                               const r = await api('/api/central/fabrica', { id: i.id, acao: 'capa-ia' });
                               setItens((lista) => lista.map((x) => (x.id === i.id ? { ...x, capaOpcoes: r.opcoes || [] } : x)));
-                              setAviso('Duas capas novas prontas: toque na que você quer usar.');
+                              setAviso(r.aviso ? `⚠️ ${r.aviso}` : 'Capas novas prontas: toque na que você quer usar.');
                             } catch (e) {
                               setAviso(`⚠️ ${e.message}`);
                             } finally {

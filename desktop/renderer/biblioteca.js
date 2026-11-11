@@ -757,11 +757,11 @@ const Biblioteca = (() => {
       if (capaNova)
         capaNova.onclick = async () => {
           capaNova.disabled = true;
-          capaNova.textContent = '🎨 Fazendo as duas (uns 40 s)...';
+          capaNova.textContent = '🎨 Fazendo as capas (uns 40 s)...';
           try {
             const r = await window.api.fabrica.acao({ id: i.id, acao: 'capa-ia' });
             desenharCapas(r?.opcoes || []);
-            avisar('Duas capas novas prontas: clique na que você quer usar');
+            avisar(r?.aviso || 'Capas novas prontas: clique na que você quer usar', !!r?.aviso);
           } catch (e) {
             avisar(msgErro(e), true);
           } finally {

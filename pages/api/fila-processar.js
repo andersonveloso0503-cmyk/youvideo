@@ -718,7 +718,17 @@ export default async function handler(req, res) {
                 capaIa = true;
                 console.log(`[capa-ia] ${item.games ? 'games' : 'politica'}: ${item.roteiro?.titulo}`);
               } catch (e) {
-                console.log(`[capa-ia] falhou (${String(e.message || e).slice(0, 160)}) — fica a capa antiga`);
+                console.log(`[capa-ia] falhou (${String(e.message || e).slice(0, 160)}) — vai a capa grátis (foto real + texto)`);
+                try {
+                  const { capaShortGratis, imagensDaCapa } = await import('../../lib/capaShortGratis');
+                  const { textoDaCapa } = await import('../../lib/capaShortIa');
+                  const url = await capaShortGratis({ tipo: item.games ? 'games' : 'politica', texto: textoDaCapa(item), imagens: imagensDaCapa(item) });
+                  thumbnailUrl = url;
+                  capaIa = true;
+                  await ref.update({ capaOpcoes: [{ modelo: 'gratis', nome: 'Grátis (foto real)', url }] }).catch(() => {});
+                } catch (e2) {
+                  console.log(`[capa-gratis] falhou (${String(e2.message || e2).slice(0, 160)}) — fica a capa antiga`);
+                }
               }
             }
           } else if (item.infantil && !item.shortMusica) {
