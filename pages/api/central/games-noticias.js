@@ -125,9 +125,24 @@ async function aprovarSozinho(db, col, cfgDados) {
   const quentes = fila.filter(({ d }) => (d.ep?.potencial || 5) >= 8 && idade(d) < 3 * 3600e3);
   const extras = Math.max(0, Math.min(quentes.length, 7 - ultimas24) - vagas);
   const ordem = [...quentes, ...fila.filter((x) => !quentes.includes(x))];
+  // O MESMO JOGO no máximo 1 vez por dia (ex.: 4 notícias do remake de Ocarina of Time no mesmo dia = vídeos repetidos)
+  const jogoDe = (d) => {
+    const conta = {};
+    for (const c of d.ep?.cenas || []) {
+      const m = String(c.midia || c.busca || '').match(/^\s*@?\s*jogo:\s*([^|]+)/i);
+      if (m) conta[m[1].trim().toLowerCase()] = (conta[m[1].trim().toLowerCase()] || 0) + 1;
+    }
+    return Object.entries(conta).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  };
+  const recentes = (await col.where('status', '==', 'aprovada').get()).docs.map((x) => x.data()).filter((x) => Date.now() - new Date(x.aprovadaEm || 0).getTime() < 24 * 3600e3);
+  const jogosDoDia = new Set(recentes.map(jogoDe).filter(Boolean));
   let automaticas = 0;
-  for (const { ref, d } of ordem.slice(0, vagas + extras)) {
+  for (const { ref, d } of ordem) {
+    if (automaticas >= vagas + extras) break;
+    const jogo = jogoDe(d);
+    if (jogo && jogosDoDia.has(jogo)) continue; // esse jogo já teve vídeo hoje: espera (ou você aprova à mão)
     await aprovarNoticia(db, ref, d, canal, null, { limite: 1 });
+    if (jogo) jogosDoDia.add(jogo);
     automaticas++;
   }
   return { automaticas, vagas, quentes: quentes.length };
