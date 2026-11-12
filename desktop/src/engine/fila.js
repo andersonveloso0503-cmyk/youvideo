@@ -225,6 +225,12 @@ class Fila extends EventEmitter {
     } finally {
       this.tentandoStudio = false;
     }
+    // Manda o resultado para os registros do site (para conferir de longe por que a capa não foi)
+    try {
+      const pend = this.lerCapasStudio();
+      const texto = `fila=${lista.length} ficaram=${pend.length} semLogin=${[...semLogin].join(',') || '-'} | ` + pend.slice(0, 6).map((p) => `${p.videoId}: ${p.precisaLogin ? 'LOGIN' : p.ultimoErro || (Date.now() - p.em < 3 * 60e3 ? 'esperando 3 min' : 'não tentou')} (tent ${p.tentativas || 0})`).join(' ; ');
+      Central.chamar(this.obterConfig(), '/api/central/log-pc', { metodo: 'POST', corpo: { pc: require('os').hostname(), area: 'capa-studio', texto } }).catch(() => {});
+    } catch {}
     if (this.aoMudarStudio) this.aoMudarStudio(this.canaisSemLoginStudio());
   }
 
@@ -782,6 +788,8 @@ class Fila extends EventEmitter {
         this.guardarCapaPendente({ videoId: r.id, canalId: e.canalId, arquivo: capaUsada, jobId: job.id, titulo: e.titulo });
         r.miniaturaErro = 'Capa recusada agora pelo limite do YouTube — vou mandar de novo sozinho daqui a pouco (de hora em hora)';
       }
+      if (e.curto && r.id)
+        Central.chamar(cfg, '/api/central/log-pc', { metodo: 'POST', corpo: { pc: os.hostname(), area: 'capa-studio', texto: `subiu ${r.id} "${String(e.titulo || '').slice(0, 60)}": capa ${capaUsada ? 'vai para o Studio' : `NÃO vai (chamativa=${!!chamativa}, manual=${!!e.capaManual}, capa=${!!e.capa})`}${r.miniaturaErro ? ` | API: ${String(r.miniaturaErro).slice(0, 120)}` : ''}` } }).catch(() => {});
       // Short: a capa pela API não aparece — troca também pelo YouTube Studio (sozinho, daqui a uns minutos)
       if (e.curto && capaUsada && r.id) {
         this.guardarCapaStudio({ videoId: r.id, canalId: e.canalId, arquivo: capaUsada, jobId: job.id, titulo: e.titulo });
