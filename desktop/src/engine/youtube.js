@@ -467,6 +467,40 @@ async function desempenhoRecente({ credenciais, refreshToken, redirectOriginal }
   return { inscritos: Number(ch.statistics?.subscriberCount) || 0, ocultos: !!ch.statistics?.hiddenSubscriberCount, videos };
 }
 
+/**
+ * Números dos últimos 28 dias para o quadro "O que melhorar" (YouTube Analytics):
+ * por vídeo (views, % assistida, inscritos ganhos, likes, compartilhamentos) + duração/horário de cada um
+ * + de onde vêm as views (feed de Shorts, pesquisa, sugeridos...).
+ */
+async function metricasParaMelhorar({ credenciais, refreshToken, redirectOriginal }) {
+  const auth = cliente(credenciais, redirectOriginal || REDIRECT);
+  auth.setCredentials({ refresh_token: refreshToken });
+  const ya = google.youtubeAnalytics({ version: 'v2', auth });
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const fim = new Date().toISOString().slice(0, 10);
+  const inicio = new Date(Date.now() - 28 * 86400e3).toISOString().slice(0, 10);
+  const base = { ids: 'channel==MINE', startDate: inicio, endDate: fim };
+  const porVideo = await ya.reports.query({ ...base, dimensions: 'video', metrics: 'views,averageViewPercentage,averageViewDuration,subscribersGained,likes,shares', sort: '-views', maxResults: 50 });
+  const linhas = porVideo.data.rows || [];
+  const ids = linhas.map((r) => r[0]);
+  const info = {};
+  for (let i = 0; i < ids.length; i += 50) {
+    const v = await yt.videos.list({ part: ['snippet', 'contentDetails'], id: ids.slice(i, i + 50), maxResults: 50 });
+    for (const x of v.data.items || []) {
+      const dur = String(x.contentDetails?.duration || '');
+      const seg = (Number((dur.match(/(\d+)H/) || [])[1]) || 0) * 3600 + (Number((dur.match(/(\d+)M/) || [])[1]) || 0) * 60 + (Number((dur.match(/(\d+)S/) || [])[1]) || 0);
+      info[x.id] = { titulo: x.snippet?.title || '', publicadoEm: x.snippet?.publishedAt || null, seg };
+    }
+  }
+  const videos = linhas.map(([id, views, pct, dur, insc, likes, shares]) => ({ id, ...(info[id] || {}), views: Number(views) || 0, retencao: Math.round((Number(pct) || 0) * 10) / 10, duracaoMedia: Number(dur) || 0, inscritos: Number(insc) || 0, likes: Number(likes) || 0, shares: Number(shares) || 0 }));
+  const trafego = {};
+  try {
+    const t = await ya.reports.query({ ...base, dimensions: 'insightTrafficSourceType', metrics: 'views', sort: '-views' });
+    for (const [fonte, views] of t.data.rows || []) trafego[fonte] = Number(views) || 0;
+  } catch {}
+  return { de: inicio, ate: fim, videos, trafego };
+}
+
 /** Quais destes vídeos ainda existem no canal (apagado = some da lista). Devolve Set de ids. */
 async function videosQueExistem({ credenciais, refreshToken, redirectOriginal }, ids) {
   const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
@@ -903,7 +937,7 @@ async function responderComentario({ credenciais, refreshToken, redirectOriginal
   return { id: r.data.id };
 }
 
-module.exports = { arrumarPlaylistsDoCanal, desempenhoRecente, retencaoDosVideos, videosQueExistem,
+module.exports = { arrumarPlaylistsDoCanal, desempenhoRecente, retencaoDosVideos, videosQueExistem, metricasParaMelhorar,
   comentariosSemResposta,
   responderComentario,
   tituloParecido,

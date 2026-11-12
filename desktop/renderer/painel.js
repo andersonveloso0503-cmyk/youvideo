@@ -176,6 +176,31 @@ const Painel = (() => {
   // Cor da retenção: verde 70%+, amarelo 55-69%, vermelho abaixo
   const corRet = (r) => (r >= 70 ? '#8fd6ac' : r >= 55 ? '#f0b86a' : '#f08a8a');
 
+  function melhorar() {
+    const box = q('#pnMelhorar');
+    if (!box) return;
+    if (!ultimo.dados) return (box.innerHTML = '<p class="nota">Carregando...</p>');
+    const m = ultimo.dados.melhorias;
+    const cs = (m?.canais || []).filter((c) => (c.dicas || []).length);
+    if (!cs.length) {
+      const semAna = (ultimo.dados.canais || []).some((c) => c.analytics === 'reconectar' || c.analytics === 'api-desligada');
+      box.innerHTML = `<p class="nota">${semAna ? 'Reconecte os canais em Contas YouTube (permissão do YouTube Analytics) para ver as dicas.' : 'Juntando os números dos canais... as dicas aparecem aqui em alguns minutos.'}</p>`;
+      return;
+    }
+    box.innerHTML =
+      cs
+        .map(
+          (c) => `<div style="margin-bottom:12px"><h3 style="margin:4px 0 6px;font-size:14px">${esc(c.canal)}</h3>${c.dicas
+            .map(
+              (d) => `<div class="pn-aviso" style="align-items:flex-start"><i style="font-style:normal">${d.icone || '•'}</i><span>${esc(d.texto)}${
+                d.acao ? `<br><span style="color:${d.auto ? '#8fd6ac' : '#f0b86a'}">${d.auto ? (d.info || d.bom ? '' : '🤖 ') : '👤 '}${esc(d.acao)}</span>` : ''
+              }</span></div>`
+            )
+            .join('')}</div>`
+        )
+        .join('') + (m.em ? `<span class="nota">Atualizado ${new Date(m.em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · refaz sozinho a cada 6 h</span>` : '');
+  }
+
   function retencao() {
     const box = q('#pnRetencao');
     if (!box) return;
@@ -272,7 +297,7 @@ const Painel = (() => {
       }
     };
     const precisa = seguro(resumo) || [];
-    for (const f of [listaAprovar, () => avisos(precisa), canais, desempenho, retencao, comentarios, pcs, agenda]) seguro(f);
+    for (const f of [listaAprovar, () => avisos(precisa), canais, desempenho, melhorar, retencao, comentarios, pcs, agenda]) seguro(f);
   }
 
   async function carregar(forcar = false) {

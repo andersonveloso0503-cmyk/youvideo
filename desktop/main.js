@@ -1145,7 +1145,22 @@ app.whenReady().then(() => {
     const itensRet = canais.flatMap((c) => (c.videos || []).filter((v) => v.retencao != null).map((v) => ({ videoId: v.id, canalId: c.id, canal: c.titulo, titulo: v.titulo, publicadoEm: v.publicadoEm, seg: v.seg, views: v.views, retencao: v.retencao, duracaoMedia: v.duracaoMedia })));
     if (itensRet.length) await Central.chamar(cfg, '/api/central/retencao', { metodo: 'POST', corpo: { itens: itensRet } }).catch(() => {});
     const retencao = await Central.chamar(cfg, '/api/central/retencao').catch(() => null);
-    const dados = { canais, comentarios, pcs, retencao, eu: identidadePc().pc };
+    // "O que melhorar": a cada 6 h manda os números de 28 dias de cada canal (com Analytics) e o site devolve as dicas
+    let melhorias = null;
+    if (Date.now() - (global._melhoriasEm || 0) > 6 * 3600e3) {
+      const lista = [];
+      for (const c of store.canais().map((x) => store.canal(x.id)).filter(Boolean)) {
+        if (!c.refreshToken || canais.find((x) => x.id === c.id)?.analytics !== 'ok') continue;
+        const m = await YT.metricasParaMelhorar({ credenciais: cfg.google, refreshToken: c.refreshToken, redirectOriginal: c.redirect }).catch(() => null);
+        if (m?.videos?.length) lista.push({ canalId: c.id, canal: c.titulo, ...m });
+      }
+      if (lista.length) {
+        melhorias = await Central.chamar(cfg, '/api/central/melhorias', { metodo: 'POST', corpo: { canais: lista } }).catch(() => null);
+        if (melhorias) global._melhoriasEm = Date.now();
+      }
+    }
+    if (!melhorias) melhorias = await Central.chamar(cfg, '/api/central/melhorias').catch(() => null);
+    const dados = { canais, comentarios, pcs, retencao, melhorias, eu: identidadePc().pc };
     cachePainel = { em: Date.now(), dados };
     return dados;
   });
