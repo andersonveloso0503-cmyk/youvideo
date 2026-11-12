@@ -204,6 +204,25 @@ class Fila extends EventEmitter {
     // Trava de segurança: se uma tentativa ficou presa mais de 15 min, libera (antes ficava presa para sempre)
     if (this.tentandoStudio && Date.now() - (this.tentandoStudioEm || 0) < 15 * 60e3) return;
     this.capasStudioAtrasadas();
+    // Capas que OUTRO PC não conseguiu trocar (login do Studio dele no canal errado): este PC tenta no lugar dele
+    try {
+      const pcNome = require('os').hostname();
+      const r = await Central.chamar(this.obterConfig(), `/api/central/capas-studio?pc=${encodeURIComponent(pcNome)}`).catch(() => null);
+      const locais = this.lerCapasStudio();
+      const tem = new Set(locais.map((x) => x.videoId));
+      const novas = [];
+      for (const c of r?.capas || []) {
+        if (tem.has(c.videoId) || !this.obterCanal?.(c.canalId)?.refreshToken) continue;
+        const resp = await fetch(c.url).catch(() => null);
+        if (!resp?.ok) continue;
+        const dir = path.join(this.dirCache, 'capas-studio');
+        fs.mkdirSync(dir, { recursive: true });
+        const arq = path.join(dir, `${c.videoId}${/\.png($|\?)/i.test(c.url) ? '.png' : '.jpg'}`);
+        fs.writeFileSync(arq, Buffer.from(await resp.arrayBuffer()));
+        novas.push({ videoId: c.videoId, canalId: c.canalId, arquivo: arq, jobId: null, titulo: c.titulo || '', em: Date.now() - 5 * 60e3, tentativas: 0, remota: true, reforcado: true });
+      }
+      if (novas.length) fs.writeFileSync(this.arquivoCapasStudio(), JSON.stringify([...locais, ...novas]));
+    } catch {}
     let lista = this.lerCapasStudio();
     if (!lista.length) return;
     this.tentandoStudio = true;
@@ -254,6 +273,7 @@ class Fila extends EventEmitter {
         try {
           await trocarCapaStudio({ canalId: p.canalId, videoId: p.videoId, arquivo: p.arquivo });
           deuCerto.add(p.canalId);
+          if (p.remota || p.passada) Central.chamar(this.obterConfig(), '/api/central/capas-studio', { metodo: 'POST', corpo: { acao: 'feita', pc: require('os').hostname(), videoId: p.videoId } }).catch(() => {});
           // Reforço: troca de novo uns 40 min depois. Às vezes o Studio "salva" logo após o envio e o YouTube volta
           // a miniatura automática quando termina de processar o Short (Baldur's Gate, Dataminer GTA 6)
           if (!p.reforcado) fica.push({ ...p, reforcado: true, reforcoEm: Date.now() + 40 * 60e3, tentativas: 0, ultimoErro: null });
@@ -262,7 +282,22 @@ class Fila extends EventEmitter {
         } catch (e) {
           const login = e.codigo === 'LOGIN';
           if (login) semLogin.add(p.canalId);
-          fica.push({ ...p, precisaLogin: login, ultimaTentativa: Date.now(), tentativas: (p.tentativas || 0) + (login ? 0 : 1), ultimoErro: String(e.message || e).slice(0, 200) });
+          const tent = (p.tentativas || 0) + (login ? 0 : 1);
+          let passada = p.passada;
+          // 3 falhas aqui: passa a capa para o outro PC trocar (este continua tentando também)
+          if (!p.remota && !p.passada && tent >= 3) {
+            try {
+              Central.chamar(this.obterConfig(), '/api/central/capas-studio', { metodo: 'POST', corpo: { acao: 'passar', pc: require('os').hostname(), videoId: p.videoId, canalId: p.canalId, titulo: p.titulo, imagem: fs.readFileSync(p.arquivo).toString('base64') } }).catch(() => {});
+              passada = true;
+            } catch {}
+          }
+          // Capa de outro PC que aqui também não deu: avisa e larga (fica para um 3º PC, se houver)
+          if (p.remota && tent >= 3) {
+            Central.chamar(this.obterConfig(), '/api/central/capas-studio', { metodo: 'POST', corpo: { acao: 'falhou', pc: require('os').hostname(), videoId: p.videoId } }).catch(() => {});
+            fs.rmSync(p.arquivo, { force: true });
+            continue;
+          }
+          fica.push({ ...p, passada, precisaLogin: login, ultimaTentativa: Date.now(), tentativas: tent, ultimoErro: String(e.message || e).slice(0, 200) });
           if (job) this.atualizar(job, { aviso: login ? 'Capa do Short: entre uma vez no YouTube Studio deste canal (Contas YouTube → 🔑 Entrar no Studio) e ela é trocada sozinha' : `Capa do Short no Studio: ${String(e.message || e).slice(0, 140)} — tento de novo sozinho` });
         }
       }
