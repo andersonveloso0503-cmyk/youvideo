@@ -67,6 +67,8 @@ async function aprovarNoticia(db, ref, d, canalYoutube, quandoPedido = null, { l
     episodioId: d.ep.id,
     ...(d.ilustrado ? { ilustrado: true } : {}), // Short ilustrado (tema): as ilustrações explicam cada frase
     ...(d.desafio ? { desafio: true } : {}), // Desafio "adivinhe o jogo": imagens pixeladas de propósito
+    ...(d.ep?.tamanho ? { tamanho: d.ep.tamanho } : {}), // curto (25-35 s) ou medio (45-55 s): escolhido pelo assunto
+    ...(d.ep?.potencial != null ? { notaNoticia: Number(d.ep.potencial) } : {}),
     serie: null,
     estilo: 'realista',
     formato: longo ? 'longo' : 'short',
@@ -105,11 +107,13 @@ async function canalDosGames(db, cfgDados) {
  * os Shorts de notícia que esperam aprovação vão sozinhos para a Fábrica, os mais novos primeiro,
  * até 8 por dia, produzidos já e publicados no mesmo dia (horário escolhido quando ficam prontos). Notícia com mais de 2 dias fica de fora (velha).
  */
-async function aprovarSozinho(db, col, cfgDados) {
+async function aprovarSozinho(db, col, cfgDados, opc = {}) {
+  // opc.plano (Map): só SIMULA — diz o que vai acontecer com cada notícia, sem aprovar nada (tela da Fábrica)
+  const plano = opc.plano;
   if (cfgDados?.autoAprovar === false) return { automaticas: 0, motivo: 'desligada' };
-  const canal = await canalDosGames(db, cfgDados);
+  const canal = plano ? true : await canalDosGames(db, cfgDados);
   if (!canal) return { automaticas: 0, motivo: 'sem canal do YouTube (aprove uma notícia à mão uma vez)' };
-  const snap = await col.where('status', '==', 'aguardando').get();
+  const snap = opc.snap || (await col.where('status', '==', 'aguardando').get());
   // Só notícia ATUAL: até 36 h desde que saiu; a nota cai 1 ponto a cada 12 h (a de hoje passa na frente da de ontem)
   const idade = (d) => Date.now() - new Date(d.data || d.criadoEm || 0).getTime();
   const pontos = (d) => (d.ep?.potencial || 5) - idade(d) / (12 * 3600e3);
@@ -144,13 +148,24 @@ async function aprovarSozinho(db, col, cfgDados) {
   const jogosDoDia = new Set(recentes.map(jogoDe).filter(Boolean));
   let automaticas = 0;
   for (const { ref, d } of ordem) {
-    if (automaticas >= vagas + extras) break;
     const jogo = jogoDe(d);
-    if (jogo && jogosDoDia.has(jogo)) continue; // esse jogo já teve vídeo hoje: espera (ou você aprova à mão)
-    await aprovarNoticia(db, ref, d, canal, null, { limite: 1 });
+    if (automaticas >= vagas + extras) {
+      if (plano) plano.set(ref.id, { acao: 'fila', texto: `Na fila: entra quando abrir vaga (até 5 vídeos de games por dia; já saíram ${ultimas24} nas últimas 24 h)` });
+      continue;
+    }
+    if (jogo && jogosDoDia.has(jogo)) {
+      if (plano) plano.set(ref.id, { acao: 'espera', texto: 'Espera: esse jogo já teve vídeo hoje (1 por jogo por dia)' });
+      continue; // esse jogo já teve vídeo hoje: espera (ou você aprova à mão)
+    }
+    if (plano) plano.set(ref.id, { acao: 'vai', texto: quentes.some((x) => x.d === d) ? 'Notícia quente: vai sozinha para a Fábrica na próxima rodada' : 'Vai sozinha para a Fábrica na próxima rodada' });
+    else await aprovarNoticia(db, ref, d, canal, null, { limite: 1 });
     if (jogo) jogosDoDia.add(jogo);
     automaticas++;
   }
+  if (plano)
+    for (const { ref, d } of fila)
+      if (!plano.has(ref.id))
+        plano.set(ref.id, nota(d) < 5 ? { acao: 'nao', texto: 'Nota baixa: só sai se você mandar (Fazer agora)' } : { acao: 'espera', texto: 'Nota média: só entra se até as 15h tiverem saído menos de 3 vídeos' });
   return { automaticas, vagas, quentes: quentes.length };
 }
 
@@ -256,10 +271,32 @@ export default async function handler(req, res) {
         col.where('status', '==', 'aprovada').get(),
         cfg.get(),
       ]);
+      // O que a aprovação automática vai fazer com cada notícia (nota + destino), sem aprovar nada
+      const plano = new Map();
+      const cdG = c.data() || {};
+      if (cdG.autoAprovar !== false) await aprovarSozinho(db, col, cdG, { plano, snap: aguardando }).catch(() => {});
+      const proxRodada = (() => {
+        const t = new Date();
+        t.setUTCSeconds(0, 0);
+        if (t.getUTCMinutes() >= 5) t.setUTCHours(t.getUTCHours() + 1);
+        t.setUTCMinutes(5);
+        return t.toISOString();
+      })();
+      const destino = (x, id) => {
+        if (x.status !== 'aguardando') return null;
+        if (cdG.autoAprovar === false) return { acao: 'mao', texto: 'Aprovação automática desligada: só sai se você mandar' };
+        if ((x.tipo || 'short') !== 'short') return { acao: 'mao', texto: 'Vídeo longo: espera você mandar (Fazer agora)' };
+        if (!x.ep) return { acao: 'nao', texto: 'Sem roteiro: não vai sair' };
+        if (Date.now() - new Date(x.data || x.criadoEm || 0).getTime() >= 36 * 3600e3) return { acao: 'nao', texto: 'Notícia velha (mais de 36 h): não sai sozinha' };
+        const p = plano.get(id);
+        return p ? { ...p, ...(p.acao === 'vai' ? { quando: proxRodada } : {}) } : { acao: 'espera', texto: 'Esperando a próxima rodada' };
+      };
       const resumo = (d) => {
         const x = d.data();
         return {
           id: d.id,
+          nota: x.ep?.potencial != null ? Number(x.ep.potencial) : null,
+          destino: destino(x, d.id),
           tipo: x.tipo || 'short',
           titulo: x.titulo,
           tituloVideo: x.ep?.titulo || '',
@@ -281,7 +318,7 @@ export default async function handler(req, res) {
       };
       const porData = (a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || ''));
       return res.status(200).json({
-        aguardando: aguardando.docs.map(resumo).sort(porData),
+        aguardando: aguardando.docs.map(resumo).sort((a, b) => (b.nota ?? 0) - (a.nota ?? 0) || porData(a, b)),
         aprovadas: aprovadas.docs.map(resumo).sort((a, b) => String(b.aprovadaEm || '').localeCompare(String(a.aprovadaEm || ''))).slice(0, 15),
         ultimaBusca: c.data()?.ultimaBusca || null,
         autoAprovar: c.data()?.autoAprovar !== false,

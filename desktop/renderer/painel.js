@@ -89,6 +89,9 @@ const Painel = (() => {
     for (const c of cr) precisa.push(`${String(c.nome).replace(/\s*\(.*\)/, '')}: ${c.texto}`);
     const erros = (ultimo.fabrica || []).filter((i) => i.status === 'erro' && Date.now() - Date.parse(i.concluidoEm || i.criadoEm || 0) < 24 * 3600e3);
     if (erros.length) precisa.push(`${erros.length} vídeo(s) com erro hoje na Fábrica`);
+    const semAnalytics = (ultimo.dados?.canais || []).filter((c) => c.analytics === 'reconectar');
+    if (semAnalytics.length) precisa.push(`Reconectar ${semAnalytics.map((c) => c.titulo).join(', ')} em Contas YouTube (para ver a retenção)`);
+    if ((ultimo.dados?.canais || []).some((c) => c.analytics === 'api-desligada')) precisa.push('Ativar a "YouTube Analytics API" no Google Cloud (para ver a retenção)');
     q('#pnPrecisaN').textContent = precisa.length;
     q('#pnPrecisaDet').textContent = precisa[0] || 'nada 👍';
     q('#pnPrecisaCard').classList.toggle('alerta', precisa.length > 0);
@@ -166,8 +169,42 @@ const Painel = (() => {
     box.innerHTML =
       linhas
         .slice(0, 6)
-        .map((v) => `<div class="pn-linha-simples" title="${esc(v.canal)} · média ${num(Math.round(v.media))} views"><span>${esc(v.titulo)}</span><span class="${v.rel >= 1 ? 'pn-sobe' : 'pn-desce'}">${v.rel >= 1 ? '▲' : '▼'} ${num(v.views)}</span></div>`)
-        .join('') + '<span class="nota">▲ acima da média dos últimos Shorts do canal · ▼ abaixo</span>';
+        .map((v) => `<div class="pn-linha-simples" title="${esc(v.canal)} · média ${num(Math.round(v.media))} views${v.seg ? ` · ${v.seg} s` : ''}"><span>${esc(v.titulo)}</span><span style="white-space:nowrap">${v.retencao != null ? `<span style="color:${corRet(v.retencao)};margin-right:8px" title="assistem em média ${Math.round(v.duracaoMedia || 0)} s">${Math.round(v.retencao)}%</span>` : ''}<span class="${v.rel >= 1 ? 'pn-sobe' : 'pn-desce'}">${v.rel >= 1 ? '▲' : '▼'} ${num(v.views)}</span></span></div>`)
+        .join('') + '<span class="nota">▲ acima da média dos últimos Shorts do canal · ▼ abaixo · % = quanto do vídeo assistem</span>';
+  }
+
+  // Cor da retenção: verde 70%+, amarelo 55-69%, vermelho abaixo
+  const corRet = (r) => (r >= 70 ? '#8fd6ac' : r >= 55 ? '#f0b86a' : '#f08a8a');
+
+  function retencao() {
+    const box = q('#pnRetencao');
+    if (!box) return;
+    if (!ultimo.dados) return (box.innerHTML = '<p class="nota">Carregando...</p>');
+    const cs = ultimo.dados.canais || [];
+    const reconectar = cs.filter((c) => c.analytics === 'reconectar');
+    const desligada = cs.find((c) => c.analytics === 'api-desligada');
+    const r = ultimo.dados.retencao;
+    const partes = [];
+    if (desligada)
+      partes.push(`<div class="pn-aviso"><i style="color:#f0b86a">!</i><span>Falta ativar a <b>YouTube Analytics API</b> no Google Cloud (o mesmo projeto do Client ID do Compilador): console.cloud.google.com → APIs e serviços → Biblioteca → "YouTube Analytics API" → Ativar.</span></div>`);
+    if (reconectar.length)
+      partes.push(`<div class="pn-aviso"><i style="color:#f0b86a">!</i><span>Para ver a retenção, reconecte uma vez em <b>Contas YouTube</b>: ${esc(reconectar.map((c) => c.titulo).join(', '))} (o Google vai pedir a permissão nova de "ver relatórios do YouTube Analytics").</span></div>`);
+    const linhas = (r?.porCanal || []).filter((c) => c.curto.qtd || c.medio.qtd);
+    if (linhas.length) {
+      const cel = (x) => (x.qtd ? `<span><b style="color:${corRet(x.retencao)}">${Math.round(x.retencao)}%</b> <span class="nota">(${x.qtd})</span></span>` : '<span class="nota">—</span>');
+      partes.push(
+        `<div class="pn-tabela" style="grid-template-columns:2fr 1fr 1fr"><span class="cab">Canal (últimos 45 dias)</span><span class="cab">Curto (até 40 s)</span><span class="cab">Médio (mais de 40 s)</span>${linhas
+          .map((c) => `<b>${esc(c.canal)}</b>${cel(c.curto)}${cel(c.medio)}`)
+          .join('')}</div>`
+      );
+    }
+    const ab = (x) => `<div class="pn-linha-simples" title="${esc(x.titulo)} · ${x.seg || '?'} s · ${num(x.views)} views"><span>“${esc(x.abertura)}”</span><b style="color:${corRet(x.retencao)};white-space:nowrap">${Math.round(x.retencao)}%</b></div>`;
+    if (r?.melhores?.length >= 3) {
+      partes.push(`<div class="pn-tres" style="grid-template-columns:1fr 1fr;margin-top:10px"><div><h3 style="margin:4px 0;font-size:14px">🟢 Aberturas que mais seguraram</h3>${r.melhores.map(ab).join('')}</div><div><h3 style="margin:4px 0;font-size:14px">🔴 Aberturas que menos seguraram</h3>${r.piores.map(ab).join('')}</div></div>`);
+      partes.push('<span class="nota">Os roteiros novos aprendem sozinhos com as aberturas verdes (e evitam o jeito das vermelhas).</span>');
+    }
+    if (!partes.length) partes.push('<p class="nota">Ainda sem dados de retenção (aparecem quando os Shorts têm 1 dia no ar).</p>');
+    box.innerHTML = partes.join('');
   }
 
   function comentarios() {
@@ -239,7 +276,7 @@ const Painel = (() => {
       }
     };
     const precisa = seguro(resumo) || [];
-    for (const f of [listaAprovar, () => avisos(precisa), canais, desempenho, comentarios, pcs, agenda]) seguro(f);
+    for (const f of [listaAprovar, () => avisos(precisa), canais, desempenho, retencao, comentarios, pcs, agenda]) seguro(f);
   }
 
   async function carregar(forcar = false) {

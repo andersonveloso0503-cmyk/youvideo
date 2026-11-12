@@ -90,6 +90,29 @@ const Fabrica = (() => {
   const quandoTxt = (iso) =>
     iso ? new Date(iso).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
 
+  // Nota da notícia (0-10) e o que a automação vai fazer com ela
+  const COR_NOTA = (n) => (n >= 8 ? '#22c55e' : n >= 7 ? '#84cc16' : n >= 5 ? '#f5a524' : '#ef4444');
+  const seloNota = (n) =>
+    n == null ? '' : `<span title="Nota da notícia (0 a 10)" style="display:inline-block;min-width:34px;text-align:center;font-weight:700;font-size:12px;padding:1px 6px;border-radius:999px;margin-right:6px;background:${COR_NOTA(n)}22;color:${COR_NOTA(n)};border:1px solid ${COR_NOTA(n)}66">★ ${Math.round(n * 10) / 10}</span>`;
+  const ICONE_DESTINO = { vai: '🤖', fila: '⏳', espera: '⏸️', nao: '🚫', mao: '✋' };
+  const linhaDestino = (d) =>
+    d ? `<div class="nota" style="margin:2px 0">${ICONE_DESTINO[d.acao] || '•'} ${esc(d.texto)}${d.quando ? ` (por volta de ${new Date(d.quando).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})` : ''}</div>` : '';
+  // Menu ⋯ no lugar dos botões grandes: a Fábrica é automática, então mandar/descartar à mão é exceção
+  const menuTres = (clsFazer, clsNao, id, txtFazer = '▶️ Fazer agora', semFazer = false) => `
+    <details class="menu-tres" style="position:relative;flex:none">
+      <summary title="Opções" style="list-style:none;cursor:pointer;font-size:20px;line-height:1;padding:2px 10px;border-radius:8px;border:1px solid var(--borda, #333);user-select:none">⋯</summary>
+      <div style="position:absolute;right:0;top:calc(100% + 4px);z-index:20;display:flex;flex-direction:column;gap:6px;padding:8px;min-width:170px;background:var(--fundo2, #1b1b1f);border:1px solid var(--borda, #333);border-radius:10px;box-shadow:0 8px 24px #0008">
+        ${semFazer ? '' : `<button type="button" class="btn-primario ${clsFazer}" style="width:100%;white-space:nowrap" data-id="${esc(id)}">${txtFazer}</button>`}
+        <button type="button" class="btn-mini perigo ${clsNao}" style="width:100%;white-space:nowrap" data-id="${esc(id)}">🚫 Não fazer</button>
+      </div>
+    </details>`;
+  // fecha o menu ⋯ aberto ao clicar fora
+  document.addEventListener('click', (e) => {
+    document.querySelectorAll('details.menu-tres[open]').forEach((d) => {
+      if (!d.contains(e.target)) d.removeAttribute('open');
+    });
+  });
+
   function prefs() {
     return config.fabricaPrefs || {};
   }
@@ -858,7 +881,7 @@ const Fabrica = (() => {
         esc(r.ultimaBusca ? `Última busca: ${quandoTxt(r.ultimaBusca)}${falhas.length ? ` · sem resposta: ${falhas.join(', ')}` : ''}` : 'Ainda não buscou notícias.') +
         ` · <b>${auto ? '🤖 Aprovação automática ligada' : '✋ Aprovação manual'}</b> ` +
         `<button type="button" id="gmAuto" style="font-size:12px;padding:2px 8px">${auto ? 'Desligar' : 'Ligar'}</button>` +
-        (auto ? '<div class="nota">As notícias novas vão sozinhas para a Fábrica (3 h entre vídeos, só o que cabe nas próximas 24 h). Você ainda pode descartar as que estiverem esperando.</div>' : '');
+        (auto ? '<div class="nota">Tudo automático: as notícias de <b>maior nota</b> vão sozinhas para a Fábrica (até 5 por dia). Cada uma mostra a nota ★ e o que vai acontecer com ela. Use o <b>⋯</b> só se quiser <b>Fazer agora</b> ou <b>Não fazer</b>.</div>' : '');
       const btAuto = q('#gmAuto');
       if (btAuto)
         btAuto.onclick = async () => {
@@ -875,13 +898,12 @@ const Fabrica = (() => {
           ${aprovada || n.tipo !== 'short' ? '' : `<input type="checkbox" class="gm-marca" value="${esc(n.id)}" style="flex:none;width:auto;margin-top:4px" title="Marcar para juntar num vídeo" />`}
           ${n.imagem ? `<img src="${esc(n.imagem)}" style="width:120px;height:68px;object-fit:cover;border-radius:6px;flex-shrink:0" />` : ''}
           <div style="flex:1;min-width:0">
-            <div><b>${n.tipo === 'dicas' ? '💡 Dicas: ' : n.tipo === 'longo' ? '📺 Vídeo: ' : '📱 Short: '}${esc(n.tituloVideo || n.titulo)}</b>${n.rumor ? ' <span style="color:#f5a524">· ⚠️ rumor</span>' : ''}</div>
+            <div>${seloNota(n.nota)}<b>${n.tipo === 'dicas' ? '💡 Dicas: ' : n.tipo === 'longo' ? '📺 Vídeo: ' : '📱 Short: '}${esc(n.tituloVideo || n.titulo)}</b>${n.rumor ? ' <span style="color:#f5a524">· ⚠️ rumor</span>' : ''}</div>
+            ${aprovada ? '' : linhaDestino(n.destino)}
             <div class="nota" style="margin:2px 0">${esc(n.fonte)}${n.oficial ? ' (oficial)' : ''}${n.data ? ' · ' + quandoTxt(n.data) : ''} · ${n.link ? `<a href="${esc(n.link)}" target="_blank">abrir a notícia</a>` : (n.links || []).map((l) => `<a href="${esc(l.link)}" target="_blank" title="${esc(l.titulo)}">fonte</a>`).join(' ')}</div>
             <details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>
           </div>
-          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : `<div style="display:flex;flex-direction:column;gap:6px;flex:none;width:auto">
-            <button type="button" class="btn-primario gm-aprovar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">✅ Aprovar</button>
-            <button type="button" class="btn-mini perigo gm-descartar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
+          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : menuTres('gm-aprovar', 'gm-descartar', n.id)}
         </div>`;
       lista.innerHTML =
         (r.aguardando.length ? r.aguardando.map((n) => cartao(n, false)).join('') : '<p class="nota">Nenhuma notícia esperando. Clique em 🔎 Buscar notícias agora.</p>') +
@@ -1033,9 +1055,7 @@ const Fabrica = (() => {
             ${n.erro ? `<div class="nota alerta">${esc(n.erro)}</div>` : ''}
             ${n.roteiro ? `<details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>` : ''}
           </div>
-          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : n.estado === 'aguardando' ? `<div style="display:flex;flex-direction:column;gap:6px;flex:none;width:auto">
-            <button type="button" class="btn-primario bi-aprovar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">✅ Mandar para a Fábrica</button>
-            <button type="button" class="btn-mini perigo bi-descartar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">❌ Descartar</button></div>` : ''}
+          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : n.estado === 'aguardando' ? menuTres('bi-aprovar', 'bi-descartar', n.id) : ''}
         </div>`;
       lista.innerHTML =
         (r.aguardando.length ? r.aguardando.map((n) => cartao(n, false)).join('') : `<p class="nota">${auto && !semCanal ? 'Nenhum roteiro esperando: a automação escreve sozinha quando faltar vídeo na agenda (confere de hora em hora).' : 'Nenhum roteiro esperando. Clique em ✍️ Escrever a próxima história agora.'}</p>`) +
@@ -1121,7 +1141,7 @@ const Fabrica = (() => {
         esc(r.ultimaBusca ? `Última busca: ${quandoTxt(r.ultimaBusca)}${falhas.length ? ` · sem resposta: ${falhas.join(', ')}` : ''}` : 'Ainda não buscou notícias.') +
         ` · <b>${auto ? '🤖 Aprovação automática ligada' : '✋ Aprovação manual'}</b> ` +
         `<button type="button" id="plAuto" style="font-size:12px;padding:2px 8px">${auto ? 'Desligar' : 'Ligar'}</button>` +
-        (auto ? '<div class="nota">As notícias mais novas vão sozinhas para a Fábrica (até 5 por dia, 3 h entre vídeos, no canal de política). Notícia com mais de 2 dias sai sozinha. Explicador LONGO e 📺 Resumo continuam esperando você aprovar.</div>' : '');
+        (auto ? '<div class="nota">Tudo automático: as notícias de <b>maior nota</b> vão sozinhas para a Fábrica (até 5 por dia, no canal de política). Cada uma mostra a nota ★ e o que vai acontecer com ela. Notícia com mais de 2 dias sai sozinha. Explicador LONGO e 📺 Resumo esperam você (⋯ → Fazer agora).</div>' : '');
       const btAuto = q('#plAuto');
       if (btAuto)
         btAuto.onclick = async () => {
@@ -1139,13 +1159,12 @@ const Fabrica = (() => {
           ${aprovada || n.tipo !== 'short' ? '' : `<input type="checkbox" class="pl-marca" value="${esc(n.id)}" style="flex:none;width:auto;margin-top:4px" title="Marcar para juntar num resumo" />`}
           ${n.imagem ? `<img src="${esc(n.imagem)}" style="width:120px;height:68px;object-fit:cover;border-radius:6px;flex-shrink:0" />` : ''}
           <div style="flex:1;min-width:0">
-            <div><b>${rotulo(n.tipo)}${esc(n.tituloVideo || n.titulo)}</b></div>
+            <div>${seloNota(n.nota)}<b>${rotulo(n.tipo)}${esc(n.tituloVideo || n.titulo)}</b></div>
+            ${aprovada ? '' : linhaDestino(n.destino)}
             <div class="nota" style="margin:2px 0">${esc(n.fonte)}${n.data ? ' · ' + quandoTxt(n.data) : ''} · ${n.link ? `<a href="${esc(n.link)}" target="_blank">abrir a notícia</a>` : (n.links || []).map((l) => `<a href="${esc(l.link)}" target="_blank" title="${esc(l.titulo)}">fonte</a>`).join(' ')}</div>
             <details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>
           </div>
-          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : n.estado === 'escrevendo' ? '<span class="nota" style="white-space:nowrap">⏳ escrevendo…</span>' : `<div style="display:flex;flex-direction:column;gap:6px;flex:none;width:auto">
-            ${n.estado === 'falhou' ? '' : `<button type="button" class="btn-primario pl-aprovar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">✅ Aprovar</button>`}
-            <button type="button" class="btn-mini perigo pl-descartar" style="width:auto;white-space:nowrap" data-id="${esc(n.id)}">❌ Descartar</button></div>`}
+          ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : n.estado === 'escrevendo' ? '<span class="nota" style="white-space:nowrap">⏳ escrevendo…</span>' : menuTres('pl-aprovar', 'pl-descartar', n.id, '▶️ Fazer agora', n.estado === 'falhou')}
         </div>`;
       lista.innerHTML =
         (r.aguardando.length ? r.aguardando.map((n) => cartao(n, false)).join('') : '<p class="nota">Nenhum roteiro esperando. Clique em 🔎 Buscar notícias agora ou 💡 Criar explicador.</p>') +

@@ -94,13 +94,15 @@ async function aprovarPolitica(db, ref, d, canal, opcoes = {}) {
  * as mais novas primeiro, até 5 por dia. Notícia com mais de 2 dias é velha: sai da lista sem virar vídeo.
  * Explicador Short que você pediu entra também; os LONGOS (explicador longo, "📺 Resumo") esperam você aprovar (são caros).
  */
-async function aprovarSozinhoPolitica(db, col, cfgDados) {
+async function aprovarSozinhoPolitica(db, col, cfgDados, opc = {}) {
+  // opc.plano (Map): só SIMULA — diz o que vai acontecer com cada notícia, sem aprovar nada (tela da Fábrica)
+  const plano = opc.plano;
   if (cfgDados?.autoAprovar === false) return { automaticas: 0, motivo: 'desligada' };
-  const snap = await col.where('status', '==', 'aguardando').get();
+  const snap = opc.snap || (await col.where('status', '==', 'aguardando').get());
   const agora = Date.now();
   const idade = (x) => agora - new Date(x.data || x.criadoEm || 0).getTime();
   let velhas = 0;
-  for (const doc of snap.docs) {
+  for (const doc of plano ? [] : snap.docs) {
     const x = doc.data();
     if (!String(x.tipo || 'short').startsWith('explicador') && x.tipo !== 'longo' && idade(x) > 2 * 86400e3) {
       await doc.ref.update({ status: 'descartada', descartadaEm: new Date().toISOString(), motivo: 'Notícia velha (mais de 2 dias): saiu sozinha.' }).catch(() => {});
@@ -108,7 +110,7 @@ async function aprovarSozinhoPolitica(db, col, cfgDados) {
     }
   }
   const { canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
-  const canal = await canalDaPolitica(db, await canalDosGamesId(db));
+  const canal = plano ? true : await canalDaPolitica(db, await canalDosGamesId(db));
   if (!canal) return { automaticas: 0, velhas, motivo: 'sem canal do YouTube (aprove uma notícia à mão uma vez)' };
   const fila = snap.docs
     .map((doc) => ({ ref: doc.ref, d: doc.data() }))
@@ -130,8 +132,16 @@ async function aprovarSozinhoPolitica(db, col, cfgDados) {
   const ordem = [...quentes, ...[...boas, ...medias].filter((x) => !quentes.includes(x))];
   let automaticas = 0;
   for (const { ref, d } of ordem.slice(0, vagas + extras)) {
-    await aprovarPolitica(db, ref, d, canal, { automatica: true, urgente: quente(d) });
+    if (plano) plano.set(ref.id, { acao: 'vai', texto: quente(d) ? 'Notícia quente: vai sozinha para a Fábrica na próxima rodada' : 'Vai sozinha para a Fábrica na próxima rodada' });
+    else await aprovarPolitica(db, ref, d, canal, { automatica: true, urgente: quente(d) });
     automaticas++;
+  }
+  if (plano) {
+    for (const { ref } of ordem.slice(vagas + extras))
+      plano.set(ref.id, { acao: 'fila', texto: `Na fila: entra quando abrir vaga (até 5 por dia; já saíram ${ultimas24} nas últimas 24 h)` });
+    for (const { ref, d } of fila)
+      if (!plano.has(ref.id))
+        plano.set(ref.id, nota(d) < 5 ? { acao: 'nao', texto: 'Nota baixa: só sai se você mandar (Fazer agora)' } : { acao: 'espera', texto: 'Nota média: só entra se até as 15h tiverem saído menos de 3 vídeos' });
   }
   return { automaticas, vagas, velhas, quentes: quentes.length };
 }
@@ -223,10 +233,39 @@ export default async function handler(req, res) {
         col.where('status', '==', 'escrevendo').get(),
         col.where('status', '==', 'falhou').get(),
       ]);
+      // O que a aprovação automática vai fazer com cada notícia (nota + destino), sem aprovar nada
+      const plano = new Map();
+      const cdP = c.data() || {};
+      if (cdP.autoAprovar !== false) await aprovarSozinhoPolitica(db, col, cdP, { plano, snap: aguardando }).catch(() => {});
+      const proxRodada = (() => {
+        const t = new Date();
+        t.setUTCSeconds(0, 0);
+        const m = t.getUTCMinutes();
+        if (m < 15) t.setUTCMinutes(15);
+        else if (m < 45) t.setUTCMinutes(45);
+        else {
+          t.setUTCHours(t.getUTCHours() + 1);
+          t.setUTCMinutes(15);
+        }
+        return t.toISOString();
+      })();
+      const destino = (x, id) => {
+        if (x.status !== 'aguardando') return null;
+        if (cdP.autoAprovar === false) return { acao: 'mao', texto: 'Aprovação automática desligada: só sai se você mandar' };
+        if (x.tipo === 'longo' || x.tipo === 'explicador') return { acao: 'mao', texto: 'Vídeo longo: espera você mandar (Fazer agora)' };
+        if (!x.ep) return { acao: 'nao', texto: 'Sem roteiro: não vai sair' };
+        const p = plano.get(id);
+        if (p) return { ...p, ...(p.acao === 'vai' ? { quando: proxRodada } : {}) };
+        return Date.now() - new Date(x.data || x.criadoEm || 0).getTime() > 2 * 86400e3
+          ? { acao: 'nao', texto: 'Notícia velha (mais de 2 dias): sai sozinha da lista' }
+          : { acao: 'espera', texto: 'Esperando a próxima rodada' };
+      };
       const resumo = (d) => {
         const x = d.data();
         return {
           id: d.id,
+          nota: x.potencial != null ? Number(x.potencial) : null,
+          destino: destino(x, d.id),
           tipo: x.tipo || 'short',
           titulo: x.titulo,
           tituloVideo: x.ep?.titulo || '',
@@ -255,7 +294,7 @@ export default async function handler(req, res) {
         aguardando: [
           ...escrevendo.docs.filter((d) => Date.now() - new Date(d.data().criadoEm || 0).getTime() < 10 * 60e3),
           ...falhou.docs.filter((d) => Date.now() - new Date(d.data().falhouEm || 0).getTime() < 24 * 3600e3),
-        ].map(resumo).sort(porData).concat(aguardando.docs.map(resumo).sort(porData)),
+        ].map(resumo).sort(porData).concat(aguardando.docs.map(resumo).sort((a, b) => (b.nota ?? 0) - (a.nota ?? 0) || porData(a, b))),
         aprovadas: aprovadas.docs.map(resumo).sort((a, b) => String(b.aprovadaEm || '').localeCompare(String(a.aprovadaEm || ''))).slice(0, 15),
         ultimaBusca: c.data()?.ultimaBusca || null,
         fontes: c.data()?.fontes || [],

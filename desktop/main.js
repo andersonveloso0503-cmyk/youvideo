@@ -1125,8 +1125,13 @@ app.whenReady().then(() => {
     const canais = await Promise.all(
       store.canais().map((x) => store.canal(x.id)).filter(Boolean).map(async (c) => {
         try {
-          const d = await YT.desempenhoRecente({ credenciais: cfg.google, refreshToken: c.refreshToken, redirectOriginal: c.redirect });
-          return { id: c.id, titulo: c.titulo, foto: c.thumb || '', ...d };
+          const conta = { credenciais: cfg.google, refreshToken: c.refreshToken, redirectOriginal: c.redirect };
+          const d = await YT.desempenhoRecente(conta);
+          // Retenção (% assistida) dos Shorts com mais de 1 dia no ar
+          const shorts = d.videos.filter((v) => v.curto && Date.now() - Date.parse(v.publicadoEm) > 24 * 3600e3).map((v) => v.id);
+          const ret = await YT.retencaoDosVideos(conta, shorts).catch((e) => ({ estado: 'erro', erro: String(e.message || e) }));
+          for (const v of d.videos) if (ret.porVideo?.[v.id]) Object.assign(v, { retencao: ret.porVideo[v.id].retencao, duracaoMedia: ret.porVideo[v.id].duracaoMedia });
+          return { id: c.id, titulo: c.titulo, foto: c.thumb || '', ...d, analytics: ret.estado, analyticsErro: ret.erro || null };
         } catch (e) {
           return { id: c.id, titulo: c.titulo, erro: String(e.message || e).slice(0, 120), videos: [] };
         }
@@ -1136,7 +1141,11 @@ app.whenReady().then(() => {
       Central.chamar(cfg, '/api/central/comentarios').catch(() => null),
       Central.chamar(cfg, '/api/central/pc-filas').then((r) => r.pcs || []).catch(() => []),
     ]);
-    const dados = { canais, comentarios, pcs, eu: identidadePc().pc };
+    // Manda a retenção para o site (casa com a 1ª frase de cada roteiro: os roteiros novos aprendem com as aberturas que seguraram)
+    const itensRet = canais.flatMap((c) => (c.videos || []).filter((v) => v.retencao != null).map((v) => ({ videoId: v.id, canalId: c.id, canal: c.titulo, titulo: v.titulo, publicadoEm: v.publicadoEm, seg: v.seg, views: v.views, retencao: v.retencao, duracaoMedia: v.duracaoMedia })));
+    if (itensRet.length) await Central.chamar(cfg, '/api/central/retencao', { metodo: 'POST', corpo: { itens: itensRet } }).catch(() => {});
+    const retencao = await Central.chamar(cfg, '/api/central/retencao').catch(() => null);
+    const dados = { canais, comentarios, pcs, retencao, eu: identidadePc().pc };
     cachePainel = { em: Date.now(), dados };
     return dados;
   });

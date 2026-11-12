@@ -10,6 +10,8 @@ const ESCOPOS = [
   'https://www.googleapis.com/auth/youtube.upload',
   'https://www.googleapis.com/auth/youtube.readonly',
   'https://www.googleapis.com/auth/youtube.force-ssl',
+  // retenção dos Shorts (% assistida): canais conectados antes precisam reconectar uma vez
+  'https://www.googleapis.com/auth/yt-analytics.readonly',
 ];
 
 function cliente({ clientId, clientSecret }, redirect = REDIRECT) {
@@ -458,11 +460,46 @@ async function desempenhoRecente({ credenciais, refreshToken, redirectOriginal }
       if (x.status?.privacyStatus !== 'public') continue; // agendado/privado ainda não conta
       const dur = String(x.contentDetails?.duration || '');
       const seg = (Number((dur.match(/(\d+)H/) || [])[1]) || 0) * 3600 + (Number((dur.match(/(\d+)M/) || [])[1]) || 0) * 60 + (Number((dur.match(/(\d+)S/) || [])[1]) || 0);
-      videos.push({ id: x.id, titulo: x.snippet?.title || '', publicadoEm: x.snippet?.publishedAt || null, views: Number(x.statistics?.viewCount) || 0, curto: seg > 0 && seg <= 180 });
+      videos.push({ id: x.id, titulo: x.snippet?.title || '', publicadoEm: x.snippet?.publishedAt || null, views: Number(x.statistics?.viewCount) || 0, seg, curto: seg > 0 && seg <= 180 });
     }
   }
   videos.sort((a, b) => String(b.publicadoEm).localeCompare(String(a.publicadoEm)));
   return { inscritos: Number(ch.statistics?.subscriberCount) || 0, ocultos: !!ch.statistics?.hiddenSubscriberCount, videos };
+}
+
+/**
+ * Retenção (YouTube Analytics) de cada vídeo: % média assistida e segundos assistidos em média.
+ * Devolve { estado:'ok', porVideo:{ id:{ retencao, duracaoMedia, views } } }
+ * ou { estado:'reconectar' } (canal conectado antes da permissão de Analytics)
+ * ou { estado:'api-desligada', erro } (a "YouTube Analytics API" não está ativada no projeto do Google Cloud).
+ */
+async function retencaoDosVideos({ credenciais, refreshToken, redirectOriginal }, ids) {
+  if (!ids?.length) return { estado: 'ok', porVideo: {} };
+  const auth = cliente(credenciais, redirectOriginal || REDIRECT);
+  auth.setCredentials({ refresh_token: refreshToken });
+  const ya = google.youtubeAnalytics({ version: 'v2', auth });
+  const hoje = new Date().toISOString().slice(0, 10);
+  const porVideo = {};
+  try {
+    for (let i = 0; i < ids.length; i += 50) {
+      const r = await ya.reports.query({
+        ids: 'channel==MINE',
+        startDate: '2020-01-01',
+        endDate: hoje,
+        metrics: 'views,averageViewDuration,averageViewPercentage',
+        dimensions: 'video',
+        filters: `video==${ids.slice(i, i + 50).join(',')}`,
+        maxResults: 50,
+      });
+      for (const [id, views, dur, pct] of r.data.rows || []) porVideo[id] = { views: Number(views) || 0, duracaoMedia: Number(dur) || 0, retencao: Math.round((Number(pct) || 0) * 10) / 10 };
+    }
+    return { estado: 'ok', porVideo };
+  } catch (e) {
+    const msg = String(e?.response?.data?.error?.message || e.message || e);
+    if (/insufficient|scope|permission/i.test(msg) && !/has not been used|disabled|accessNotConfigured/i.test(msg)) return { estado: 'reconectar', erro: msg.slice(0, 160) };
+    if (/has not been used|disabled|accessNotConfigured|not enabled/i.test(msg)) return { estado: 'api-desligada', erro: msg.slice(0, 200) };
+    return { estado: 'erro', erro: msg.slice(0, 160) };
+  }
 }
 
 /**
@@ -855,7 +892,7 @@ async function responderComentario({ credenciais, refreshToken, redirectOriginal
   return { id: r.data.id };
 }
 
-module.exports = { arrumarPlaylistsDoCanal, desempenhoRecente,
+module.exports = { arrumarPlaylistsDoCanal, desempenhoRecente, retencaoDosVideos,
   comentariosSemResposta,
   responderComentario,
   tituloParecido,

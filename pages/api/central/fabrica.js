@@ -1237,6 +1237,8 @@ export default async function handler(req, res) {
       const capaErro = b.capaErro ? String(b.capaErro).slice(0, 300) : null;
       await ref.update({
         'fabrica.youtube': { status: 'ok', em: Date.now(), url: String(b.url || '').slice(0, 200), ...(capaErro ? { capaErro } : {}) },
+        // id do vídeo no YouTube: a retenção (YouTube Analytics) é casada com o roteiro por ele
+        ...((String(b.url || '').match(/(?:shorts\/|youtu\.be\/|[?&]v=)([\w-]{11})/) || [])[1] ? { 'fabrica.youtubeId': String(b.url).match(/(?:shorts\/|youtu\.be\/|[?&]v=)([\w-]{11})/)[1] } : {}),
         // O vídeo subiu, mas o YouTube recusou a thumbnail: aparece na Fábrica (antes só ficava escondido na Fila do PC)
         ...(capaErro ? { aviso: `YouTube recusou a thumbnail: ${capaErro}` } : {}),
       });
