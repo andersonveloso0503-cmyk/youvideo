@@ -808,15 +808,15 @@
           <button type="button" class="btn-mini" id="btnPlVideo">📺 Juntar marcadas num resumo</button>
           <button type="button" class="btn-mini" id="btnPlIgConectar" title="Abre a página de conexão do Instagram (entre no Instagram do Noites na História antes)">📸 Conectar Instagram</button>
           <button type="button" class="btn-mini" id="btnPlIgTodos" title="Manda ao Instagram do Noites na História os Shorts de política prontos que ainda não foram (um a cada 40 min)">📸 Enviar prontos ao Instagram</button>
-          <button type="button" class="btn-mini" id="btnPlExplicador">💡 Criar explicador</button>
+          <button type="button" class="btn-mini" id="btnPlExplicador">🎯 Escolher um tema</button>
           <button type="button" class="btn-mini" id="btnPlRefazerProg" title="Apaga do YouTube os vídeos de política que ainda NÃO foram ao ar e monta de novo com a imagem inteira, no mesmo horário">♻️ Refazer os programados</button>
           <button type="button" class="btn-mini" id="btnPlAtualizar" title="Atualizar">↻</button>
           <span class="nota" id="plInfo" style="margin:0"></span>
         </div>
         <p class="nota" style="margin:6px 0">Notícias reais da Agência Brasil, Agência Senado, Agência Câmara, G1, Folha, Estadão, Poder360, CNN Brasil, Gazeta do Povo e CartaCapital (linhas diferentes, para o canal não ficar de um lado só), buscadas sozinhas a cada 3 horas. O roteiro mostra o que cada lado diz e trata quem não foi condenado como investigado. Imagens: só fotos das agências públicas (uso livre com crédito) e vídeos reais do Pexels — <b>nunca IA imitando político</b>. Nada vira vídeo sem o seu ✅. <b>Leia o roteiro antes de aprovar.</b></p>
         <div id="plExplicadorCaixa" hidden style="margin:8px 0;padding:10px;border:1px dashed var(--borda, #444);border-radius:10px">
-          <label>Tema do explicador (curiosidade, em forma de pergunta funciona melhor)</label>
-          <input type="text" id="plTema" maxlength="200" style="width:100%" placeholder="Ex.: Como Lula virou no segundo turno de 2026" />
+          <label>Tema: uma pessoa, um país ou um assunto (ex.: Trump, Moraes, gasolina) — ou uma pergunta para explicar</label>
+          <input type="text" id="plTema" maxlength="200" style="width:100%" placeholder="Ex.: Trump" />
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0">
             <button type="button" class="btn-mini" data-pl-tema="Entenda: como funcionaria a escala 5x2 e o fim da 6x1">Entenda: escala 5x2 / fim da 6x1</button>
             <button type="button" class="btn-mini" data-pl-tema="Entenda: quem passa a não pagar Imposto de Renda e quanto você economiza">Entenda: isenção do IR</button>
@@ -828,9 +828,10 @@
             <button type="button" class="btn-mini" data-pl-tema="Como fica o governo com o PL na maior bancada do Congresso">Como fica o governo agora</button>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select id="plFormato"><option value="short" selected>Short ilustrado (55 a 70 s)</option><option value="longo">Vídeo longo (8 a 10 min)</option></select>
+            <select id="plFormato"><option value="noticias" selected>📰 Notícia mais recente do tema (Short)</option><option value="short">💡 Explicar o tema (Short)</option><option value="longo">📺 Explicar o tema (vídeo longo, 8 a 10 min)</option></select>
+            <label style="display:flex;align-items:center;gap:4px;margin:0" title="Teste: as cenas de objetos e lugares viram ilustração de quadrinho (IA, ~R$ 1 a 2 por vídeo). Pessoas continuam com foto real."><input type="checkbox" id="plQuadrinho" /> 🎨 Estilo quadrinho (teste)</label>
             <button type="button" class="btn-mini" id="btnPlExplicadorCriar">💡 Pesquisar e escrever</button>
-            <span class="nota">O Claude pesquisa na web em fontes de linhas diferentes e escreve com os dois lados. Leva 1 a 2 minutos.</span>
+            <span class="nota">O Claude pesquisa na web as notícias do tema em fontes de linhas diferentes e escreve com os dois lados. Leva 1 a 3 minutos; o roteiro aparece na lista para você aprovar.</span>
           </div>
         </div>
         <div id="plLista"></div>

@@ -67,6 +67,7 @@ async function aprovarPolitica(db, ref, d, canal, opcoes = {}) {
       episodioId: d.ep.id,
       serie: null,
       estilo: 'realista',
+      ...(d.quadrinho ? { quadrinho: true } : {}), // teste: cenas de objeto/lugar em ilustração de quadrinho
       formato: longo ? 'longo' : 'short',
       animar: false,
       ...(opcoes.vozId ? { vozId: String(opcoes.vozId).trim() } : {}),
@@ -354,12 +355,13 @@ export default async function handler(req, res) {
     if (b.acao === 'explicador') {
       const tema = String(b.tema || '').trim().slice(0, 200);
       if (!tema) return res.status(400).json({ erro: 'Escreva o tema do explicador.' });
-      const formato = b.formato === 'short' ? 'short' : 'longo';
+      const formato = b.formato === 'short' || b.formato === 'noticias' ? b.formato : 'longo';
+      const quadrinho = !!b.quadrinho;
       // A pesquisa + o roteiro levam de 1 a 4 min: o cartão "⏳ Escrevendo" aparece na lista na hora
       // e vira o roteiro (ou mostra o erro) quando termina. Assim nada some sem aviso.
-      const tipo = formato === 'short' ? 'explicador-short' : 'explicador';
+      const tipo = formato === 'longo' ? 'explicador' : 'explicador-short';
       const marcador = col.doc();
-      await marcador.set({ status: 'escrevendo', tipo, titulo: tema, fonte: 'Pesquisa na web', imagens: [], criadoEm: new Date().toISOString() });
+      await marcador.set({ status: 'escrevendo', tipo, titulo: formato === 'noticias' ? `Notícias de: ${tema}` : tema, fonte: 'Pesquisa na web', imagens: [], criadoEm: new Date().toISOString() });
       const trabalho = (async () => {
         try {
           const { ep, fontes } = await roteiroExplicador(tema, formato);
@@ -372,6 +374,8 @@ export default async function handler(req, res) {
             links: fontes.slice(0, 8).map((f) => ({ titulo: f.titulo, link: f.url })),
             imagens: [],
             ep,
+            ...(quadrinho ? { quadrinho: true } : {}),
+            ...(formato === 'noticias' ? { temaPedido: tema } : {}),
             criadoEm: new Date().toISOString(),
           });
           await marcador.delete();

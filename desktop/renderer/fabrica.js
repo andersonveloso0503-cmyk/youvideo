@@ -1167,7 +1167,7 @@ const Fabrica = (() => {
           ${aprovada ? `<span class="nota">${n.automatica ? '🤖' : '✅'} ${quandoTxt(n.aprovadaEm)}</span>` : n.estado === 'escrevendo' ? '<span class="nota" style="white-space:nowrap">⏳ escrevendo…</span>' : menuTres('pl-aprovar', 'pl-descartar', n.id, '▶️ Fazer agora', n.estado === 'falhou')}
         </div>`;
       lista.innerHTML =
-        (r.aguardando.length ? r.aguardando.map((n) => cartao(n, false)).join('') : '<p class="nota">Nenhum roteiro esperando. Clique em 🔎 Buscar notícias agora ou 💡 Criar explicador.</p>') +
+        (r.aguardando.length ? r.aguardando.map((n) => cartao(n, false)).join('') : '<p class="nota">Nenhum roteiro esperando. Clique em 🔎 Buscar notícias agora ou 🎯 Escolher um tema.</p>') +
         (r.aprovadas.length ? `<details style="margin-top:8px"><summary class="nota" style="cursor:pointer">Aprovados recentemente (${r.aprovadas.length})</summary>${r.aprovadas.map((n) => cartao(n, true)).join('')}</details>` : '');
       lista.querySelectorAll('.pl-aprovar').forEach((b) => (b.onclick = () => aprovarPolitica(b.dataset.id, b)));
       lista.querySelectorAll('.pl-descartar').forEach((b) => (b.onclick = () => descartarPolitica(b.dataset.id, b)));
@@ -1242,12 +1242,12 @@ const Fabrica = (() => {
 
   async function criarExplicador() {
     const tema = q('#plTema').value.trim();
-    if (!tema) return avisar('Escreva o tema do explicador (ou clique numa das sugestões).', true);
+    if (!tema) return avisar('Escreva o tema (ex.: Trump) ou clique numa das sugestões.', true);
     const b = q('#btnPlExplicadorCriar');
     b.disabled = true;
     b.textContent = '💡 Pesquisando e escrevendo (1 a 2 min)...';
     try {
-      const r = await window.api.politica.acao({ acao: 'explicador', tema, formato: q('#plFormato').value });
+      const r = await window.api.politica.acao({ acao: 'explicador', tema, formato: q('#plFormato').value, quadrinho: !!q('#plQuadrinho')?.checked });
       avisar(r.emSegundoPlano ? `O Claude está pesquisando "${r.titulo}". O cartão ⏳ já está na lista e vira o roteiro em 1 a 4 min` : `Explicador escrito: "${r.titulo}" — leia e aprove na lista`);
       if (r.emSegundoPlano) [60, 120, 180, 240].forEach((s) => setTimeout(carregarPolitica, s * 1000)); // atualiza a lista sozinho
       q('#plTema').value = '';
