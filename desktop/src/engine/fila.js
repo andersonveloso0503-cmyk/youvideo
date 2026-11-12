@@ -209,13 +209,17 @@ class Fila extends EventEmitter {
     const { trocarCapaStudio } = require('./capaStudio');
     const fica = [];
     const semLogin = new Set();
+    const deuCerto = new Set();
     try {
       for (const p of lista) {
         if (Date.now() - p.em > 4 * 86400e3 || !fs.existsSync(p.arquivo) || (p.tentativas || 0) >= 12) continue; // desiste
         // espera uns minutos depois do envio (o Studio ainda está processando o vídeo) e não insiste em canal sem login
         // Canal sem login no Studio: NÃO tenta de novo sozinho (cada tentativa fazia o Windows pedir o PIN);
         // só volta a tentar quando você usa o botão 🔑 Entrar no Studio daquele canal
-        if (Date.now() - p.em < 3 * 60e3 || semLogin.has(p.canalId) || (soCanal && p.canalId !== soCanal) || (p.precisaLogin && soCanal !== p.canalId)) {
+        // Marcado como "precisa login": tenta de novo sozinho 1 vez por hora (a janela escondida não abre mais o login,
+        // então não aparece PIN) e na hora se outra capa do MESMO canal acabou de dar certo
+        const loginVelho = p.precisaLogin && soCanal !== p.canalId && !deuCerto.has(p.canalId) && Date.now() - (p.ultimaTentativa || 0) < 60 * 60e3;
+        if (Date.now() - p.em < 3 * 60e3 || semLogin.has(p.canalId) || (soCanal && p.canalId !== soCanal) || loginVelho) {
           fica.push(p);
           continue;
         }
@@ -223,11 +227,12 @@ class Fila extends EventEmitter {
         try {
           await trocarCapaStudio({ canalId: p.canalId, videoId: p.videoId, arquivo: p.arquivo });
           fs.rmSync(p.arquivo, { force: true });
+          deuCerto.add(p.canalId);
           if (job) this.atualizar(job, { aviso: null, etapa: `${String(job.etapa || 'Enviado').replace(/ · capa.*$/, '')} · capa do Short no Studio ✅` });
         } catch (e) {
           const login = e.codigo === 'LOGIN';
           if (login) semLogin.add(p.canalId);
-          fica.push({ ...p, precisaLogin: login, tentativas: (p.tentativas || 0) + (login ? 0 : 1), ultimoErro: String(e.message || e).slice(0, 200) });
+          fica.push({ ...p, precisaLogin: login, ultimaTentativa: Date.now(), tentativas: (p.tentativas || 0) + (login ? 0 : 1), ultimoErro: String(e.message || e).slice(0, 200) });
           if (job) this.atualizar(job, { aviso: login ? 'Capa do Short: entre uma vez no YouTube Studio deste canal (Contas YouTube → 🔑 Entrar no Studio) e ela é trocada sozinha' : `Capa do Short no Studio: ${String(e.message || e).slice(0, 140)} — tento de novo sozinho` });
         }
       }
@@ -238,7 +243,8 @@ class Fila extends EventEmitter {
     // Manda o resultado para os registros do site (para conferir de longe por que a capa não foi)
     try {
       const pend = this.lerCapasStudio();
-      const texto = `fila=${lista.length} ficaram=${pend.length} semLogin=${[...semLogin].join(',') || '-'} | ` + pend.slice(0, 6).map((p) => `${p.videoId}: ${p.precisaLogin ? 'LOGIN' : p.ultimoErro || (Date.now() - p.em < 3 * 60e3 ? 'esperando 3 min' : 'não tentou')} (tent ${p.tentativas || 0})`).join(' ; ');
+      const nome = (id) => this.obterCanal?.(id)?.titulo || id;
+      const texto = `fila=${lista.length} ficaram=${pend.length} trocadas-agora=${[...deuCerto].map(nome).join(',') || '-'} semLogin=${[...semLogin].map(nome).join(',') || '-'} | ` + pend.slice(0, 6).map((p) => `${nome(p.canalId)} ${p.videoId}: ${p.precisaLogin ? 'LOGIN' : p.ultimoErro || (Date.now() - p.em < 3 * 60e3 ? 'esperando 3 min' : 'não tentou')} (tent ${p.tentativas || 0})`).join(' ; ');
       Central.chamar(this.obterConfig(), '/api/central/log-pc', { metodo: 'POST', corpo: { pc: require('os').hostname(), area: 'capa-studio', texto } }).catch(() => {});
     } catch {}
     if (this.aoMudarStudio) this.aoMudarStudio(this.canaisSemLoginStudio());
