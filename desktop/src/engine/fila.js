@@ -213,6 +213,12 @@ class Fila extends EventEmitter {
       const novas = [];
       for (const c of r?.capas || []) {
         if (tem.has(c.videoId) || !this.obterCanal?.(c.canalId)?.refreshToken) continue;
+        // Este PC já trocou a capa desse Short (a própria, feita na hora): não põe outra por cima
+        const jaTrocou = (this.jobs || []).some((j) => j.youtube?.id === c.videoId && /capa do Short no Studio ✅/.test(String(j.etapa || '')));
+        if (jaTrocou) {
+          Central.chamar(this.obterConfig(), '/api/central/capas-studio', { metodo: 'POST', corpo: { acao: 'feita', pc: require('os').hostname(), videoId: c.videoId } }).catch(() => {});
+          continue;
+        }
         const resp = await fetch(c.url).catch(() => null);
         if (!resp?.ok) continue;
         const dir = path.join(this.dirCache, 'capas-studio');

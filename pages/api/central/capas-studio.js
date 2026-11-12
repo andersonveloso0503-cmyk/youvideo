@@ -76,6 +76,8 @@ async function capasGratisAntigas() {
     try {
       const x = (await getDb().collection('youvideo_fila').doc(filaId).get()).data();
       if (!x) continue;
+      // Shorts dos últimos 5 dias já tinham a capa do PC trocada no Studio: não troca por outra
+      if (Date.parse(x.criadoEm || 0) > Date.now() - 5 * 86400e3) continue;
       const vid = x.fabrica?.youtubeId || (String(x.fabrica?.youtube?.url || '').match(/(?:shorts\/|youtu\.be\/|[?&]v=)([\w-]{11})/) || [])[1];
       const cy = x.fabrica?.canalYoutube;
       const canalId = (typeof cy === 'string' ? cy : cy?.id || cy?.canalId) || '';
