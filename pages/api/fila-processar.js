@@ -750,7 +750,7 @@ export default async function handler(req, res) {
           } else if (item.documentario && !item.politica) {
             // Documentário: foto real escurecida + a pergunta da capa
             // Episódios criados antes da capa pintada: pega título, subtítulo e pintura do episódio escrito
-            const ep = EPISODIOS.find((e) => e.id === item.episodioId) || {};
+            const ep = EPISODIOS.find((e) => e.id === item.episodioId) || item.episodio || {};
             thumbnailUrl =
               (await thumbDocumentario({
                 // Política: a capa mostra a pessoa da notícia (1ª foto de pessoa das cenas), não Brasília

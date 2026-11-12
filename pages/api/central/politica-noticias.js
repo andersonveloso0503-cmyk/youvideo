@@ -159,6 +159,49 @@ export default async function handler(req, res) {
 
   try {
     // Vídeo LONGO da semana (2 por semana, quarta e sábado): junta as notícias de maior nota dos últimos dias
+    // 1 documentário longo de ARQUEOLOGIA/HISTÓRIA por semana no Noites na História (tema modelado em vídeos que deram certo).
+    // Não é política: vai pelo motor dos documentários (fotos de museu/sítio, ilustrações da época) e espera o ✅ Aprovar.
+    if (req.method === 'GET' && req.query.auto === 'historia') {
+      const cfgH = db.collection('youvideo_config').doc('historia_longo');
+      const ch = (await cfgH.get()).data() || {};
+      if (ch.ultimo && Date.now() - new Date(ch.ultimo).getTime() < 5 * 86400e3) return res.status(200).json({ pulou: 'já fez o documentário da semana' });
+      await cfgH.set({ ultimo: new Date().toISOString() }, { merge: true });
+      const { canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
+      const canal = await canalDaPolitica(db, await canalDosGamesId(db));
+      if (!canal?.id) return res.status(200).json({ pulou: 'sem canal do Noites na História' });
+      const { escolherTemaModelado } = await import('../../../lib/longoModelado');
+      const { roteiroHistoriaLongo } = await import('../../../lib/historiaLonga');
+      const m = await escolherTemaModelado('historia');
+      const { ep } = await roteiroHistoriaLongo(m.tema, m.titulo);
+      const fab = db.collection('youvideo_fila').doc();
+      const quando = new Date(Date.now() + 6 * 3600e3).toISOString();
+      await fab.set({
+        tema: ep.titulo,
+        documentario: true,
+        historiaGerada: true,
+        episodioId: ep.id,
+        episodio: ep, // o episódio escrito fica guardado aqui (não está na lista de episódios fixos)
+        serie: null,
+        estilo: 'realista',
+        formato: 'longo',
+        animar: false,
+        roteiro: roteiroDoEpisodio(ep),
+        status: 'pendente',
+        origem: 'fabrica',
+        criadoEm: new Date().toISOString(),
+        fabrica: {
+          ativo: true,
+          lote: `historia-${Date.now().toString(36)}`,
+          quando: new Date().toISOString(),
+          quandoYoutube: quando,
+          redes: { youtube: true, facebook: false, instagram: false, tiktok: false, kwai: false },
+          canalYoutube: { id: String(canal.id), titulo: String(canal.titulo || '') },
+        },
+      });
+      console.log(`[historia-longo] "${ep.titulo}" (nota ${m.nota}) na Fábrica, canal ${canal.titulo}`);
+      return res.status(200).json({ ok: true, id: fab.id, titulo: ep.titulo, nota: m.nota });
+    }
+
     if (req.method === 'GET' && req.query.auto === 'longo') {
       const cd = (await cfg.get()).data() || {};
       if (cd.ultimoLongo && Date.now() - new Date(cd.ultimoLongo).getTime() < 40 * 3600e3) return res.status(200).json({ pulou: 'já fez um longo há pouco' });
