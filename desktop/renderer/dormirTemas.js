@@ -337,5 +337,57 @@ const DORMIR_TEMAS = [
     "capaDestaque": "PATAGÔNIA",
     "somPrompt": "cold mountain wind and gentle lake water, calm",
     "musicaPrompt": "soft strings and piano, slow 50 bpm, epic but calm"
+  },
+  {
+    "id": "flor-riacho-laranja",
+    "nome": "Flor no riacho",
+    "titulo": "Música para Acalmar os Pensamentos e Aliviar o Estresse 🌿 Instrumental Suave",
+    "descricao": "Uma flor delicada sobre a pedra com musgo, no meio de um riacho de água limpa, com a luz do sol entrando pela mata. Uma música instrumental suave para acalmar os pensamentos, aliviar o estresse e descansar a mente.\n\n🌿 Ideal para:\n• Acalmar os pensamentos e aliviar o estresse\n• Dormir rápido e ter um sono profundo\n• Meditar, ler ou estudar com calma\n• Deixar a TV ligada com uma imagem linda e serena\n\nAs músicas são originais, compostas para o [NOME DO CANAL].\n\nSe este vídeo te ajudou a relaxar, deixe seu like e se inscreva no [NOME DO CANAL]. Toda semana tem uma nova música para o seu descanso. 💙\n\nComente aqui: o que você sentiu ouvindo esta música?\n\n#musicarelaxante #acalmarospensamentos #instrumentalsuave",
+    "tags": "música para acalmar, música para aliviar o estresse, música relaxante, instrumental suave, música para dormir, acalmar os pensamentos, ansiedade, meditação, sons da natureza, riacho, sono tranquilo",
+    "prompt": "A single vibrant orange exotic flower growing on a mossy rock in the middle of a forest stream, macro photography, shallow depth of field, soft golden sunbeams through the trees, dreamy bokeh, crystal clear shallow forest stream with smooth pebbles, lush green moss and ferns, hyper detailed, 8k, serene and peaceful mood",
+    "movimento": "clear water flowing gently around the stone, soft light rays shimmering, fern leaves swaying slightly, tiny floating particles in the light",
+    "capaFrase": "ALÍVIO MENTAL",
+    "capaDestaque": "ALÍVIO",
+    "somPrompt": "gentle forest stream trickling over pebbles, soft birdsong far away, calm, constant",
+    "musicaPrompt": "soft instrumental piano and warm ambient pads, gentle harp, slow 55 bpm, calm, healing, relaxing meditation, no drums"
+  },
+  {
+    "id": "flor-riacho-azul",
+    "nome": "Flor azul no riacho",
+    "titulo": "Música Calmante para Ansiedade 💙 Mente em Paz | Instrumental Relaxante",
+    "descricao": "Uma flor azul e lilás nascendo entre o musgo, à beira de um riacho cristalino na floresta. Música calma para diminuir a ansiedade, desacelerar e deixar a mente em paz.\n\n🌿 Ideal para:\n• Acalmar os pensamentos e aliviar o estresse\n• Dormir rápido e ter um sono profundo\n• Meditar, ler ou estudar com calma\n• Deixar a TV ligada com uma imagem linda e serena\n\nAs músicas são originais, compostas para o [NOME DO CANAL].\n\nSe este vídeo te ajudou a relaxar, deixe seu like e se inscreva no [NOME DO CANAL]. Toda semana tem uma nova música para o seu descanso. 💙\n\nComente aqui: o que você sentiu ouvindo esta música?\n\n#musicacalmante #ansiedade #musicarelaxante",
+    "tags": "música para acalmar, música para aliviar o estresse, música relaxante, instrumental suave, música para dormir, acalmar os pensamentos, ansiedade, meditação, sons da natureza, riacho, sono tranquilo, música para ansiedade",
+    "prompt": "A single blue and lilac protea flower on a mossy log beside a crystal clear forest stream, macro photography, shallow depth of field, soft golden sunbeams through the trees, dreamy bokeh, crystal clear shallow forest stream with smooth pebbles, lush green moss and ferns, hyper detailed, 8k, serene and peaceful mood",
+    "movimento": "clear water flowing gently around the stone, soft light rays shimmering, fern leaves swaying slightly, tiny floating particles in the light",
+    "capaFrase": "MENTE EM PAZ",
+    "capaDestaque": "PAZ",
+    "somPrompt": "gentle forest stream trickling over pebbles, soft birdsong far away, calm, constant",
+    "musicaPrompt": "soft instrumental piano and warm ambient pads, gentle harp, slow 55 bpm, calm, healing, relaxing meditation, no drums"
+  },
+  {
+    "id": "flor-riacho-rosa",
+    "nome": "Rosa na névoa",
+    "titulo": "Música para Dormir Profundamente 🌹 Relaxe a Mente e o Corpo | Instrumental",
+    "descricao": "Uma rosa vermelha sobre a pedra, no meio de um riacho com névoa leve e a luz suave da manhã. Música instrumental para relaxar a mente e o corpo e dormir profundamente.\n\n🌿 Ideal para:\n• Acalmar os pensamentos e aliviar o estresse\n• Dormir rápido e ter um sono profundo\n• Meditar, ler ou estudar com calma\n• Deixar a TV ligada com uma imagem linda e serena\n\nAs músicas são originais, compostas para o [NOME DO CANAL].\n\nSe este vídeo te ajudou a relaxar, deixe seu like e se inscreva no [NOME DO CANAL]. Toda semana tem uma nova música para o seu descanso. 💙\n\nComente aqui: o que você sentiu ouvindo esta música?\n\n#musicaparadormir #sonoprofundo #musicarelaxante",
+    "tags": "música para acalmar, música para aliviar o estresse, música relaxante, instrumental suave, música para dormir, acalmar os pensamentos, ansiedade, meditação, sons da natureza, riacho, sono tranquilo, música para dormir profundamente, sono profundo",
+    "prompt": "A single red rose growing on a mossy stone in a misty forest stream at dawn, soft fog over the water, macro photography, shallow depth of field, soft golden sunbeams through the trees, dreamy bokeh, crystal clear shallow forest stream with smooth pebbles, lush green moss and ferns, hyper detailed, 8k, serene and peaceful mood",
+    "movimento": "clear water flowing gently around the stone, soft light rays shimmering, fern leaves swaying slightly, tiny floating particles in the light, soft mist drifting over the water",
+    "capaFrase": "SONO PROFUNDO",
+    "capaDestaque": "SONO",
+    "somPrompt": "gentle forest stream trickling over pebbles, soft birdsong far away, calm, constant",
+    "musicaPrompt": "very soft felt piano and warm pads, slow 50 bpm, deep sleep, lullaby, calm, no drums"
+  },
+  {
+    "id": "flor-riacho-lotus",
+    "nome": "Lótus no riacho",
+    "titulo": "Música de Cura Interior 🪷 Paz Interior e Calma | Instrumental Suave para Meditar",
+    "descricao": "Uma flor de lótus branca e rosa sobre a água calma de um riacho na mata, com raios de sol entre as árvores. Música suave para meditar, encontrar a paz interior e descansar.\n\n🌿 Ideal para:\n• Acalmar os pensamentos e aliviar o estresse\n• Dormir rápido e ter um sono profundo\n• Meditar, ler ou estudar com calma\n• Deixar a TV ligada com uma imagem linda e serena\n\nAs músicas são originais, compostas para o [NOME DO CANAL].\n\nSe este vídeo te ajudou a relaxar, deixe seu like e se inscreva no [NOME DO CANAL]. Toda semana tem uma nova música para o seu descanso. 💙\n\nComente aqui: o que você sentiu ouvindo esta música?\n\n#pazinterior #meditacao #musicarelaxante",
+    "tags": "música para acalmar, música para aliviar o estresse, música relaxante, instrumental suave, música para dormir, acalmar os pensamentos, ansiedade, meditação, sons da natureza, riacho, sono tranquilo, música para meditar, paz interior, cura interior",
+    "prompt": "A single white and pink lotus flower resting on calm water in a forest stream surrounded by mossy stones, macro photography, shallow depth of field, soft golden sunbeams through the trees, dreamy bokeh, crystal clear shallow forest stream with smooth pebbles, lush green moss and ferns, hyper detailed, 8k, serene and peaceful mood",
+    "movimento": "clear water flowing gently around the stone, soft light rays shimmering, fern leaves swaying slightly, tiny floating particles in the light, lotus petals moving very slightly",
+    "capaFrase": "PAZ INTERIOR",
+    "capaDestaque": "PAZ",
+    "somPrompt": "gentle forest stream trickling over pebbles, soft birdsong far away, calm, constant",
+    "musicaPrompt": "tibetan singing bowl, soft piano and ambient pads, slow 50 bpm, meditation, healing, calm, no drums"
   }
 ];
