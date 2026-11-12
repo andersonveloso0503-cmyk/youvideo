@@ -11,13 +11,46 @@ import { exigirToken } from '../../../lib/central';
 export const config = { api: { bodyParser: { sizeLimit: '6mb' } } };
 const col = () => getDb().collection('youvideo_capas_studio');
 
+// Uma vez: os Shorts de games e política dos últimos 30 dias que já subiram com a capa pronta (feita no site)
+// entram nesta lista — qualquer PC com o canal troca a capa no Studio (antes só os últimos dias, e só no PC que subiu)
+async function repassarAntigas() {
+  const cfg = getDb().collection('youvideo_config').doc('capas-studio');
+  if ((await cfg.get()).data()?.repasse1) return;
+  await cfg.set({ repasse1: Date.now() }, { merge: true });
+  const desde = new Date(Date.now() - 45 * 86400e3).toISOString();
+  const id = (x) => x.fabrica?.youtubeId || (String(x.fabrica?.youtube?.url || '').match(/(?:shorts\/|youtu\.be\/|[?&]v=)([\w-]{11})/) || [])[1];
+  let n = 0;
+  let semCapaPronta = 0;
+  for (const campo of ['games', 'politica']) {
+    const snap = await getDb().collection('youvideo_fila').where(campo, '==', true).get();
+    for (const d of snap.docs) {
+      const x = d.data();
+      const vid = id(x);
+      if (!vid || String(x.criadoEm || '') < desde || x.formato !== 'short') continue;
+      if (!x.capaIa || !/^https?:/.test(String(x.thumbnailUrl || ''))) {
+        semCapaPronta++;
+        continue;
+      }
+      const cy = x.fabrica?.canalYoutube;
+      const canalId = (typeof cy === 'string' ? cy : cy?.id || cy?.canalId) || '';
+      if (!canalId) continue;
+      const ref = col().doc(vid);
+      if ((await ref.get()).exists) continue;
+      await ref.set({ canalId, titulo: String(x.roteiro?.titulo || x.tema || '').slice(0, 100), url: x.thumbnailUrl, de: 'site (Shorts antigos)', falhouEm: [], em: Date.now() });
+      n++;
+    }
+  }
+  console.log(`[capa-studio] repasse dos Shorts antigos: ${n} capas na lista para os PCs trocarem (${semCapaPronta} Shorts sem capa pronta no site)`);
+}
+
 export default async function handler(req, res) {
   if (!exigirToken(req, res)) return;
   try {
     if (req.method === 'GET') {
       const pc = String(req.query.pc || '');
+      await repassarAntigas().catch((e) => console.log(`[capa-studio] repasse dos antigos falhou: ${String(e.message || e).slice(0, 160)}`));
       const snap = await col().get();
-      const limite = Date.now() - 4 * 86400e3;
+      const limite = Date.now() - 6 * 86400e3;
       const lista = [];
       for (const d of snap.docs) {
         const x = d.data();
