@@ -19,7 +19,7 @@ function abrirLogin(canalId, titulo = '') {
     height: 820,
     title: `Entrar no YouTube Studio — ${titulo || canalId}`,
     autoHideMenuBar: true,
-    webPreferences: { partition: particao(canalId), contextIsolation: true, nodeIntegration: false },
+    webPreferences: { partition: particao(canalId), contextIsolation: true, nodeIntegration: false, preload: require('path').join(__dirname, 'semPasskey.js') },
   });
   win.webContents.setUserAgent(UA);
   // Abre direto a tela de login do Google; depois de entrar, cai no Studio do canal
@@ -49,7 +49,7 @@ async function trocarCapaStudio({ canalId, videoId, arquivo, limiteMs = 120000 }
     show: false,
     width: 1400,
     height: 950,
-    webPreferences: { partition: particao(canalId), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+    webPreferences: { partition: particao(canalId), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, preload: require('path').join(__dirname, 'semPasskey.js') },
   });
   win.webContents.setUserAgent(UA);
   // "Sair do site? As alterações não foram salvas": nunca trava a janela escondida
