@@ -782,6 +782,7 @@ const Biblioteca = (() => {
             <div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><b>${ruins.length ? `⚠️ ${ruins.length} ponto(s) para olhar` : '✅ Conferido: texto, legenda, cenas e capa'}${c.nota != null ? ` · Nota do vídeo ${String(c.nota).replace('.', ',')}` : ''}</b>
             <button type="button" class="btn-mini ap-conf-de-novo" title="Conferir tudo de novo (ex.: depois de trocar a capa)">🔍 De novo</button></div>
             ${c.porqueNota ? `<div class="nota">${esc(c.porqueNota)}</div>` : ''}
+            ${c.corrigido ? `<div style="margin:3px 0">🔧 <b>Arrumado sozinho antes de chegar aqui:</b> ${esc((c.corrigido.oque || []).join(' · '))}${c.corrigido.antes?.nota != null ? ` (nota antes: ${String(c.corrigido.antes.nota).replace('.', ',')})` : ''}</div>` : ''}
             ${(c.etapas || []).map((e) => `<div>${e.ok ? '✅' : '⚠️'} <b>${esc(e.nome)}:</b> ${esc(e.detalhe)}</div>`).join('')}
             ${(c.cenas || []).length ? `<details style="margin-top:4px"><summary>Linha do tempo das cenas (${c.cenas.length})</summary>
               ${c.cenas.map((x) => `<div style="display:flex;gap:6px;align-items:center;margin-top:4px">

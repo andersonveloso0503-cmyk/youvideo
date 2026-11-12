@@ -36,6 +36,12 @@ function Conferencia({ c, deNovo, ocupado }) {
       </div>
       <div style={{ marginTop: 6, lineHeight: 1.45 }}>
         {c.porqueNota && <div style={{ opacity: 0.85, marginBottom: 4 }}>{c.porqueNota}</div>}
+        {c.corrigido && (
+          <div style={{ marginBottom: 4 }}>
+            🔧 <b>Arrumado sozinho antes de chegar aqui:</b> {(c.corrigido.oque || []).join(' · ')}
+            {c.corrigido.antes?.nota != null ? ` (nota antes: ${String(c.corrigido.antes.nota).replace('.', ',')})` : ''}
+          </div>
+        )}
         {(c.etapas || []).map((e, k) => (
           <div key={k}>
             {e.ok ? '✅' : '⚠️'} <b>{e.nome}:</b> {e.detalhe}

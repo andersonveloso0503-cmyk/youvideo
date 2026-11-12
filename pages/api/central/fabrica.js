@@ -1229,7 +1229,7 @@ export default async function handler(req, res) {
       const d = (await ref.get()).data();
       if (!d) return res.status(404).json({ erro: 'Vídeo não encontrado.' });
       const { conferirVideo } = await import('../../../lib/conferenciaFinal');
-      const conferencia = await conferirVideo(d);
+      const conferencia = { ...(await conferirVideo(d)), ...(d.correcao ? { corrigido: d.correcao } : {}) };
       await ref.update({ conferencia });
       return res.status(200).json({ ok: true, conferencia });
     }
