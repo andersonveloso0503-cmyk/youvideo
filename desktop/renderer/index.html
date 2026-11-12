@@ -15,35 +15,54 @@
       </div>
       <div class="marca-texto"><span class="marca-nome">Youvideo</span><span class="marca-sub">Compilador</span></div>
     </div>
-    <div class="modos" id="modos">
+    <div class="modos" id="modos" hidden>
       <button class="modo ativo" data-v="compilar">🎬 Compilar</button>
       <button class="modo" data-v="criar">✨ Criar</button>
     </div>
     <nav class="topo-acoes">
+      <button class="btn-topo ativo-topo" id="btnPainel" title="Tela principal: o que precisa de você hoje">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Painel
+      </button>
+      <button class="btn-topo" id="btnAprovarTopo" title="Vídeos prontos esperando você aprovar antes do YouTube">
+        <svg viewBox="0 0 24 24"><path d="M5 12.5 10 17l9-10"/></svg>
+        Aprovar <span class="contador alerta" id="qtdAprovarTopo" hidden>0</span>
+      </button>
       <button class="btn-topo" id="btnCanais">
         <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M10 9.5v5l4.5-2.5z" class="cheio"/></svg>
         Contas YouTube <span class="contador" id="qtdCanais">0</span>
-      </button>
-      <button class="btn-topo" id="btnBiblioteca">
-        <svg viewBox="0 0 24 24"><path d="M4 5h4v14H4zM10 5h4v14h-4zM16 6l3.5-1 3 13.5-3.5 1z"/></svg>
-        Biblioteca
       </button>
       <button class="btn-topo" id="btnFabrica" title="Cria Shorts sozinho (histórias e narrados) e agenda nas redes">
         <svg viewBox="0 0 24 24"><path d="M3 20V10l5 3V10l5 3V6h4l1 14z"/><path d="M3 20h18"/></svg>
         Fábrica
       </button>
-      <button class="btn-topo" id="btnSubir">
+      <button class="btn-topo" id="btnFilaTopo" title="A fila de montagem e envio deste PC">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        Fila <span class="contador" id="qtdFilaTopo">0</span>
+      </button>
+      <div class="menu-mais-wrap">
+        <button class="btn-topo" id="btnMais" aria-haspopup="true" aria-expanded="false">Mais ferramentas ▾</button>
+        <div class="menu-mais" id="menuMais" hidden>
+          <button class="item-mais" data-mais="compilar"><b>🎬 Compilar músicas</b><span>A tela de compilação (músicas, efeitos, onda de áudio)</span></button>
+          <button class="item-mais" data-mais="criar"><b>✨ Criar</b><span>Ferramentas do site: histórias, cortes, cover, estúdio</span></button>
+          <button class="btn-topo item-mais" id="btnBiblioteca">
+        <svg viewBox="0 0 24 24"><path d="M4 5h4v14H4zM10 5h4v14h-4zM16 6l3.5-1 3 13.5-3.5 1z"/></svg>
+        Biblioteca
+      </button>
+          <button class="btn-topo item-mais" id="btnSubir">
         <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M12 15V9M9 11.5 12 9l3 2.5"/></svg>
         Subir p/ YouTube
       </button>
-      <button class="btn-topo" id="btnCantor" title="Corta o melhor trecho da música para o vídeo do cantor e transforma o vídeo pronto em Short">
+          <button class="btn-topo item-mais" id="btnCantor" title="Corta o melhor trecho da música para o vídeo do cantor e transforma o vídeo pronto em Short">
         <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
         Short do cantor
       </button>
-      <button class="btn-topo" id="btnDormir" title="Vídeos longos (1 a 10 horas) com cenas lindas, som de chuva, mar, cachoeira e música calma">
+          <button class="btn-topo item-mais" id="btnDormir" title="Vídeos longos (1 a 10 horas) com cenas lindas, som de chuva, mar, cachoeira e música calma">
         <svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
         Sons p/ dormir
       </button>
+        </div>
+      </div>
       <button class="btn-topo" id="btnConfig">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         Configurações
@@ -57,6 +76,32 @@
       <span class="chip discreto" id="versao">v1.0.0</span>
     </div>
   </header>
+
+  <!-- Painel: tela principal (o que precisa de você hoje) -->
+  <section class="tela-painel" id="telaPainel">
+    <div class="painel-wrap">
+      <div class="painel-cabeca"><h1 id="pnHoje">Hoje</h1><span class="nota" id="pnSub"></span><button class="btn-mini" id="pnAtualizar">↻ Atualizar</button></div>
+      <div class="pn-resumo">
+        <div class="pn-card destaque"><span class="pn-rot">Esperando você aprovar</span><span class="pn-num" id="pnAprovarN">–</span><span class="pn-det" id="pnAprovarDet"></span><button class="btn-ouro" id="pnAbrirAprovar">Abrir Aprovar</button></div>
+        <div class="pn-card"><span class="pn-rot">Sobem nas próximas 24 h</span><span class="pn-num" id="pnSobemN">–</span><span class="pn-det" id="pnSobemDet"></span></div>
+        <div class="pn-card"><span class="pn-rot">Montando nos PCs</span><span class="pn-num" id="pnMontandoN">–</span><span class="pn-det" id="pnMontandoDet"></span></div>
+        <div class="pn-card" id="pnPrecisaCard"><span class="pn-rot">Precisa de você</span><span class="pn-num" id="pnPrecisaN">–</span><span class="pn-det" id="pnPrecisaDet"></span></div>
+      </div>
+      <div class="pn-linha">
+        <section class="pn-bloco pn-largo"><div class="pn-tit"><h2>Para aprovar agora</h2><span class="nota">o que vai ao ar primeiro</span></div><div id="pnAprovarLista"></div></section>
+        <div class="pn-coluna">
+          <section class="pn-bloco"><h2>Avisos</h2><div id="pnAvisos"></div></section>
+          <section class="pn-bloco"><div class="pn-tit"><h2>Canais nesta semana</h2><span class="nota">números do YouTube</span></div><div id="pnCanais"></div></section>
+        </div>
+      </div>
+      <div class="pn-tres">
+        <section class="pn-bloco"><div class="pn-tit"><h2>Últimos Shorts</h2><span class="nota">vs. média do canal</span></div><div id="pnDesempenho"></div></section>
+        <section class="pn-bloco"><h2>Comentários para responder</h2><div id="pnComentarios"></div></section>
+        <section class="pn-bloco"><h2>PCs agora</h2><div id="pnPcs"></div></section>
+      </div>
+      <section class="pn-bloco"><h2>Próximas 24 horas</h2><div id="pnAgenda"></div></section>
+    </div>
+  </section>
 
   <main class="area">
     <!-- 1. Músicas -->
@@ -1123,5 +1168,6 @@
   <script src="dormir.js"></script>
   <script src="criar.js"></script>
   <script src="app.js"></script>
+  <script src="painel.js"></script>
 </body>
 </html>

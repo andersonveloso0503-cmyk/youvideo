@@ -1076,6 +1076,30 @@ app.whenReady().then(() => {
   });
   setTimeout(mandarFilaParaNuvem, 5000);
   setInterval(() => !tFilaNuvem && mandarFilaParaNuvem(), 60000);
+  // ---------- Painel (tela principal): canais, comentários e PCs num pedido só ----------
+  let cachePainel = null;
+  ipcMain.handle('painel:dados', async (_e, { forcar = false } = {}) => {
+    if (!forcar && cachePainel && Date.now() - cachePainel.em < 10 * 60e3) return cachePainel.dados;
+    const cfg = store.ler();
+    const canais = await Promise.all(
+      store.canais().map((x) => store.canal(x.id)).filter(Boolean).map(async (c) => {
+        try {
+          const d = await YT.desempenhoRecente({ credenciais: cfg.google, refreshToken: c.refreshToken, redirectOriginal: c.redirect });
+          return { id: c.id, titulo: c.titulo, foto: c.thumb || '', ...d };
+        } catch (e) {
+          return { id: c.id, titulo: c.titulo, erro: String(e.message || e).slice(0, 120), videos: [] };
+        }
+      })
+    );
+    const [comentarios, pcs] = await Promise.all([
+      Central.chamar(cfg, '/api/central/comentarios').catch(() => null),
+      Central.chamar(cfg, '/api/central/pc-filas').then((r) => r.pcs || []).catch(() => []),
+    ]);
+    const dados = { canais, comentarios, pcs, eu: identidadePc().pc };
+    cachePainel = { em: Date.now(), dados };
+    return dados;
+  });
+
   ipcMain.handle('fila:outrosPcs', async () => {
     const { pcs = [] } = await Central.chamar(store.ler(), '/api/central/pc-filas');
     const eu = identidadePc().pc;

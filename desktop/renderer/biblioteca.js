@@ -779,8 +779,9 @@ const Biblioteca = (() => {
         }
         const ruins = (c.etapas || []).filter((e) => !e.ok);
         el.innerHTML = `<div style="border-radius:8px;padding:8px;font-size:12px;line-height:1.45;background:${ruins.length ? 'rgba(214,150,40,.18)' : 'rgba(47,138,91,.18)'}">
-            <div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><b>${ruins.length ? `⚠️ ${ruins.length} ponto(s) para olhar` : '✅ Conferido: texto, legenda, cenas e capa'}</b>
+            <div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><b>${ruins.length ? `⚠️ ${ruins.length} ponto(s) para olhar` : '✅ Conferido: texto, legenda, cenas e capa'}${c.nota != null ? ` · Nota do vídeo ${String(c.nota).replace('.', ',')}` : ''}</b>
             <button type="button" class="btn-mini ap-conf-de-novo" title="Conferir tudo de novo (ex.: depois de trocar a capa)">🔍 De novo</button></div>
+            ${c.porqueNota ? `<div class="nota">${esc(c.porqueNota)}</div>` : ''}
             ${(c.etapas || []).map((e) => `<div>${e.ok ? '✅' : '⚠️'} <b>${esc(e.nome)}:</b> ${esc(e.detalhe)}</div>`).join('')}
             ${(c.cenas || []).length ? `<details style="margin-top:4px"><summary>Linha do tempo das cenas (${c.cenas.length})</summary>
               ${c.cenas.map((x) => `<div style="display:flex;gap:6px;align-items:center;margin-top:4px">

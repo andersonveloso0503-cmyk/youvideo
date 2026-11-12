@@ -141,6 +141,7 @@ contextBridge.exposeInMainWorld('api', {
     montar: chamar('narrar:montar'),
   },
   creditos: { ler: chamar('creditos:ler') },
+  painel: { dados: chamar('painel:dados') },
   caminhoDoArquivo: (file) => webUtils.getPathForFile(file),
   ao: (canal, fn) => {
     const permitidos = ['fila:mudou', 'sistema:cpu', 'app:progressoAtualizacao', 'central:progresso', 'criar:navegou', 'criar:carregando', 'criar:erro', 'criar:download', 'sync:feito', 'creditos:status', 'abrir:agenda', 'canais:progresso', 'cantor:progresso', 'dormir:progresso', 'dormir:semana', 'estudio:musicas', 'musicaAuto:mudou', 'narrar:progresso', 'redes:progresso', 'studio:login'];

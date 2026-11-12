@@ -442,6 +442,29 @@ function tituloParecido(lista, titulo) {
 }
 
 /** Troca a miniatura (capa) de um vídeo que já está no canal. */
+/** Painel: inscritos + os últimos vídeos com visualizações (para ▲/▼ e "esta semana"). Gasta ~3 de cota. */
+async function desempenhoRecente({ credenciais, refreshToken, redirectOriginal }, maximo = 20) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const c = await yt.channels.list({ part: ['contentDetails', 'statistics', 'snippet'], mine: true });
+  const ch = c.data.items?.[0];
+  const uploads = ch?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploads) return { inscritos: 0, videos: [] };
+  const r = await yt.playlistItems.list({ part: ['contentDetails'], playlistId: uploads, maxResults: Math.min(50, maximo) });
+  const ids = (r.data.items || []).map((x) => x.contentDetails?.videoId).filter(Boolean);
+  const videos = [];
+  if (ids.length) {
+    const v = await yt.videos.list({ part: ['snippet', 'statistics', 'status', 'contentDetails'], id: ids, maxResults: 50 });
+    for (const x of v.data.items || []) {
+      if (x.status?.privacyStatus !== 'public') continue; // agendado/privado ainda não conta
+      const dur = String(x.contentDetails?.duration || '');
+      const seg = (Number((dur.match(/(\d+)H/) || [])[1]) || 0) * 3600 + (Number((dur.match(/(\d+)M/) || [])[1]) || 0) * 60 + (Number((dur.match(/(\d+)S/) || [])[1]) || 0);
+      videos.push({ id: x.id, titulo: x.snippet?.title || '', publicadoEm: x.snippet?.publishedAt || null, views: Number(x.statistics?.viewCount) || 0, curto: seg > 0 && seg <= 180 });
+    }
+  }
+  videos.sort((a, b) => String(b.publicadoEm).localeCompare(String(a.publicadoEm)));
+  return { inscritos: Number(ch.statistics?.subscriberCount) || 0, ocultos: !!ch.statistics?.hiddenSubscriberCount, videos };
+}
+
 async function trocarCapa({ credenciais, refreshToken, redirectOriginal, videoId, arquivo }) {
   const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
   try {
@@ -778,7 +801,7 @@ async function responderComentario({ credenciais, refreshToken, redirectOriginal
   return { id: r.data.id };
 }
 
-module.exports = {
+module.exports = { desempenhoRecente,
   comentariosSemResposta,
   responderComentario,
   tituloParecido,

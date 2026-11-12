@@ -26,12 +26,16 @@ function Conferencia({ c, deNovo, ocupado }) {
   return (
     <div style={{ background: cor, borderRadius: 12, padding: 10, marginBottom: 12, fontSize: 13 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <b>{ruins.length ? `⚠️ Conferência: ${ruins.length} ponto(s) para olhar` : '✅ Conferido: texto, legenda, cenas e capa'}</b>
+        <b>
+          {ruins.length ? `⚠️ Conferência: ${ruins.length} ponto(s) para olhar` : '✅ Conferido: texto, legenda, cenas e capa'}
+          {c.nota != null ? ` · Nota ${String(c.nota).replace('.', ',')}` : ''}
+        </b>
         <button onClick={deNovo} disabled={ocupado} style={{ background: 'transparent', color: '#f3ead9', border: '1px solid #f3ead9', borderRadius: 8, padding: '4px 8px', fontSize: 12 }}>
           {ocupado ? '...' : '🔍 De novo'}
         </button>
       </div>
       <div style={{ marginTop: 6, lineHeight: 1.45 }}>
+        {c.porqueNota && <div style={{ opacity: 0.85, marginBottom: 4 }}>{c.porqueNota}</div>}
         {(c.etapas || []).map((e, k) => (
           <div key={k}>
             {e.ok ? '✅' : '⚠️'} <b>{e.nome}:</b> {e.detalhe}
