@@ -435,7 +435,10 @@ async function renderizarIlustracao(d, { W, H, duracao, fps, saida, capturar, ff
   const { spawn } = require('child_process');
   const proc = spawn(ffmpeg, ['-hide_banner', '-y', '-loglevel', 'error', ...entrada,
     '-vf', `fps=${fps},scale=${W}:${H},setsar=1,format=yuv420p`, '-frames:v', String(total), '-an',
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-r', String(fps), saida], { windowsHide: true });
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-threads', String(Math.max(2, Math.floor((require('os').cpus().length || 4) / 2))), '-r', String(fps), saida], { windowsHide: true });
+  try {
+    require('./ffmpeg').vigiar(proc, 'normal'); // prioridade baixa quando você está usando o PC
+  } catch {}
   let erro = '';
   proc.stderr.on('data', (x) => (erro = (erro + x).slice(-2000)));
   const fim = new Promise((ok, falha) => {

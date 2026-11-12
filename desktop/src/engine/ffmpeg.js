@@ -63,6 +63,43 @@ const PRIORIDADE = {
   maximo: os.constants.priority.PRIORITY_NORMAL,
 };
 
+// PC EM USO (mexeram no mouse/teclado nos últimos 3 min): o ffmpeg vai para a prioridade mais baixa e usa metade
+// dos núcleos, para o PC não travar. PC parado: volta ao modo escolhido. Reajusta a cada 15 s os ffmpeg rodando.
+function pcEmUso() {
+  try {
+    const { powerMonitor } = require('electron');
+    return powerMonitor.getSystemIdleTime() < 180;
+  } catch {
+    return false;
+  }
+}
+function modoEfetivo(modo) {
+  return pcEmUso() ? 'leve' : modo || 'normal';
+}
+const vivos = new Map(); // pid -> modo pedido
+function ajustarPrioridade(pid, modo) {
+  try {
+    os.setPriority(pid, PRIORIDADE[modoEfetivo(modo)] ?? PRIORIDADE.normal);
+  } catch {}
+}
+let relogioPrioridade = null;
+function vigiar(p, modo) {
+  if (!p?.pid) return;
+  vivos.set(p.pid, modo);
+  ajustarPrioridade(p.pid, modo);
+  p.on('close', () => vivos.delete(p.pid));
+  if (!relogioPrioridade) {
+    relogioPrioridade = setInterval(() => {
+      for (const [pid, m] of vivos) ajustarPrioridade(pid, m);
+      if (!vivos.size) {
+        clearInterval(relogioPrioridade);
+        relogioPrioridade = null;
+      }
+    }, 15000);
+    relogioPrioridade.unref?.();
+  }
+}
+
 /**
  * Roda o ffmpeg. `duracaoTotal` (segundos) permite calcular % de progresso.
  * Retorna { promise, cancelar }.
@@ -70,9 +107,7 @@ const PRIORIDADE = {
 function rodar(args, { duracaoTotal = 0, onProgresso, modo = 'normal', cwd } = {}) {
   const finalArgs = ['-hide_banner', '-y', '-nostdin', '-progress', 'pipe:1', '-nostats', ...args];
   const p = spawn(FFMPEG, finalArgs, { cwd, windowsHide: true });
-  try {
-    os.setPriority(p.pid, PRIORIDADE[modo] ?? PRIORIDADE.normal);
-  } catch {}
+  vigiar(p, modo);
   let cancelado = false;
   let stderr = '';
   let buf = '';
@@ -129,4 +164,4 @@ async function detectarEncoder() {
   return encoderCache;
 }
 
-module.exports = { FFMPEG, FFPROBE, probe, rodar, detectarEncoder, erroLegivel };
+module.exports = { FFMPEG, FFPROBE, probe, rodar, detectarEncoder, erroLegivel, vigiar, modoEfetivo, pcEmUso };

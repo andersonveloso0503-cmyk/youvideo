@@ -1006,7 +1006,15 @@ class Fila extends EventEmitter {
     // Envios que esperam o limite do YouTube renovar: confere de novo a cada 5 min
     if (!this.relogioEspera) this.relogioEspera = setInterval(() => this.jobs.some((x) => x.status === 'aguardando' && x.naoAntesDe) && this.proximo(), 5 * 60e3);
     const cfg = this.obterConfig();
-    const limite = cfg.modo === 'maximo' ? Math.max(1, Math.min(3, Number(cfg.simultaneos) || 1)) : 1;
+    // PC em uso (mouse/teclado nos últimos 3 min): um vídeo por vez, para não travar
+    const emUso = (() => {
+      try {
+        return require('./ffmpeg').pcEmUso();
+      } catch {
+        return false;
+      }
+    })();
+    const limite = cfg.modo === 'maximo' && !emUso ? Math.max(1, Math.min(3, Number(cfg.simultaneos) || 1)) : 1;
     // Geração (usa o processador) e envio (usa a internet) andam em paralelo, cada um na sua vez
     const vaga = (j) => (!j?.tipo || j.tipo === 'video' || j.tipo === 'montagem' ? 'video' : 'rede');
     const rodandoDe = (tipo) => [...this.rodando].filter((id) => vaga(this.jobs.find((j) => j.id === id)) === tipo).length;

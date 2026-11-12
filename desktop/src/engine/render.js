@@ -37,6 +37,9 @@ function par(n) {
 
 function threadsPorModo(modo) {
   const nucleos = os.cpus().length || 2;
+  try {
+    modo = require('./ffmpeg').modoEfetivo(modo); // PC em uso: metade dos núcleos
+  } catch {}
   if (modo === 'leve') return Math.max(1, Math.floor(nucleos / 2));
   if (modo === 'normal') return Math.max(1, nucleos - 1);
   return 0; // automático = todos
