@@ -253,7 +253,7 @@ class Fila extends EventEmitter {
     const deuCerto = new Set();
     try {
       for (const p of lista) {
-        if (Date.now() - p.em > 4 * 86400e3 || !fs.existsSync(p.arquivo) || (p.tentativas || 0) >= 12) continue; // desiste
+        if (Date.now() - p.em > 4 * 86400e3 || !fs.existsSync(p.arquivo) || ((p.tentativas || 0) >= 12 && (p.passada2 || p.remota))) continue; // desiste (só depois de passar a capa para o outro PC)
         // espera uns minutos depois do envio (o Studio ainda está processando o vídeo) e não insiste em canal sem login
         // Canal sem login no Studio: NÃO tenta de novo sozinho (cada tentativa fazia o Windows pedir o PIN);
         // só volta a tentar quando você usa o botão 🔑 Entrar no Studio daquele canal
