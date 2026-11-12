@@ -224,6 +224,35 @@ export default async function handler(req, res) {
       const cfgL = db.collection('youvideo_config').doc('games_longo');
       const cd = (await cfgL.get()).data() || {};
       if (cd.ultimoLongo && Date.now() - new Date(cd.ultimoLongo).getTime() < 40 * 3600e3) return res.status(200).json({ pulou: 'já fez um longo há pouco' });
+      // LONGO MODELADO: curiosidades inspiradas em vídeos longos de games que estouraram no YouTube (antes: resumo de notícias)
+      try {
+        const { escolherTemaModelado } = await import('../../../lib/longoModelado');
+        const { roteiroLongoGames } = await import('../../../lib/gamesDicas');
+        const m = await escolherTemaModelado('games');
+        const { ep, fontes } = await roteiroLongoGames(m.tema, m.titulo);
+        const refM = col.doc(ep.id);
+        const dM = {
+          status: 'aguardando',
+          tipo: 'longo',
+          titulo: ep.titulo,
+          texto: (ep.fatos || []).join('\n'),
+          fonte: 'Pesquisa na web',
+          links: fontes.slice(0, 8).map((f) => ({ titulo: f.titulo, link: f.url })),
+          imagens: [],
+          ep,
+          semanal: true,
+          modelado: { nota: m.nota, porque: m.porque, inspirado: m.inspirado },
+          criadoEm: new Date().toISOString(),
+        };
+        await refM.set(dM);
+        await cfgL.set({ ultimoLongo: new Date().toISOString() }, { merge: true });
+        const cfgGm = (await db.collection('youvideo_config').doc('games_noticias').get().catch(() => null))?.data?.() || {};
+        const canalM = await canalDosGames(db, cfgGm);
+        const aprovadoM = canalM ? await aprovarNoticia(db, refM, dM, canalM, null, { limite: true }) : null;
+        return res.status(200).json({ ok: true, modelado: true, id: ep.id, titulo: ep.titulo, nota: m.nota, aprovado: aprovadoM });
+      } catch (e) {
+        console.log(`[longo-modelado] games falhou, faz o resumo de notícias: ${String(e.message || e).slice(0, 160)}`);
+      }
       const desde = Date.now() - 4 * 86400e3;
       const snap = await col.where('status', 'in', ['aguardando', 'aprovada']).get();
       const nota = (x) => Number(x.ep?.potencial ?? x.potencial) || 5;

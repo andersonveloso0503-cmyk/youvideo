@@ -171,8 +171,19 @@ export default async function handler(req, res) {
         .slice(0, 5);
       if (!candidatas.length) return res.status(200).json({ pulou: 'nenhuma notícia boa nos últimos dias' });
       // UM assunto explicado a fundo (o mais quente da semana): é o que o pessoal procura no YouTube e no Google por meses
-      const top = candidatas[0];
-      const tema = `${top.x.titulo} — explicado do começo ao fim: o que aconteceu, por que importa, quem ganha e quem perde e o que muda para o brasileiro`;
+      let top = candidatas[0];
+      let tema = `${top.x.titulo} — explicado do começo ao fim: o que aconteceu, por que importa, quem ganha e quem perde e o que muda para o brasileiro`;
+      // Sábado: tema MODELADO em vídeos longos de política que estouraram no YouTube (quarta: a notícia mais quente explicada)
+      if (new Date().getUTCDay() === 6 || req.query.modelado) {
+        try {
+          const { escolherTemaModelado } = await import('../../../lib/longoModelado');
+          const m = await escolherTemaModelado('politica');
+          tema = `${m.tema}${m.titulo ? ` (título sugerido: ${m.titulo})` : ''} — explicado do começo ao fim, com o que cada lado diz`;
+          top = { x: { titulo: m.titulo || m.tema, texto: '', imagens: [] } };
+        } catch (e) {
+          console.log(`[longo-modelado] política: ficou com a notícia da semana (${String(e.message || e).slice(0, 120)})`);
+        }
+      }
       const marcador = col.doc();
       await marcador.set({ status: 'escrevendo', tipo: 'explicador', titulo: top.x.titulo, fonte: 'Pesquisa na web', imagens: [], semanal: true, criadoEm: new Date().toISOString() });
       await cfg.set({ ultimoLongo: new Date().toISOString() }, { merge: true });
