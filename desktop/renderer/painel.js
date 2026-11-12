@@ -135,7 +135,7 @@ const Painel = (() => {
     }
     const outros = (ultimo.dados?.pcs || []).filter((p) => p.pc !== ultimo.dados?.eu && p.versao);
     const velhos = outros.filter((p) => typeof versaoMenor === 'function' && APP_VERSAO && versaoMenor(p.versao, APP_VERSAO));
-    linhas.push(velhos.length ? `<div class="pn-aviso"><i style="color:#f0b86a">!</i><span>${esc(velhos.map((p) => p.pcNome || p.pc).join(', '))} ainda na v${esc(velhos[0].versao)} (este está na v${esc(APP_VERSAO)}): atualiza sozinho quando terminar o que está fazendo.</span></div>` : `<div class="pn-aviso"><i style="color:#8fd6ac">✓</i><span>PCs na mesma versão (v${esc(APP_VERSAO || '?')}).</span></div>`);
+    linhas.push(velhos.length ? `<div class="pn-aviso"><i style="color:#f0b86a">!</i><span>${esc(velhos.map((p) => p.pcNome || p.pc).join(', '))} ainda na v${esc(velhos[0].versao)} (este está na v${esc(APP_VERSAO)}): atualiza sozinho quando terminar o que está fazendo.</span></div>` : (APP_VERSAO ? `<div class="pn-aviso"><i style="color:#8fd6ac">✓</i><span>PCs na mesma versão (v${esc(APP_VERSAO)}).</span></div>` : ''));
     box.innerHTML = linhas.join('');
   }
 
