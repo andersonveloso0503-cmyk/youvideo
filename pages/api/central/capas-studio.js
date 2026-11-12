@@ -59,6 +59,10 @@ export default async function handler(req, res) {
           continue;
         }
         if ((x.falhouEm || []).includes(pc)) continue;
+        // já está com outro PC (há menos de 40 min): não pega a mesma (antes os dois PCs trocavam a mesma capa)
+        if (x.pegoPor && x.pegoPor !== pc && Date.now() - (x.pegoEm || 0) < 40 * 60e3) continue;
+        if (lista.length >= 8) continue;
+        await d.ref.update({ pegoPor: pc, pegoEm: Date.now() }).catch(() => {});
         lista.push({ videoId: d.id, canalId: x.canalId, titulo: x.titulo, url: x.url, de: x.de });
       }
       return res.status(200).json({ capas: lista });
