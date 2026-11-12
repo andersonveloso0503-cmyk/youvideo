@@ -273,7 +273,7 @@ class Fila extends EventEmitter {
         try {
           await trocarCapaStudio({ canalId: p.canalId, videoId: p.videoId, arquivo: p.arquivo });
           deuCerto.add(p.canalId);
-          if (p.remota || p.passada) Central.chamar(this.obterConfig(), '/api/central/capas-studio', { metodo: 'POST', corpo: { acao: 'feita', pc: require('os').hostname(), videoId: p.videoId } }).catch(() => {});
+          if (p.remota || p.passada2) Central.chamar(this.obterConfig(), '/api/central/capas-studio', { metodo: 'POST', corpo: { acao: 'feita', pc: require('os').hostname(), videoId: p.videoId } }).catch(() => {});
           // Reforço: troca de novo uns 40 min depois. Às vezes o Studio "salva" logo após o envio e o YouTube volta
           // a miniatura automática quando termina de processar o Short (Baldur's Gate, Dataminer GTA 6)
           if (!p.reforcado) fica.push({ ...p, reforcado: true, reforcoEm: Date.now() + 40 * 60e3, tentativas: 0, ultimoErro: null });
@@ -283,11 +283,19 @@ class Fila extends EventEmitter {
           const login = e.codigo === 'LOGIN';
           if (login) semLogin.add(p.canalId);
           const tent = (p.tentativas || 0) + (login ? 0 : 1);
-          let passada = p.passada;
+          let passada = p.passada2;
           // 3 falhas aqui: passa a capa para o outro PC trocar (este continua tentando também)
-          if (!p.remota && !p.passada && tent >= 3) {
+          if (!p.remota && !p.passada2 && tent >= 3) {
             try {
-              Central.chamar(this.obterConfig(), '/api/central/capas-studio', { metodo: 'POST', corpo: { acao: 'passar', pc: require('os').hostname(), videoId: p.videoId, canalId: p.canalId, titulo: p.titulo, imagem: fs.readFileSync(p.arquivo).toString('base64') } }).catch(() => {});
+              // JPEG leve (o PNG da capa passava do limite de 4,5 MB do site e a capa não chegava ao outro PC)
+              let buf = fs.readFileSync(p.arquivo);
+              try {
+                const img = require('electron').nativeImage.createFromPath(p.arquivo);
+                if (!img.isEmpty()) buf = img.toJPEG(88);
+              } catch {}
+              Central.chamar(this.obterConfig(), '/api/central/capas-studio', { metodo: 'POST', corpo: { acao: 'passar', pc: require('os').hostname(), videoId: p.videoId, canalId: p.canalId, titulo: p.titulo, imagem: buf.toString('base64') } }).catch((e2) =>
+                Central.chamar(this.obterConfig(), '/api/central/log-pc', { metodo: 'POST', corpo: { pc: require('os').hostname(), area: 'capa-studio', texto: `não consegui passar ${p.videoId} para outro PC: ${String(e2.message || e2).slice(0, 160)}` } }).catch(() => {})
+              );
               passada = true;
             } catch {}
           }
@@ -297,7 +305,7 @@ class Fila extends EventEmitter {
             fs.rmSync(p.arquivo, { force: true });
             continue;
           }
-          fica.push({ ...p, passada, precisaLogin: login, ultimaTentativa: Date.now(), tentativas: tent, ultimoErro: String(e.message || e).slice(0, 200) });
+          fica.push({ ...p, passada2: passada, precisaLogin: login, ultimaTentativa: Date.now(), tentativas: tent, ultimoErro: String(e.message || e).slice(0, 200) });
           if (job) this.atualizar(job, { aviso: login ? 'Capa do Short: entre uma vez no YouTube Studio deste canal (Contas YouTube → 🔑 Entrar no Studio) e ela é trocada sozinha' : `Capa do Short no Studio: ${String(e.message || e).slice(0, 140)} — tento de novo sozinho` });
         }
       }
