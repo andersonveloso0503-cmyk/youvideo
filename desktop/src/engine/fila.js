@@ -199,11 +199,13 @@ class Fila extends EventEmitter {
     return [...new Set(this.lerCapasStudio().filter((x) => x.precisaLogin).map((x) => x.canalId))];
   }
   async tentarCapasStudio({ canalId: soCanal = null } = {}) {
-    if (this.tentandoStudio) return;
+    // Trava de segurança: se uma tentativa ficou presa mais de 15 min, libera (antes ficava presa para sempre)
+    if (this.tentandoStudio && Date.now() - (this.tentandoStudioEm || 0) < 15 * 60e3) return;
     this.capasStudioAtrasadas();
     const lista = this.lerCapasStudio();
     if (!lista.length) return;
     this.tentandoStudio = true;
+    this.tentandoStudioEm = Date.now();
     const { trocarCapaStudio } = require('./capaStudio');
     const fica = [];
     const semLogin = new Set();

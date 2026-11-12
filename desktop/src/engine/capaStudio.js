@@ -69,9 +69,11 @@ async function trocarCapaStudio({ canalId, videoId, arquivo, limiteMs = 120000 }
   win.webContents.on('will-frame-navigate', (ev) => bloquearLogin(ev, ev.url));
   win.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
   const fim = Date.now() + limiteMs;
-  const js = (codigo) => win.webContents.executeJavaScript(codigo, true);
+  // Nada pode ficar preso para sempre (antes uma página travada segurava TODAS as capas): cada passo tem prazo
+  const comPrazo = (p, ms, valor) => Promise.race([p, new Promise((ok) => setTimeout(() => ok(valor), ms))]);
+  const js = (codigo) => comPrazo(win.webContents.executeJavaScript(codigo, true), 15000, '');
   try {
-    await win.loadURL(`https://studio.youtube.com/video/${videoId}/edit`).catch(() => {});
+    await comPrazo(win.loadURL(`https://studio.youtube.com/video/${videoId}/edit`).catch(() => {}), 45000);
     // espera a página do vídeo montar (ou cair no login)
     let estado = '';
     while (Date.now() < fim) {
