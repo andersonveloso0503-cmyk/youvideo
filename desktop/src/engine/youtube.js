@@ -465,6 +465,60 @@ async function desempenhoRecente({ credenciais, refreshToken, redirectOriginal }
   return { inscritos: Number(ch.statistics?.subscriberCount) || 0, ocultos: !!ch.statistics?.hiddenSubscriberCount, videos };
 }
 
+/**
+ * Coloca nas playlists do assunto os vídeos do canal que ainda não estão em NENHUMA playlist.
+ * classificar(titulo) -> { titulo, descricao } | null. tipo 'politica': só Shorts (os longos já têm a playlist da série).
+ * limite: quantos coloca por vez (cada um gasta 50 de cota do YouTube; o resto fica para o dia seguinte).
+ */
+async function arrumarPlaylistsDoCanal({ credenciais, refreshToken, redirectOriginal, canalId, tipo, classificar, limite = 40, onProgresso }) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const jaEmPlaylist = new Set();
+  let pt;
+  const playlists = [];
+  do {
+    const r = await yt.playlists.list({ part: ['id'], mine: true, maxResults: 50, pageToken: pt });
+    playlists.push(...(r.data.items || []).map((p) => p.id));
+    pt = r.data.nextPageToken;
+  } while (pt && playlists.length < 200);
+  for (const id of playlists) {
+    let p2;
+    let n = 0;
+    do {
+      const r = await yt.playlistItems.list({ part: ['contentDetails'], playlistId: id, maxResults: 50, pageToken: p2 });
+      for (const it of r.data.items || []) jaEmPlaylist.add(it.contentDetails?.videoId);
+      p2 = r.data.nextPageToken;
+    } while (p2 && ++n < 10);
+  }
+  const todos = await ultimosDoCanal({ credenciais, refreshToken, redirectOriginal }, 250);
+  const faltando = todos.filter((v) => !jaEmPlaylist.has(v.id) && !v.privado);
+  // duração (para saber o que é Short)
+  const dur = {};
+  for (let i = 0; i < faltando.length; i += 50) {
+    const r = await yt.videos.list({ part: ['contentDetails', 'status'], id: faltando.slice(i, i + 50).map((v) => v.id), maxResults: 50 });
+    for (const x of r.data.items || []) {
+      const d = String(x.contentDetails?.duration || '');
+      dur[x.id] = { seg: (Number((d.match(/(\d+)H/) || [])[1]) || 0) * 3600 + (Number((d.match(/(\d+)M/) || [])[1]) || 0) * 60 + (Number((d.match(/(\d+)S/) || [])[1]) || 0), publico: x.status?.privacyStatus === 'public' || !!x.status?.publishAt };
+    }
+  }
+  const alvo = faltando.filter((v) => dur[v.id] && dur[v.id].publico && (tipo !== 'politica' || dur[v.id].seg <= 180));
+  let feitos = 0;
+  const porPlaylist = {};
+  for (const v of alvo) {
+    if (feitos >= limite) break;
+    const pl = classificar(v.titulo);
+    if (!pl) continue;
+    try {
+      await adicionarNaPlaylist({ credenciais, refreshToken, redirectOriginal, canalId, videoId: v.id, titulo: pl.titulo, descricao: pl.descricao });
+      feitos++;
+      porPlaylist[pl.titulo] = (porPlaylist[pl.titulo] || 0) + 1;
+      if (onProgresso) onProgresso(feitos, Math.min(limite, alvo.length));
+    } catch (e) {
+      if (/quota/i.test(String(e?.message || e))) break; // cota do dia acabou: continua amanhã
+    }
+  }
+  return { feitos, faltam: Math.max(0, alvo.length - feitos), porPlaylist };
+}
+
 async function trocarCapa({ credenciais, refreshToken, redirectOriginal, videoId, arquivo }) {
   const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
   try {
@@ -801,7 +855,7 @@ async function responderComentario({ credenciais, refreshToken, redirectOriginal
   return { id: r.data.id };
 }
 
-module.exports = { desempenhoRecente,
+module.exports = { arrumarPlaylistsDoCanal, desempenhoRecente,
   comentariosSemResposta,
   responderComentario,
   tituloParecido,

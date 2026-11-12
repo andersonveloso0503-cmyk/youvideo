@@ -1076,6 +1076,47 @@ app.whenReady().then(() => {
   });
   setTimeout(mandarFilaParaNuvem, 5000);
   setInterval(() => !tFilaNuvem && mandarFilaParaNuvem(), 60000);
+  // ---------- Playlists por assunto (games e política): arruma os vídeos que já estavam no canal, 1x por dia ----------
+  // Só um PC faz (trava no site). Até 40 vídeos por canal por dia (cada um gasta 50 de cota do YouTube).
+  const arquivoPlaylists = path.join(dirDados, 'playlists-assunto.json');
+  const arrumarPlaylists = async ({ forcar = false } = {}) => {
+    let estado = {};
+    try { estado = JSON.parse(fs.readFileSync(arquivoPlaylists, 'utf8')); } catch {}
+    if (!forcar && Date.now() - (estado.em || 0) < 20 * 3600e3) return estado;
+    const cfg = store.ler();
+    if (!cfg.centralToken) return estado;
+    const eu = identidadePc().pc;
+    const trava = await Central.chamar(cfg, '/api/central/trava', { metodo: 'POST', corpo: { nome: 'playlists-assunto', pc: eu, minutos: 60 } }).catch(() => null);
+    if (!trava?.ok) return estado; // o outro PC está fazendo
+    const { playlistDoAssunto } = require('./src/engine/playlistAssunto');
+    const resultado = { em: Date.now(), canais: {} };
+    try {
+      for (const c0 of store.canais()) {
+        const c = store.canal(c0.id);
+        const t = String(c?.titulo || '');
+        const tipo = /games|pr[óo]xima fase|fofura/i.test(t) ? 'games' : /noites|hist[óo]ria|pol[ií]tica/i.test(t) ? 'politica' : /inacredit/i.test(t) ? 'brasil' : null;
+        if (!c || !tipo) continue;
+        try {
+          const r = await YT.arrumarPlaylistsDoCanal({
+            credenciais: cfg.google, refreshToken: c.refreshToken, redirectOriginal: c.redirect, canalId: c.id, tipo,
+            classificar: (titulo) => playlistDoAssunto({ games: tipo === 'games', politica: tipo === 'politica', brasil: tipo === 'brasil', titulo }),
+          });
+          resultado.canais[t] = r;
+        } catch (e) {
+          resultado.canais[t] = { erro: String(e.message || e).slice(0, 160) };
+        }
+      }
+    } finally {
+      await Central.chamar(cfg, '/api/central/trava', { metodo: 'POST', corpo: { nome: 'playlists-assunto', pc: eu, soltar: true } }).catch(() => {});
+    }
+    try { fs.writeFileSync(arquivoPlaylists, JSON.stringify(resultado)); } catch {}
+    console.log('[playlists]', JSON.stringify(resultado).slice(0, 400));
+    return resultado;
+  };
+  setTimeout(() => arrumarPlaylists().catch(() => {}), 6 * 60e3);
+  setInterval(() => arrumarPlaylists().catch(() => {}), 3 * 3600e3);
+  ipcMain.handle('playlists:arrumar', () => arrumarPlaylists({ forcar: true }));
+
   // ---------- Painel (tela principal): canais, comentários e PCs num pedido só ----------
   let cachePainel = null;
   ipcMain.handle('painel:dados', async (_e, { forcar = false } = {}) => {

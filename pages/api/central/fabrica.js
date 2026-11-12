@@ -12,6 +12,7 @@
 //                                        -> episódios de historinha infantil animada (~4 min) com música chiclete, só YouTube (conteúdo para crianças)
 // POST { acao:'youtube-pegar'|'youtube-feito'|'youtube-erro', id, ... }
 // POST { acao:'cancelar', id }
+import { playlistDoAssunto } from '../../../lib/playlistAssunto';
 import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 import { horarioBrasilia, diaBrasilia, somarDias } from '../../../lib/fabrica';
@@ -375,7 +376,7 @@ export default async function handler(req, res) {
           horaFixada: x.fabrica?.horaFixada === true,
           urgente: x.fabrica?.urgente === true,
           concluidoEm: x.concluidoEm || x.atualizadoEm || null,
-          playlist: x.roteiro?.playlist?.titulo ? x.roteiro.playlist : null, // documentário: entra sozinho na playlist da série (ex.: "Catástrofes do Brasil")
+          playlist: x.roteiro?.playlist?.titulo ? x.roteiro.playlist : x.games || x.politica || x.brasil ? playlistDoAssunto(x) : null, // games/política/Brasil: playlist do assunto (GTA 6, STF, Economia...) // documentário: entra sozinho na playlist da série (ex.: "Catástrofes do Brasil")
           infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true, shortMusica: x.shortMusica === true, temporada: x.infantil.temporada ? { nome: x.infantil.temporada.nome, numero: x.infantil.temporada.numero, ep: x.infantil.temporada.ep, total: x.infantil.temporada.total } : null } : null,
           comBotao: x.comBotao === true,
           renderId: x.renderId || null, // pedido de montagem no PC: liga o cartão da Fila do Compilador a este vídeo
