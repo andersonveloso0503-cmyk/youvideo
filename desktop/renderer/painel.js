@@ -198,11 +198,7 @@ const Painel = (() => {
           .join('')}</div>`
       );
     }
-    const ab = (x) => `<div class="pn-linha-simples" title="${esc(x.titulo)} · ${x.seg || '?'} s · ${num(x.views)} views"><span>“${esc(x.abertura)}”</span><b style="color:${corRet(x.retencao)};white-space:nowrap">${Math.round(x.retencao)}%</b></div>`;
-    if (r?.melhores?.length >= 3) {
-      partes.push(`<div class="pn-tres" style="grid-template-columns:1fr 1fr;margin-top:10px"><div><h3 style="margin:4px 0;font-size:14px">🟢 Aberturas que mais seguraram</h3>${r.melhores.map(ab).join('')}</div><div><h3 style="margin:4px 0;font-size:14px">🔴 Aberturas que menos seguraram</h3>${r.piores.map(ab).join('')}</div></div>`);
-      partes.push('<span class="nota">Os roteiros novos aprendem sozinhos com as aberturas verdes (e evitam o jeito das vermelhas).</span>');
-    }
+    // As aberturas que mais/menos seguraram ficam só no site: os roteiros novos aprendem com elas sozinhos (pedido do dono: painel limpo)
     if (!partes.length) partes.push('<p class="nota">Ainda sem dados de retenção (aparecem quando os Shorts têm 1 dia no ar).</p>');
     box.innerHTML = partes.join('');
   }
