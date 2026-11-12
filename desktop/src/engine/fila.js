@@ -173,13 +173,15 @@ class Fila extends EventEmitter {
   /** Uma vez: os Shorts que já subiram nos últimos 4 dias com capa e ainda não tiveram a capa trocada no Studio. */
   capasStudioAtrasadas() {
     try {
-      const marca = path.join(this.dirCache, 'capas-studio-atrasadas.ok');
+      // "-2": passa de novo nos Shorts dos últimos 2 dias (algumas capas "trocadas" voltaram para a automática)
+      const marca = path.join(this.dirCache, 'capas-studio-atrasadas-2.ok');
       if (fs.existsSync(marca)) return;
+      const naFila = new Set(this.lerCapasStudio().map((x) => x.videoId));
       for (const j of this.jobs || []) {
         const e = j.envio || {};
         const id = j.youtube?.id;
         const quando = Date.parse(j.concluidoEm || '') || 0;
-        if (j.status !== 'concluido' || !e.curto || !id || Date.now() - quando > 4 * 86400e3) continue;
+        if (j.status !== 'concluido' || !e.curto || !id || naFila.has(id) || Date.now() - quando > 2 * 86400e3) continue;
         if (!['20', '25'].includes(String(e.categoria || ''))) continue;
         if (e.capa && fs.existsSync(e.capa)) this.guardarCapaStudio({ videoId: id, canalId: e.canalId, arquivo: e.capa, jobId: j.id, titulo: e.titulo });
       }
@@ -239,7 +241,7 @@ class Fila extends EventEmitter {
         // Marcado como "precisa login": tenta de novo sozinho 1 vez por hora (a janela escondida não abre mais o login,
         // então não aparece PIN) e na hora se outra capa do MESMO canal acabou de dar certo
         const loginVelho = p.precisaLogin && soCanal !== p.canalId && !deuCerto.has(p.canalId) && Date.now() - (p.ultimaTentativa || 0) < 60 * 60e3;
-        if (Date.now() - p.em < 3 * 60e3 || semLogin.has(p.canalId) || (soCanal && p.canalId !== soCanal) || loginVelho) {
+        if ((p.reforcoEm && Date.now() < p.reforcoEm) || Date.now() - p.em < 3 * 60e3 || semLogin.has(p.canalId) || (soCanal && p.canalId !== soCanal) || loginVelho) {
           fica.push(p);
           continue;
         }
@@ -251,8 +253,11 @@ class Fila extends EventEmitter {
         const job = this.jobs.find((j) => j.id === p.jobId);
         try {
           await trocarCapaStudio({ canalId: p.canalId, videoId: p.videoId, arquivo: p.arquivo });
-          fs.rmSync(p.arquivo, { force: true });
           deuCerto.add(p.canalId);
+          // Reforço: troca de novo uns 40 min depois. Às vezes o Studio "salva" logo após o envio e o YouTube volta
+          // a miniatura automática quando termina de processar o Short (Baldur's Gate, Dataminer GTA 6)
+          if (!p.reforcado) fica.push({ ...p, reforcado: true, reforcoEm: Date.now() + 40 * 60e3, tentativas: 0, ultimoErro: null });
+          else fs.rmSync(p.arquivo, { force: true });
           if (job) this.atualizar(job, { aviso: null, etapa: `${String(job.etapa || 'Enviado').replace(/ · capa.*$/, '')} · capa do Short no Studio ✅` });
         } catch (e) {
           const login = e.codigo === 'LOGIN';
