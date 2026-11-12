@@ -90,7 +90,18 @@ async function trocarCapaStudio({ canalId, videoId, arquivo, limiteMs = 120000 }
     }
     // sem acesso = ainda não entrou, ou entrou com outra conta: tratado como login (o botão 🔑 fica em destaque)
     if (estado === 'sem-acesso') throw new ErroStudio('LOGIN', 'a conta deste canal não está logada no Studio do Compilador (ou é outra conta)');
-    if (estado !== 'campo') throw new ErroStudio('CAMPO', 'o campo da capa não apareceu (vídeo ainda processando?)');
+    if (estado !== 'campo') {
+      // Diz o que a página mostrava (canal ainda sem "recursos intermediários"/verificação por telefone não tem o botão de capa)
+      const pagina = await js(`(() => {
+        const t = ((document.body && document.body.innerText) || '').replace(/\s+/g, ' ');
+        const m = t.match(/(Miniatura|Thumbnail)[^]{0,160}/i);
+        return JSON.stringify({ titulo: document.title, url: location.pathname, miniatura: m ? m[0] : '', verificar: /verifi|recursos intermedi|intermediate features/i.test(t) });
+      })()`).catch(() => '');
+      let info = {};
+      try { info = JSON.parse(pagina || '{}'); } catch {}
+      if (info.verificar) throw new ErroStudio('VERIFICAR', 'o canal precisa ativar "recursos intermediários" (verificação por telefone) para poder trocar a capa');
+      throw new ErroStudio('CAMPO', `o campo da capa não apareceu | página: ${String(info.titulo || '').slice(0, 50)} ${String(info.url || '').slice(0, 60)} | ${String(info.miniatura || '').slice(0, 140)}`);
+    }
 
     // põe a imagem no campo da capa, como se você tivesse escolhido o arquivo
     const ok = await js(`(async () => {
