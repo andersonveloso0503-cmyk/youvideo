@@ -202,10 +202,30 @@ class Fila extends EventEmitter {
     // Trava de segurança: se uma tentativa ficou presa mais de 15 min, libera (antes ficava presa para sempre)
     if (this.tentandoStudio && Date.now() - (this.tentandoStudioEm || 0) < 15 * 60e3) return;
     this.capasStudioAtrasadas();
-    const lista = this.lerCapasStudio();
+    let lista = this.lerCapasStudio();
     if (!lista.length) return;
     this.tentandoStudio = true;
     this.tentandoStudioEm = Date.now();
+    // Vídeo apagado do canal (ex.: duplicado removido): tira da fila (antes travava 2 min por vídeo a cada rodada)
+    try {
+      const cfgY = this.obterConfig();
+      const apagados = new Set();
+      for (const canalId of new Set(lista.map((x) => x.canalId))) {
+        const canal = this.obterCanal(canalId);
+        if (!canal?.refreshToken) continue;
+        const ids = lista.filter((x) => x.canalId === canalId).map((x) => x.videoId);
+        const existe = await YT.videosQueExistem({ credenciais: cfgY.google, refreshToken: canal.refreshToken, redirectOriginal: canal.redirect }, ids).catch(() => null);
+        if (existe) for (const id of ids) if (!existe.has(id)) apagados.add(id);
+      }
+      if (apagados.size) {
+        for (const x of lista) if (apagados.has(x.videoId)) fs.rmSync(x.arquivo, { force: true });
+        lista = lista.filter((x) => !apagados.has(x.videoId));
+        fs.writeFileSync(this.arquivoCapasStudio(), JSON.stringify(lista));
+      }
+    } catch {}
+    // Os mais NOVOS primeiro (são os que estão sendo vistos agora) e no máximo 8 por rodada: os novos não esperam os velhos
+    lista.sort((a, b) => b.em - a.em);
+    let tentadas = 0;
     const { trocarCapaStudio } = require('./capaStudio');
     const fica = [];
     const semLogin = new Set();
@@ -223,6 +243,11 @@ class Fila extends EventEmitter {
           fica.push(p);
           continue;
         }
+        if (tentadas >= 8) {
+          fica.push(p);
+          continue;
+        }
+        tentadas++;
         const job = this.jobs.find((j) => j.id === p.jobId);
         try {
           await trocarCapaStudio({ canalId: p.canalId, videoId: p.videoId, arquivo: p.arquivo });

@@ -467,6 +467,17 @@ async function desempenhoRecente({ credenciais, refreshToken, redirectOriginal }
   return { inscritos: Number(ch.statistics?.subscriberCount) || 0, ocultos: !!ch.statistics?.hiddenSubscriberCount, videos };
 }
 
+/** Quais destes vídeos ainda existem no canal (apagado = some da lista). Devolve Set de ids. */
+async function videosQueExistem({ credenciais, refreshToken, redirectOriginal }, ids) {
+  const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
+  const existe = new Set();
+  for (let i = 0; i < ids.length; i += 50) {
+    const r = await yt.videos.list({ part: ['id'], id: ids.slice(i, i + 50), maxResults: 50 });
+    for (const x of r.data.items || []) existe.add(x.id);
+  }
+  return existe;
+}
+
 /**
  * Retenção (YouTube Analytics) de cada vídeo: % média assistida e segundos assistidos em média.
  * Devolve { estado:'ok', porVideo:{ id:{ retencao, duracaoMedia, views } } }
@@ -892,7 +903,7 @@ async function responderComentario({ credenciais, refreshToken, redirectOriginal
   return { id: r.data.id };
 }
 
-module.exports = { arrumarPlaylistsDoCanal, desempenhoRecente, retencaoDosVideos,
+module.exports = { arrumarPlaylistsDoCanal, desempenhoRecente, retencaoDosVideos, videosQueExistem,
   comentariosSemResposta,
   responderComentario,
   tituloParecido,
