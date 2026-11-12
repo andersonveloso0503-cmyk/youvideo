@@ -8,7 +8,7 @@ import { put } from '@vercel/blob';
 import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 
-export const config = { api: { bodyParser: { sizeLimit: '6mb' } } };
+export const config = { api: { bodyParser: { sizeLimit: '6mb' } }, maxDuration: 120 };
 const col = () => getDb().collection('youvideo_capas_studio');
 
 // Uma vez: os Shorts de games e política dos últimos 30 dias que já subiram com a capa pronta (feita no site)
@@ -43,12 +43,60 @@ async function repassarAntigas() {
   console.log(`[capa-studio] repasse dos Shorts antigos: ${n} capas na lista para os PCs trocarem (${semCapaPronta} Shorts sem capa pronta no site)`);
 }
 
+// Os Shorts antigos SEM capa pronta (261 em 12/11): o site faz a capa GRÁTIS (foto real + título grande, sem IA paga)
+// aos poucos — 4 por pedido dos PCs — e põe na mesma lista para os PCs trocarem no Studio.
+async function capasGratisAntigas() {
+  const cfgRef = getDb().collection('youvideo_config').doc('capas-studio');
+  const cfg = (await cfgRef.get()).data() || {};
+  if (cfg.gratisFeito) return;
+  let pendentes = cfg.gratisPendentes;
+  if (!Array.isArray(pendentes)) {
+    // 1ª vez: monta a lista (ids da fila) uma vez só, para não ler a fila inteira a cada pedido
+    const desde = new Date(Date.now() - 45 * 86400e3).toISOString();
+    const vidDe = (x) => x.fabrica?.youtubeId || (String(x.fabrica?.youtube?.url || '').match(/(?:shorts\/|youtu\.be\/|[?&]v=)([\w-]{11})/) || [])[1];
+    pendentes = [];
+    for (const campo of ['games', 'politica']) {
+      const snap = await getDb().collection('youvideo_fila').where(campo, '==', true).get();
+      for (const d of snap.docs) {
+        const x = d.data();
+        if (!vidDe(x) || String(x.criadoEm || '') < desde || x.formato !== 'short' || x.desafio) continue;
+        if (x.capaIa && /^https?:/.test(String(x.thumbnailUrl || ''))) continue; // já tinha capa pronta (foi no repasse 1)
+        pendentes.push({ id: d.id, em: x.criadoEm || '' });
+      }
+    }
+    pendentes = pendentes.sort((a, b) => String(b.em).localeCompare(String(a.em))).map((x) => x.id); // mais novos primeiro
+    await cfgRef.set({ gratisPendentes: pendentes, gratisTotal: pendentes.length }, { merge: true });
+  }
+  if (!pendentes.length) return cfgRef.set({ gratisFeito: Date.now() }, { merge: true });
+  const lote = pendentes.slice(0, 4);
+  await cfgRef.set({ gratisPendentes: pendentes.slice(4) }, { merge: true }); // tira antes: se der erro, não trava a lista
+  const { capaShortGratis, imagensDaCapa } = await import('../../../lib/capaShortGratis');
+  const { textoDaCapa } = await import('../../../lib/capaShortIa');
+  for (const filaId of lote) {
+    try {
+      const x = (await getDb().collection('youvideo_fila').doc(filaId).get()).data();
+      if (!x) continue;
+      const vid = x.fabrica?.youtubeId || (String(x.fabrica?.youtube?.url || '').match(/(?:shorts\/|youtu\.be\/|[?&]v=)([\w-]{11})/) || [])[1];
+      const cy = x.fabrica?.canalYoutube;
+      const canalId = (typeof cy === 'string' ? cy : cy?.id || cy?.canalId) || '';
+      if (!vid || !canalId || (await col().doc(vid).get()).exists) continue;
+      const url = await capaShortGratis({ tipo: x.games ? 'games' : 'politica', texto: textoDaCapa(x), imagens: await imagensDaCapa(x) });
+      if (!url) continue;
+      await col().doc(vid).set({ canalId, titulo: String(x.roteiro?.titulo || x.tema || '').slice(0, 100), url, de: 'site (capa grátis de Short antigo)', falhouEm: [], em: Date.now() });
+    } catch (e) {
+      console.log(`[capa-studio] capa grátis falhou (${filaId}): ${String(e.message || e).slice(0, 140)}`);
+    }
+  }
+  console.log(`[capa-studio] capas grátis dos Shorts antigos: faltam ${pendentes.length - lote.length} de ${cfg.gratisTotal || pendentes.length}`);
+}
+
 export default async function handler(req, res) {
   if (!exigirToken(req, res)) return;
   try {
     if (req.method === 'GET') {
       const pc = String(req.query.pc || '');
       await repassarAntigas().catch((e) => console.log(`[capa-studio] repasse dos antigos falhou: ${String(e.message || e).slice(0, 160)}`));
+      await capasGratisAntigas().catch((e) => console.log(`[capa-studio] capas grátis falharam: ${String(e.message || e).slice(0, 160)}`));
       const snap = await col().get();
       const limite = Date.now() - 6 * 86400e3;
       const lista = [];

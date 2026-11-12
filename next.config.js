@@ -9,6 +9,7 @@ const nextConfig = {
     outputFileTracingIncludes: {
       '/api/fila-processar': ['./node_modules/mupdf/**/*', './lib/fontes/**/*', './node_modules/@resvg/**/*'],
       '/api/central/fabrica': ['./lib/fontes/**/*', './node_modules/@resvg/**/*'],
+      '/api/central/capas-studio': ['./lib/fontes/**/*', './node_modules/@resvg/**/*'],
     },
   },
   webpack: (config, { isServer }) => {
