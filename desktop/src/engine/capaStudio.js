@@ -73,6 +73,12 @@ async function trocarCapaStudio({ canalId, videoId, arquivo, limiteMs = 120000 }
   const comPrazo = (p, ms, valor) => Promise.race([p, new Promise((ok) => setTimeout(() => ok(valor), ms))]);
   const js = (codigo) => comPrazo(win.webContents.executeJavaScript(codigo, true), 15000, '');
   try {
+    // 1º abre o Studio DESTE canal: a mesma conta Google tem vários canais (Próxima Fase, Noites na história...) e o
+    // Studio abria no canal errado — a página do vídeo do outro canal vinha vazia, sem o botão da capa
+    if (/^UC[\w-]{22}$/.test(String(canalId || ''))) {
+      await comPrazo(win.loadURL(`https://studio.youtube.com/channel/${canalId}`).catch(() => {}), 45000);
+      await espera(4000);
+    }
     await comPrazo(win.loadURL(`https://studio.youtube.com/video/${videoId}/edit`).catch(() => {}), 45000);
     // espera a página do vídeo montar (ou cair no login)
     let estado = '';
