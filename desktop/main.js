@@ -1393,7 +1393,9 @@ app.whenReady().then(() => {
   // Login no YouTube Studio do canal (para a capa dos Shorts). Ao fechar a janela, já tenta trocar as capas pendentes.
   ipcMain.handle('canais:studioLogin', async (_e, { id, titulo }) => {
     await require('./src/engine/capaStudio').abrirLogin(id, titulo);
-    fila.tentarCapasStudio({ canalId: id }).catch(() => {});
+    fila.limparLoginStudio(id);
+    const tentar = () => (fila.tentandoStudio ? setTimeout(tentar, 30000) : fila.tentarCapasStudio({ canalId: id }).catch(() => {}));
+    tentar();
     return true;
   });
   ipcMain.handle('canais:studioPendentes', () => ({ semLogin: fila.canaisSemLoginStudio(), total: fila.lerCapasStudio().length }));

@@ -187,6 +187,14 @@ class Fila extends EventEmitter {
     } catch {}
   }
   /** Canais que precisam do login no Studio (para a tela mostrar o botão 🔑). */
+  /** Você acabou de entrar no Studio deste canal: tira o aviso de login na hora (volta se o Studio ainda pedir login). */
+  limparLoginStudio(canalId) {
+    try {
+      const lista = this.lerCapasStudio().map((x) => (x.canalId === canalId ? { ...x, precisaLogin: false, em: Math.min(x.em, Date.now() - 4 * 60e3) } : x));
+      fs.writeFileSync(this.arquivoCapasStudio(), JSON.stringify(lista));
+    } catch {}
+    if (this.aoMudarStudio) this.aoMudarStudio(this.canaisSemLoginStudio());
+  }
   canaisSemLoginStudio() {
     return [...new Set(this.lerCapasStudio().filter((x) => x.precisaLogin).map((x) => x.canalId))];
   }
