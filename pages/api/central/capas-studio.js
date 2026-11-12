@@ -68,8 +68,8 @@ async function capasGratisAntigas() {
     await cfgRef.set({ gratisPendentes: pendentes, gratisTotal: pendentes.length }, { merge: true });
   }
   if (!pendentes.length) return cfgRef.set({ gratisFeito: Date.now() }, { merge: true });
-  const lote = pendentes.slice(0, 4);
-  await cfgRef.set({ gratisPendentes: pendentes.slice(4) }, { merge: true }); // tira antes: se der erro, não trava a lista
+  const lote = pendentes.slice(0, 12);
+  await cfgRef.set({ gratisPendentes: pendentes.slice(12) }, { merge: true }); // tira antes: se der erro, não trava a lista
   const { capaShortGratis, imagensDaCapa } = await import('../../../lib/capaShortGratis');
   const { textoDaCapa } = await import('../../../lib/capaShortIa');
   for (const filaId of lote) {
