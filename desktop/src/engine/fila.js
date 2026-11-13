@@ -245,7 +245,12 @@ class Fila extends EventEmitter {
         if (existe) for (const id of ids) if (!existe.has(id)) apagados.add(id);
       }
       if (apagados.size) {
-        for (const x of lista) if (apagados.has(x.videoId)) fs.rmSync(x.arquivo, { force: true });
+        for (const x of lista)
+          if (apagados.has(x.videoId)) {
+            fs.rmSync(x.arquivo, { force: true });
+            // capa passada por outro PC/site de um vídeo que não existe mais: tira da lista do site também
+            if (x.remota) Central.chamar(cfgY, '/api/central/capas-studio', { metodo: 'POST', corpo: { acao: 'feita', pc: require('os').hostname(), videoId: x.videoId } }).catch(() => {});
+          }
         lista = lista.filter((x) => !apagados.has(x.videoId));
         fs.writeFileSync(this.arquivoCapasStudio(), JSON.stringify(lista));
       }

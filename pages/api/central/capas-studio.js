@@ -101,7 +101,10 @@ export default async function handler(req, res) {
       await capasGratisAntigas().catch((e) => console.log(`[capa-studio] capas grátis falharam: ${String(e.message || e).slice(0, 160)}`));
       // Canais em que ESTE PC já falhou (ex.: o 08KCH3R no Noites na História): não manda capa desse canal para ele por 24 h
       // — antes ele reservava as capas, falhava 3 vezes cada e travava a fila de todo mundo
-      const ruins = ((await getDb().collection('youvideo_config').doc('capas-studio').get()).data()?.pcCanalRuim || {})[pc.replace(/[.\/]/g, '_')] || {};
+      const cfgCs = (await getDb().collection('youvideo_config').doc('capas-studio').get()).data() || {};
+      // "ruim" só depois de 3 vídeos DIFERENTES do mesmo canal falharem neste PC (1 vídeo apagado não bloqueia o canal)
+      const falhas = (cfgCs.pcCanalFalhas || {})[pc.replace(/[.\/]/g, '_')] || {};
+      const ruins = Object.fromEntries(Object.entries(falhas).filter(([, v]) => (v?.videos || []).length >= 3).map(([k, v]) => [k, v.em]));
       const snap = await col().get();
       const limite = Date.now() - 6 * 86400e3;
       const lista = [];
@@ -118,6 +121,13 @@ export default async function handler(req, res) {
         if (lista.length >= 8) continue;
         await d.ref.update({ pegoPor: pc, pegoEm: Date.now() }).catch(() => {});
         lista.push({ videoId: d.id, canalId: x.canalId, titulo: x.titulo, url: x.url, de: x.de });
+      }
+      if (Date.now() - (globalThis._diagCapas || 0) > 20 * 60e3) {
+        globalThis._diagCapas = Date.now();
+        const todos = snap.docs.map((d) => d.data());
+        const porCanal = {};
+        for (const x of todos) porCanal[x.canalId] = (porCanal[x.canalId] || 0) + 1;
+        console.log(`[capa-studio] lista: ${todos.length} capas esperando (${Object.entries(porCanal).map(([c, n]) => `${c.slice(-6)}: ${n}`).join(', ')}) · reservadas: ${todos.filter((x) => x.pegoPor && Date.now() - (x.pegoEm || 0) < 40 * 60e3).length} · já falharam em algum PC: ${todos.filter((x) => (x.falhouEm || []).length).length}`);
       }
       return res.status(200).json({ capas: lista });
     }
@@ -136,7 +146,13 @@ export default async function handler(req, res) {
       const d = (await ref.get()).data();
       if (d) {
         await ref.update({ falhouEm: [...new Set([...(d.falhouEm || []), pc])], pegoPor: null });
-        if (d.canalId) await getDb().collection('youvideo_config').doc('capas-studio').set({ pcCanalRuim: { [pc.replace(/[.\/]/g, '_')]: { [d.canalId]: Date.now() } } }, { merge: true });
+        if (d.canalId) {
+          const cRef = getDb().collection('youvideo_config').doc('capas-studio');
+          const chave = pc.replace(/[.\/]/g, '_');
+          const atual = ((await cRef.get()).data()?.pcCanalFalhas || {})[chave]?.[d.canalId] || {};
+          const recentes = Date.now() - (atual.em || 0) < 24 * 3600e3 ? atual.videos || [] : [];
+          await cRef.set({ pcCanalFalhas: { [chave]: { [d.canalId]: { em: Date.now(), videos: [...new Set([...recentes, videoId])].slice(-10) } } } }, { merge: true });
+        }
       }
       return res.status(200).json({ ok: true });
     }
