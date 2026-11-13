@@ -1286,6 +1286,17 @@ class Fila extends EventEmitter {
         return;
       }
       checar();
+      // Política: a própria pessoa falando (trecho de canal oficial, com a voz real) quando a frase exata está na notícia
+      if ((rc.clipes || []).some((c) => c.ilustracao?.tipo === 'fala' && c.ilustracao.literal)) {
+        faixa(0.15, 0.02, 'audio', 'Procurando a fala da pessoa em canal oficial')(0);
+        try {
+          const n = await require('./trechoOficial').inserirTrechosOficiais(rc, locais, dir, { checar, log: (t) => { console.log(t); Central.chamar(cfg, '/api/central/log-pc', { metodo: 'POST', corpo: { pc: os.hostname(), area: 'trecho-oficial', texto: t } }).catch(() => {}); } });
+          if (n) console.log(`[trecho-oficial] ${n} trecho(s) com a voz real no vídeo "${job.nome}"`);
+        } catch (e) {
+          if (e?.message === 'CANCELADO') throw e;
+          console.warn('[trecho-oficial] não deu:', String(e?.message || e).slice(0, 200));
+        }
+      }
       faixa(0.15, 0.05, 'audio', 'Preparando narração')(0);
       const audio = await M.prepararAudio(rc, locais, dir, { modo, registrarCancelar });
       checar();

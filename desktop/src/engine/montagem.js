@@ -95,7 +95,9 @@ async function prepararAudio(receita, locais, dir, { modo, registrarCancelar }) 
   pedacos.forEach((p) => args.push('-i', locais[p.url]));
   const partes = pedacos.map((p, i) => {
     const ms = Math.max(0, Math.round((Number(p.start) || 0) * 1000));
-    const corte = p.length ? `atrim=0:${Number(p.length).toFixed(3)},` : '';
+    // inicio: pedaço da narração que continua depois do trecho oficial (começa no meio do arquivo)
+    const off = Number(p.inicio) || 0;
+    const corte = off ? `atrim=start=${off.toFixed(3)}${p.length ? `:end=${(off + Number(p.length)).toFixed(3)}` : ''},asetpts=PTS-STARTPTS,` : p.length ? `atrim=0:${Number(p.length).toFixed(3)},` : '';
     // volume: efeito sonoro mais baixo que as falas (desenho infantil)
     const vol = p.volume != null && Number(p.volume) !== 1 ? `volume=${Math.max(0, Math.min(2, Number(p.volume))).toFixed(2)},` : '';
     // fade: some devagar nos últimos N segundos (música de encerramento do desenho infantil)
