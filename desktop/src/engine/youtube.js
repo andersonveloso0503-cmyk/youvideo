@@ -937,7 +937,49 @@ async function responderComentario({ credenciais, refreshToken, redirectOriginal
   return { id: r.data.id };
 }
 
-module.exports = { arrumarPlaylistsDoCanal, desempenhoRecente, retencaoDosVideos, videosQueExistem, metricasParaMelhorar,
+
+/**
+ * Meta da monetização (YouTube Partner Program) pelos números do Analytics:
+ * inscritos, horas de vídeos LONGOS em 365 dias (Shorts não contam), views de Shorts em 90 dias
+ * e o ritmo dos últimos 28 dias (para estimar quando chega). É uma estimativa: o YouTube conta
+ * só horas "qualificadas" (públicas), então o número oficial do Studio pode ser um pouco menor.
+ */
+async function monetizacao({ credenciais, refreshToken, redirectOriginal }) {
+  const auth = cliente(credenciais, redirectOriginal || REDIRECT);
+  auth.setCredentials({ refresh_token: refreshToken });
+  const ya = google.youtubeAnalytics({ version: 'v2', auth });
+  const yt = google.youtube({ version: 'v3', auth });
+  const dia = (n) => new Date(Date.now() - n * 86400e3).toISOString().slice(0, 10);
+  const hoje = dia(0);
+  const ch = await yt.channels.list({ part: ['statistics'], mine: true });
+  const est = ch.data.items?.[0]?.statistics || {};
+  const porTipo = async (inicio, metrica) => {
+    const r = await ya.reports.query({ ids: 'channel==MINE', startDate: inicio, endDate: hoje, dimensions: 'creatorContentType', metrics: metrica });
+    const t = {};
+    for (const [tipo, v] of r.data.rows || []) t[tipo] = Number(v) || 0;
+    return t;
+  };
+  const longos = (t) => Object.entries(t).filter(([k]) => k !== 'SHORTS' && k !== 'STORY').reduce((n, [, v]) => n + v, 0);
+  const [min365, views90, min28, insc28] = await Promise.all([
+    porTipo(dia(365), 'estimatedMinutesWatched'),
+    porTipo(dia(90), 'views'),
+    porTipo(dia(28), 'estimatedMinutesWatched'),
+    ya.reports.query({ ids: 'channel==MINE', startDate: dia(28), endDate: hoje, metrics: 'subscribersGained,subscribersLost' }).then((r) => {
+      const [g, l] = r.data.rows?.[0] || [0, 0];
+      return (Number(g) || 0) - (Number(l) || 0);
+    }),
+  ]);
+  return {
+    em: new Date().toISOString(),
+    inscritos: est.hiddenSubscriberCount ? null : Number(est.subscriberCount) || 0,
+    horas: Math.round(longos(min365) / 60),
+    shortsViews: views90.SHORTS || 0,
+    horasPorDia: Math.round((longos(min28) / 60 / 28) * 10) / 10,
+    inscritosPorDia: Math.round((insc28 / 28) * 10) / 10,
+  };
+}
+
+module.exports = { monetizacao, arrumarPlaylistsDoCanal, desempenhoRecente, retencaoDosVideos, videosQueExistem, metricasParaMelhorar,
   comentariosSemResposta,
   responderComentario,
   tituloParecido,

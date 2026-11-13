@@ -942,3 +942,17 @@ span.chip-estilo { cursor: default; }
 .pn-agenda .faixa { display: flex; gap: 8px; flex-wrap: wrap; }
 .pn-agenda .faixa span { background: var(--bg-3); border-radius: 8px; padding: 7px 9px; }
 @media (max-width: 1200px) { .pn-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pn-tres { grid-template-columns: 1fr; } .pn-linha { flex-direction: column; } }
+
+/* Meta da monetização (barrinhas por canal) */
+.pn-mt-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.pn-mt-canal { border: 1px solid var(--borda); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.pn-mt-cab { display: flex; align-items: center; gap: 8px; }
+.pn-mt-cab img { width: 26px; height: 26px; border-radius: 50%; }
+.pn-mt-cab .pn-chip { margin-left: auto; }
+.pn-mt-linha { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.pn-mt-rot { display: flex; justify-content: space-between; gap: 8px; color: var(--texto-2); }
+.pn-mt-rot b { color: inherit; filter: brightness(1.4); }
+.pn-mt-barra { height: 9px; border-radius: 6px; background: rgba(127, 127, 127, .18); overflow: hidden; }
+.pn-mt-barra > div { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #2bb3e6, #3ad29f); }
+.pn-mt-rodape { font-size: 12px; }
+.pn-mt-ok { color: #3ad29f; font-weight: 600; }

@@ -1160,6 +1160,18 @@ app.whenReady().then(() => {
       }
     }
     if (!melhorias) melhorias = await Central.chamar(cfg, '/api/central/melhorias').catch(() => null);
+    // Meta da monetização: inscritos, horas de longos (365 dias) e views de Shorts (90 dias) — busca a cada 6 h por canal
+    global._monet = global._monet || {};
+    for (const c of store.canais().map((x) => store.canal(x.id)).filter(Boolean)) {
+      const tela = canais.find((x) => x.id === c.id);
+      if (!tela || !c.refreshToken || tela.analytics !== 'ok') continue;
+      const guardado = global._monet[c.id];
+      if (!guardado || Date.now() - guardado.pegoEm > 6 * 3600e3) {
+        const m = await YT.monetizacao({ credenciais: cfg.google, refreshToken: c.refreshToken, redirectOriginal: c.redirect }).catch((e) => ({ erro: String(e.message || e).slice(0, 120) }));
+        if (!m.erro || !guardado) global._monet[c.id] = { ...m, pegoEm: Date.now() };
+      }
+      tela.monet = global._monet[c.id];
+    }
     const dados = { canais, comentarios, pcs, retencao, melhorias, eu: identidadePc().pc };
     cachePainel = { em: Date.now(), dados };
     return dados;

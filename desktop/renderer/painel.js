@@ -153,6 +153,51 @@ const Painel = (() => {
       .join('')}</div>`;
   }
 
+
+  // Meta da monetização: barrinhas de inscritos, horas (longos, 365 dias) e views de Shorts (90 dias), com previsão pelo ritmo
+  function monetizacao() {
+    const box = q('#pnMonet');
+    if (!box) return;
+    if (!ultimo.dados) return (box.innerHTML = '<p class="nota">Carregando...</p>');
+    const cs = (ultimo.dados.canais || []).filter((c) => c.monet && !c.monet.erro);
+    if (!cs.length) {
+      const semAna = (ultimo.dados.canais || []).some((c) => c.analytics === 'reconectar' || c.analytics === 'api-desligada');
+      return (box.innerHTML = `<p class="nota">${semAna ? 'Reconecte os canais em Contas YouTube (permissão do YouTube Analytics) para ver a meta.' : 'Buscando os números dos canais...'}</p>`);
+    }
+    // Regra nova do YouTube a partir de 1/2/2027 para quem ainda não monetiza: 8.000 h ou 20 mi de views de Shorts
+    const regra2027 = Date.now() >= Date.parse('2027-02-01T00:00:00-03:00');
+    const META = { inscritos: 1000, horas: regra2027 ? 8000 : 4000, shorts: regra2027 ? 20e6 : 10e6 };
+    const curto = (n) => (n >= 1e6 ? `${String(Math.round(n / 1e5) / 10).replace('.', ',')} mi` : n >= 1e4 ? `${Math.round(n / 1e3)} mil` : num(n));
+    const previsao = (falta, porDia) => {
+      if (falta <= 0) return '<span class="pn-mt-ok">✓ atingido</span>';
+      if (!porDia || porDia <= 0) return '<span class="nota">sem ritmo ainda</span>';
+      const dias = Math.ceil(falta / porDia);
+      if (dias > 730) return '<span class="nota">mais de 2 anos no ritmo atual</span>';
+      const d = new Date(Date.now() + dias * 86400e3);
+      return `<span class="nota">no ritmo atual: ${d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</span>`;
+    };
+    const barra = (rot, val, meta, extra) => {
+      const pct = Math.min(100, (val / meta) * 100);
+      return `<div class="pn-mt-linha"><div class="pn-mt-rot"><span>${rot}</span><span><b>${curto(val)}</b> de ${curto(meta)}</span></div>
+        <div class="pn-mt-barra"><div style="width:${Math.max(pct, val > 0 ? 1.5 : 0).toFixed(1)}%"></div></div><div class="pn-mt-rodape">${extra}</div></div>`;
+    };
+    const aviso = regra2027 ? '' : '<p class="nota">⚠ A partir de 1º de fevereiro de 2027 a meta sobe para 8.000 horas ou 20 milhões de views de Shorts (para quem ainda não monetiza).</p>';
+    box.innerHTML =
+      aviso +
+      `<div class="pn-mt-grade">${cs
+        .map((c) => {
+          const m = c.monet;
+          const insc = m.inscritos ?? c.inscritos ?? 0;
+          const pctTotal = Math.min(100, Math.round(((Math.min(1, insc / META.inscritos) + Math.min(1, Math.max(m.horas / META.horas, m.shortsViews / META.shorts))) / 2) * 100));
+          return `<div class="pn-mt-canal"><div class="pn-mt-cab">${c.foto ? `<img src="${esc(c.foto)}" alt="">` : ''}<b>${esc(c.titulo)}</b><span class="pn-chip">${pctTotal}% do caminho</span></div>
+            ${barra('Inscritos', insc, META.inscritos, previsao(META.inscritos - insc, m.inscritosPorDia) + (m.inscritosPorDia ? ` <span class="nota">· +${String(m.inscritosPorDia).replace('.', ',')}/dia</span>` : ''))}
+            ${barra('Horas de vídeos longos (12 meses)', m.horas, META.horas, previsao(META.horas - m.horas, m.horasPorDia) + ` <span class="nota">· ${String(m.horasPorDia || 0).replace('.', ',')} h/dia</span>`)}
+            ${barra('Views de Shorts (90 dias)', m.shortsViews, META.shorts, '<span class="nota">ou este caminho (não soma com as horas)</span>')}
+          </div>`;
+        })
+        .join('')}</div>`;
+  }
+
   function desempenho() {
     const box = q('#pnDesempenho');
     if (!ultimo.dados) return (box.innerHTML = '<p class="nota">Carregando...</p>');
@@ -297,7 +342,7 @@ const Painel = (() => {
       }
     };
     const precisa = seguro(resumo) || [];
-    for (const f of [listaAprovar, () => avisos(precisa), canais, desempenho, melhorar, retencao, comentarios, pcs, agenda]) seguro(f);
+    for (const f of [listaAprovar, () => avisos(precisa), canais, monetizacao, desempenho, melhorar, retencao, comentarios, pcs, agenda]) seguro(f);
   }
 
   async function carregar(forcar = false) {
