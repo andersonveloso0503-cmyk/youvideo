@@ -363,6 +363,45 @@ const Fabrica = (() => {
     q('#btnPlRefazerProg').onclick = () => refazerProgramados('politica', q('#btnPlRefazerProg'));
     q('#btnPlVideo').onclick = resumoPolitica;
     q('#btnPlAtualizar').onclick = () => carregarPolitica();
+    // Voz do narrador da política: o dono ouve as amostras e escolhe (13/11)
+    q('#btnPlVozes').onclick = async () => {
+      const caixa = q('#plVozesCaixa');
+      caixa.hidden = !caixa.hidden;
+      if (caixa.hidden) return;
+      const lista = q('#plVozesLista');
+      const info = q('#plVozesInfo');
+      lista.innerHTML = '';
+      info.textContent = 'Buscando vozes jovens brasileiras…';
+      try {
+        const r = await window.api.politica.acao({ acao: 'vozes' });
+        if (r?.erro) throw new Error(r.erro);
+        info.textContent = r.atual?.nome ? `Hoje: ${r.atual.nome}` : 'Ouça e clique em "Usar esta".';
+        for (const v of r.vozes || []) {
+          const d = document.createElement('div');
+          d.style.cssText = 'padding:8px;border:1px solid var(--borda, #444);border-radius:8px';
+          const escolhida = r.atual?.vozId && r.atual?.nome === v.nome;
+          d.innerHTML = `<div><b>${esc(v.nome)}</b> ${escolhida ? '✅' : ''}</div><div class="nota" style="margin:2px 0">${esc([v.idade === 'young' ? 'jovem' : v.idade === 'middle_aged' ? 'adulto' : v.idade, v.estilo].filter(Boolean).join(' · '))}</div><audio controls preload="none" src="${esc(v.amostra)}" style="width:100%;height:32px"></audio><button type="button" class="btn-mini">Usar esta</button>`;
+          d.querySelector('button').onclick = async (ev) => {
+            ev.target.disabled = true;
+            ev.target.textContent = 'Salvando…';
+            try {
+              const x = await window.api.politica.acao({ acao: 'usarVoz', voice_id: v.voice_id, dono: v.dono, nome: v.nome });
+              if (x?.erro) throw new Error(x.erro);
+              info.textContent = `Pronto: os próximos vídeos de política saem com a voz ${v.nome}.`;
+              ev.target.textContent = '✅ Escolhida';
+            } catch (e) {
+              ev.target.disabled = false;
+              ev.target.textContent = 'Usar esta';
+              info.textContent = `Não deu: ${e.message || e}`;
+            }
+          };
+          lista.appendChild(d);
+        }
+        if (!(r.vozes || []).length) info.textContent = 'Não achei vozes agora. Tente de novo em alguns minutos.';
+      } catch (e) {
+        info.textContent = `Não deu: ${e.message || e}`;
+      }
+    };
     q('#btnPlExplicador').onclick = () => {
       const caixa = q('#plExplicadorCaixa');
       caixa.hidden = !caixa.hidden;

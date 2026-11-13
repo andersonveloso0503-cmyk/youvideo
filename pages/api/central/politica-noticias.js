@@ -368,6 +368,14 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ erro: 'Use GET ou POST.' });
     const b = req.body || {};
 
+    if (b.acao === 'vozes') {
+      const { vozesParaEscolher } = await import('../../../lib/documentario');
+      return res.status(200).json(await vozesParaEscolher());
+    }
+    if (b.acao === 'usarVoz') {
+      const { usarVozDaPolitica } = await import('../../../lib/documentario');
+      return res.status(200).json(await usarVozDaPolitica(b));
+    }
     if (b.acao === 'buscar') {
       const r = await buscarNoticiasPolitica(db, { quantas: Math.max(1, Math.min(8, Number(b.quantas) || 5)) });
       await cfg.set({ ultimaBusca: new Date().toISOString(), fontes: r.fontes }, { merge: true });
