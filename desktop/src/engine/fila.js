@@ -1314,7 +1314,7 @@ class Fila extends EventEmitter {
         // Vídeo longo: a legenda passava por cima dos textos dos desenhos (pedido do dono, 13/11) — nas cenas com
         // ilustração a legenda some (o desenho já mostra o texto); nas fotos e vídeos ela continua
         if (!curto) for (const c of rc.clipes || []) if (c.ilustracao && !c.ilustracao.sobreJogo && c.ilustracao.tipo !== 'inscreva') ocultar.push([Number(c.start) || 0, (Number(c.start) || 0) + (Number(c.length) || 0)]);
-        fs.writeFileSync(assArquivo, M.gerarAssNarracao({ W, H, palavras: rc.legenda === false ? [] : rc.palavras, duracao: rc.duracao, marca: rc.marca, curto, cta: rc.cta, textos: rc.textos, manchete: rc.manchete, ocultar }));
+        fs.writeFileSync(assArquivo, M.gerarAssNarracao({ W, H, palavras: rc.legenda === false || !curto ? [] : rc.palavras, /* vídeo longo com narrador: sem legenda (pedido do dono, 13/11) */ duracao: rc.duracao, marca: rc.marca, curto, cta: rc.cta, textos: rc.textos, manchete: rc.manchete, ocultar }));
         const fontsTmp = path.join(dir, 'fonts');
         fs.mkdirSync(fontsTmp, { recursive: true });
         for (const f of fs.readdirSync(this.fontsDir)) fs.copyFileSync(path.join(this.fontsDir, f), path.join(fontsTmp, f));
