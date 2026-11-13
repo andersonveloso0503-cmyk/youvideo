@@ -369,6 +369,13 @@ const Fabrica = (() => {
       if (!caixa.hidden) caixa.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
     document.querySelectorAll('[data-pl-tema]').forEach((b) => (b.onclick = () => (q('#plTema').value = b.dataset.plTema)));
+    // formato do explicador: 3 botões (a lista suspensa não abria em alguns PCs)
+    const marcarFmt = (f) => {
+      q('#plFormato').value = f;
+      document.querySelectorAll('.pl-fmt').forEach((b) => b.classList.toggle('ativo', b.dataset.fmt === f));
+    };
+    document.querySelectorAll('.pl-fmt').forEach((b) => (b.onclick = () => marcarFmt(b.dataset.fmt)));
+    marcarFmt(q('#plFormato').value || 'noticias');
     q('#btnPlExplicadorCriar').onclick = criarExplicador;
     q('#btnBiGerar').onclick = gerarBrasil;
     q('#btnBiAtualizar').onclick = () => carregarBrasil();

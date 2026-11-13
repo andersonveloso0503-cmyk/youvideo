@@ -828,7 +828,12 @@
             <button type="button" class="btn-mini" data-pl-tema="Como fica o governo com o PL na maior bancada do Congresso">Como fica o governo agora</button>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select id="plFormato"><option value="noticias" selected>📰 Notícia mais recente do tema (Short)</option><option value="short">💡 Explicar o tema (Short)</option><option value="longo">📺 Explicar o tema (vídeo longo, 8 a 10 min)</option></select>
+            <input type="hidden" id="plFormato" value="noticias" />
+            <span id="plFormatoBotoes" style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="btn-mini pl-fmt" data-fmt="noticias">📰 Notícia mais recente (Short)</button>
+              <button type="button" class="btn-mini pl-fmt" data-fmt="short">💡 Explicar o tema (Short)</button>
+              <button type="button" class="btn-mini pl-fmt" data-fmt="longo">📺 Vídeo longo (8 a 10 min)</button>
+            </span>
             <label style="display:flex;align-items:center;gap:4px;margin:0" title="Teste: as cenas de objetos e lugares viram ilustração de quadrinho (IA, ~R$ 1 a 2 por vídeo). Pessoas continuam com foto real."><input type="checkbox" id="plQuadrinho" /> 🎨 Estilo quadrinho (teste)</label>
             <button type="button" class="btn-mini" id="btnPlExplicadorCriar">💡 Pesquisar e escrever</button>
             <span class="nota">O Claude pesquisa na web as notícias do tema em fontes de linhas diferentes e escreve com os dois lados. Leva 1 a 3 minutos; o roteiro aparece na lista para você aprovar.</span>
