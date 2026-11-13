@@ -258,20 +258,30 @@ const DESENHOS = {
     };
   },
   // O que a pessoa disse, EM RESUMO: foto real (ou o bonequinho, se não houver foto) + balão
+  // Pessoa falando em estilo QUADRINHO: a FOTO REAL (ou o vídeo livre dela) num quadro com borda grossa, e um balão de
+  // fala apontando para ela. d.literal = frase exata copiada da notícia ("DISSE"); sem isso, "EM RESUMO".
   fala(d) {
     const temFoto = d.fotoArquivo && fs.existsSync(d.fotoArquivo);
+    const lit = !!d.literal;
+    const texto = String(d.texto || '');
+    const tamTxt = texto.length > 80 ? 40 : texto.length > 55 ? 46 : 52;
+    const retrato = Array.isArray(d.videoQuadros) && d.videoQuadros.length
+      ? d.videoQuadros.map((f, i) => `<img class="vq" src="${esc(pathToFileURL(f).href)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 25%;${i ? 'visibility:hidden' : ''}">`).join('')
+      : temFoto ? `<img src="${esc(pathToFileURL(d.fotoArquivo).href)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 20%">` : `<div style="position:absolute;left:90px;top:60px;transform:scale(1.5)">${boneco('#3a6fd8')}</div>`;
     return {
-      html: `<div id="fp" style="position:absolute;left:330px;top:0;width:340px;height:340px;border-radius:50%;overflow:hidden;border:6px solid var(--ouro);background:var(--card);box-shadow:0 20px 60px rgba(0,0,0,.5)">
-          ${Array.isArray(d.videoQuadros) && d.videoQuadros.length
-            ? d.videoQuadros.map((f, i) => `<img class="vq" src="${esc(pathToFileURL(f).href)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 30%;${i ? 'visibility:hidden' : ''}">`).join('')
-            : temFoto ? `<img src="${esc(pathToFileURL(d.fotoArquivo).href)}" style="width:100%;height:100%;object-fit:cover;object-position:50% 20%">` : `<div style="transform:translate(70px,20px) scale(1.1)">${boneco('#3a6fd8')}</div>`}</div>
-        ${d.nome ? `<div id="fn" style="position:absolute;left:0;right:0;top:355px;text-align:center"><span style="background:var(--ouro);color:#1a1206;border-radius:30px;padding:8px 26px;font-size:34px;font-weight:800">${txt(d.nome, 40)}</span></div>` : ''}
-        <div id="fb" style="position:absolute;left:60px;right:60px;top:440px;background:#fff;color:#111;border-radius:36px;padding:28px 40px 30px">
-          <div style="font-size:24px;font-weight:800;letter-spacing:3px;color:#8a6a1e">EM RESUMO</div>
-          <div style="font-size:46px;font-weight:800;line-height:1.2;margin-top:6px">${txt(d.texto, 90)}</div>
-          <div style="position:absolute;left:470px;top:-30px;width:0;height:0;border-left:30px solid transparent;border-right:30px solid transparent;border-bottom:32px solid #fff"></div></div>`,
-      anim: `const p=back(ap(t,.05,.5));$('fp').style.transform='scale('+p+')';$('fp').style.opacity=Math.min(1,p);if($('fn'))$('fn').style.opacity=eo(ap(t,.4,.3));
-        const b=back(ap(t,.6*k,.45));$('fb').style.transform='scale('+b+')';$('fb').style.transformOrigin='50% 0';$('fb').style.opacity=Math.min(1,b);`,
+      html: `<div id="fp" style="position:absolute;left:20px;top:215px;width:430px;height:440px;background:#c9ced9;border:9px solid #111;border-radius:6px;overflow:hidden;transform:rotate(-2.5deg);box-shadow:14px 14px 0 rgba(0,0,0,.35)">
+          ${retrato}
+          <div style="position:absolute;inset:0;background-image:radial-gradient(circle,rgba(0,0,0,.22) 1.6px,transparent 2px);background-size:9px 9px;mix-blend-mode:multiply;pointer-events:none"></div>
+          ${d.nome ? `<div id="fn" style="position:absolute;left:0;right:0;bottom:0;background:#111;color:var(--ouro);text-align:center;font-size:${String(d.nome).length > 18 ? 26 : String(d.nome).length > 12 ? 30 : 38}px;font-weight:800;letter-spacing:1px;padding:12px 10px;text-transform:uppercase;white-space:nowrap">${txt(d.nome, 40)}</div>` : ''}</div>
+        <div id="fb" style="position:absolute;left:280px;top:0;width:710px">
+          <div style="position:relative;background:#fff;color:#111;border:7px solid #111;border-radius:60px;padding:30px 44px 34px;box-shadow:12px 12px 0 rgba(0,0,0,.3)">
+            <div style="display:inline-block;background:${lit ? '#e5302f' : '#111'};color:#fff;font-size:26px;font-weight:800;letter-spacing:3px;padding:6px 16px;border-radius:8px;transform:rotate(-2deg)">${lit ? 'DISSE:' : 'EM RESUMO'}</div>
+            <div style="font-size:${tamTxt}px;font-weight:800;line-height:1.18;margin-top:12px">${lit ? '“' : ''}${txt(texto, 120)}${lit ? '”' : ''}</div>
+          </div>
+          <svg width="150" height="130" viewBox="0 0 150 130" style="position:absolute;left:40px;bottom:-112px"><path d="M40 0 L120 0 L8 124 Z" fill="#fff" stroke="#111" stroke-width="7" stroke-linejoin="round"/><rect x="34" y="-8" width="92" height="14" fill="#fff"/></svg>
+        </div>`,
+      anim: `const p=back(ap(t,.05,.5));$('fp').style.transform='rotate(-2.5deg) scale('+p+')';$('fp').style.opacity=Math.min(1,p);
+        const b=back(ap(t,.45*k,.45));$('fb').style.transform='scale('+b+')';$('fb').style.transformOrigin='15% 100%';$('fb').style.opacity=Math.min(1,b);`,
     };
   },
   // Fecho do vídeo: o bonequinho pergunta e "aperta" o botão de se inscrever (botão genérico, sem marca)
@@ -392,7 +402,7 @@ ${d.etiqueta && !d.semTitulo ? `<div class="tagp" id="tag">${txt(d.etiqueta, 24)
 ${d.titulo && !d.semTitulo ? `<div class="tit" id="tit">${tituloHtml(d.titulo, d.destaque)}</div>` : ''}
 <div class="ilu">${des.html}</div>
 ${(d.clima === 'ruim' || d.clima === 'bom') && masc && vertical ? `<svg id="clima" viewBox="0 0 100 100" style="position:absolute;right:${W * 0.05}px;top:${H * 0.627}px;width:${Math.round(W * 0.1)}px;opacity:0;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))"><circle cx="50" cy="50" r="46" fill="#ffcc4d" stroke="#e0a020" stroke-width="4"/><ellipse cx="35" cy="42" rx="6" ry="8" fill="#3a2a10"/><ellipse cx="65" cy="42" rx="6" ry="8" fill="#3a2a10"/>${d.clima === 'ruim' ? '<path d="M30 74 q20 -18 40 0" stroke="#3a2a10" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M24 30 l14 -6 M76 30 l-14 -6" stroke="#3a2a10" stroke-width="5" stroke-linecap="round"/><path id="clag" d="M30 52 q-6 10 0 14 q6 -4 0 -14z" fill="#5ab0ff"/>' : '<path d="M28 62 q22 22 44 0" stroke="#3a2a10" stroke-width="6" fill="none" stroke-linecap="round"/>'}</svg>` : ''}
-${d.fonte && vertical ? `<div id="fonte" style="position:absolute;top:${H * (masc ? 0.607 : 0.688)}px;left:${masc ? W * 0.24 : W * 0.06}px;right:${W * 0.05}px;text-align:center;white-space:nowrap;overflow:hidden;font-weight:600;font-size:${Math.round(27 * W / 1080)}px;letter-spacing:.5px;color:#aab3c9;opacity:0">Fonte: ${txt(d.fonte, 42)}</div>` : ''}
+${d.fonte && vertical ? `<div id="fonte" style="position:absolute;top:${H * (masc ? 0.607 : 0.688)}px;left:${masc ? W * 0.24 : W * 0.06}px;right:${W * 0.05}px;text-align:center;white-space:nowrap;overflow:hidden;font-weight:600;font-size:${Math.round(27 * W / 1080)}px;letter-spacing:.5px;color:var(--mut);opacity:0">Fonte: ${txt(d.fonte, 42)}</div>` : ''}
 ${masc ? `<div id="masc" style="position:absolute;left:${vertical ? W * 0.01 : W * 0.03}px;top:${(vertical ? H * 0.765 : H * 0.9) - mascH}px;width:240px;height:360px;transform-origin:0 0"><div style="transform:scale(${mascEsc});transform-origin:0 0">${mascoteSvg(d.mascote.roupa)}</div></div>` : ''}</div>
 <div id="marca" style="position:fixed;left:0;top:0;width:2px;height:2px;background:rgb(0,0,77);z-index:99"></div>
 <script>
