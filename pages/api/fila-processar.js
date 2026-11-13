@@ -690,6 +690,17 @@ export default async function handler(req, res) {
             thumbnailUrl = item.games ? item.capaUrl || primeiraImagem : fotoPessoa || primeiraImagem;
             // Short: capa pronta no estilo da IA do YouTube Studio (arte 9:16 + 2-4 palavras gigantes); o Compilador
             // manda essa capa como está. Desafio "adivinhe o jogo" fica com a capa pixelada (não pode entregar a resposta).
+            // Vídeo LONGO de política/games: capa de verdade (antes ia só a 1ª foto, sem texto — "não foi feita a capa")
+            if (item.formato !== 'short' && !item.desafio && (item.politica || item.games)) {
+              try {
+                const { capaShortIa, textoDaCapa } = await import('../../lib/capaShortIa');
+                thumbnailUrl = await capaShortIa({ tipo: item.games ? 'games' : 'politica', titulo: item.roteiro?.titulo || item.tema, descricao: item.roteiro?.descricao, texto: textoDaCapa(item), refUrl: item.games ? item.capaUrl || primeiraImagem : null, modelo: 'pro', deitada: true });
+                capaIa = true;
+                console.log(`[capa-ia] longo ${item.games ? 'games' : 'politica'}: ${item.roteiro?.titulo}`);
+              } catch (e) {
+                console.log(`[capa-ia] longo falhou (${String(e.message || e).slice(0, 160)}) — fica a foto`);
+              }
+            }
             if (item.formato === 'short' && !item.desafio) {
               try {
                 const { capaShortIa, textoDaCapa } = await import('../../lib/capaShortIa');

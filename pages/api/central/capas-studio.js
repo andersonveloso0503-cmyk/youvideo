@@ -165,7 +165,7 @@ export default async function handler(req, res) {
     const buf = Buffer.from(String(b.imagem || ''), 'base64');
     if (buf.length < 2000) return res.status(400).json({ erro: 'Imagem vazia.' });
     const png = buf[0] === 0x89;
-    const blob = await put(`capas-studio/${videoId}-${Date.now()}.${png ? 'png' : 'jpg'}`, buf, { access: 'public', contentType: png ? 'image/png' : 'image/jpeg' });
+    const blob = await put(`capas-studio/${videoId}-${Date.now()}.${png ? 'png' : 'jpg'}`, buf, { access: 'public', contentType: png ? 'image/png' : 'image/jpeg', token: process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN });
     await col().doc(videoId).set({ canalId: String(b.canalId || ''), titulo: String(b.titulo || '').slice(0, 100), url: blob.url, de: pc, falhouEm: [pc], em: Date.now() });
     console.log(`[capa-studio] ${videoId}: o PC ${pc} não conseguiu, passou para outro PC`);
     return res.status(200).json({ ok: true });
