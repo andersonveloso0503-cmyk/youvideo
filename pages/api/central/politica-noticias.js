@@ -416,6 +416,7 @@ export default async function handler(req, res) {
       const tipo = formato === 'longo' ? 'explicador' : 'explicador-short';
       const marcador = col.doc();
       await marcador.set({ status: 'escrevendo', tipo, titulo: formato === 'noticias' ? `Notícias de: ${tema}` : tema, fonte: 'Pesquisa na web', imagens: [], criadoEm: new Date().toISOString() });
+      console.log(`[explicador] começou "${String(tema).slice(0, 60)}" (${formato})`);
       const trabalho = (async () => {
         try {
           const { ep, fontes } = await roteiroExplicador(tema, formato);
