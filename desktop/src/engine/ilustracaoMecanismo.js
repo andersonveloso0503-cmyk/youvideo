@@ -173,7 +173,7 @@ function criar(extra) {
       const sim = Math.max(0, Math.min(total, Math.round(Number(d.sim) || 0)));
       const nao = Math.max(0, Math.min(total - sim, Math.round(Number(d.nao) || 0)));
       const fileiras = total > 300 ? 9 : total > 100 ? 7 : total > 30 ? 5 : total > 11 ? 3 : 2;
-      const r0 = 170, r1 = 440;
+      const r0 = total > 100 ? 215 : 170, r1 = 440; // miolo maior: o nome da votação não fica em cima das cadeiras
       const raios = Array.from({ length: fileiras }, (_, i) => r0 + ((r1 - r0) * i) / Math.max(1, fileiras - 1));
       const somaR = raios.reduce((a, b) => a + b, 0);
       const cad = [];
@@ -193,7 +193,7 @@ function criar(extra) {
         html: `<svg style="position:absolute;left:0;top:0;width:1000px;height:520px">${cad
             .map((c, i) => `<circle class="cad" data-c="${i < sim ? 's' : i < sim + nao ? 'n' : 'o'}" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${tam}" fill="#2a3354"/>`)
             .join('')}</svg>
-          <div style="position:absolute;left:0;right:0;top:330px;text-align:center"><div style="font-size:30px;font-weight:800;letter-spacing:3px;color:var(--mut)">${txt(d.rotulo || (d.casa === 'senado' ? 'SENADO' : d.casa === 'stf' ? 'STF' : 'CÂMARA'), 24).toUpperCase()}</div>
+          <div style="position:absolute;left:0;right:0;top:${total > 100 ? 385 : 330}px;text-align:center"><div style="font-size:${String(d.rotulo || '').length > 14 ? 24 : 30}px;font-weight:800;letter-spacing:2px;color:var(--mut)">${txt(d.rotulo || (d.casa === 'senado' ? 'SENADO' : d.casa === 'stf' ? 'STF' : 'CÂMARA'), 24).toUpperCase()}</div>
             <div style="font-size:30px;color:var(--mut);font-weight:700">${total} ${d.casa === 'stf' ? 'ministros' : d.casa === 'senado' ? 'senadores' : 'cadeiras'}</div></div>
           <div id="pres" style="position:absolute;left:0;right:0;top:490px;text-align:center;opacity:0;white-space:nowrap">
             <span style="font-size:96px;font-weight:800;color:var(--ok)" id="psim">0</span><span style="font-size:40px;font-weight:800;color:var(--ok)"> SIM</span>
