@@ -288,6 +288,14 @@ export default async function handler(req, res) {
         col.where('status', '==', 'escrevendo').get(),
         col.where('status', '==', 'falhou').get(),
       ]);
+      // "Escrevendo" parado há mais de 6 min = a função morreu no meio: vira "Falhou" com aviso (antes ficava girando para sempre)
+      for (const d of escrevendo.docs) {
+        if (Date.now() - Date.parse(d.data().criadoEm || 0) > 6 * 60e3) {
+          const erro = 'A pesquisa passou do tempo limite e parou no meio. Clique em ❌ Descartar e tente de novo.';
+          await d.ref.update({ status: 'falhou', erro, falhouEm: new Date().toISOString() }).catch(() => {});
+          console.log(`[explicador] travou e virou falha: "${String(d.data().titulo || '').slice(0, 60)}"`);
+        }
+      }
       // O que a aprovação automática vai fazer com cada notícia (nota + destino), sem aprovar nada
       const plano = new Map();
       const cdP = c.data() || {};
@@ -435,6 +443,7 @@ export default async function handler(req, res) {
           });
           await marcador.delete();
         } catch (e) {
+          if (/abort|timeout/i.test(String(e.name || '') + String(e.message || ''))) e = new Error('A pesquisa demorou demais (o Claude estava lento). Tente de novo em alguns minutos.');
           console.log(`[explicador] falhou "${String(tema).slice(0, 60)}": ${String(e.message || e).slice(0, 200)}`);
           await marcador.update({ status: 'falhou', erro: String(e.message || e).slice(0, 300), falhouEm: new Date().toISOString() }).catch(() => {});
         }
