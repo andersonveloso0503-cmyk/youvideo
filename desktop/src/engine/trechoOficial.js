@@ -75,18 +75,25 @@ async function candidatos(nome, citacao) {
   const ws = String(citacao).split(/\s+/);
   const buscas = [`${nome} ${ws.slice(0, 8).join(' ')}`, `"${ws.slice(0, 7).join(' ')}"`, `${nome} discurso ${ws.slice(0, 4).join(' ')}`];
   const vistos = new Map();
+  const canaisVistos = new Set();
+  let erro = '';
   for (const q of buscas) {
     try {
       const j = JSON.parse(await rodarYt(['--flat-playlist', '-J', `ytsearch10:${q}`], { prazo: 45e3 }));
       for (const e of j.entries || []) {
         const canal = String(e.channel || e.uploader || '').trim();
+        canaisVistos.add(canal || '(sem nome)');
         if (!e.id || vistos.has(e.id) || !OFICIAIS.test(canal)) continue;
         if (e.duration && e.duration < 8) continue;
         vistos.set(e.id, { id: e.id, titulo: e.title || '', canal, url: `https://www.youtube.com/watch?v=${e.id}` });
       }
-    } catch {}
+    } catch (e) {
+      erro = String(e.message || e).slice(0, 160);
+    }
     if (vistos.size >= 4) break;
   }
+  // diagnóstico: que canais apareceram (para ver se falta algum oficial na lista) ou o erro do yt-dlp
+  candidatos.ultimo = erro ? `erro do yt-dlp: ${erro}` : `canais na busca: ${[...canaisVistos].slice(0, 12).join(', ') || 'nenhum'}`;
   // primeiro os que têm o sobrenome da pessoa no título
   const sobrenome = palavras(nome).slice(-1)[0] || '';
   return [...vistos.values()].sort((a, b) => (palavras(b.titulo).includes(sobrenome) ? 1 : 0) - (palavras(a.titulo).includes(sobrenome) ? 1 : 0)).slice(0, 4);
@@ -159,7 +166,7 @@ function acharFrase(transcricao, citacao) {
 async function acharTrecho(nome, citacao, dir, log = () => {}) {
   const lista = await candidatos(nome, citacao);
   if (!lista.length) {
-    log(`[trecho-oficial] "${nome}": nenhum vídeo de canal oficial na busca`);
+    log(`[trecho-oficial] "${nome}": nenhum vídeo de canal oficial na busca (${candidatos.ultimo || ''})`);
     return null;
   }
   const dl = path.join(dir, 'trechos');
