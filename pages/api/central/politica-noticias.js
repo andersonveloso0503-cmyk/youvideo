@@ -434,6 +434,7 @@ export default async function handler(req, res) {
           });
           await marcador.delete();
         } catch (e) {
+          console.log(`[explicador] falhou "${String(tema).slice(0, 60)}": ${String(e.message || e).slice(0, 200)}`);
           await marcador.update({ status: 'falhou', erro: String(e.message || e).slice(0, 300), falhouEm: new Date().toISOString() }).catch(() => {});
         }
       })();
