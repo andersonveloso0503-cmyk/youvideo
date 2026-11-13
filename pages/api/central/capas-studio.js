@@ -99,6 +99,9 @@ export default async function handler(req, res) {
       const pc = String(req.query.pc || '');
       await repassarAntigas().catch((e) => console.log(`[capa-studio] repasse dos antigos falhou: ${String(e.message || e).slice(0, 160)}`));
       await capasGratisAntigas().catch((e) => console.log(`[capa-studio] capas grátis falharam: ${String(e.message || e).slice(0, 160)}`));
+      // Canais em que ESTE PC já falhou (ex.: o 08KCH3R no Noites na História): não manda capa desse canal para ele por 24 h
+      // — antes ele reservava as capas, falhava 3 vezes cada e travava a fila de todo mundo
+      const ruins = ((await getDb().collection('youvideo_config').doc('capas-studio').get()).data()?.pcCanalRuim || {})[pc.replace(/[.\/]/g, '_')] || {};
       const snap = await col().get();
       const limite = Date.now() - 6 * 86400e3;
       const lista = [];
@@ -109,6 +112,7 @@ export default async function handler(req, res) {
           continue;
         }
         if ((x.falhouEm || []).includes(pc)) continue;
+        if (ruins[x.canalId] && Date.now() - ruins[x.canalId] < 24 * 3600e3) continue;
         // já está com outro PC (há menos de 40 min): não pega a mesma (antes os dois PCs trocavam a mesma capa)
         if (x.pegoPor && x.pegoPor !== pc && Date.now() - (x.pegoEm || 0) < 40 * 60e3) continue;
         if (lista.length >= 8) continue;
@@ -130,7 +134,10 @@ export default async function handler(req, res) {
     if (b.acao === 'falhou') {
       const ref = col().doc(videoId);
       const d = (await ref.get()).data();
-      if (d) await ref.update({ falhouEm: [...new Set([...(d.falhouEm || []), pc])] });
+      if (d) {
+        await ref.update({ falhouEm: [...new Set([...(d.falhouEm || []), pc])], pegoPor: null });
+        if (d.canalId) await getDb().collection('youvideo_config').doc('capas-studio').set({ pcCanalRuim: { [pc.replace(/[.\/]/g, '_')]: { [d.canalId]: Date.now() } } }, { merge: true });
+      }
       return res.status(200).json({ ok: true });
     }
     // passar
