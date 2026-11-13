@@ -403,6 +403,8 @@ window.setT=function(t){
        const ax=${vertical ? W * 0.03 : masc ? W * 0.2 : W * 0.06},aw=${vertical ? W * 0.94 : masc ? W * 0.74 : W * 0.88},ay=T0,ah=${vertical ? H * (masc ? (d.fonte ? 0.585 : 0.595) : d.fonte ? 0.67 : 0.68) : H * 0.9}-T0;
        const s2=Math.min(aw/lw,ah/lh,s*1.5);if(s2>s*1.04||s2<s){il.style.left=(ax+(aw-lw*s2)/2-lx*s2)+'px';il.style.top=(ay+(ah-lh*s2)/2-ly*s2)+'px';il.style.transform='scale('+s2+')';}}}`}
    const nn=$('nn'),nv=$('nv');if(nn&&nv){const o=nv.textContent;if(nv.dataset.final)nv.textContent=nv.dataset.final;nn.style.whiteSpace='nowrap';nn.style.display='inline-block';let s=parseFloat(getComputedStyle(nn).fontSize);while(nn.scrollWidth>930&&s>50){s-=6;nn.style.fontSize=s+'px';}nv.textContent=o;}
+   // Texto que não cabe na caixa (fica cortado na borda): diminui a letra até caber (no máximo até 55% do tamanho)
+   document.querySelectorAll('#raiz div,#raiz span').forEach(e=>{if(e.children.length>2||e.id==='nn'||e.id==='nv')return;const cw=e.clientWidth;if(cw<20||e.scrollWidth<=cw+2)return;let f=parseFloat(getComputedStyle(e).fontSize);const f0=f;while(e.scrollWidth>e.clientWidth+2&&f>f0*0.55){f-=2;e.style.fontSize=f+'px';}});
  }catch(e){}}
  try{const vq=document.getElementsByClassName('vq');if(vq.length){const q=Math.min(vq.length-1,Math.max(0,Math.floor((t-${d.continua ? 1.2 : 0})*12)));for(let i=0;i<vq.length;i++)vq[i].style.visibility=i===q?'visible':'hidden';}}catch(e){}
  try{const fj=document.getElementsByClassName('fj');if(fj.length){const q=Math.min(fj.length-1,Math.floor((t-${d.continua ? 1.2 : 0})*12));for(let i=0;i<fj.length;i++)fj[i].style.visibility=i===q?'visible':'hidden';}}catch(e){}
