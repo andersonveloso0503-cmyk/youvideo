@@ -423,7 +423,7 @@ export default async function handler(req, res) {
     }
 
     if (b.acao === 'explicador') {
-      const tema = String(b.tema || '').trim().slice(0, 6000); // aceita o PROMPT do caso escrito pelo dono
+      const tema = String(b.tema || '').trim().slice(0, 15000); // aceita o PROMPT do caso escrito pelo dono
       if (!tema) return res.status(400).json({ erro: 'Escreva o tema do explicador.' });
       const temaCurto = tema.split('\n')[0].slice(0, 120);
       const formato = b.formato === 'short' || b.formato === 'noticias' ? b.formato : 'longo';
