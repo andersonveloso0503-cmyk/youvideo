@@ -363,12 +363,12 @@ function paginaHtml(d, { W, H, duracao }) {
   // Vídeo deitado: título no alto e desenho menor no meio (legenda nos 10% de baixo)
   // Mascote apresentador no canto de baixo à esquerda: a ilustração fica um pouco menor e à direita
   const masc = !!d.mascote && !['inscreva', 'pergunta'].includes(d.tipo);
-  const escala = (vertical ? W / 1080 : (H * 0.62) / 780) * (masc && vertical ? (d.semTitulo ? 0.98 : 0.93) : 1);
+  const escala = (vertical ? W / 1080 : (H * 0.7) / 780) /* deitado: sem legenda embaixo, o desenho cresce */ * (masc && vertical ? (d.semTitulo ? 0.98 : 0.93) : 1);
   const caixaW = 1000 * escala;
   const iluLeft = masc ? (vertical ? W - caixaW - W * 0.03 : (W - caixaW) / 2 + W * 0.06) : (W - caixaW) / 2;
   const mascH = vertical ? H * 0.16 : H * 0.45;
   const mascEsc = mascH / 360;
-  const iluTop = vertical ? H * (d.semTitulo ? 0.3 : 0.29) : H * 0.29; // sem título (manchete no alto): sobe e cresce
+  const iluTop = vertical ? H * (d.semTitulo ? 0.3 : 0.29) : H * 0.25; // sem título (manchete no alto): sobe e cresce
   const titTop = vertical ? H * 0.155 : H * 0.11;
   const titTam = (vertical ? 92 : 64) * (vertical ? W / 1080 : H / 1080);
   const k = Math.max(0.45, Math.min(1, duracao / 4)); // cena curta: anima mais rápido

@@ -380,7 +380,7 @@ const Fabrica = (() => {
           const d = document.createElement('div');
           d.style.cssText = 'padding:8px;border:1px solid var(--borda, #444);border-radius:8px';
           const escolhida = r.atual?.vozId && r.atual?.nome === v.nome;
-          d.innerHTML = `<div><b>${esc(v.nome)}</b> ${escolhida ? '✅' : ''}</div><div class="nota" style="margin:2px 0">${esc([v.idade === 'young' ? 'jovem' : v.idade === 'middle_aged' ? 'adulto' : v.idade, v.estilo].filter(Boolean).join(' · '))}</div><audio controls preload="none" src="${esc(v.amostra)}" style="width:100%;height:32px"></audio><button type="button" class="btn-mini">Usar esta</button>`;
+          d.innerHTML = `<div><b>${esc(v.nome)}</b> ${escolhida ? '✅' : ''}</div><div class="nota" style="margin:2px 0">${esc(['🇧🇷 ' + (v.sotaque || 'brasileiro'), v.idade === 'young' ? 'jovem' : v.idade === 'middle_aged' ? 'adulto' : v.idade, v.estilo].filter(Boolean).join(' · '))}</div><audio controls preload="none" src="${esc(v.amostra)}" style="width:100%;height:32px"></audio><button type="button" class="btn-mini">Usar esta</button>`;
           d.querySelector('button').onclick = async (ev) => {
             ev.target.disabled = true;
             ev.target.textContent = 'Salvando…';
