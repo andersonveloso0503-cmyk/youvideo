@@ -316,7 +316,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
           ilu.mascote = { ...ilu.mascote, boca };
         }
         // Pessoa falando (vídeo livre do Commons) no cartão: os quadros do trecho (12 por segundo, sem som) no lugar da foto parada
-        if (videoCena && ['foto', 'fala'].includes(ilu.tipo)) {
+        if (videoCena && ['foto', 'fala', 'trailer'].includes(ilu.tipo)) {
           const dv = path.join(dir, `video_pessoa_${i}`);
           fs.mkdirSync(dv, { recursive: true });
           try {

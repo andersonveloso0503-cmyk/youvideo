@@ -1286,6 +1286,29 @@ class Fila extends EventEmitter {
         return;
       }
       checar();
+      // Games (14/11): quando a narração fala do TRAILER, o trecho do trailer passa numa "telinha" com o selo
+      // "▶ TRAILER OFICIAL" (até ~10 s, no máximo 1 a cada 60 s) — o vídeo da própria cena, sem som (a narração segue)
+      try {
+        const sem = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        let ultima = -999;
+        for (const w of rc.palavras || []) {
+          if (!/^trailers?\b|^teaser\b/.test(sem(w.texto)) || w.start - ultima < 60) continue;
+          let usado = 0;
+          for (const c of rc.clipes || []) {
+            const fim = c.start + c.length;
+            if (fim <= w.start - 0.3 || c.start > w.start + 9 || usado >= 10) continue;
+            if (c.ilustracao || c.tipo !== 'video' || !c.url) continue;
+            c.ilustracao = { tipo: 'trailer', videoUrl: c.url, videoInicio: Number(c.inicio) || 0, sobreJogo: true, duracaoCena: c.length, titulo: '', etiqueta: '', semTitulo: true };
+            usado += c.length;
+          }
+          if (usado) {
+            ultima = w.start;
+            console.log(`[trailer] telinha do trailer aos ${Math.round(w.start)} s (${usado.toFixed(1)} s) em "${job.nome}"`);
+          }
+        }
+      } catch (e) {
+        console.warn('[trailer] não deu:', String(e?.message || e).slice(0, 160));
+      }
       // Política: a própria pessoa falando (trecho de canal oficial, com a voz real) quando a frase exata está na notícia
       if ((rc.clipes || []).some((c) => c.ilustracao?.tipo === 'fala' && c.ilustracao.literal)) {
         faixa(0.15, 0.02, 'audio', 'Procurando a fala da pessoa em canal oficial')(0);

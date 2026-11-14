@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
-const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calendario', 'numero', 'lista', 'linhaTempo', 'pergunta', 'foto', 'inscreva', 'fluxo', 'icone', 'fala'];
+const TIPOS = ['carimbo', 'placar', 'versus', 'checklist', 'comparacao', 'calendario', 'numero', 'lista', 'linhaTempo', 'pergunta', 'foto', 'inscreva', 'fluxo', 'icone', 'fala', 'trailer'];
 const { EXTRA, TIPOS_EXTRA, validaExtra, mascoteSvg, MASCOTE_ANIM, figuraPara } = require('./ilustracaoExtra');
 TIPOS.push(...TIPOS_EXTRA);
 
@@ -212,6 +212,21 @@ const DESENHOS = {
         $$('.ev').forEach((e,i)=>{const p=eo(ap(t,(.2+i*.6)*k,.4));e.style.opacity=p;e.style.transform='translateX('+((1-p)*60)+'px)';});`,
     };
   },
+  // Trailer oficial numa "telinha" (pedido do dono, 14/11): quando a narração fala do trailer, o trecho dele passa
+  // numa janela 16:9 com borda, selo "▶ TRAILER OFICIAL" e o fundo desfocado da própria gameplay
+  trailer(d) {
+    const quadros = d.videoQuadros || [];
+    return {
+      html: `<div class="cardx" id="tw" style="left:20px;top:110px;width:960px;height:540px;overflow:hidden;border:6px solid #fff;border-radius:22px;box-shadow:0 30px 90px rgba(0,0,0,.7);background:#000">
+          ${quadros.map((f, i) => `<img class="vq" src="${esc(pathToFileURL(f).href)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;${i ? 'visibility:hidden' : ''}">`).join('')}
+          <div style="position:absolute;left:18px;top:18px;background:rgba(229,48,47,.95);color:#fff;border-radius:10px;padding:6px 16px;font-size:28px;font-weight:800;letter-spacing:2px">▶ TRAILER OFICIAL</div>
+          <div id="twb" style="position:absolute;left:0;right:0;bottom:0;height:8px;background:rgba(255,255,255,.25)"><div id="twp" style="height:100%;width:0;background:#e5302f"></div></div>
+        </div>
+        ${d.legenda ? `<div id="twl" style="position:absolute;left:0;right:0;top:680px;text-align:center"><span style="background:var(--card);border:2px solid var(--borda);border-radius:40px;padding:10px 30px;font-size:38px;font-weight:800">${txt(d.legenda, 40)}</span></div>` : ''}`,
+      anim: `const p=back(ap(t,.05,.5));$('tw').style.transform='scale('+(.6+.4*p)+')';$('tw').style.opacity=Math.min(1,p*1.4);
+        $('twp').style.width=(Math.min(1,t/${Math.max(2, Number(d.duracaoCena) || 8)})*100)+'%';if($('twl'))$('twl').style.opacity=eo(ap(t,.4,.4));`,
+    };
+  },
   // Foto real da cena num cartão (com o nome embaixo): o vídeo inteiro fica no estilo explicador
   foto(d) {
     const quadros = Array.isArray(d.videoQuadros) && d.videoQuadros.length ? d.videoQuadros : null;
@@ -335,6 +350,7 @@ function valida(d) {
     case 'icone': return !!d.texto;
     case 'fala': return !!d.texto;
     case 'foto': return (Array.isArray(d.videoQuadros) && d.videoQuadros.length > 0) || (!!d.fotoArquivo && fs.existsSync(d.fotoArquivo));
+    case 'trailer': return Array.isArray(d.videoQuadros) && d.videoQuadros.length >= 6;
     default: return validaExtra(d);
   }
 }
