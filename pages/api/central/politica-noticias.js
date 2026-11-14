@@ -337,7 +337,7 @@ export default async function handler(req, res) {
           oficial: !!x.oficial,
           link: x.link || '',
           links: x.links || null,
-          data: x.data || null,
+          data: x.data || (String(x.tipo || '').startsWith('explicador') ? x.criadoEm || null : null), // pedido por você: mostra quando foi feito
           imagem: x.imagens?.[0] || null,
           roteiro:
             x.status === 'escrevendo'
