@@ -240,7 +240,6 @@ export default async function handler(req, res) {
             titulo: ep.titulo,
             texto: [(ep.fatos || []).join('\n'), top.x.texto || ''].join('\n\n').slice(0, 9000),
             fonte: 'Pesquisa na web',
-            pedidoEm: new Date().toISOString(),
             links: fontes.slice(0, 8).map((f) => ({ titulo: f.titulo, link: f.url })),
             imagens: top.x.imagens || [],
             ep,
@@ -249,11 +248,14 @@ export default async function handler(req, res) {
           };
           await ref.set(d);
           await marcador.delete();
-          await top.doc.ref.update({ usadaEmLongo: ep.id }).catch(() => {});
+          // o tema MODELADO não vem de uma notícia (sem top.doc): antes isso dava erro aqui e o longo nunca era aprovado sozinho
+          if (top.doc?.ref) await top.doc.ref.update({ usadaEmLongo: ep.id }).catch(() => {});
           const { canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
           const canal = await canalDaPolitica(db, await canalDosGamesId(db));
           if (canal) await aprovarPolitica(db, ref, d, canal, { automatica: true });
+          console.log(`[longo-semana] política: "${ep.titulo}" ${canal ? 'aprovado sozinho' : 'esperando aprovação (sem canal)'}`);
         } catch (e) {
+          console.log(`[longo-semana] política falhou: ${String(e.message || e).slice(0, 200)}`);
           await marcador.update({ status: 'falhou', erro: String(e.message || e).slice(0, 300), falhouEm: new Date().toISOString() }).catch(() => {});
         }
       })();
@@ -331,6 +333,7 @@ export default async function handler(req, res) {
           nota: x.potencial != null ? Number(x.potencial) : null,
           destino: destino(x, d.id),
           tipo: x.tipo || 'short',
+          semanal: !!x.semanal,
           titulo: x.titulo,
           tituloVideo: x.ep?.titulo || '',
           fonte: x.fonte || '',
