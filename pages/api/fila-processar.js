@@ -133,6 +133,53 @@ export default async function handler(req, res) {
   // foi dividida em mais de um pedaço (textos longos passam do limite de
   // caracteres da ElevenLabs numa chamada só).
   // Quadrinhos do documentário: aparecem quando a cena muda de lugar, ficam até 8 s
+  // Vídeo LONGO de política (sem legenda): cada foto/vídeo ganha uma tarja dizendo O QUE é e o que está sendo contado
+  // — antes passava "uma imagem sem contexto algum, só a imagem na tela" (13/11)
+  const tarjasDaPolitica = (arquivos, cenas) => {
+    const cortarP = (t, n) => {
+      const x = String(t || '').replace(/\s+/g, ' ').trim();
+      if (x.length <= n) return x;
+      const c = x.slice(0, n + 1);
+      const i = c.lastIndexOf(' ');
+      return `${(i > n * 0.5 ? c.slice(0, i) : x.slice(0, n)).replace(/[\s,;:–-]+$/, '')}…`;
+    };
+    // a narração escreve os anos por extenso para a voz ("dois mil e dezessete"): na tarja volta a ser 2017
+    const UN = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez', 'onze', 'doze', 'treze', 'catorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+    const DZ = { vinte: 20, trinta: 30 };
+    const anos = (t) =>
+      String(t).replace(/dois mil(?: e (vinte|trinta)(?: e (\S+))?| e (\S+))?/gi, (m, dz, un2, un1) => {
+        let n = 2000;
+        if (dz) n += DZ[dz.toLowerCase()] + Math.max(0, UN.indexOf(String(un2 || '').toLowerCase()));
+        else if (un1) {
+          const k = UN.indexOf(String(un1).toLowerCase().replace(/[.,;]$/, ''));
+          if (k < 0) return m;
+          n += k;
+        }
+        return String(n) + (/[.,;]$/.test(un2 || un1 || '') ? String(un2 || un1).slice(-1) : '');
+      });
+    const lista = [];
+    let anterior = '';
+    (arquivos || []).forEach((a, i) => {
+      if (a.ilustracao || a.start == null || !a.length || a.length < 2.5 || a.erro) return;
+      const busca = String(a.cena || cenas?.[i]?.busca || '');
+      const pref = (busca.match(/^([^:]{2,20}):/) || [])[1] || '';
+      let assunto = /foto de|foto real|lugar/i.test(pref) ? busca.replace(/^[^:]*:\s*/, '').replace(/\s*\|.*$/, '').trim() : '';
+      assunto = assunto.replace(/^caso d[oa]s?\s+/i, 'Caso do ').slice(0, 40);
+      const frase = anos(String(cenas?.[i]?.textoNarrado || '').split(/(?<=[.!?])\s/)[0] || '');
+      let titulo = assunto;
+      let texto = cortarP(frase, 80);
+      if (!titulo) {
+        // sem nome do que aparece: o começo da frase vira o título e o resto explica
+        const partes = frase.split(/,\s|:\s/);
+        titulo = cortarP(partes[0], 34);
+        texto = partes.length > 1 ? cortarP(partes.slice(1).join(', '), 80).replace(/^./, (c) => c.toUpperCase()) : '';
+      }
+      if (!titulo || `${titulo}|${texto}` === anterior) return;
+      anterior = `${titulo}|${texto}`;
+      lista.push({ titulo, texto, start: Number((a.start + 0.5).toFixed(2)), length: Number(Math.min(7, a.length - 0.8).toFixed(2)) });
+    });
+    return lista;
+  };
   const quadrinhosDoDocumentario = (arquivos) => {
     const lista = [];
     let anterior = '';
@@ -563,6 +610,7 @@ export default async function handler(req, res) {
             ...(item.fabrica?.urgente ? { urgente: true } : {}), // notícia quente: o PC monta antes das outras // games: mídia deitada inteira no Short, com fundo desfocado
             // Documentário: quadrinho explicando o lugar que aparece e música baixinha por baixo da narração
             ...(item.documentario ? { textos: quadrinhosDoDocumentario(item.arquivos), musica: item.musicaUrl ? { url: item.musicaUrl, volume: 0.1 } : null } : {}),
+            ...(item.politica && item.formato !== 'short' ? { textos: [...(item.documentario ? quadrinhosDoDocumentario(item.arquivos) : []), ...tarjasDaPolitica(item.arquivos, item.roteiro?.cenas)] } : {}),
           });
           // duracaoAlvo só existe quando a narração guarda as palavras (o documentário não guarda)
           await ref.update({ ...(duracaoAlvo != null ? { duracaoAlvo } : {}), renderId, status: 'montando' });
