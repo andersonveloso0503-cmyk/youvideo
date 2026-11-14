@@ -79,7 +79,7 @@ function Item({ i, acao }) {
         </div>
       </div>
       {!['concluido', 'erro'].includes(i.status) && !naEspera(i) && <Barra valor={prog} />}
-      {(i.videoUrl || i.youtube?.url || i.status === 'erro' || yt === 'erro' || naEspera(i) || (i.erro && i.status !== 'concluido')) && (
+      {(i.videoUrl || i.youtube?.url || (i.status === 'concluido' && i.documentario) || i.status === 'erro' || yt === 'erro' || naEspera(i) || (i.erro && i.status !== 'concluido')) && (
         <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
           {i.status === 'erro' && <BotaoAcao acao={acao} id={i.id} tipo="repetir" texto="↻ Tentar de novo" ok="Volta a produzir em até 5 min, de onde parou" />}
           {i.status !== 'erro' && i.status !== 'concluido' && !naEspera(i) && i.erro && <BotaoAcao acao={acao} id={i.id} tipo="destravar" texto="↻ Tentar agora" ok="Tenta de novo em até 5 min" />}
@@ -87,6 +87,16 @@ function Item({ i, acao }) {
           {naEspera(i) && <BotaoAcao acao={acao} id={i.id} tipo="produzir-agora" texto="⚡ Produzir agora" ok="Começa em até 5 min (a data no YouTube continua a mesma)" />}
           {i.status === 'concluido' && i.infantil && !i.infantil.shortMusica && !i.infantil.teste && (
             <BotaoAcao acao={acao} id={i.id} tipo="criar-short" texto="🎵 Short da música" ok="Short da música criado (ou já existia) — aparece em Na espera / Produzindo" />
+          )}
+          {i.status === 'concluido' && i.documentario && (
+            <BotaoAcao
+              acao={acao}
+              id={i.id}
+              tipo="refazer-documentario"
+              texto="🎬 Refazer"
+              confirmar={yt === 'ok' ? 'Este vídeo JÁ ESTÁ no YouTube (agendado). O Refazer monta um vídeo novo no mesmo horário, mas o antigo continua lá: apague no YouTube Studio depois. Refazer mesmo assim?' : 'Montar este vídeo de novo, com as imagens escolhidas de novo? (a narração é aproveitada quando dá)'}
+              ok="Refazendo: quando ficar pronto, aparece de novo para aprovar"
+            />
           )}
           {i.videoUrl && <a href={i.videoUrl} target="_blank" rel="noreferrer" style={botao}>▶ Assistir</a>}
           {i.youtube?.url && <a href={i.youtube.url} target="_blank" rel="noreferrer" style={botao}>Abrir no YouTube</a>}
@@ -96,12 +106,13 @@ function Item({ i, acao }) {
   );
 }
 
-function BotaoAcao({ acao, id, tipo, texto, ok }) {
+function BotaoAcao({ acao, id, tipo, texto, ok, confirmar }) {
   const [estado, setEstado] = useState('');
   return (
     <button
       disabled={estado === '…'}
       onClick={async () => {
+        if (confirmar && !window.confirm(confirmar)) return;
         setEstado('…');
         const r = await acao(id, tipo);
         setEstado(r === true ? '✓' : '');
@@ -124,7 +135,7 @@ function Pc({ p }) {
   return (
     <div style={{ background: '#1b1b28', borderRadius: 12, padding: 12, marginBottom: 10 }}>
       <div style={{ fontWeight: 700 }}>
-        💻 {p.pcNome || p.pc} <span style={{ fontSize: 12, fontWeight: 400, color: online ? '#4cd18a' : '#a9a9c0' }}>· {online ? 'ligado' : `visto ${ha(p.atualizadoEm)}`}</span>
+        💻 {p.pcNome || p.pc} <span style={{ fontSize: 12, fontWeight: 400, color: online ? '#4cd18a' : '#a9a9c0' }}>· {online ? 'ligado' : `visto ${ha(p.atualizadoEm)}`}{p.versao ? ` · versão ${p.versao}` : ''}</span>
       </div>
       {!ativos.length && <div style={{ fontSize: 13, color: '#a9a9c0', marginTop: 4 }}>Nada na fila agora.</div>}
       {ativos.filter((j) => j.status !== 'erro').slice(0, 8).map((j) => (
