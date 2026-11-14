@@ -423,15 +423,16 @@ export default async function handler(req, res) {
     }
 
     if (b.acao === 'explicador') {
-      const tema = String(b.tema || '').trim().slice(0, 200);
+      const tema = String(b.tema || '').trim().slice(0, 6000); // aceita o PROMPT do caso escrito pelo dono
       if (!tema) return res.status(400).json({ erro: 'Escreva o tema do explicador.' });
+      const temaCurto = tema.split('\n')[0].slice(0, 120);
       const formato = b.formato === 'short' || b.formato === 'noticias' ? b.formato : 'longo';
       const quadrinho = !!b.quadrinho;
       // A pesquisa + o roteiro levam de 1 a 4 min: o cartão "⏳ Escrevendo" aparece na lista na hora
       // e vira o roteiro (ou mostra o erro) quando termina. Assim nada some sem aviso.
       const tipo = formato === 'longo' ? 'explicador' : 'explicador-short';
       const marcador = col.doc();
-      await marcador.set({ status: 'escrevendo', tipo, titulo: formato === 'noticias' ? `Notícias de: ${tema}` : tema, fonte: 'Pesquisa na web', imagens: [], criadoEm: new Date().toISOString() });
+      await marcador.set({ status: 'escrevendo', tipo, titulo: formato === 'noticias' ? `Notícias de: ${temaCurto}` : temaCurto, fonte: 'Pesquisa na web', imagens: [], criadoEm: new Date().toISOString() });
       console.log(`[explicador] começou "${String(tema).slice(0, 60)}" (${formato})`);
       const trabalho = (async () => {
         try {
