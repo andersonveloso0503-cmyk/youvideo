@@ -240,6 +240,7 @@ export default async function handler(req, res) {
             titulo: ep.titulo,
             texto: [(ep.fatos || []).join('\n'), top.x.texto || ''].join('\n\n').slice(0, 9000),
             fonte: 'Pesquisa na web',
+            pedidoEm: new Date().toISOString(),
             links: fontes.slice(0, 8).map((f) => ({ titulo: f.titulo, link: f.url })),
             imagens: top.x.imagens || [],
             ep,
@@ -357,7 +358,7 @@ export default async function handler(req, res) {
         aguardando: [
           ...escrevendo.docs.filter((d) => Date.now() - new Date(d.data().criadoEm || 0).getTime() < 10 * 60e3),
           ...falhou.docs.filter((d) => Date.now() - new Date(d.data().falhouEm || 0).getTime() < 24 * 3600e3),
-        ].map(resumo).sort(porData).concat(aguardando.docs.map(resumo).sort((a, b) => (b.nota ?? 0) - (a.nota ?? 0) || porData(a, b))),
+        ].map(resumo).sort(porData).concat(aguardando.docs.map(resumo).sort((a, b) => (String(b.tipo).startsWith('explicador') ? 1 : 0) - (String(a.tipo).startsWith('explicador') ? 1 : 0) || (b.nota ?? 0) - (a.nota ?? 0) || porData(a, b))), // os que VOCÊ pediu (🎯) ficam no topo
         aprovadas: aprovadas.docs.map(resumo).sort((a, b) => String(b.aprovadaEm || '').localeCompare(String(a.aprovadaEm || ''))).slice(0, 15),
         ultimaBusca: c.data()?.ultimaBusca || null,
         fontes: c.data()?.fontes || [],

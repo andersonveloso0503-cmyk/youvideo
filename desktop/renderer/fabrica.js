@@ -1199,9 +1199,9 @@ const Fabrica = (() => {
           }
           carregarPolitica();
         };
-      const rotulo = (t) => (t === 'explicador' ? '💡 Explicador: ' : t === 'explicador-short' ? '💡 Explicador (Short): ' : t === 'longo' ? '📺 Resumo: ' : '📱 Short: ');
+      const rotulo = (t) => (t === 'explicador' ? '🎯 PEDIDO POR VOCÊ · 📺 Vídeo longo: ' : t === 'explicador-short' ? '🎯 PEDIDO POR VOCÊ · Short: ' : t === 'longo' ? '📺 Resumo: ' : '📱 Short: ');
       const cartao = (n, aprovada) => `
-        <div class="pl-noticia" style="display:flex;gap:10px;padding:10px;border:1px solid var(--borda, #333);border-radius:10px;margin:8px 0;align-items:flex-start${aprovada ? ';opacity:.6' : ''}">
+        <div class="pl-noticia" style="display:flex;gap:10px;padding:10px;border:${String(n.tipo).startsWith('explicador') ? '2px solid var(--ouro, #e8b04a)' : '1px solid var(--borda, #333)'};border-radius:10px;margin:8px 0;align-items:flex-start${aprovada ? ';opacity:.6' : ''}">
           ${aprovada || n.tipo !== 'short' ? '' : `<input type="checkbox" class="pl-marca" value="${esc(n.id)}" style="flex:none;width:auto;margin-top:4px" title="Marcar para juntar num resumo" />`}
           ${n.imagem ? `<img src="${esc(n.imagem)}" style="width:120px;height:68px;object-fit:cover;border-radius:6px;flex-shrink:0" />` : ''}
           <div style="flex:1;min-width:0">
