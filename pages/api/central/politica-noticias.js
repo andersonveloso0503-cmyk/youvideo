@@ -331,6 +331,7 @@ export default async function handler(req, res) {
         return {
           id: d.id,
           nota: x.potencial != null ? Number(x.potencial) : null,
+          editor: x.ep?.editor ? { nota: x.ep.editor.nota, problemas: (x.ep.editor.problemas || []).slice(0, 4), corrigido: !!x.ep.editor.corrigido } : null, // nota do editor-chefe no roteiro
           destino: destino(x, d.id),
           tipo: x.tipo || 'short',
           semanal: !!x.semanal,

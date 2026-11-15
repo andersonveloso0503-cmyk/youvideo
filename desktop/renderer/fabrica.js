@@ -1206,6 +1206,7 @@ const Fabrica = (() => {
           ${n.imagem ? `<img src="${esc(n.imagem)}" style="width:120px;height:68px;object-fit:cover;border-radius:6px;flex-shrink:0" />` : ''}
           <div style="flex:1;min-width:0">
             <div>${seloNota(n.nota)}<b>${n.semanal ? '🗓️ LONGO DA SEMANA (automático) · ' : rotulo(n.tipo)}${esc(n.tituloVideo || n.titulo)}</b></div>
+            ${n.editor ? `<div style="font-size:12px;color:${n.editor.nota >= 8 ? '#22c55e' : n.editor.nota >= 7 ? '#f5a524' : '#ef4444'}">✍️ Editor-chefe: nota ${esc(String(n.editor.nota))}${n.editor.corrigido ? ' (roteiro corrigido por ele)' : ''}${n.editor.nota < 7 ? ' · não sobe sozinho' : ''}${n.editor.nota < 8 && n.editor.problemas?.length ? ` — ${esc(n.editor.problemas.join(' · '))}` : ''}</div>` : ''}
             ${aprovada ? '' : linhaDestino(n.destino)}
             <div class="nota" style="margin:2px 0">${esc(n.fonte)}${n.data ? ' · ' + quandoTxt(n.data) : ''} · ${n.link ? `<a href="${esc(n.link)}" target="_blank">abrir a notícia</a>` : (n.links || []).map((l) => `<a href="${esc(l.link)}" target="_blank" title="${esc(l.titulo)}">fonte</a>`).join(' ')}</div>
             <details><summary class="nota" style="cursor:pointer">Ler o roteiro</summary><div style="white-space:pre-wrap;font-size:13px;margin-top:6px">${esc(n.roteiro)}</div></details>
