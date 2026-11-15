@@ -376,6 +376,14 @@ class Fila extends EventEmitter {
           const job = this.jobs.find((j) => j.id === p.jobId);
           if (job) this.atualizar(job, { aviso: null, etapa: `${job.etapa || 'Agendado'} · capa enviada ✅` });
         } catch (e) {
+          // 15/11: a capa do vídeo longo do tríplex nunca subiu (limite da API todo dia) — passa também pelo YouTube Studio
+          if (!p.studio) {
+            try {
+              this.guardarCapaStudio({ videoId: p.videoId, canalId: p.canalId, arquivo: p.arquivo, jobId: p.jobId, titulo: p.titulo });
+              setTimeout(() => this.tentarCapasStudio().catch(() => {}), 60e3);
+              p.studio = true;
+            } catch {}
+          }
           fica.push({ ...p, tentativas: (p.tentativas || 0) + 1, ultimoErro: String(e.message || e).slice(0, 200) });
           if (/too many|rate|quota|limit|later/i.test(String(e.message))) {
             fica.push(...lista.slice(lista.indexOf(p) + 1).filter((x) => !fica.includes(x)));
@@ -890,8 +898,9 @@ class Fila extends EventEmitter {
       }
       if (e.curto && r.id)
         Central.chamar(cfg, '/api/central/log-pc', { metodo: 'POST', corpo: { pc: os.hostname(), area: 'capa-studio', texto: `subiu ${r.id} "${String(e.titulo || '').slice(0, 60)}": capa ${capaUsada ? 'vai para o Studio' : `NÃO vai (chamativa=${!!chamativa}, manual=${!!e.capaManual}, capa=${!!e.capa})`}${r.miniaturaErro ? ` | API: ${String(r.miniaturaErro).slice(0, 120)}` : ''}` } }).catch(() => {});
-      // Short: a capa pela API não aparece — troca também pelo YouTube Studio (sozinho, daqui a uns minutos)
-      if (e.curto && capaUsada && r.id) {
+      // Short: a capa pela API não aparece — troca também pelo YouTube Studio (sozinho, daqui a uns minutos).
+      // Vídeo longo: pelo Studio também quando a API recusou a capa (limite)
+      if (capaUsada && r.id && (e.curto || r.miniaturaErro)) {
         this.guardarCapaStudio({ videoId: r.id, canalId: e.canalId, arquivo: capaUsada, jobId: job.id, titulo: e.titulo });
         setTimeout(() => this.tentarCapasStudio().catch(() => {}), 4 * 60e3);
       }
