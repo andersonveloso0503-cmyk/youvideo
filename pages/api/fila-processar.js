@@ -780,14 +780,15 @@ export default async function handler(req, res) {
                 if (escolhido) {
                   thumbnailUrl = await capaShortIa({ ...base, modelo: escolhido });
                 } else {
-                  const [pro, eco] = await Promise.allSettled([capaShortIa({ ...base, modelo: 'pro' }), capaShortIa({ ...base, modelo: 'economica' })]);
-                  const opcoes = [
-                    pro.status === 'fulfilled' ? { modelo: 'pro', nome: 'Melhor (~R$ 0,75)', url: pro.value } : null,
-                    eco.status === 'fulfilled' ? { modelo: 'economica', nome: 'Econômica (~R$ 0,25)', url: eco.value } : null,
-                  ].filter(Boolean);
-                  if (!opcoes.length) throw new Error(String(pro.reason?.message || eco.reason?.message || 'sem imagem'));
-                  thumbnailUrl = opcoes[0].url;
-                  await ref.update({ capaOpcoes: opcoes }).catch(() => {});
+                  // Gasto no AI Studio (15/11): antes fazia DUAS capas por Short (Pro + Econômica). Agora UMA: a Econômica,
+                  // com o texto conferido; só se ela errar o texto vai a Pro.
+                  try {
+                    thumbnailUrl = await capaShortIa({ ...base, modelo: 'economica' });
+                  } catch (eEco) {
+                    console.log(`[capa-ia] econômica falhou (${String(eEco.message || eEco).slice(0, 100)}), tenta a Pro`);
+                    if (/depleted|quota|billing|credit/i.test(String(eEco.message || ''))) throw eEco; // sem crédito: não adianta a Pro
+                    thumbnailUrl = await capaShortIa({ ...base, modelo: 'pro' });
+                  }
                 }
                 capaIa = true;
                 console.log(`[capa-ia] ${item.games ? 'games' : 'politica'}: ${item.roteiro?.titulo}`);
