@@ -1499,6 +1499,17 @@ export default async function handler(req, res) {
       // (se o horário já passou, ele agenda para daqui a 20 minutos)
       const d = (await ref.get()).data() || {};
       if (d.fabrica?.youtube?.status !== 'revisar') return res.status(400).json({ erro: 'Esse vídeo não está esperando aprovação.' });
+      // Trava (15/11, "estamos subindo muito errado"): vídeo de games/política só sobe se a conferência final passou.
+      // Ainda conferindo/corrigindo -> espera. Com problema -> mostra os problemas e só sobe se o dono confirmar.
+      const cf = d.conferencia || {};
+      if ((d.games || d.politica) && !b.forcar) {
+        if (['pendente', 'conferindo', 'corrigindo'].includes(cf.status))
+          return res.status(409).json({ erro: 'Ainda estou conferindo/corrigindo este vídeo. Espere uns minutos antes de aprovar.', aindaConferindo: true });
+        if (cf.status !== 'ok') {
+          const probs = (cf.etapas || []).filter((e) => e.ok === false).map((e) => `• ${e.nome}: ${String(e.detalhe || '').slice(0, 140)}`).slice(0, 6);
+          return res.status(409).json({ erro: `A conferência achou problema neste vídeo:\n${(probs.length ? probs : ['• A conferência não terminou ou deu erro.']).join('\n')}`, problemas: probs.length ? probs : ['• A conferência não terminou ou deu erro.'], precisaConfirmar: true });
+        }
+      }
       await ref.update({ 'fabrica.youtube': { status: 'pendente', aprovadoEm: new Date().toISOString() } });
       // Aprovou = vai também para o Instagram do canal, sozinho, na mesma hora do YouTube (Shorts; se a conta estiver conectada)
       let instagram = false;

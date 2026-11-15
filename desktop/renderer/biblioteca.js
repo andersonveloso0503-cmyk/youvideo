@@ -823,7 +823,18 @@ const Biblioteca = (() => {
       const acao = async (nome, msg, bt) => {
         bt.disabled = true;
         try {
-          await window.api.fabrica.acao({ id: i.id, acao: nome });
+          try {
+            await window.api.fabrica.acao({ id: i.id, acao: nome });
+          } catch (e1) {
+            // A conferência achou problema: mostra e só sobe se você confirmar
+            const m = String(e1?.message || e1);
+            if (nome !== 'video-aprovar' || !/conferência achou problema/i.test(m)) throw e1;
+            if (!confirm(`⚠️ ${m.replace(/^Error[^:]*:\s*/, '')}\n\nRecomendo 🎬 Refazer em vez de subir. Subir ASSIM MESMO?`)) {
+              bt.disabled = false;
+              return;
+            }
+            await window.api.fabrica.acao({ id: i.id, acao: nome, forcar: true });
+          }
           avisar(msg);
           card.remove();
           const resto = q('#aprovarLista').children.length;

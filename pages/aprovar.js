@@ -104,7 +104,7 @@ export default function Aprovar() {
       setToken('');
       throw new Error('Senha da Central incorreta.');
     }
-    if (!r.ok) throw new Error(d.erro || `Erro ${r.status}`);
+    if (!r.ok) throw Object.assign(new Error(d.erro || `Erro ${r.status}`), { dados: d });
     return d;
   }
 
@@ -125,7 +125,15 @@ export default function Aprovar() {
     if (pergunta && !confirm(pergunta)) return;
     setOcupado(i.id + nome);
     try {
-      const r = await api('/api/central/fabrica', { id: i.id, acao: nome });
+      let r;
+      try {
+        r = await api('/api/central/fabrica', { id: i.id, acao: nome });
+      } catch (e) {
+        // A conferência achou problema: mostra o que é e só sobe se você confirmar
+        if (!e.dados?.precisaConfirmar) throw e;
+        if (!confirm(`⚠️ ${e.message}\n\nRecomendo 🎬 Refazer em vez de subir. Subir ASSIM MESMO?`)) return;
+        r = await api('/api/central/fabrica', { id: i.id, acao: nome, forcar: true });
+      }
       setItens((lista) => lista.filter((x) => x.id !== i.id));
       setAviso(nome === 'video-aprovar' && r.instagram ? `${msg} (e vai para o Instagram também)` : msg);
     } catch (e) {

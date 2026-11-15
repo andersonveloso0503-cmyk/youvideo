@@ -954,7 +954,7 @@ app.whenReady().then(() => {
     return r;
   });
   ipcMain.handle('fabrica:criar', (_e, dados) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { ...dados, acao: 'criar' } }));
-  ipcMain.handle('fabrica:acao', (_e, { id, acao, url }) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao, ...(url ? { url } : {}) } }));
+  ipcMain.handle('fabrica:acao', (_e, { id, acao, url, forcar }) => Central.chamar(store.ler(), '/api/central/fabrica', { metodo: 'POST', corpo: { id, acao, ...(url ? { url } : {}), ...(forcar ? { forcar: true } : {}) } }));
   // Vídeos prontos esperando aprovação antes do YouTube (aba ✅ Aprovar da Biblioteca)
   ipcMain.handle('revisar:listar', () => Central.chamar(store.ler(), '/api/central/fabrica', { query: { revisar: '1' } }));
   // Botões 📸 Instagram / 📱 TikTok de um vídeo pronto. Vídeo longo ou deitado vira antes um corte EM PÉ de 1 minuto
