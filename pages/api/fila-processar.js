@@ -746,7 +746,22 @@ export default async function handler(req, res) {
                 capaIa = true;
                 console.log(`[capa-ia] longo ${item.games ? 'games' : 'politica'}: ${item.roteiro?.titulo}`);
               } catch (e) {
-                console.log(`[capa-ia] longo falhou (${String(e.message || e).slice(0, 160)}) — fica a foto`);
+                console.log(`[capa-ia] longo falhou (${String(e.message || e).slice(0, 160)}) — vai a capa grátis (foto + título)`);
+                // Sem Gemini (ex.: créditos acabaram em 14/11): capa GRÁTIS deitada — a foto do vídeo com o título grande
+                try {
+                  const fundo = /^https?:/.test(String(thumbnailUrl || '')) ? thumbnailUrl : primeiraImagem;
+                  if (fundo) {
+                    const { montarCapa } = await import('../../lib/capaDocumentario');
+                    const { textoDaCapa } = await import('../../lib/capaShortIa');
+                    const jpg = await montarCapa({ fundoUrl: fundo, texto: String(textoDaCapa(item) || item.roteiro?.titulo || '').split(/\s+/).slice(0, 6).join(' '), chamada: item.games ? 'CURIOSIDADES' : 'ENTENDA O CASO' });
+                    const { put } = await import('@vercel/blob');
+                    const bl = await put(`thumbnails/longo-gratis-${Date.now()}.jpg`, Buffer.from(jpg), { access: 'public', contentType: 'image/jpeg', token: process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN, addRandomSuffix: true });
+                    thumbnailUrl = bl.url;
+                    capaIa = true;
+                  }
+                } catch (e2) {
+                  console.log(`[capa-ia] capa grátis do longo também falhou: ${String(e2.message || e2).slice(0, 160)} — fica a foto`);
+                }
               }
             }
             if (item.formato === 'short' && !item.desafio) {
