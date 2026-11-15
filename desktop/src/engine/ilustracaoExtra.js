@@ -8,12 +8,14 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// 15/11: folga de 40% (a letra diminui para caber na tela); se ainda passar, corta em palavra inteira com "…"
 const txt = (t, max = 80) => {
   const x = String(t ?? '').replace(/\s+/g, ' ').trim();
-  if (x.length <= max) return esc(x);
-  const c = x.slice(0, max);
+  const lim = Math.round(max * 1.4);
+  if (x.length <= lim) return esc(x);
+  const c = x.slice(0, lim);
   const e = c.lastIndexOf(' ');
-  return esc(e > max * 0.5 ? c.slice(0, e) : c); // corta em palavra inteira
+  return esc((e > lim * 0.5 ? c.slice(0, e) : c).replace(/[\s,;:–—-]+$/, '') + '…');
 };
 
 let mapasCache = null;

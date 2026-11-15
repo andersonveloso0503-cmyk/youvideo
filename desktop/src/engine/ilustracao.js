@@ -12,12 +12,14 @@ TIPOS.push(...TIPOS_EXTRA);
 
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 // Corta sem quebrar palavra no meio ("bets i" virava título): volta até o último espaço
+// 15/11: o limite é uma folga de 40% (a letra diminui para caber); se ainda passar, corta em palavra inteira com "…"
 const corta = (t, max) => {
   const x = String(t ?? '').replace(/\s+/g, ' ').trim();
-  if (x.length <= max) return x;
-  const c = x.slice(0, max);
+  const lim = Math.round(max * 1.4);
+  if (x.length <= lim) return x;
+  const c = x.slice(0, lim);
   const e = c.lastIndexOf(' ');
-  return (e > max * 0.5 ? c.slice(0, e) : c).replace(/[\s,;:–—-]+$/, '');
+  return (e > lim * 0.5 ? c.slice(0, e) : c).replace(/[\s,;:–—-]+$/, '').replace(/\s+(de|da|do|das|dos|e|a|o|as|os|em|no|na|com|para|por|que|um|uma)$/i, '') + '…';
 };
 const txt = (t, max = 80) => esc(corta(t, max));
 const num = (v) => {
@@ -173,11 +175,13 @@ const DESENHOS = {
         ${d.antes ? `<div id="na" style="font-size:120px;font-weight:800;color:var(--mut);position:relative;display:inline-block">${txt(d.antes, 14)}<div id="risco" style="position:absolute;left:-10px;top:50%;height:12px;width:0;background:var(--nao);border-radius:6px;transform:rotate(-8deg)"></div></div>
         <div style="font-size:70px;color:var(--ouro);line-height:1.2">↓</div>` : ''}
         <div class="num" id="nn" style="font-size:${String(d.prefixo || '').length + String(d.valor || '').length + String(d.sufixo || '').length > 9 ? 130 : 190}px;line-height:1.05;color:var(--ouro2)">${esc(String(d.prefixo || '').slice(0, 6)).replace(/ /g, '&nbsp;')}<span id="nv" data-final="${alvo != null ? esc(alvo.toLocaleString('pt-BR')) : ''}">${alvo != null ? 0 : txt(d.valor, 14)}</span>${/^[A-Za-zÀ-ÿ]/.test(String(d.sufixo || '')) ? '&nbsp;' : ''}${esc(String(d.sufixo || '').slice(0, 12)).replace(/ /g, '&nbsp;')}</div>
+        ${String(d.sufixo || '').trim() === '%' && alvo != null && alvo > 0 && alvo <= 100 ? `<div style="margin:26px auto 0;width:760px;height:34px;border-radius:17px;background:var(--borda);overflow:hidden"><div id="npb" data-v="${alvo}" style="height:100%;width:0;border-radius:17px;background:linear-gradient(90deg,var(--ouro),var(--ouro2))"></div></div>` : ''}
         <div id="nt" style="margin:30px 60px 0;font-size:44px;font-weight:700;line-height:1.25">${txt(d.texto, 70)}</div></div>`,
       anim: `const r=$('risco');if(r)r.style.width=(eo(ap(t,.5*k,.4))*110)+'%';
         const n=$('nn');const p=back(ap(t,(${d.antes ? 0.9 : 0.1})*k,.5));n.style.transform='scale('+p+')';n.style.opacity=Math.min(1,p);
-        ${alvo != null ? `const c=eo(ap(t,(${d.antes ? 0.9 : 0.1})*k,1.2*k));const v=${alvo}*c;const cs=${(String(d.valor).match(/[.,](\d+)\s*$/) || ['', ''])[1].length};$('nv').textContent=c>=.999?${JSON.stringify(esc(String(d.valor)))}:v.toLocaleString('pt-BR',{minimumFractionDigits:cs,maximumFractionDigits:cs});` : ''}
+        ${alvo != null ? `const c=eo(ap(t,(${d.antes ? 0.9 : 0.1})*k,1.2*k));const v=${alvo}*c;const cs=${(String(d.valor).match(/[.,](\d+)\s*$/) || ['', ''])[1].length};$('nv').textContent=c>=.999?${JSON.stringify(alvo.toLocaleString('pt-BR', { minimumFractionDigits: (String(d.valor).match(/[.,](\d+)\s*$/) || ['', ''])[1].length, maximumFractionDigits: (String(d.valor).match(/[.,](\d+)\s*$/) || ['', ''])[1].length }))}:v.toLocaleString('pt-BR',{minimumFractionDigits:cs,maximumFractionDigits:cs});` : ''}
         $('nt').style.opacity=eo(ap(t,1.3*k,.4));
+        if($('npb'))$('npb').style.width=(eo(ap(t,(${d.antes ? 0.9 : 0.1})*k,1.2*k))*$('npb').dataset.v)+'%';
         if($('nfig')){const f=back(ap(t,0,.45));$('nfig').style.opacity=Math.min(1,f);$('nfig').style.transform='scale('+(.4+.6*f)+') translateY('+(Math.sin(t*2.5)*6)+'px)';}`,
     };
   },
@@ -449,6 +453,20 @@ window.setT=function(t){
    const nn=$('nn'),nv=$('nv');if(nn&&nv){const o=nv.textContent;if(nv.dataset.final)nv.textContent=nv.dataset.final;nn.style.whiteSpace='nowrap';nn.style.display='inline-block';let s=parseFloat(getComputedStyle(nn).fontSize);while(nn.scrollWidth>930&&s>50){s-=6;nn.style.fontSize=s+'px';}nv.textContent=o;}
    // Texto que não cabe na caixa (fica cortado na borda): diminui a letra até caber (no máximo até 55% do tamanho)
    document.querySelectorAll('#raiz div,#raiz span').forEach(e=>{if(e.children.length>2||e.id==='nn'||e.id==='nv')return;const cw=e.clientWidth;if(cw<20||e.scrollWidth<=cw+2)return;let f=parseFloat(getComputedStyle(e).fontSize);const f0=f;while(e.scrollWidth>e.clientWidth+2&&f>f0*0.55){f-=2;e.style.fontSize=f+'px';}});
+   // 15/11 (texto cortado: "…e atac", "…sindicatos p"): texto que passa da BORDA DA TELA ou sai da caixa dele
+   // (cartão, recibo, tabela) é cortado sem aviso. Primeiro deixa quebrar a linha; se ainda não couber, diminui a letra.
+   (function(){const M=${Math.round(W * 0.025)},MW=${W},MH=${H};const raiz=document.querySelector('.ilu');if(!raiz)return;
+     const temTexto=(e)=>[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim().length>1);
+     const caixa=(e)=>{for(let a=e.parentElement;a&&a!==raiz;a=a.parentElement){const cs=getComputedStyle(a);if(cs.overflow!=='visible'||a.classList.contains('cardx')||a.classList.contains('cx'))return a;}return null;};
+     const fora=(e,cx)=>{const r=e.getBoundingClientRect();if(r.width<1)return false;if(r.left<M-1||r.right>MW-M+1||r.bottom>MH)return true;if(cx){const b=cx.getBoundingClientRect();if(r.right>b.right+2||r.left<b.left-2||r.bottom>b.bottom+2)return true;}return false;};
+     [...raiz.querySelectorAll('*')].filter(temTexto).forEach(e=>{if(e.id==='nn'||e.id==='nv'||e.classList.contains('cnt'))return;const cx=caixa(e);if(!fora(e,cx))return;
+       const cs=getComputedStyle(e);if(cs.whiteSpace==='nowrap'){e.style.whiteSpace='normal';}
+       if(cs.display==='inline')e.style.display='inline-block';
+       if(e.style.display==='inline-block'||cs.display==='inline-block'){const pr=(e.parentElement||raiz).getBoundingClientRect();const s=pr.width/Math.max(1,(e.parentElement||raiz).offsetWidth);e.style.maxWidth=Math.max(80,((Math.min(pr.right,MW-M)-Math.max(pr.left,M))/(s||1)))+'px';}
+       let f=parseFloat(cs.fontSize);const f0=f;let g=0;while(fora(e,cx)&&f>f0*0.45&&g++<60){f-=2;e.style.fontSize=f+'px';e.style.lineHeight='1.12';}
+       // ainda não coube nem com a letra pequena: o pai inteiro também encolhe (nunca fica pedaço de palavra na tela)
+       if(fora(e,cx)&&e.parentElement&&e.parentElement!==raiz){const p=e.parentElement;let fp=parseFloat(getComputedStyle(p).fontSize);let h=0;while(fora(e,cx)&&h++<20){fp*=0.92;p.style.fontSize=fp+'px';f*=0.92;e.style.fontSize=f+'px';}}
+     });})();
  }catch(e){}}
  try{const vq=document.getElementsByClassName('vq');if(vq.length){const q=Math.min(vq.length-1,Math.max(0,Math.floor((t-${d.continua ? 1.2 : 0})*12)));for(let i=0;i<vq.length;i++)vq[i].style.visibility=i===q?'visible':'hidden';}}catch(e){}
  try{const fj=document.getElementsByClassName('fj');if(fj.length){const q=Math.min(fj.length-1,Math.floor((t-${d.continua ? 1.2 : 0})*12));for(let i=0;i<fj.length;i++)fj[i].style.visibility=i===q?'visible':'hidden';}}catch(e){}

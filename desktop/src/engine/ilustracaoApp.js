@@ -6,12 +6,14 @@
 // Mesmo palco 1000×780 e mesmas cores das outras ilustrações. Nada de marca/logo de terceiros.
 
 const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// 15/11: o limite é uma folga de 40% (a letra diminui para caber); se ainda passar, corta em palavra inteira com "…"
 const corta = (t, max) => {
   const x = String(t ?? '').replace(/\s+/g, ' ').trim();
-  if (x.length <= max) return x;
-  const c = x.slice(0, max);
+  const lim = Math.round(max * 1.4);
+  if (x.length <= lim) return x;
+  const c = x.slice(0, lim);
   const e = c.lastIndexOf(' ');
-  return (e > max * 0.5 ? c.slice(0, e) : c).replace(/[\s,;:–—-]+$/, '');
+  return (e > lim * 0.5 ? c.slice(0, e) : c).replace(/[\s,;:–—-]+$/, '').replace(/\s+(de|da|do|das|dos|e|a|o|as|os|em|no|na|com|para|por|que|um|uma)$/i, '') + '…';
 };
 const txt = (t, max = 80) => esc(corta(t, max)).replace(/(R\$|US\$|€) /g, '$1&nbsp;');
 
@@ -160,12 +162,71 @@ const APP = {
   },
 };
 
+// ───── 15/11: desenhos novos no padrão dos explicadores que o dono gostou ─────
+const COR_COL = { ouro: 'var(--ouro)', vermelho: 'var(--nao)', verde: 'var(--ok)', azul: '#4f8cff', cinza: '#8f97ad' };
+Object.assign(APP, {
+  // Colunas que CRESCEM do chão, com o número contando em cima (compara 2 a 4 valores: antes x depois, estado x estado)
+  colunas(d) {
+    const cols = (d.colunas || []).filter((c) => c && c.rotulo && partesValor(c.valor)).slice(0, 4);
+    const nums = cols.map((c) => partesValor(c.valor).n);
+    const maior = Math.max(...nums, 1);
+    const larg = cols.length > 3 ? 170 : cols.length > 2 ? 210 : 250;
+    const vao = (840 - cols.length * larg) / Math.max(1, cols.length - 1);
+    const base = 600;
+    const altMax = 400;
+    return {
+      html: `<div class="cx" style="position:absolute;left:0;top:0;width:1000px;height:740px;background:var(--card);border:2px solid var(--borda);border-radius:30px;box-shadow:0 24px 60px rgba(0,0,0,.35)">
+          ${[0, 1, 2, 3].map((i) => `<div style="position:absolute;left:60px;right:60px;top:${base - (i * altMax) / 3}px;border-top:3px dashed var(--borda)"></div>`).join('')}
+          ${cols
+            .map((c, i) => {
+              const h = Math.max(24, (nums[i] / maior) * altMax);
+              const cor = COR_COL[c.cor] || (nums[i] === maior ? 'var(--ouro)' : '#4f8cff');
+              const left = 80 + i * (larg + vao);
+              return `<div class="colb" data-h="${h}" style="position:absolute;left:${left}px;width:${larg}px;top:${base}px;height:0;background:${cor};border-radius:16px 16px 0 0"></div>
+            <div class="coln" style="position:absolute;left:${left - vao / 2 + 4}px;width:${larg + vao - 8}px;top:${base - h - 84}px;text-align:center;white-space:nowrap;font-size:${Math.min(64, Math.round((larg + vao - 20) / Math.max(4, String(c.valor).length * 0.6)))}px;font-weight:800;opacity:0">${valorHtml(c.valor, 16, `data-ini="${0.3 + i * 0.35}"`)}</div>
+            <div class="colr" style="position:absolute;left:${left - 20}px;width:${larg + 40}px;top:${base + 18}px;text-align:center;font-size:34px;font-weight:800;line-height:1.1;text-transform:uppercase;letter-spacing:1px">${txt(c.rotulo, 22)}</div>`;
+            })
+            .join('')}
+        </div>
+        ${d.nota ? `<div id="cln" style="position:absolute;left:0;right:0;top:752px;text-align:center;font-size:34px;font-weight:700;color:var(--mut)">${txt(d.nota, 50)}</div>` : ''}`,
+      anim: `$$('.colb').forEach((e,i)=>{const p=eo(ap(t,(.3+i*.35)*k,.7*k));const h=+e.dataset.h*p;e.style.height=h+'px';e.style.top=(${base}-h)+'px';});
+        $$('.coln').forEach((e,i)=>{e.style.opacity=eo(ap(t,(.3+i*.35)*k,.3));});
+        if($('cln'))$('cln').style.opacity=eo(ap(t,(.6+${cols.length}*.35)*k,.4));${CONTA}`,
+    };
+  },
+  // Tabela de STATUS: cada linha recebe um CARIMBO que cai com um tranco (cumprido / não cumprido / adiado...)
+  status(d) {
+    const itens = (d.itens || []).filter((i) => i && i.texto && i.status).slice(0, 4);
+    const alt = itens.length > 3 ? 138 : 160;
+    const cor = (c, st) => (c === 'vermelho' || (!c && /n[aã]o|adiad|negad|vetad|barrad|fora|atras|proib|derrub|rejeit|cancel/i.test(st)) ? 'var(--nao)' : c === 'ouro' || (!c && /andamento|espera|an[aá]lis|votando|pendente|tramit|julgamento|prazo/i.test(st)) ? 'var(--ouro)' : 'var(--ok)');
+    const maisLongo = Math.max(...itens.map((i) => String(i.status).length));
+    const cab = Array.isArray(d.cabecalho) && d.cabecalho.length === 2 ? d.cabecalho : ['O QUE', 'SITUAÇÃO'];
+    return {
+      html: `<div class="cx" id="stt" style="position:absolute;left:0;top:0;width:1000px;height:${96 + itens.length * alt}px;background:var(--card);border:2px solid var(--borda);border-radius:26px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.35)">
+          <div style="height:96px;background:#0d1226;display:flex;align-items:center;justify-content:space-between;padding:0 44px;color:#fff;font-size:30px;font-weight:800;letter-spacing:3px;text-transform:uppercase"><span>${txt(cab[0], 18)}</span><span>${txt(cab[1], 14)}</span></div>
+          ${itens
+            .map(
+              (it, i) => `<div class="stl" style="position:absolute;left:0;right:0;top:${96 + i * alt}px;height:${alt}px;border-top:2px solid var(--borda);display:flex;align-items:center;padding:0 44px;opacity:0">
+            <div style="width:${maisLongo > 12 ? 500 : 560}px;font-size:42px;font-weight:800;line-height:1.12">${txt(it.texto, 34)}</div>
+            <div class="stc" style="position:absolute;right:30px;top:${alt / 2 - 40}px;border:6px solid ${cor(it.cor, it.status)};color:${cor(it.cor, it.status)};border-radius:14px;padding:6px 16px;font-size:${String(it.status).length > 12 ? 26 : String(it.status).length > 9 ? 30 : 36}px;font-weight:800;letter-spacing:2px;text-transform:uppercase;white-space:nowrap;opacity:0;background:rgba(0,0,0,.08)">${txt(it.status, 16)}</div></div>`
+            )
+            .join('')}
+        </div>`,
+      anim: `$$('.stl').forEach((e,i)=>{const p=eo(ap(t,(.15+i*.5)*k,.35));e.style.opacity=p;e.style.transform='translateX('+((1-p)*-80)+'px)';
+          const c=e.querySelector('.stc');const q=ap(t,(.45+i*.5)*k,.22);c.style.opacity=q>0?1:0;c.style.transform='rotate(-9deg) scale('+(2.3-1.3*eo(q))+')';
+          if(q>0&&q<1){$('stt').style.transform='translate('+(Math.sin(t*90)*5*(1-q))+'px,'+(Math.cos(t*70)*4*(1-q))+'px)';}});`,
+    };
+  },
+});
+
 function validaApp(d) {
   switch (d.tipo) {
     case 'recibo': return Array.isArray(d.itens) && d.itens.filter((i) => i && i.texto && i.valor).length >= 2;
     case 'pix': return !!d.valor && !!(d.de || d.para);
     case 'rota': return !!d.de && !!d.para;
     case 'impacto': return !!String(d.texto || '').trim();
+    case 'colunas': return Array.isArray(d.colunas) && d.colunas.filter((c) => c && c.rotulo && partesValor(c.valor)).length >= 2;
+    case 'status': return Array.isArray(d.itens) && d.itens.filter((i) => i && i.texto && i.status).length >= 2;
     default: return false;
   }
 }

@@ -7,10 +7,11 @@ const txt = (t, max = 80) => nb(txt0(t, max));
 const nb = (h) => h.replace(/(R\$|US\$|€) /g, '$1&nbsp;');
 const txt0 = (t, max = 80) => {
   const s = String(t ?? '').replace(/\s+/g, ' ').trim();
-  if (s.length <= max) return esc(s);
-  const c = s.slice(0, max + 1);
+  const lim = Math.round(max * 1.4); // 15/11: folga (a letra diminui para caber); se passar, corta com "…"
+  if (s.length <= lim) return esc(s);
+  const c = s.slice(0, lim + 1);
   const i = c.lastIndexOf(' ');
-  return esc((i > max * 0.5 ? c.slice(0, i) : s.slice(0, max)).replace(/[,;:.\-–]+$/, ''));
+  return esc((i > lim * 0.5 ? c.slice(0, i) : s.slice(0, lim)).replace(/[,;:.\-–\s]+$/, '') + '…');
 };
 
 // ───────── Personagens e lugares (viewBox 200×200) ─────────
