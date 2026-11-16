@@ -43,6 +43,10 @@
     {
       "path": "/api/central/games-noticias?auto=serie&tipo=steam-top",
       "schedule": "10 15 * * 1"
+    },
+    {
+      "path": "/api/central/politica-noticias?auto=cidade",
+      "schedule": "23 14 * * *"
     }
   ]
 }

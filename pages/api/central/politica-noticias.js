@@ -117,7 +117,7 @@ async function aprovarSozinhoPolitica(db, col, cfgDados, opc = {}) {
     .map((doc) => ({ ref: doc.ref, d: doc.data() }))
     .filter(({ d }) => d.ep && d.tipo !== 'longo' && d.tipo !== 'explicador' && (d.tipo === 'explicador-short' || idade(d) <= 2 * 86400e3))
     // explicadores que você pediu primeiro; depois as de mais potencial (em alta, bolso, polêmica, Trump); empate: a mais nova
-    .sort((a, b) => (String(b.d.tipo || '').startsWith('explicador') ? 1 : 0) - (String(a.d.tipo || '').startsWith('explicador') ? 1 : 0) || ((Number(b.d.potencial) || 5) - idade(b.d) / (12 * 3600e3)) - ((Number(a.d.potencial) || 5) - idade(a.d) / (12 * 3600e3))); // nota cai 1 ponto a cada 12 h: a mais atual na frente
+    .sort((a, b) => (String(b.d.tipo || '').startsWith('explicador') ? 1 : 0) - (String(a.d.tipo || '').startsWith('explicador') ? 1 : 0) || (b.d.tipo === 'cidade' ? 1 : 0) - (a.d.tipo === 'cidade' ? 1 : 0) || ((Number(b.d.potencial) || 5) - idade(b.d) / (12 * 3600e3)) - ((Number(a.d.potencial) || 5) - idade(a.d) / (12 * 3600e3))); // nota cai 1 ponto a cada 12 h: a mais atual na frente
   // 16/11: conta VÍDEOS DIFERENTES do dia (Short). O mesmo vídeo refeito/corrigido aparecia 2 ou 3 vezes e o longo
   // também contava: o limite de 5 enchia com 2 notícias e nada mais subia ("hoje não subiu nada").
   const ultimas24 = new Set(
@@ -157,7 +157,8 @@ export default async function handler(req, res) {
   const ehCron =
     (process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`) || /vercel-cron/i.test(req.headers['user-agent'] || '');
   const a = autorizado(req);
-  if (!a.ok && !(ehCron && req.method === 'GET' && req.query.auto)) return res.status(401).json({ erro: a.erro });
+  // auto=cidade pode ser chamado sem login: faz no máximo 1 por dia (o id do documento é a data) e não refaz
+  if (!a.ok && !(ehCron && req.method === 'GET' && req.query.auto) && !(req.method === 'GET' && req.query.auto === 'cidade')) return res.status(401).json({ erro: a.erro });
 
   const db = getDb();
   const col = db.collection(COLECAO_POLITICA);
@@ -167,6 +168,13 @@ export default async function handler(req, res) {
     // Vídeo LONGO da semana (2 por semana, quarta e sábado): junta as notícias de maior nota dos últimos dias
     // 1 documentário longo de ARQUEOLOGIA/HISTÓRIA por semana no Noites na História (tema modelado em vídeos que deram certo).
     // Não é política: vai pelo motor dos documentários (fotos de museu/sítio, ilustrações da época) e espera o ✅ Aprovar.
+    // NOTÍCIA DA CIDADE (1 por dia): o fato local mais forte do dia numa capital, sem crime/violência
+    if (req.method === 'GET' && req.query.auto === 'cidade') {
+      const { noticiaDaCidade } = await import('../../../lib/noticiaCidade');
+      const r = await noticiaDaCidade(db, { forcar: req.query.forcar === '1' && a.ok });
+      const auto = r.ok ? await aprovarSozinhoPolitica(db, col, (await cfg.get()).data()).catch((e) => ({ erro: String(e.message || e).slice(0, 200) })) : {};
+      return res.status(200).json({ ...r, ...auto });
+    }
     if (req.method === 'GET' && req.query.auto === 'historia') {
       const cfgH = db.collection('youvideo_config').doc('historia_longo');
       const ch = (await cfgH.get()).data() || {};
