@@ -8,6 +8,13 @@
 import { getDb } from '../../../lib/firebase-admin';
 import { exigirToken } from '../../../lib/central';
 import { COLECAO } from '../../../lib/montarPc';
+import pacoteCompilador from '../../../desktop/package.json';
+const maisVelhaN = (v) => String(v || '0').split('.').map((x) => Number(x) || 0);
+const maisVelha = (a, b) => {
+  const x = maisVelhaN(a), y = maisVelhaN(b);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0);
+  return false;
+};
 
 // Trailers da Steam vêm em streaming (.m3u8). Só o Compilador 2.5.24 em diante baixa isso direito;
 // para os mais antigos, a cena do trailer vira a imagem do próprio trailer (com zoom), em vez de dar erro.
@@ -68,6 +75,18 @@ export default async function handler(req, res) {
       let pcNovoAtivo = pcNovo;
       if (pcNovo) await marca.set({ visto: agora }, { merge: true }).catch(() => {});
       else pcNovoAtivo = agora - ((await marca.get().catch(() => null))?.data()?.visto || 0) < 15 * 60e3;
+      // PC com Compilador atrasado não pega vídeo novo por até 1 h depois que sai a versão nova: assim ele termina o que
+      // está fazendo, fica livre e se atualiza sozinho (antes ficava sempre ocupado e nunca instalava — 16/11, 08KCH3R)
+      try {
+        const ultima = pacoteCompilador.version;
+        if (req.query.v && maisVelha(String(req.query.v), ultima)) {
+          const ref = db.collection('youvideo_config').doc('atualizacao-pc');
+          const info = (await ref.get().catch(() => null))?.data?.() || {};
+          const desde = info.versao === ultima ? info.desde || agora : agora;
+          if (info.versao !== ultima) await ref.set({ versao: ultima, desde }, { merge: true }).catch(() => {});
+          if (agora - desde < 60 * 60e3) return res.status(200).json({ pedidos: [], aguardandoAtualizacao: ultima });
+        }
+      } catch {}
       const pedidos = [];
       for (const doc of snap.docs) {
         const d = doc.data();

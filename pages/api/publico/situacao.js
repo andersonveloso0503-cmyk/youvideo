@@ -27,5 +27,11 @@ export default async function handler(req, res) {
   const cont = {};
   for (const i of itens) cont[`${i.status}|${i.youtube}`] = (cont[`${i.status}|${i.youtube}`] || 0) + 1;
   const pcs = (await getDb().collection('youvideo_pc_filas').get()).docs.map((d) => ({ pc: d.id, versao: d.data().versao || '', visto: new Date(d.data().atualizadoEm || 0).toISOString() }));
-  res.status(200).json({ agora: new Date().toISOString(), pcs, contagem: cont, itens });
+  const cmds = (await getDb().collection('youvideo_pc_comandos').where('acao', '==', 'atualizar').limit(400).get()).docs
+    .map((d) => d.data())
+    .filter((c) => c.criadoEm > Date.now() - 6 * 3600e3)
+    .sort((a, b) => b.criadoEm - a.criadoEm)
+    .slice(0, 12)
+    .map((c) => ({ pc: c.pc, status: c.status, erro: c.erro || '', de: c.deNome, em: new Date(c.criadoEm).toISOString(), feito: c.feitoEm ? new Date(c.feitoEm).toISOString() : '' }));
+  res.status(200).json({ agora: new Date().toISOString(), pcs, atualizacoes: cmds, contagem: cont, itens: itens.slice(0, 8) });
 }
