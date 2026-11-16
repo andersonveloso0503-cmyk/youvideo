@@ -83,8 +83,15 @@ async function adicionarEfeitos(rc, locais, { modo } = {}) {
   }
   if (!pedidos.length) return 0;
   const usados = [...new Set(pedidos.map((p) => p.som))];
-  for (const nome of usados) locais[`efeito-${nome}`] = await arquivo(nome, modo);
-  rc.audio = [...(rc.audio || []), ...pedidos.map((p) => ({ url: `efeito-${p.som}`, start: Number(p.t.toFixed(3)), volume: p.vol }))];
+  // link file:// (válido em qualquer etapa que leia a receita de novo, ex.: montar outra vez depois de uma correção)
+  const { pathToFileURL } = require('url');
+  const urlDe = {};
+  for (const nome of usados) {
+    const arq = await arquivo(nome, modo);
+    urlDe[nome] = pathToFileURL(arq).href;
+    locais[urlDe[nome]] = arq;
+  }
+  rc.audio = [...(rc.audio || []).filter((a) => !/^file:.*\/sons\//.test(String(a.url))), ...pedidos.map((p) => ({ url: urlDe[p.som], start: Number(p.t.toFixed(3)), volume: p.vol }))];
   return pedidos.length;
 }
 

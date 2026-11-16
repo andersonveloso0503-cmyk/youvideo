@@ -57,6 +57,24 @@ async function baixarTudo(receita, dirCache, onProgresso, checar) {
   const comReserva = new Set(receita.clipes.map((c) => c.url));
   for (let i = 0; i < urls.length; i++) {
     checar && checar();
+    // Arquivo que já está no PC (efeito sonoro, trecho já cortado) ou link quebrado: não derruba a montagem
+    // (16/11: "Erro ao montar no PC: Invalid URL")
+    if (/^file:/i.test(urls[i])) {
+      try {
+        locais[urls[i]] = require('url').fileURLToPath(urls[i]);
+      } catch {
+        locais[urls[i]] = null;
+      }
+      continue;
+    }
+    if (!/^https?:\/\//i.test(urls[i])) {
+      if (fs.existsSync(urls[i])) locais[urls[i]] = urls[i];
+      else {
+        console.warn('[baixar] link inválido ignorado:', String(urls[i]).slice(0, 120));
+        locais[urls[i]] = null;
+      }
+      continue;
+    }
     try {
       await baixarUm(i);
     } catch (e) {

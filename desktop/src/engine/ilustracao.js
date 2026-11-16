@@ -442,6 +442,9 @@ ${!d.sobreJogo ? temaDoFundo(d.fundo).html(W, H) : ''}
 <div class="luz" id="l1" style="width:${W * 0.5}px;height:${W * 0.5}px;left:${-W * 0.1}px;top:${H * 0.15}px;background:#2b4a9a"></div>
 <div class="luz" id="l2" style="width:${W * 0.4}px;height:${W * 0.4}px;right:${-W * 0.1}px;top:${H * 0.58}px;background:#8a5a14"></div>
 <div class="luz" id="l3" style="width:${W * 0.28}px;height:${W * 0.28}px;left:${W * 0.38}px;top:${-H * 0.04}px;background:#1f6b8f"></div>
+${d.cab && vertical ? `<div id="cab" style="position:absolute;top:${H * 0.068}px;left:${W * 0.045}px;right:${W * 0.045}px;display:flex;justify-content:space-between;align-items:center;font-weight:800;letter-spacing:${2 * W / 1080}px">
+  <div style="display:flex;align-items:center;gap:${12 * W / 1080}px;color:#9fb0d8;font-size:${24 * W / 1080}px">${txt(d.cab.secao, 26)}<span style="display:inline-flex;gap:${7 * W / 1080}px">${[1, 2, 3, 4].map((i) => `<i style="display:block;width:${12 * W / 1080}px;height:${12 * W / 1080}px;border-radius:50%;background:${i <= (d.cab.passo || 1) ? 'var(--ouro)' : '#33406a'}"></i>`).join('')}</span></div>
+  <div style="text-align:right;color:var(--ouro);font-size:${22 * W / 1080}px;line-height:1.15">${txt(d.cab.canal, 22)}${d.cab.sub ? `<div style="color:#7d8bb3;font-size:${15 * W / 1080}px;letter-spacing:${2 * W / 1080}px">${txt(d.cab.sub, 22)}</div>` : ''}</div></div>` : ''}
 ${d.etiqueta && !d.semTitulo ? `<div class="tagp" id="tag">${txt(d.etiqueta, 24)}</div>` : ''}
 ${d.titulo && !d.semTitulo ? `<div class="tit" id="tit">${tituloHtml(d.titulo, d.destaque)}</div>` : ''}
 <div class="ilu">${des.html}</div>
