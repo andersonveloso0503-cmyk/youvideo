@@ -303,7 +303,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
         // Short com manchete fixa no alto: a manchete ocupa o lugar do título da ilustração (o fecho mantém o "Se inscreve!")
         if (receita.manchete && H > W && !['inscreva'].includes(ilu.tipo)) ilu.semTitulo = true;
         // quadro de fotos: as fotos baixadas de cada pessoa (sem foto, a silhueta com o nome)
-        if (Array.isArray(ilu.fotos)) ilu.fotos = ilu.fotos.map((f) => ({ nome: f.nome, ...(f.url && locais[f.url] ? { arquivo: locais[f.url] } : {}) }));
+        if (Array.isArray(ilu.fotos)) ilu.fotos = ilu.fotos.map((f) => ({ nome: f.nome, ...(f.voto ? { voto: f.voto } : {}), ...(f.apelido ? { apelido: f.apelido } : {}), ...(f.url && locais[f.url] ? { arquivo: locais[f.url] } : {}) }));
         // mascote: a boca abre e fecha nas palavras que estão sendo faladas neste trecho (12 valores por segundo)
         if (ilu.mascote) {
           const ini = c.start - (ilu.continua ? 1.2 : 0); // pedaço seguinte: a página anda 1,2 s à frente
