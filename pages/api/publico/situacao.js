@@ -18,6 +18,7 @@ export default async function handler(req, res) {
       agendado: x.fabrica?.youtube?.publicarEm || x.fabrica?.youtube?.agendadoPara || '',
       conferencia: x.conferencia?.status || '',
       pc: x.pc || x.montadoPor || x.fabrica?.pc || '',
+      ilustracoes: (x.arquivos || []).map((a) => a?.ilustracao?.tipo).filter(Boolean).join(','),
       criadoEm: x.criadoEm,
       atualizadoEm: x.atualizadoEm || '',
     };
@@ -25,5 +26,6 @@ export default async function handler(req, res) {
   itens.sort((a, b) => String(b.criadoEm).localeCompare(String(a.criadoEm)));
   const cont = {};
   for (const i of itens) cont[`${i.status}|${i.youtube}`] = (cont[`${i.status}|${i.youtube}`] || 0) + 1;
-  res.status(200).json({ agora: new Date().toISOString(), contagem: cont, itens });
+  const pcs = (await getDb().collection('youvideo_pc_filas').get()).docs.map((d) => ({ pc: d.id, versao: d.data().versao || '', visto: new Date(d.data().atualizadoEm || 0).toISOString() }));
+  res.status(200).json({ agora: new Date().toISOString(), pcs, contagem: cont, itens });
 }
