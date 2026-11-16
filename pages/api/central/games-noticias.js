@@ -122,8 +122,13 @@ async function aprovarSozinho(db, col, cfgDados, opc = {}) {
     .filter(({ d }) => (d.tipo || 'short') === 'short' && d.ep && idade(d) < 36 * 3600e3)
     .sort((a, b) => pontos(b.d) - pontos(a.d));
   // Até 5 vídeos de games por dia (mais alcance por vídeo e não estoura o limite de capas); as mais novas primeiro
-  const ultimas24 = (await db.collection('youvideo_fila').where('games', '==', true).get()).docs
-    .filter((x) => Date.now() - new Date(x.data().criadoEm || 0).getTime() < 24 * 3600e3).length;
+  // 16/11: conta VÍDEOS DIFERENTES do dia (o mesmo refeito/corrigido contava 2 vezes; o longo não entra)
+  const ultimas24 = new Set(
+    (await db.collection('youvideo_fila').where('games', '==', true).get()).docs
+      .map((x) => x.data())
+      .filter((x) => Date.now() - new Date(x.criadoEm || 0).getTime() < 24 * 3600e3 && !x.refeitoDe && x.formato !== 'longo')
+      .map((x) => String(x.noticia || x.roteiro?.titulo || x.tema || Math.random()).toLowerCase())
+  ).size;
   const vagas = Math.max(0, 5 - ultimas24);
   // Notícia QUENTE (saiu há menos de 3 h, nota 8+): entra mesmo passando das 5 do dia (até 7)
   const quentes = fila.filter(({ d }) => (d.ep?.potencial || 5) >= 8 && idade(d) < 3 * 3600e3);

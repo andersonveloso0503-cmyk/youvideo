@@ -118,8 +118,14 @@ async function aprovarSozinhoPolitica(db, col, cfgDados, opc = {}) {
     .filter(({ d }) => d.ep && d.tipo !== 'longo' && d.tipo !== 'explicador' && (d.tipo === 'explicador-short' || idade(d) <= 2 * 86400e3))
     // explicadores que você pediu primeiro; depois as de mais potencial (em alta, bolso, polêmica, Trump); empate: a mais nova
     .sort((a, b) => (String(b.d.tipo || '').startsWith('explicador') ? 1 : 0) - (String(a.d.tipo || '').startsWith('explicador') ? 1 : 0) || ((Number(b.d.potencial) || 5) - idade(b.d) / (12 * 3600e3)) - ((Number(a.d.potencial) || 5) - idade(a.d) / (12 * 3600e3))); // nota cai 1 ponto a cada 12 h: a mais atual na frente
-  const ultimas24 = (await db.collection('youvideo_fila').where('politica', '==', true).get()).docs
-    .filter((x) => agora - new Date(x.data().criadoEm || 0).getTime() < 24 * 3600e3 && !x.data().refeitoDe).length;
+  // 16/11: conta VÍDEOS DIFERENTES do dia (Short). O mesmo vídeo refeito/corrigido aparecia 2 ou 3 vezes e o longo
+  // também contava: o limite de 5 enchia com 2 notícias e nada mais subia ("hoje não subiu nada").
+  const ultimas24 = new Set(
+    (await db.collection('youvideo_fila').where('politica', '==', true).get()).docs
+      .map((x) => x.data())
+      .filter((x) => agora - new Date(x.criadoEm || 0).getTime() < 24 * 3600e3 && !x.refeitoDe && x.formato !== 'longo')
+      .map((x) => String(x.noticia || x.roteiro?.titulo || x.tema || Math.random()).toLowerCase())
+  ).size;
   const vagas = Math.max(0, 5 - ultimas24);
   // Só sobe sozinho o que tem NOTA BOA (7+). Nota 5-6 só completa o dia se até as 15h saíram menos de 3; abaixo de 5, só à mão.
   const hora = Number(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }));
