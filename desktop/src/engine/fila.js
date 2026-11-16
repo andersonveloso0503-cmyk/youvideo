@@ -1329,6 +1329,13 @@ class Fila extends EventEmitter {
           console.warn('[trecho-oficial] não deu:', String(e?.message || e).slice(0, 200));
         }
       }
+      // Efeitos sonoros (16/11): whoosh, pop e carimbo nas ilustrações, baixinhos por baixo da narração
+      try {
+        const ne = await require('./efeitosSonoros').adicionarEfeitos(rc, locais, { modo });
+        if (ne) console.log(`[efeitos] ${ne} efeito(s) sonoro(s) no vídeo "${job.nome}"`);
+      } catch (e) {
+        console.warn('[efeitos] não deu:', String(e?.message || e).slice(0, 160));
+      }
       faixa(0.15, 0.05, 'audio', 'Preparando narração')(0);
       const audio = await M.prepararAudio(rc, locais, dir, { modo, registrarCancelar });
       checar();
