@@ -219,16 +219,19 @@ const DESENHOS = {
   // Trailer oficial numa "telinha" (pedido do dono, 14/11): quando a narração fala do trailer, o trecho dele passa
   // numa janela 16:9 com borda, selo "▶ TRAILER OFICIAL" e o fundo desfocado da própria gameplay
   trailer(d) {
+    // 16/11 (estilo palco, aprovado para política e games): o trailer passa na mesma "TV" azul do placar,
+    // com o selo "▶ TRAILER OFICIAL", a barrinha do tempo e o nome do jogo embaixo
     const quadros = d.videoQuadros || [];
     return {
-      html: `<div class="cardx" id="tw" style="left:20px;top:110px;width:960px;height:540px;overflow:hidden;border:6px solid #fff;border-radius:22px;box-shadow:0 30px 90px rgba(0,0,0,.7);background:#000">
+      html: `<div id="tw" style="position:absolute;left:0;top:40px;width:1000px;height:590px;border-radius:40px;background:linear-gradient(#2a3866,#141c38);border:5px solid #3b4c86;box-shadow:0 16px 0 #0b1024,0 34px 60px rgba(0,0,0,.6)">
+          <div style="position:absolute;left:22px;top:22px;right:22px;bottom:22px;border-radius:24px;overflow:hidden;background:#000">
           ${quadros.map((f, i) => `<img class="vq" src="${esc(pathToFileURL(f).href)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;${i ? 'visibility:hidden' : ''}">`).join('')}
-          <div style="position:absolute;left:18px;top:18px;background:rgba(229,48,47,.95);color:#fff;border-radius:10px;padding:6px 16px;font-size:28px;font-weight:800;letter-spacing:2px">▶ TRAILER OFICIAL</div>
-          <div id="twb" style="position:absolute;left:0;right:0;bottom:0;height:8px;background:rgba(255,255,255,.25)"><div id="twp" style="height:100%;width:0;background:#e5302f"></div></div>
+          <div id="twb" style="position:absolute;left:0;right:0;bottom:0;height:10px;background:rgba(255,255,255,.25)"><div id="twp" style="height:100%;width:0;background:#e5302f"></div></div></div>
+          <div style="position:absolute;left:46px;top:44px;background:#e5302f;color:#fff;border-radius:14px;padding:8px 20px;font-size:30px;font-weight:900;letter-spacing:2px;box-shadow:0 6px 0 rgba(0,0,0,.35)">▶ TRAILER OFICIAL</div>
         </div>
-        ${d.legenda ? `<div id="twl" style="position:absolute;left:0;right:0;top:680px;text-align:center"><span style="background:var(--card);border:2px solid var(--borda);border-radius:40px;padding:10px 30px;font-size:38px;font-weight:800">${txt(d.legenda, 40)}</span></div>` : ''}`,
-      anim: `const p=back(ap(t,.05,.5));$('tw').style.transform='scale('+(.6+.4*p)+')';$('tw').style.opacity=Math.min(1,p*1.4);
-        $('twp').style.width=(Math.min(1,t/${Math.max(2, Number(d.duracaoCena) || 8)})*100)+'%';if($('twl'))$('twl').style.opacity=eo(ap(t,.4,.4));`,
+        ${d.legenda ? `<div id="twl" style="position:absolute;left:0;right:0;top:670px;display:flex;justify-content:center"><div style="display:flex;align-items:center;gap:16px;background:#0e1428;border:3px solid #2c3a66;border-radius:60px;padding:12px 36px 12px 14px;box-shadow:0 10px 24px rgba(0,0,0,.5)"><span style="width:70px;height:70px;border-radius:50%;background:linear-gradient(#7b4dff,#4a22b8);display:flex;align-items:center;justify-content:center;font-size:40px">🎮</span><span style="color:#fff;font-size:42px;font-weight:900;letter-spacing:1px;text-transform:uppercase;white-space:nowrap">${txt(d.legenda, 30)}</span></div></div>` : ''}`,
+      anim: `const p=back(ap(t,.05,.5));$('tw').style.transform='scale('+(.7+.3*p)+')';$('tw').style.opacity=Math.min(1,p*1.4);
+        $('twp').style.width=(Math.min(1,t/${Math.max(2, Number(d.duracaoCena) || 8)})*100)+'%';if($('twl')){const q=back(ap(t,.4,.4));$('twl').style.opacity=Math.min(1,q);$('twl').style.transform='translateY('+((1-q)*50)+'px)';}`,
     };
   },
   // Foto real da cena num cartão (com o nome embaixo): o vídeo inteiro fica no estilo explicador

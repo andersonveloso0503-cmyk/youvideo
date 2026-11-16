@@ -306,7 +306,7 @@ const { APP, validaApp } = require('./ilustracaoApp');
 Object.assign(EXTRA, APP);
 // Estilo "palco" (16/11): votação com placar contando + foto de cada um, e o selo que pula com o prédio
 const { criarPalco, validaPalco } = require('./ilustracaoPalco');
-Object.assign(EXTRA, criarPalco(PREDIOS));
+Object.assign(EXTRA, criarPalco({ ...PREDIOS, ...FIGURAS }));
 
 function validaExtra(d) {
   switch (d.tipo) {

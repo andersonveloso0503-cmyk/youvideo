@@ -32,14 +32,14 @@ const bonecoMinistro = (i, toga = true) => `<svg width="110" height="170" viewBo
 <ellipse cx="55" cy="164" rx="40" ry="7" fill="#000" opacity=".4"/><rect x="18" y="66" width="74" height="96" rx="32" fill="url(#tg${i})"/>${toga ? '<rect x="48" y="70" width="14" height="40" fill="#fff"/>' : '<path d="M47 70 l8 26 l8 -26z" fill="#c33"/>'}
 <circle cx="55" cy="40" r="32" fill="url(#pl${i})"/><path d="M24 34 q31 -44 62 0 q-6 -26 -31 -26 q-25 0 -31 26z" fill="${CABELOS[i % CABELOS.length]}"/><circle cx="44" cy="44" r="4" fill="#1b2236"/><circle cx="66" cy="44" r="4" fill="#1b2236"/></svg>`;
 
-const trabalhador = (reacao) => `<svg width="190" height="290" viewBox="0 0 190 290" style="overflow:visible"><defs><radialGradient id="tpele" cx=".35" cy=".3"><stop offset="0" stop-color="#ffe0c2"/><stop offset="1" stop-color="#d9a074"/></radialGradient>
-<linearGradient id="tcam" x1="0" x2="1"><stop offset="0" stop-color="#3f86ff"/><stop offset="1" stop-color="#1d4fb8"/></linearGradient></defs>
+const trabalhador = (reacao, gamer) => `<svg width="190" height="290" viewBox="0 0 190 290" style="overflow:visible"><defs><radialGradient id="tpele" cx=".35" cy=".3"><stop offset="0" stop-color="#ffe0c2"/><stop offset="1" stop-color="#d9a074"/></radialGradient>
+<linearGradient id="tcam" x1="0" x2="1"><stop offset="0" stop-color="${gamer ? '#7b4dff' : '#3f86ff'}"/><stop offset="1" stop-color="${gamer ? '#4a22b8' : '#1d4fb8'}"/></linearGradient></defs>
 <ellipse cx="95" cy="282" rx="70" ry="10" fill="#000" opacity=".45"/>
 <rect x="60" y="210" width="28" height="70" rx="12" fill="#22305a"/><rect x="102" y="210" width="28" height="70" rx="12" fill="#22305a"/>
 <rect x="45" y="110" width="100" height="120" rx="40" fill="url(#tcam)"/>
 <rect x="20" y="120" width="30" height="80" rx="15" fill="url(#tcam)"/>
 <g id="tbraco" style="transform-origin:150px 128px"><rect x="138" y="${reacao === 'feliz' ? 20 : 40}" width="30" height="96" rx="15" fill="url(#tcam)" transform="rotate(${reacao === 'feliz' ? 20 : -18} 150 128)"/></g>
-<circle cx="95" cy="68" r="50" fill="url(#tpele)"/><path d="M48 58 q47 -62 96 0 q-8 -38 -48 -38 q-40 0 -48 38z" fill="#3a2618"/>
+<circle cx="95" cy="68" r="50" fill="url(#tpele)"/>${gamer ? '<path d="M44 52 q51 -60 102 0 z" fill="#2fe08a"/><rect x="40" y="46" width="70" height="12" rx="6" fill="#22b36d" transform="rotate(-8 75 52)"/>' : '<path d="M48 58 q47 -62 96 0 q-8 -38 -48 -38 q-40 0 -48 38z" fill="#3a2618"/>'}
 <circle cx="78" cy="74" r="6" fill="#1b2236"/><circle cx="112" cy="74" r="6" fill="#1b2236"/>
 ${reacao === 'feliz' ? '<path d="M78 92 q17 16 34 0" stroke="#1b2236" stroke-width="5" fill="none" stroke-linecap="round"/>' : reacao === 'preocupado' ? '<path d="M80 100 q15 -12 30 0" stroke="#1b2236" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M68 58 l18 6 M122 58 l-18 6" stroke="#1b2236" stroke-width="4" stroke-linecap="round"/>' : '<path d="M82 96 q13 -8 26 0" stroke="#1b2236" stroke-width="4" fill="none" stroke-linecap="round"/>'}</svg>`;
 
@@ -97,12 +97,12 @@ function criarPalco(PREDIOS) {
         html: `<div id="aprd" style="position:absolute;left:300px;top:250px;width:640px;height:480px;opacity:0;filter:drop-shadow(0 26px 30px rgba(0,0,0,.55))">${PREDIOS[lugar].replace('<svg ', '<svg style="width:640px;height:480px" ')}</div>
           ${selo('aselo', curto(d.selo || 'ATENÇÃO!', 22).toUpperCase(), d.cor, 72).replace('left:0;right:0;', 'left:0;right:0;top:120px;')}
           ${d.texto ? `<div id="atx" style="position:absolute;left:0;right:0;top:20px;text-align:center;opacity:0"><span style="display:inline-block;background:#0e1428;border:3px solid #2c3a66;border-radius:18px;padding:12px 28px;font-size:40px;font-weight:800;color:#f3efe6">${esc(curto(d.texto, 44))}</span></div>` : ''}
-          <div id="atrab" style="position:absolute;left:20px;top:440px;width:190px;height:290px;transform-origin:50% 100%">${trabalhador(reacao)}</div>
+          <div id="atrab" style="position:absolute;left:50px;top:420px;width:190px;height:290px;transform-origin:50% 100%">${trabalhador(reacao, !!d.gamer)}</div>
           ${reacao === 'duvida' ? '<div id="aint" style="position:absolute;left:190px;top:390px;font-size:110px;font-weight:900;color:#ffd54a;text-shadow:0 8px 0 #a87a00;opacity:0">?</div>' : ''}`,
         anim: `const p=back(ap(t,.05*k,.55));$('aprd').style.opacity=Math.min(1,eo(ap(t,.05*k,.3)));$('aprd').style.transform='translateY('+((1-p)*260)+'px) scale('+(.75+.25*p)+')';
           const s=back(ap(t,.55*k,.4));$('aselo').style.opacity=Math.min(1,s);$('aselo').style.transform='rotate(-4deg) scale('+s+')';
           if($('atx'))$('atx').style.opacity=eo(ap(t,.9*k,.4));
-          const w=eo(ap(t,.3*k,.5));$('atrab').style.transform='translateX('+((1-w)*-320)+'px)';
+          const w=eo(ap(t,.3*k,.5));$('atrab').style.transform='translateX('+((1-w)*-320)+'px) scale(1.35)';
           const b=document.getElementById('tbraco');if(b)b.style.transform='rotate('+(Math.sin(t*${reacao === 'feliz' ? 9 : 5})*${reacao === 'feliz' ? 12 : 5})+'deg)';
           if($('aint')){const q=back(ap(t,.8*k,.4));$('aint').style.opacity=Math.min(1,q);$('aint').style.transform='translateY('+(Math.sin(t*3)*12)+'px) scale('+q+')';}`,
       };
