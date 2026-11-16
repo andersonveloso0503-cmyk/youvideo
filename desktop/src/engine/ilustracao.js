@@ -287,6 +287,27 @@ const DESENHOS = {
     const retrato = Array.isArray(d.videoQuadros) && d.videoQuadros.length
       ? d.videoQuadros.map((f, i) => `<img class="vq" src="${esc(pathToFileURL(f).href)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 25%;${i ? 'visibility:hidden' : ''}">`).join('')
       : temFoto ? `<img src="${esc(pathToFileURL(d.fotoArquivo).href)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 20%">` : `<div style="position:absolute;left:90px;top:60px;transform:scale(1.5)">${boneco('#3a6fd8')}</div>`;
+    // 16/11 (estilo palco): o TRECHO REAL da pessoa passa na mesma "TV" do placar, com o nome e a fonte embaixo
+    if (d.trechoOficial && Array.isArray(d.videoQuadros) && d.videoQuadros.length) {
+      const nomeT = String(d.nome || '');
+      return {
+        html: `<div id="tvt" style="position:absolute;left:0;top:0;width:1000px;height:590px;border-radius:40px;background:linear-gradient(#2a3866,#141c38);border:5px solid #3b4c86;box-shadow:0 16px 0 #0b1024,0 34px 60px rgba(0,0,0,.6);opacity:0">
+            <div style="position:absolute;left:22px;top:22px;right:22px;bottom:22px;border-radius:24px;overflow:hidden;background:#000">${retrato}
+              <div style="position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(transparent,rgba(0,0,0,.7))"></div></div>
+            <div style="position:absolute;left:46px;top:44px;display:flex;align-items:center;gap:14px;background:#e5302f;color:#fff;font-size:30px;font-weight:900;letter-spacing:3px;padding:8px 20px;border-radius:14px;box-shadow:0 6px 0 rgba(0,0,0,.35)">
+              <span style="display:flex;gap:5px;align-items:flex-end;height:30px">${[0, 1, 2, 3].map((i) => `<i class="eq" style="display:block;width:7px;height:20px;background:#fff;border-radius:3px"></i>`).join('')}</span>OUÇA</div>
+            ${d.fonte ? `<div style="position:absolute;right:46px;bottom:40px;color:#dfe6f8;font-size:24px;font-weight:700;letter-spacing:1px;text-shadow:0 2px 6px #000">FONTE: ${txt(d.fonte, 24).toUpperCase()}</div>` : ''}</div>
+          <div id="tvn" style="position:absolute;left:0;right:0;top:620px;display:flex;justify-content:center;opacity:0">
+            <div style="display:flex;align-items:center;gap:18px;background:#0e1428;border:3px solid #2c3a66;border-radius:60px;padding:10px 34px 10px 10px;box-shadow:0 10px 24px rgba(0,0,0,.5)">
+              ${temFoto ? `<div style="width:96px;height:96px;border-radius:50%;overflow:hidden;border:4px solid #fff;box-shadow:0 0 0 4px var(--ouro)"><img src="${esc(pathToFileURL(d.fotoArquivo).href)}" style="width:100%;height:100%;object-fit:cover;object-position:50% 20%"></div>` : ''}
+              <div style="color:#fff;font-size:${nomeT.length > 18 ? 34 : 42}px;font-weight:900;letter-spacing:1px;text-transform:uppercase;white-space:nowrap">${txt(nomeT, 30)}</div></div></div>
+          ${texto ? `<div id="tvq" style="position:absolute;left:30px;right:30px;top:760px;text-align:center;opacity:0"><span style="display:inline-block;background:#fff;color:#111;border-radius:22px;padding:16px 30px;font-size:${texto.length > 70 ? 36 : 42}px;font-weight:800;line-height:1.2;box-shadow:0 10px 0 rgba(0,0,0,.3)">“${txt(texto, 120)}”</span></div>` : ''}`,
+        anim: `const p=back(ap(t,.02,.45));$('tvt').style.opacity=Math.min(1,p);$('tvt').style.transform='scale('+(.7+.3*p)+')';
+          const n=back(ap(t,.35,.4));$('tvn').style.opacity=Math.min(1,n);$('tvn').style.transform='translateY('+((1-n)*60)+'px)';
+          if($('tvq')){const q=eo(ap(t,.6,.4));$('tvq').style.opacity=q;}
+          $$('.eq').forEach((e,i)=>{e.style.height=(8+Math.abs(Math.sin(t*9+i*1.7))*22)+'px';});`,
+      };
+    }
     return {
       html: `<div id="fp" style="position:absolute;left:20px;top:215px;width:430px;height:440px;background:#c9ced9;border:9px solid #111;border-radius:6px;overflow:hidden;transform:rotate(-2.5deg);box-shadow:14px 14px 0 rgba(0,0,0,.35)">
           ${retrato}
@@ -422,7 +443,7 @@ ${d.etiqueta && !d.semTitulo ? `<div class="tagp" id="tag">${txt(d.etiqueta, 24)
 ${d.titulo && !d.semTitulo ? `<div class="tit" id="tit">${tituloHtml(d.titulo, d.destaque)}</div>` : ''}
 <div class="ilu">${des.html}</div>
 ${(d.clima === 'ruim' || d.clima === 'bom') && masc && vertical ? `<svg id="clima" viewBox="0 0 100 100" style="position:absolute;right:${W * 0.05}px;top:${H * 0.627}px;width:${Math.round(W * 0.1)}px;opacity:0;filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))"><circle cx="50" cy="50" r="46" fill="#ffcc4d" stroke="#e0a020" stroke-width="4"/><ellipse cx="35" cy="42" rx="6" ry="8" fill="#3a2a10"/><ellipse cx="65" cy="42" rx="6" ry="8" fill="#3a2a10"/>${d.clima === 'ruim' ? '<path d="M30 74 q20 -18 40 0" stroke="#3a2a10" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M24 30 l14 -6 M76 30 l-14 -6" stroke="#3a2a10" stroke-width="5" stroke-linecap="round"/><path id="clag" d="M30 52 q-6 10 0 14 q6 -4 0 -14z" fill="#5ab0ff"/>' : '<path d="M28 62 q22 22 44 0" stroke="#3a2a10" stroke-width="6" fill="none" stroke-linecap="round"/>'}</svg>` : ''}
-${d.fonte && vertical ? `<div id="fonte" style="position:absolute;top:${H * (masc ? 0.607 : 0.688)}px;left:${masc ? W * 0.24 : W * 0.06}px;right:${W * 0.05}px;text-align:center;white-space:nowrap;overflow:hidden;font-weight:600;font-size:${Math.round(27 * W / 1080)}px;letter-spacing:.5px;color:var(--mut);opacity:0">Fonte: ${txt(d.fonte, 42)}</div>` : ''}
+${d.fonte && vertical && !d.trechoOficial ? `<div id="fonte" style="position:absolute;top:${H * (masc ? 0.607 : 0.688)}px;left:${masc ? W * 0.24 : W * 0.06}px;right:${W * 0.05}px;text-align:center;white-space:nowrap;overflow:hidden;font-weight:600;font-size:${Math.round(27 * W / 1080)}px;letter-spacing:.5px;color:var(--mut);opacity:0">Fonte: ${txt(d.fonte, 42)}</div>` : ''}
 ${masc ? `<div id="masc" style="position:absolute;left:${vertical ? W * 0.01 : W * 0.03}px;top:${(vertical ? H * 0.765 : H * 0.9) - mascH}px;width:240px;height:360px;transform-origin:0 0"><div style="transform:scale(${mascEsc});transform-origin:0 0">${mascoteSvg(d.mascote.roupa)}</div></div>` : ''}</div>
 <div id="marca" style="position:fixed;left:0;top:0;width:2px;height:2px;background:rgb(0,0,77);z-index:99"></div>
 <script>
