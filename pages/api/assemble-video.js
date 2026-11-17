@@ -222,7 +222,7 @@ export default async function handler(req, res) {
       ...(req.body.urgente ? { urgente: true } : {}),
       ...(req.body.musica?.url ? { musica: { url: String(req.body.musica.url), volume: Math.max(0.02, Math.min(0.5, Number(req.body.musica.volume) || 0.1)) } } : {}),
       audio: temAudioSegments
-        ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length, ...(s.volume != null ? { volume: s.volume } : {}), ...(s.fade ? { fade: s.fade } : {}) }))
+        ? audioSegments.map((s) => ({ url: s.url, start: s.start, length: s.length, ...(s.volume != null ? { volume: s.volume } : {}), ...(s.fade ? { fade: s.fade } : {}), ...(s.inicio ? { inicio: s.inicio } : {}) }))
         : [{ url: audioUrl, start: 0, length: duracaoTotalAudio }],
       clipes: clipsVideo.map((c) => ({
         tipo: c.asset.type === 'video' ? 'video' : 'imagem',

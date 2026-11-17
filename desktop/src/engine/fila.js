@@ -1300,7 +1300,9 @@ class Fila extends EventEmitter {
       try {
         const sem = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         let ultima = -999;
-        for (const w of rc.palavras || []) {
+        // o Short já termina com o trailer (aviso "no final você vê o trailer"): não mostra a telinha antes
+        const temTrailerFinal = (rc.clipes || []).some((c) => c.ilustracao?.tipo === 'trailer');
+        for (const w of temTrailerFinal ? [] : rc.palavras || []) {
           if (!/^trailers?\b|^teaser\b/.test(sem(w.texto)) || w.start - ultima < 60) continue;
           let usado = 0;
           for (const c of rc.clipes || []) {
