@@ -320,6 +320,8 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
         let ilu = fotoCena ? { ...c.ilustracao, fotoArquivo: fotoCena } : { ...c.ilustracao };
         // Short com manchete fixa no alto: a manchete ocupa o lugar do título da ilustração (o fecho mantém o "Se inscreve!")
         if (receita.manchete && H > W && !['inscreva'].includes(ilu.tipo)) ilu.semTitulo = true;
+        // cabeçalho agora vai por cima do vídeo inteiro (legenda): não desenha o antigo, pequeno, dentro da ilustração
+        if (receita.cabecalho) delete ilu.cab;
         // quadro de fotos: as fotos baixadas de cada pessoa (sem foto, a silhueta com o nome)
         if (Array.isArray(ilu.fotos)) ilu.fotos = ilu.fotos.map((f) => ({ nome: f.nome, ...(f.voto ? { voto: f.voto } : {}), ...(f.apelido ? { apelido: f.apelido } : {}), ...(f.url && locais[f.url] ? { arquivo: locais[f.url] } : {}) }));
         // mascote: a boca abre e fecha nas palavras que estão sendo faladas neste trecho (12 valores por segundo)
@@ -423,7 +425,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
 }
 
 /** Legenda estilo karaokê: blocos de palavras em caixa alta, a palavra falada em destaque. */
-function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, manchete, ocultar = [] }) {
+function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, manchete, cabecalho, ocultar = [] }) {
   const tempo = (s) => {
     s = Math.max(0, s);
     const h = Math.floor(s / 3600);
@@ -455,6 +457,9 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, 
   if (marca) linhas.push(`Dialogue: 1,${tempo(0)},${tempo(duracao)},Marca,,0,0,0,,${limpar(marca)}`);
   // Manchete fixa no alto (Short): a frase da capa, grande, amarela com contorno preto, o vídeo todo — qualquer quadro
   // que o YouTube escolher de miniatura mostra o assunto. Some nas ilustrações (que já têm título) e na capa do começo.
+  // Cabeçalho fixo (17/11, pedido do dono: "não apareceu"): agora vai por cima do vídeo INTEIRO (foto, jogo, trailer,
+  // desenho), maior, com fundo escuro, logo abaixo da barra do app do YouTube; a manchete desce um pouco para dar lugar
+  const temCab = !!(cabecalho && cabecalho.secao && curto && duracao > 4);
   if (manchete && curto && duracao > 4) {
     // Abaixo da barra do app do YouTube (voltar / lupa / ⋯ e a etiqueta "Programado") e longe das laterais,
     // onde ficam os ícones: a letra diminui para a linha mais comprida caber inteira, sem nada por cima.
@@ -476,12 +481,12 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, 
       if (n > palsM.length) break;
       const ls = dividir(n);
       const maior = Math.max(...ls.map((l) => l.length));
-      const fs = Math.min(menor * 0.13, (W * 0.76) / (maior * 0.5), (H * 0.2) / (ls.length * 1.05));
+      const fs = Math.min(menor * 0.13, (W * 0.76) / (maior * 0.5), (H * (temCab ? 0.17 : 0.2)) / (ls.length * 1.05));
       if (!melhor || fs > melhor.fs * 1.08) melhor = { fs, ls };
     }
     const tamM = Math.round(melhor ? melhor.fs : menor * 0.1);
     linhas.splice(linhas.indexOf('[Events]') - 1, 0,
-      `Style: Manchete,Montserrat ExtraBold,${tamM},&H0012C8FF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.round(tamM / 7)},${Math.round(tamM / 16)},8,${Math.round(W * 0.1)},${Math.round(W * 0.1)},${Math.round(H * 0.105)},1`);
+      `Style: Manchete,Montserrat ExtraBold,${tamM},&H0012C8FF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.round(tamM / 7)},${Math.round(tamM / 16)},8,${Math.round(W * 0.1)},${Math.round(W * 0.1)},${Math.round(H * (temCab ? 0.135 : 0.105))},1`);
     const fora = [[0, 1.25], ...ocultar].filter((x) => x[1] > x[0]).sort((a, b) => a[0] - b[0]);
     let t = 0;
     const trechos = [];
@@ -504,6 +509,45 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, 
     }
     for (const [a, b] of trechos) linhas.push(`Dialogue: 3,${tempo(a)},${tempo(b)},Manchete,,0,0,0,,{\\fad(150,150)}${txt}`);
   }
+  if (temCab) {
+    const tamC = Math.round(W * 0.034);
+    const pad = Math.round(tamC * 0.32);
+    const topo = Math.round(H * 0.088);
+    const lado = Math.round(W * 0.04);
+    // caixa azul-marinho quase opaca atrás do texto (BorderStyle 3), igual em qualquer cena
+    linhas.splice(linhas.indexOf('[Events]') - 1, 0,
+      `Style: CabSecao,Montserrat ExtraBold,${tamC},&H00E0CCBE,&H000000FF,&H002A1A0B,&H00000000,-1,0,0,0,100,100,${Math.round(tamC * 0.06)},0,3,${pad},0,7,${lado},${lado},${topo},1`,
+      `Style: CabCanal,Montserrat ExtraBold,${tamC},&H004AB0E8,&H000000FF,&H002A1A0B,&H00000000,-1,0,0,0,100,100,${Math.round(tamC * 0.06)},0,3,${pad},0,9,${lado},${lado},${topo},1`);
+    const limparC = (t) => String(t || '').replace(/[{}\\]/g, '').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 28);
+    const fora = [[0, 1.25], ...ocultar].filter((x) => x[1] > x[0]).sort((a, b) => a[0] - b[0]);
+    let t = 0;
+    const trechosC = [];
+    for (const [a, b] of fora) {
+      if (a > t + 0.6) trechosC.push([t, a]);
+      t = Math.max(t, b);
+    }
+    if (duracao > t + 0.6) trechosC.push([t, duracao]);
+    // bolinhas de progresso: acendem uma a uma a cada quarto do vídeo
+    // (desenhadas como círculos: a fonte não tem a bolinha cheia "●")
+    const r = Math.round(tamC * 0.2);
+    const k = Math.round(r * 0.552);
+    const circ = `m ${r} 0 b ${r + k} 0 ${2 * r} ${r - k} ${2 * r} ${r} b ${2 * r} ${r + k} ${r + k} ${2 * r} ${r} ${2 * r} b ${r - k} ${2 * r} 0 ${r + k} 0 ${r} b 0 ${r - k} ${r - k} 0 ${r} 0`;
+    const bolinhas = (n) => [1, 2, 3, 4].map((i) => `{\\c&H${i <= n ? '4AB0E8' : '6A4033'}&\\p1\\pbo${Math.round(tamC * 0.08)}}${circ}{\\p0} `).join('');
+    const canal = limparC(cabecalho.canal);
+    const sub = limparC(cabecalho.sub);
+    const txtCanal = canal + (sub ? `\\N{\\fs${Math.round(tamC * 0.62)}\\c&HB38B7D&}${sub}` : '');
+    for (const [a, b] of trechosC) {
+      for (let q = 0; q < 4; q++) {
+        const qa = Math.max(a, (duracao * q) / 4);
+        const qb = Math.min(b, (duracao * (q + 1)) / 4);
+        if (qb - qa < 0.05) continue;
+        const fad = `{\\fad(${qa === a ? 150 : 0},${qb === b ? 150 : 0})}`;
+        linhas.push(`Dialogue: 4,${tempo(qa)},${tempo(qb)},CabSecao,,0,0,0,,${fad}${limparC(cabecalho.secao)}  ${bolinhas(q + 1).trimEnd()}\\h`);
+        if (canal) linhas.push(`Dialogue: 4,${tempo(qa)},${tempo(qb)},CabCanal,,0,0,0,,${fad}${txtCanal}`);
+      }
+    }
+  }
+
   // Chamada da empresa (ex.: WhatsApp) em destaque nos últimos segundos, numa faixa no alto da tela
   if (cta && duracao > 6) {
     const tamCta = Math.round(menor * (curto ? 0.07 : 0.06));

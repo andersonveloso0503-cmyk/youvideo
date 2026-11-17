@@ -123,6 +123,15 @@ async function registrarVolta(db, { inicio, docs, feitos, erro }) {
   await ref.set({ ultima: volta, voltas: [volta, ...antes].slice(0, 6) });
 }
 
+// Cabeçalho fixo dos Shorts de política e games (seção + bolinhas de progresso + canal), desenhado pelo PC por cima
+// do vídeo inteiro (17/11: o que ficava só dentro das ilustrações era pequeno e ficava atrás da barra do YouTube)
+function cabecalhoDoShort(item) {
+  if (item.formato !== 'short' || !(item.politica || item.games)) return null;
+  if (item.games) return { secao: 'GAMES · NOVIDADE', canal: 'PRÓXIMA FASE', sub: 'GAMES TODO DIA' };
+  const cidade = item.roteiro?.cidade || item.cidade || '';
+  return { secao: cidade ? `${String(cidade).toUpperCase()} · CIDADE` : 'POLÍTICA · ENTENDA', canal: 'NOITES NA HISTÓRIA', sub: 'NOTÍCIA SEM LADO' };
+}
+
 export default async function handler(req, res) {
   const db = getDb();
   const baseUrl = `https://${req.headers.host}`;
@@ -607,6 +616,7 @@ export default async function handler(req, res) {
             ...(item.games ? { encaixar: 'faixa' } : item.politica || item.brasil ? { encaixar: true } : {}), // games: gameplay grande cortando só as bordas // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
             // Manchete fixa no alto do Short (a frase da capa): qualquer quadro que vire miniatura mostra o assunto
             ...((item.games || item.politica || item.brasil) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}),
+            ...(cabecalhoDoShort(item) ? { cabecalho: cabecalhoDoShort(item) } : {}), // cabeçalho fixo no alto, por cima do vídeo inteiro
             ...(item.fabrica?.urgente ? { urgente: true } : {}), // notícia quente: o PC monta antes das outras // games: mídia deitada inteira no Short, com fundo desfocado
             // Documentário: quadrinho explicando o lugar que aparece e música baixinha por baixo da narração
             ...(item.documentario ? { textos: quadrinhosDoDocumentario(item.arquivos), musica: item.musicaUrl ? { url: item.musicaUrl, volume: 0.1 } : null } : {}),
@@ -707,6 +717,7 @@ export default async function handler(req, res) {
             ...(item.games ? { encaixar: 'faixa' } : item.politica || item.brasil ? { encaixar: true } : {}), // games: gameplay grande cortando só as bordas // vídeo e imagem deitados aparecem INTEIROS no Short (sem cortar personagem nem nome do jogo), com fundo desfocado
             // Manchete fixa no alto do Short (a frase da capa): qualquer quadro que vire miniatura mostra o assunto
             ...((item.games || item.politica || item.brasil) && item.formato === 'short' && item.roteiro?.thumbnailTitulo ? { manchete: String(item.roteiro.thumbnailTitulo).slice(0, 48) } : {}),
+            ...(cabecalhoDoShort(item) ? { cabecalho: cabecalhoDoShort(item) } : {}), // cabeçalho fixo no alto, por cima do vídeo inteiro
             ...(item.fabrica?.urgente ? { urgente: true } : {}), // notícia quente: o PC monta antes das outras
           });
           await ref.update({ arquivos: arquivosAtualizados, renderId, status: 'montando' });
