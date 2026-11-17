@@ -314,7 +314,19 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
       : null;
     // vídeo livre da pessoa (Commons) dentro do cartão: baixado junto com as outras mídias
     const videoCena = c.ilustracao?.videoUrl && locais[c.ilustracao.videoUrl] && fs.existsSync(locais[c.ilustracao.videoUrl]) ? locais[c.ilustracao.videoUrl] : null;
-    if (c.ilustracao && (c.ilustracao.tipo !== 'foto' || videoCena || (fotoCena && fs.existsSync(fotoCena)))) {
+    // 17/11 (dono: "apenas o trailer de repente tela inteira"): no Short, o TRAILER oficial ocupa a TELA INTEIRA,
+    // no vídeo original (nítido, em movimento normal); o resto do vídeo continua do tamanho de hoje
+    if (c.ilustracao?.tipo === 'trailer' && H > W && videoCena) {
+      try {
+        const ini = Math.max(0, Number(c.ilustracao.videoInicio) || 0);
+        await rodarCena(['-stream_loop', '-1', '-ss', ini.toFixed(2), '-i', videoCena, '-t', L, '-vf', `fps=${FPS},${cobrir(W, H)}`, ...comum, saida]);
+        ilustrada = true;
+      } catch (e) {
+        if (e?.message === 'CANCELADO') throw e;
+        console.warn(`[montagem] trailer em tela inteira (cena ${i + 1}) não deu, vai na TV:`, String(e?.message || e).slice(0, 200));
+      }
+    }
+    if (!ilustrada && c.ilustracao && (c.ilustracao.tipo !== 'foto' || videoCena || (fotoCena && fs.existsSync(fotoCena)))) {
       try {
         const Ilu = require('./ilustracao');
         let ilu = fotoCena ? { ...c.ilustracao, fotoArquivo: fotoCena } : { ...c.ilustracao };
@@ -425,7 +437,7 @@ async function prepararFundo(receita, locais, dir, W, H, { modo, onProgresso, re
 }
 
 /** Legenda estilo karaokê: blocos de palavras em caixa alta, a palavra falada em destaque. */
-function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, manchete, cabecalho, ocultar = [] }) {
+function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, manchete, cabecalho, trailers = [], ocultar = [] }) {
   const tempo = (s) => {
     s = Math.max(0, s);
     const h = Math.floor(s / 3600);
@@ -545,6 +557,22 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, 
         linhas.push(`Dialogue: 4,${tempo(qa)},${tempo(qb)},CabSecao,,0,0,0,,${fad}${limparC(cabecalho.secao)}  ${bolinhas(q + 1).trimEnd()}\\h`);
         if (canal) linhas.push(`Dialogue: 4,${tempo(qa)},${tempo(qb)},CabCanal,,0,0,0,,${fad}${txtCanal}`);
       }
+    }
+  }
+
+  // Trailer em tela inteira (17/11): selo vermelho "▶ TRAILER OFICIAL" e o nome do jogo, acima da legenda
+  if (curto && Array.isArray(trailers) && trailers.length) {
+    const tamT = Math.round(W * 0.04);
+    linhas.splice(linhas.indexOf('[Events]') - 1, 0,
+      `Style: TrailerSelo,Montserrat ExtraBold,${tamT},&H00FFFFFF,&H000000FF,&H002F30E5,&H00000000,-1,0,0,0,100,100,${Math.round(tamT * 0.08)},0,3,${Math.round(tamT * 0.3)},0,2,${Math.round(W * 0.06)},${Math.round(W * 0.06)},${Math.round(H * 0.4)},1`,
+      `Style: TrailerNome,Montserrat ExtraBold,${Math.round(tamT * 1.9)},&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,${Math.round(tamT / 6)},${Math.round(tamT / 14)},2,${Math.round(W * 0.06)},${Math.round(W * 0.06)},${Math.round(H * 0.33)},1`);
+    const limparT = (t) => String(t || '').replace(/[{}\\]/g, '').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 30);
+    for (const t of trailers) {
+      const a = Math.max(0, Number(t.start) || 0);
+      const b = Math.min(duracao, a + (Number(t.length) || 0));
+      if (b - a < 1) continue;
+      linhas.push(`Dialogue: 5,${tempo(a + 0.3)},${tempo(b)},TrailerSelo,,0,0,0,,{\\fad(200,150)}▶ TRAILER OFICIAL`);
+      if (t.nome) linhas.push(`Dialogue: 5,${tempo(a + 0.5)},${tempo(b)},TrailerNome,,0,0,0,,{\\fad(250,150)}${limparT(t.nome)}`);
     }
   }
 
