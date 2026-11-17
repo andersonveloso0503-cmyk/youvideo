@@ -1241,7 +1241,7 @@ class Fila extends EventEmitter {
       }
     }
     this.lembrarLocal(videoUrl, arquivo);
-    await Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: job.pedidoId, acao: 'feito', videoUrl, comBotao: !!job.comBotao } });
+    await Central.chamar(cfg, '/api/central/montar-pc', { metodo: 'POST', corpo: { id: job.pedidoId, acao: 'feito', videoUrl, comBotao: !!job.comBotao, recursos: job.recursos || [] } });
     this.atualizar(job, { videoUrlSite: videoUrl });
   }
 
@@ -1370,6 +1370,19 @@ class Fila extends EventEmitter {
         ? { arquivo: botaoLike, ...(curto ? { tamanho: 46, posicao: 'topo', primeiroSeg: 5, intervaloMin: 0.5 } : { tamanho: 28, posicao: 'inf_dir', primeiroSeg: 10, intervaloMin: 5 }) }
         : null;
       job.comBotao = !!botaoLike;
+      // 17/11 (dono: "não consegui achar as alterações"): etiquetas do que este vídeo usou, para aparecer no Painel
+      try {
+        const tiposUsados = new Set((rc.clipes || []).map((c) => c.ilustracao?.tipo).filter(Boolean));
+        job.recursos = [
+          rc.cabecalho ? 'cabecalho' : null,
+          tiposUsados.has('votacao') ? 'votacao' : null,
+          (rc.clipes || []).some((c) => c.ilustracao?.trechoOficial) ? 'fala-real' : null,
+          tiposUsados.has('alerta') ? 'selo' : null,
+          tiposUsados.has('trailer') ? 'trailer' : null,
+        ].filter(Boolean);
+      } catch (e) {
+        job.recursos = [];
+      }
       const saida = caminhoLivre(pasta, nomeSeguro(job.nome));
       const temporario = path.join(dir, 'final.mp4');
       const encoder = cfg.encoder && cfg.encoder !== 'auto' ? cfg.encoder : await detectarEncoder();

@@ -888,6 +888,7 @@ export default async function handler(req, res) {
             ...(avisoThumb ? { aviso: avisoThumb } : {}),
             'fabrica.agendaId': agendaId,
             comBotao: check.comBotao === true, // botão de like já gravado na montagem: o PC não põe de novo no YouTube
+            recursos: Array.isArray(check.recursos) ? check.recursos : [], // etiquetas no Painel: cabeçalho, votação, fala real, selo, trailer
             // Games, política e Noites na História: o vídeo pronto espera o dono assistir e aprovar
             // (aba ✅ Aprovar da Biblioteca do Compilador) antes de ir para o YouTube
             // Refeito: o original já foi aprovado pelo dono — sobe sozinho (só troca imagens/ilustrações, mesmo texto e voz)

@@ -115,6 +115,7 @@ const Painel = (() => {
           chips += ruins.length ? `<span class="pn-chip at">⚠ ${esc(ruins[0].nome)}${ruins.length > 1 ? ` +${ruins.length - 1}` : ''}</span>` : '<span class="pn-chip ok">✓ Conferido</span>';
           if (c.nota != null) chips += `<span class="pn-chip" title="${esc(c.porqueNota || '')}">Nota do vídeo <b>${String(c.nota).replace('.', ',')}</b></span>`;
         }
+        chips += etiquetasRecursos(i);
         return `<div class="pn-item">
           ${i.thumbnailUrl ? `<img src="${esc(i.thumbnailUrl)}" alt="">` : '<div class="sem-capa"></div>'}
           <div class="meio"><span class="nota">${esc(TIPO[i.tipo] || '')} · ${i.formato === 'short' ? 'Short' : 'Longo'} · ${esc(quando(i.quando))}</span><b title="${esc(i.titulo)}">${esc(i.titulo)}</b><div class="pn-chips">${chips}</div></div>
@@ -310,6 +311,15 @@ const Painel = (() => {
       .join('');
   }
 
+  // 17/11 (dono: "não consegui achar as alterações"): o que cada vídeo usou, em etiquetas
+  const ROTULO_RECURSO = { cabecalho: '🏷️ cabeçalho', votacao: '🗳️ votação', 'fala-real': '📺 fala real', selo: '💥 selo', trailer: '🎬 trailer' };
+  function etiquetasRecursos(i) {
+    if (!Array.isArray(i.recursos)) return '';
+    const l = i.recursos.filter((r) => ROTULO_RECURSO[r]);
+    if (!l.length) return i.formato === 'short' && (i.games || i.politica || ['games', 'politica'].includes(i.tipo)) ? '<span class="pn-chip" style="opacity:.7">sem cabeçalho nem extras</span>' : '';
+    return l.map((r) => `<span class="pn-chip" style="background:rgba(232,176,74,.16);color:#f3cf8a">${ROTULO_RECURSO[r]}</span>`).join('');
+  }
+
   // 17/11 (dono: "tem como colocar no compilador o que sobe hoje?"): tudo que vai ao ar HOJE, de todos os canais
   function sobeHoje() {
     const box = q('#pnHojeLista');
@@ -342,7 +352,7 @@ const Painel = (() => {
         return `<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--borda)">
           <b style="min-width:46px">${esc(hora(i.quandoYoutube || i.quando))}</b>
           <div style="flex:1;min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i.formato === 'longo' ? '📺' : '📱'} ${esc(String(i.titulo || i.tema || ''))}</div>
-          <span class="nota">${esc(canalDe(i))} · <span style="color:${cor}">${txt}</span>${link}</span></div></div>`;
+          <span class="nota">${esc(canalDe(i))} · <span style="color:${cor}">${txt}</span>${link}</span>${etiquetasRecursos(i) ? `<div class="pn-chips" style="margin-top:3px">${etiquetasRecursos(i)}</div>` : ''}</div></div>`;
       })
       .join('');
     box.querySelectorAll('[data-link]').forEach((a) => (a.onclick = (e) => (e.preventDefault(), window.api.abrir.link(a.dataset.link))));

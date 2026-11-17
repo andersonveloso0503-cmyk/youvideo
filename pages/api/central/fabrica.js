@@ -309,6 +309,7 @@ export default async function handler(req, res) {
             videoUrl: x.videoUrl || null,
             thumbnailUrl: x.thumbnailUrl || null,
             capaOpcoes: Array.isArray(x.capaOpcoes) ? x.capaOpcoes : [], // as duas capas (melhor x econômica) para comparar
+            recursos: Array.isArray(x.recursos) ? x.recursos : null, // o que o vídeo usou (etiquetas no Painel)
             conferencia: x.conferencia || null, // linha do tempo da conferência final (texto, legenda, cenas, capa)
             quando: x.fabrica?.quandoYoutube || x.fabrica?.quando || null,
             canal: x.fabrica?.canalYoutube?.titulo || '',
@@ -395,6 +396,7 @@ export default async function handler(req, res) {
           playlist: x.roteiro?.playlist?.titulo ? x.roteiro.playlist : x.games || x.politica || x.brasil ? playlistDoAssunto(x) : null, // games/política/Brasil: playlist do assunto (GTA 6, STF, Economia...) // documentário: entra sozinho na playlist da série (ex.: "Catástrofes do Brasil")
           infantil: x.infantil ? { personagem: x.infantil.personagem?.nome || '', musica: x.roteiro?.musica?.titulo || '', teste: x.infantil.teste === true, shortMusica: x.shortMusica === true, temporada: x.infantil.temporada ? { nome: x.infantil.temporada.nome, numero: x.infantil.temporada.numero, ep: x.infantil.temporada.ep, total: x.infantil.temporada.total } : null } : null,
           comBotao: x.comBotao === true,
+          recursos: Array.isArray(x.recursos) ? x.recursos : null, // o que o vídeo usou (etiquetas no Painel)
           renderId: x.renderId || null, // pedido de montagem no PC: liga o cartão da Fila do Compilador a este vídeo
           corte: x.corte ? { tipo: x.corte.tipo === 'comico' ? 'comico' : 'filme' } : null,
         };
