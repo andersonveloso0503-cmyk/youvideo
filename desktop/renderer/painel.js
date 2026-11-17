@@ -310,6 +310,44 @@ const Painel = (() => {
       .join('');
   }
 
+  // 17/11 (dono: "tem como colocar no compilador o que sobe hoje?"): tudo que vai ao ar HOJE, de todos os canais
+  function sobeHoje() {
+    const box = q('#pnHojeLista');
+    if (!box) return;
+    if (!ultimo.fabrica) return (box.innerHTML = '<p class="nota">Carregando...</p>');
+    const hojeStr = new Date().toDateString();
+    const agora = Date.now();
+    const lista = (ultimo.fabrica || [])
+      .filter((i) => {
+        const t = new Date(i.quandoYoutube || i.quando || 0);
+        return !isNaN(t) && t.toDateString() === hojeStr;
+      })
+      .sort((a, b) => String(a.quandoYoutube || a.quando).localeCompare(String(b.quandoYoutube || b.quando)));
+    if (!lista.length) return (box.innerHTML = '<p class="nota">Nada marcado para hoje.</p>');
+    const situ = (i) => {
+      const y = i.youtube?.status;
+      const t = Date.parse(i.quandoYoutube || i.quando || '');
+      if (y === 'ok') return t <= agora ? ['✅ No ar', '#3fbf7f'] : ['📅 Programado no YouTube', '#7fb2ff'];
+      if (y === 'enviando') return ['⬆️ Subindo agora', '#e8b04a'];
+      if (y === 'pendente') return ['⏳ Na fila para subir', '#e8b04a'];
+      if (y === 'revisar') return ['✋ Falta você aprovar', '#ff8a5c'];
+      if (y === 'erro') return ['⚠️ Deu erro ao subir', '#ff5a4f'];
+      return ['🛠️ Sendo produzido', '#9fb0d8'];
+    };
+    const canalDe = (i) => i.canalYoutube?.titulo || (i.games ? 'Próxima Fase' : i.politica ? 'Política' : i.brasil ? 'Brasil Inacreditável' : 'Outro canal');
+    box.innerHTML = lista
+      .map((i) => {
+        const [txt, cor] = situ(i);
+        const link = i.youtube?.url ? ` · <a href="#" data-link="${esc(i.youtube.url)}">abrir</a>` : '';
+        return `<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--borda)">
+          <b style="min-width:46px">${esc(hora(i.quandoYoutube || i.quando))}</b>
+          <div style="flex:1;min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i.formato === 'longo' ? '📺' : '📱'} ${esc(String(i.titulo || i.tema || ''))}</div>
+          <span class="nota">${esc(canalDe(i))} · <span style="color:${cor}">${txt}</span>${link}</span></div></div>`;
+      })
+      .join('');
+    box.querySelectorAll('[data-link]').forEach((a) => (a.onclick = (e) => (e.preventDefault(), window.api.abrir.link(a.dataset.link))));
+  }
+
   function agenda() {
     const box = q('#pnAgenda');
     if (!ultimo.fabrica) return (box.innerHTML = '<p class="nota">Carregando...</p>');
@@ -342,7 +380,7 @@ const Painel = (() => {
       }
     };
     const precisa = seguro(resumo) || [];
-    for (const f of [listaAprovar, () => avisos(precisa), canais, monetizacao, desempenho, melhorar, retencao, comentarios, pcs, agenda]) seguro(f);
+    for (const f of [sobeHoje, listaAprovar, () => avisos(precisa), canais, monetizacao, desempenho, melhorar, retencao, comentarios, pcs, agenda]) seguro(f);
   }
 
   async function carregar(forcar = false) {
