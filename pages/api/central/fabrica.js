@@ -282,8 +282,23 @@ export default async function handler(req, res) {
         await d.ref.update({ 'fabrica.youtube': { status: 'pendente', aprovadoEm: new Date().toISOString(), aprovadoSozinho: 'refeito' } }).catch(() => {});
         sozinhos.add(d.id);
       }
+      // 17/11 (dono: "em 8 vídeos para aprovar, nenhum ficou bom"): vídeo que a conferência reprovou e o sistema já tentou
+      // corrigir (2 vezes; longo 4) NÃO aparece para aprovar — sai da lista como "não ficou bom" e a vaga do dia abre
+      // para outra notícia. Enquanto ainda está conferindo/corrigindo, também não aparece (espera ficar pronto).
+      const { problemasGraves } = await import('../../../lib/travaQualidade');
+      const escondidos = new Set();
+      for (const d of snap.docs) {
+        const x = d.data();
+        const cf = x.conferencia;
+        if (!cf) continue;
+        if (['pendente', 'conferindo', 'corrigindo'].includes(cf.status)) { escondidos.add(d.id); continue; }
+        const g = problemasGraves(cf);
+        if (!g.length) continue; // (se ainda desse para corrigir, a conferência estaria "corrigindo", não aqui)
+        escondidos.add(d.id);
+        await d.ref.update({ 'fabrica.youtube': { status: 'erro', em: Date.now(), erro: `Não subi: o vídeo não ficou bom. ${g.join(' ')}`.slice(0, 400), tentativas: 9 } }).catch(() => {});
+      }
       const itens = snap.docs
-        .filter((d) => !sozinhos.has(d.id))
+        .filter((d) => !sozinhos.has(d.id) && !escondidos.has(d.id))
         .filter((d) => d.data().fabrica?.ativo !== false) // refeito ou cancelado: não aparece mais
         .map((d) => {
           const x = d.data();

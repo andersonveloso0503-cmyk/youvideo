@@ -46,7 +46,7 @@
     },
     {
       "path": "/api/central/politica-noticias?auto=cidade",
-      "schedule": "23 14 * * *"
+      "schedule": "23 14,16,18 * * *"
     }
   ]
 }

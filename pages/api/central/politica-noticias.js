@@ -105,7 +105,7 @@ async function aprovarSozinhoPolitica(db, col, cfgDados, opc = {}) {
   let velhas = 0;
   for (const doc of plano ? [] : snap.docs) {
     const x = doc.data();
-    if (!String(x.tipo || 'short').startsWith('explicador') && x.tipo !== 'longo' && idade(x) > 2 * 86400e3) {
+    if (!String(x.tipo || 'short').startsWith('explicador') && x.tipo !== 'longo' && idade(x) > 30 * 3600e3) {
       await doc.ref.update({ status: 'descartada', descartadaEm: new Date().toISOString(), motivo: 'Notícia velha (mais de 2 dias): saiu sozinha.' }).catch(() => {});
       velhas++;
     }
@@ -115,7 +115,7 @@ async function aprovarSozinhoPolitica(db, col, cfgDados, opc = {}) {
   if (!canal) return { automaticas: 0, velhas, motivo: 'sem canal do YouTube (aprove uma notícia à mão uma vez)' };
   const fila = snap.docs
     .map((doc) => ({ ref: doc.ref, d: doc.data() }))
-    .filter(({ d }) => d.ep && d.tipo !== 'longo' && d.tipo !== 'explicador' && (d.tipo === 'explicador-short' || idade(d) <= 2 * 86400e3))
+    .filter(({ d }) => d.ep && d.tipo !== 'longo' && d.tipo !== 'explicador' && (d.tipo === 'explicador-short' || idade(d) <= 30 * 3600e3))
     // explicadores que você pediu primeiro; depois as de mais potencial (em alta, bolso, polêmica, Trump); empate: a mais nova
     .sort((a, b) => (String(b.d.tipo || '').startsWith('explicador') ? 1 : 0) - (String(a.d.tipo || '').startsWith('explicador') ? 1 : 0) || (b.d.tipo === 'cidade' ? 1 : 0) - (a.d.tipo === 'cidade' ? 1 : 0) || ((Number(b.d.potencial) || 5) - idade(b.d) / (12 * 3600e3)) - ((Number(a.d.potencial) || 5) - idade(a.d) / (12 * 3600e3))); // nota cai 1 ponto a cada 12 h: a mais atual na frente
   // 16/11: conta VÍDEOS DIFERENTES do dia (Short). O mesmo vídeo refeito/corrigido aparecia 2 ou 3 vezes e o longo
