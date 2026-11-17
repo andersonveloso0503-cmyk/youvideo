@@ -120,9 +120,13 @@ async function aprovarSozinhoPolitica(db, col, cfgDados, opc = {}) {
     .sort((a, b) => (String(b.d.tipo || '').startsWith('explicador') ? 1 : 0) - (String(a.d.tipo || '').startsWith('explicador') ? 1 : 0) || (b.d.tipo === 'cidade' ? 1 : 0) - (a.d.tipo === 'cidade' ? 1 : 0) || ((Number(b.d.potencial) || 5) - idade(b.d) / (12 * 3600e3)) - ((Number(a.d.potencial) || 5) - idade(a.d) / (12 * 3600e3))); // nota cai 1 ponto a cada 12 h: a mais atual na frente
   // 16/11: conta VÍDEOS DIFERENTES do dia (Short). O mesmo vídeo refeito/corrigido aparecia 2 ou 3 vezes e o longo
   // também contava: o limite de 5 enchia com 2 notícias e nada mais subia ("hoje não subiu nada").
+  const { problemasGraves } = await import('../../../lib/travaQualidade');
+  const barrado = (x) => /^Não subi: o vídeo não ficou bom/.test(String(x.fabrica?.youtube?.erro || '')) || (x.conferencia?.status === 'atencao' && problemasGraves(x.conferencia).length > 0 && (x.correcao?.rodada || 0) >= (x.formato === 'longo' ? 4 : 2));
   const ultimas24 = new Set(
     (await db.collection('youvideo_fila').where('politica', '==', true).get()).docs
       .map((x) => x.data())
+      // 17/11: vídeo que a trava de qualidade barrou (não vai subir) não ocupa vaga: outra notícia entra no lugar
+      .filter((x) => !barrado(x))
       .filter((x) => agora - new Date(x.criadoEm || 0).getTime() < 24 * 3600e3 && !x.refeitoDe && x.formato !== 'longo')
       .map((x) => String(x.noticia || x.roteiro?.titulo || x.tema || Math.random()).toLowerCase())
   ).size;

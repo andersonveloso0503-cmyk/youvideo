@@ -123,9 +123,13 @@ async function aprovarSozinho(db, col, cfgDados, opc = {}) {
     .sort((a, b) => pontos(b.d) - pontos(a.d));
   // Até 5 vídeos de games por dia (mais alcance por vídeo e não estoura o limite de capas); as mais novas primeiro
   // 16/11: conta VÍDEOS DIFERENTES do dia (o mesmo refeito/corrigido contava 2 vezes; o longo não entra)
+  const { problemasGraves } = await import('../../../lib/travaQualidade');
+  const barrado = (x) => /^Não subi: o vídeo não ficou bom/.test(String(x.fabrica?.youtube?.erro || '')) || (x.conferencia?.status === 'atencao' && problemasGraves(x.conferencia).length > 0 && (x.correcao?.rodada || 0) >= (x.formato === 'longo' ? 4 : 2));
   const ultimas24 = new Set(
     (await db.collection('youvideo_fila').where('games', '==', true).get()).docs
       .map((x) => x.data())
+      // 17/11: vídeo que a trava de qualidade barrou (não vai subir) não ocupa vaga: outra notícia entra no lugar
+      .filter((x) => !barrado(x))
       .filter((x) => Date.now() - new Date(x.criadoEm || 0).getTime() < 24 * 3600e3 && !x.refeitoDe && x.formato !== 'longo')
       .map((x) => String(x.noticia || x.roteiro?.titulo || x.tema || Math.random()).toLowerCase())
   ).size;
