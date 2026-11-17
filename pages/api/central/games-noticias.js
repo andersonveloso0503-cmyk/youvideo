@@ -119,7 +119,7 @@ async function aprovarSozinho(db, col, cfgDados, opc = {}) {
   const pontos = (d) => (d.ep?.potencial || 5) - idade(d) / (12 * 3600e3);
   const fila = snap.docs
     .map((d) => ({ ref: d.ref, d: d.data() }))
-    .filter(({ d }) => (d.tipo || 'short') === 'short' && d.ep && idade(d) < 36 * 3600e3)
+    .filter(({ d }) => (d.tipo || 'short') === 'short' && d.ep && idade(d) < 96 * 3600e3)
     // 17/11: as que já estavam esperando também respeitam a regra nova (patch com versão, roadmap, tecnologia de placa)
     .filter(({ d }) => !/\b(patch|hotfix|atualiza[çc][ãa]o|update)\b[^.]*\b\d+\.\d+(\.\d+)?\b|\broadmap\b|\b(dlss|fsr|ray ?tracing|neural rendering|driver)\b/i.test(String(d.titulo || d.ep?.titulo || '')))
     .sort((a, b) => pontos(b.d) - pontos(a.d));
@@ -327,7 +327,7 @@ export default async function handler(req, res) {
         if (cdG.autoAprovar === false) return { acao: 'mao', texto: 'Aprovação automática desligada: só sai se você mandar' };
         if ((x.tipo || 'short') !== 'short') return { acao: 'mao', texto: 'Vídeo longo: espera você mandar (Fazer agora)' };
         if (!x.ep) return { acao: 'nao', texto: 'Sem roteiro: não vai sair' };
-        if (Date.now() - new Date(x.data || x.criadoEm || 0).getTime() >= 36 * 3600e3) return { acao: 'nao', texto: 'Notícia velha (mais de 36 h): não sai sozinha' };
+        if (Date.now() - new Date(x.data || x.criadoEm || 0).getTime() >= 96 * 3600e3) return { acao: 'nao', texto: 'Notícia velha (mais de 36 h): não sai sozinha' };
         const p = plano.get(id);
         return p ? { ...p, ...(p.acao === 'vai' ? { quando: proxRodada } : {}) } : { acao: 'espera', texto: 'Esperando a próxima rodada' };
       };

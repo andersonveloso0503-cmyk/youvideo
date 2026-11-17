@@ -1411,7 +1411,7 @@ export default async function handler(req, res) {
       // 17/11 (dono): refazer usa a MESMA notícia — se ela já passou do prazo, refazer só gasta crédito. Recusa e avisa.
       if (notDoc && d.formato !== 'longo' && (d.games || d.politica) && !String(notDoc.tipo || '').startsWith('explicador')) {
         const horas = (Date.now() - new Date(notDoc.data || notDoc.criadoEm || 0).getTime()) / 3600e3;
-        const prazo = d.games ? 36 : 30;
+        const prazo = d.games ? 96 : 48;
         if (horas > prazo)
           return res.status(400).json({ erro: `Notícia velha (saiu há ${Math.round(horas)} h; o limite é ${prazo} h). Refazer usaria a mesma notícia e gastaria crédito à toa: descarte este vídeo — a vaga abre para uma notícia nova.`, velha: true });
       }
