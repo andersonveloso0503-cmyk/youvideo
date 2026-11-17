@@ -1402,8 +1402,19 @@ export default async function handler(req, res) {
       if (!d?.documentario) return res.status(400).json({ erro: 'Só dá para refazer documentários.' });
       // Notícia e dicas do canal de games: o roteiro está guardado na lista de notícias (não nos episódios escritos)
       let ep = TODOS_EPISODIOS.find((e) => e.id === d.episodioId);
-      if (!ep && d.noticia) ep = (await db.collection(d.politica ? COLECAO_POLITICA : d.brasil ? COLECAO_BRASIL : COLECAO_NOTICIAS).doc(String(d.noticia)).get()).data()?.ep || null;
+      let notDoc = null;
+      if (!ep && d.noticia) {
+        notDoc = (await db.collection(d.politica ? COLECAO_POLITICA : d.brasil ? COLECAO_BRASIL : COLECAO_NOTICIAS).doc(String(d.noticia)).get()).data() || null;
+        ep = notDoc?.ep || null;
+      }
       if (!ep) return res.status(400).json({ erro: 'Não achei o roteiro deste vídeo para refazer.' });
+      // 17/11 (dono): refazer usa a MESMA notícia — se ela já passou do prazo, refazer só gasta crédito. Recusa e avisa.
+      if (notDoc && d.formato !== 'longo' && (d.games || d.politica) && !String(notDoc.tipo || '').startsWith('explicador')) {
+        const horas = (Date.now() - new Date(notDoc.data || notDoc.criadoEm || 0).getTime()) / 3600e3;
+        const prazo = d.games ? 36 : 30;
+        if (horas > prazo)
+          return res.status(400).json({ erro: `Notícia velha (saiu há ${Math.round(horas)} h; o limite é ${prazo} h). Refazer usaria a mesma notícia e gastaria crédito à toa: descarte este vídeo — a vaga abre para uma notícia nova.`, velha: true });
+      }
       // Política: escolhe de novo a imagem de cada cena pela frase (pessoa citada -> foto dela; fato -> foto real)
       if (d.politica && d.noticia) {
         const novoEp = await replanejarMidiasPolitica(ep).catch(() => ep);
