@@ -120,6 +120,8 @@ async function aprovarSozinho(db, col, cfgDados, opc = {}) {
   const fila = snap.docs
     .map((d) => ({ ref: d.ref, d: d.data() }))
     .filter(({ d }) => (d.tipo || 'short') === 'short' && d.ep && idade(d) < 36 * 3600e3)
+    // 17/11: as que já estavam esperando também respeitam a regra nova (patch com versão, roadmap, tecnologia de placa)
+    .filter(({ d }) => !/\b(patch|hotfix|atualiza[çc][ãa]o|update)\b[^.]*\b\d+\.\d+(\.\d+)?\b|\broadmap\b|\b(dlss|fsr|ray ?tracing|neural rendering|driver)\b/i.test(String(d.titulo || d.ep?.titulo || '')))
     .sort((a, b) => pontos(b.d) - pontos(a.d));
   // Até 5 vídeos de games por dia (mais alcance por vídeo e não estoura o limite de capas); as mais novas primeiro
   // 16/11: conta VÍDEOS DIFERENTES do dia (o mesmo refeito/corrigido contava 2 vezes; o longo não entra)

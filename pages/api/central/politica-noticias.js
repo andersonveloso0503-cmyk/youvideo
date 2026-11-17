@@ -116,6 +116,7 @@ async function aprovarSozinhoPolitica(db, col, cfgDados, opc = {}) {
   const fila = snap.docs
     .map((doc) => ({ ref: doc.ref, d: doc.data() }))
     .filter(({ d }) => d.ep && d.tipo !== 'longo' && d.tipo !== 'explicador' && (d.tipo === 'explicador-short' || idade(d) <= 30 * 3600e3))
+    .filter(({ d }) => !/\b(assassinad[oa]s?|assassinato|homic[íi]dio|executad[oa]|baleado|tiroteio|chacina|esfaquead[oa]|estupro|latroc[íi]nio|sequestr(o|ad[oa]))\b/i.test(String(d.titulo || d.ep?.titulo || ''))) // 17/11: crime/violência não sai
     // explicadores que você pediu primeiro; depois as de mais potencial (em alta, bolso, polêmica, Trump); empate: a mais nova
     .sort((a, b) => (String(b.d.tipo || '').startsWith('explicador') ? 1 : 0) - (String(a.d.tipo || '').startsWith('explicador') ? 1 : 0) || (b.d.tipo === 'cidade' ? 1 : 0) - (a.d.tipo === 'cidade' ? 1 : 0) || ((Number(b.d.potencial) || 5) - idade(b.d) / (12 * 3600e3)) - ((Number(a.d.potencial) || 5) - idade(a.d) / (12 * 3600e3))); // nota cai 1 ponto a cada 12 h: a mais atual na frente
   // 16/11: conta VÍDEOS DIFERENTES do dia (Short). O mesmo vídeo refeito/corrigido aparecia 2 ou 3 vezes e o longo
