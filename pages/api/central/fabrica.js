@@ -278,6 +278,7 @@ export default async function handler(req, res) {
         const orig = await col.doc(String(d.data().refeitoDe)).get().catch(() => null);
         const yo = orig?.data?.()?.fabrica?.youtube;
         if (!yo || yo.status === 'revisar') continue;
+        if (d.data().conferencia && d.data().conferencia.status !== 'ok') continue; // 17/11: refeito só sobe sozinho se a conferência passou
         await d.ref.update({ 'fabrica.youtube': { status: 'pendente', aprovadoEm: new Date().toISOString(), aprovadoSozinho: 'refeito' } }).catch(() => {});
         sozinhos.add(d.id);
       }
@@ -385,6 +386,23 @@ export default async function handler(req, res) {
       });
       if (req.query.youtube === '1') {
         const agora = Date.now();
+        // 17/11 ÚLTIMA BARREIRA: vídeo com problema sério na conferência final não vai para o YouTube, venha de onde vier
+        {
+          const { problemasGraves } = await import('../../../lib/travaQualidade');
+          const barrados = [];
+          itens = itens.filter((i) => {
+            if (!['pendente', 'erro'].includes(i.youtube?.status)) return true;
+            const cf = docsLista.find((d) => d.id === i.id)?.data()?.conferencia;
+            if (cf && ['pendente', 'conferindo', 'corrigindo'].includes(cf.status)) return false; // espera terminar
+            const g = problemasGraves(cf);
+            if (!g.length) return true;
+            barrados.push({ id: i.id, g });
+            return false;
+          });
+          for (const b of barrados)
+            if (!/^Não subi: o vídeo não ficou bom/.test(String(docsLista.find((d) => d.id === b.id)?.data()?.fabrica?.youtube?.erro || '')))
+              await col.doc(b.id).update({ 'fabrica.youtube': { status: 'erro', em: Date.now(), erro: `Não subi: o vídeo não ficou bom. ${b.g.join(' ')}`.slice(0, 400), tentativas: 9 } }).catch(() => {});
+        }
         // Vídeo refeito: o PC precisa saber o link do antigo (que já está no YouTube) para não confundir com "já subiu"
         for (const i of itens) {
           if (!i.refeitoDe || i.youtubeUrlAntiga || i.youtube?.status !== 'pendente') continue;
@@ -1502,9 +1520,17 @@ export default async function handler(req, res) {
       // Trava (15/11, "estamos subindo muito errado"): vídeo de games/política só sobe se a conferência final passou.
       // Ainda conferindo/corrigindo -> espera. Com problema -> mostra os problemas e só sobe se o dono confirmar.
       const cf = d.conferencia || {};
+      const conferido = d.games || d.politica || d.documentario || d.brasil || d.conferencia;
+      if (conferido && ['pendente', 'conferindo', 'corrigindo'].includes(cf.status))
+        return res.status(409).json({ erro: 'Ainda estou conferindo/corrigindo este vídeo. Espere uns minutos antes de aprovar.', aindaConferindo: true });
+      // 17/11 (dono: "o que não tiver a ver com o vídeo nem sobe"): problema SÉRIO não sobe nem com "subir assim mesmo"
+      if (conferido) {
+        const { problemasGraves } = await import('../../../lib/travaQualidade');
+        const graves = problemasGraves(cf);
+        if (graves.length)
+          return res.status(409).json({ erro: `Não sobe: o vídeo não ficou bom.\n${graves.join('\n')}\n\nUse 🎬 Refazer ou descarte.`, problemas: graves, bloqueado: true });
+      }
       if ((d.games || d.politica) && !b.forcar) {
-        if (['pendente', 'conferindo', 'corrigindo'].includes(cf.status))
-          return res.status(409).json({ erro: 'Ainda estou conferindo/corrigindo este vídeo. Espere uns minutos antes de aprovar.', aindaConferindo: true });
         if (cf.status !== 'ok') {
           const probs = (cf.etapas || []).filter((e) => e.ok === false).map((e) => `• ${e.nome}: ${String(e.detalhe || '').slice(0, 140)}`).slice(0, 6);
           return res.status(409).json({ erro: `A conferência achou problema neste vídeo:\n${(probs.length ? probs : ['• A conferência não terminou ou deu erro.']).join('\n')}`, problemas: probs.length ? probs : ['• A conferência não terminou ou deu erro.'], precisaConfirmar: true });

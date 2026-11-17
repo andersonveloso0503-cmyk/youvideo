@@ -893,7 +893,7 @@ export default async function handler(req, res) {
             // Refeito: o original já foi aprovado pelo dono — sobe sozinho (só troca imagens/ilustrações, mesmo texto e voz)
             'fabrica.youtube': item.fabrica.redes?.youtube ? { status: (item.games || item.politica || item.documentario) && !item.refeitoDe ? 'revisar' : 'pendente', ...(item.refeitoDe ? { aprovadoEm: new Date().toISOString(), aprovadoSozinho: 'refeito' } : {}) } : null,
             // Conferência final antes de você assistir (texto, legenda, cada cena, capa): sai no ✅ Aprovar
-            ...(item.games || item.politica || item.documentario ? { conferencia: { status: 'pendente' } } : {}),
+            ...(item.games || item.politica || item.documentario || item.brasil ? { conferencia: { status: 'pendente' } } : {}),
           });
           // Desenho infantil: o clipe da música vira um Short vertical, que sai no dia seguinte (mesmo horário)
           if (item.infantil && !item.shortMusica && !item.infantil.teste && item.infantil.shortsMusica !== false && item.vozInfantil?.musica?.audioUrl) {
