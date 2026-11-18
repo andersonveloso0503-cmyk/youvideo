@@ -135,10 +135,14 @@ async function aprovarSozinho(db, col, cfgDados, opc = {}) {
       .filter((x) => Date.now() - new Date(x.criadoEm || 0).getTime() < 24 * 3600e3 && !x.refeitoDe && x.formato !== 'longo')
       .map((x) => String(x.noticia || x.roteiro?.titulo || x.tema || Math.random()).toLowerCase())
   ).size;
-  const vagas = Math.max(0, 5 - ultimas24);
+  // 18/11: freios de crédito — sem crédito nas IAs não começa nada; e no máximo 8 criados por dia, contando barrados
+  const freio = await import('../../../lib/freioProducao');
+  if (!plano && (await freio.iaSemCredito())) return { automaticas: 0, motivo: 'IAs sem crédito: nenhum vídeo novo até o crédito voltar' };
+  const restam = await freio.restamHoje(db, 'games');
+  const vagas = Math.min(restam, Math.max(0, 5 - ultimas24));
   // Notícia QUENTE (saiu há menos de 3 h, nota 8+): entra mesmo passando das 5 do dia (até 7)
   const quentes = fila.filter(({ d }) => (d.ep?.potencial || 5) >= 8 && idade(d) < 3 * 3600e3);
-  const extras = Math.max(0, Math.min(quentes.length, 7 - ultimas24) - vagas);
+  const extras = Math.max(0, Math.min(quentes.length, 7 - ultimas24, restam) - vagas);
   // QUALIDADE antes de quantidade (pedido do dono): sozinho só sobe notícia de NOTA BOA (7+). Nota 5-6 só completa o dia
   // se até as 15h saíram menos de 3; abaixo de 5, só se você aprovar à mão. O 5 por dia é teto, não meta.
   const hora = Number(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }));
