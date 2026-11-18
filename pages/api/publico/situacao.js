@@ -45,9 +45,9 @@ export default async function handler(req, res) {
   // 18/11: de qual conta é a chave do ElevenLabs (plano e saldo; a chave nunca aparece)
   let eleven = null;
   try {
-    const r = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY || '' }, signal: AbortSignal.timeout(8000) });
+    const r = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY || '' }, signal: AbortSignal.timeout(25000) });
     const j = await r.json().catch(() => ({}));
-    eleven = r.ok ? { plano: j.tier, usados: j.character_count, limite: j.character_limit, renova: j.next_character_count_reset_unix ? new Date(j.next_character_count_reset_unix * 1000).toISOString().slice(0, 10) : '' } : { erro: `${r.status} ${String(j?.detail?.message || j?.detail?.status || '').slice(0, 120)}` };
+    eleven = r.ok ? { ms: 0, plano: j.tier, usados: j.character_count, limite: j.character_limit, renova: j.next_character_count_reset_unix ? new Date(j.next_character_count_reset_unix * 1000).toISOString().slice(0, 10) : '' } : { erro: `${r.status} ${String(j?.detail?.message || j?.detail?.status || '').slice(0, 120)}` };
   } catch (e) {
     eleven = { erro: String(e.message || e).slice(0, 120) };
   }
