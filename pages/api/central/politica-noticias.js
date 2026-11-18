@@ -134,8 +134,10 @@ async function aprovarSozinhoPolitica(db, col, cfgDados, opc = {}) {
   // 18/11: freios de crédito — sem crédito nas IAs não começa nada; e no máximo 8 criados por dia, contando barrados
   const freio = await import('../../../lib/freioProducao');
   if (!plano && (await freio.iaSemCredito())) return { automaticas: 0, velhas, motivo: 'IAs sem crédito: nenhum vídeo novo até o crédito voltar' };
-  const restam = await freio.restamHoje(db, 'politica');
-  const vagas = Math.min(restam, Math.max(0, 5 - ultimas24));
+  const extra = await freio.janelaExtra(db, 'politica');
+  const restam = extra ? extra.restam : await freio.restamHoje(db, 'politica');
+  const { aprovadosHoje, MAX_SOBE_DIA } = await import('../../../lib/melhoresDoDia');
+  const vagas = extra ? Math.min(restam, Math.max(0, MAX_SOBE_DIA - (await aprovadosHoje(db, 'politica')))) : Math.min(restam, Math.max(0, 5 - ultimas24));
   // Só sobe sozinho o que tem NOTA BOA (7+). Nota 5-6 só completa o dia se até as 15h saíram menos de 3; abaixo de 5, só à mão.
   const hora = Number(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false }));
   const nota = (d) => (d.potencial == null ? 6 : Number(d.potencial));
