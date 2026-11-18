@@ -292,7 +292,7 @@ export default async function handler(req, res) {
         const cf = x.conferencia;
         if (!cf) continue;
         if (['pendente', 'conferindo', 'corrigindo'].includes(cf.status)) { escondidos.add(d.id); continue; }
-        const g = problemasGraves(cf);
+        const g = problemasGraves(cf, x);
         if (!g.length) continue; // (se ainda desse para corrigir, a conferência estaria "corrigindo", não aqui)
         escondidos.add(d.id);
         await d.ref.update({ 'fabrica.youtube': { status: 'erro', em: Date.now(), erro: `Não subi: o vídeo não ficou bom. ${g.join(' ')}`.slice(0, 400), tentativas: 9 } }).catch(() => {});
@@ -409,10 +409,11 @@ export default async function handler(req, res) {
           const barrados = [];
           itens = itens.filter((i) => {
             if (!['pendente', 'erro'].includes(i.youtube?.status)) return true;
-            const cf = docsLista.find((d) => d.id === i.id)?.data()?.conferencia;
+            const dx = docsLista.find((d) => d.id === i.id)?.data();
+            const cf = dx?.conferencia;
             if (cf?.status === 'sem_credito' && i.youtube?.aprovadoEm && !i.youtube?.aprovadoSozinho) return true; // o dono assistiu e aprovou na mão
             if (cf && ['pendente', 'conferindo', 'corrigindo', 'sem_credito'].includes(cf.status)) return false; // espera terminar (sem_credito: só sobe sozinho depois de conferido; o dono pode aprovar na mão)
-            const g = problemasGraves(cf);
+            const g = problemasGraves(cf, dx);
             if (!g.length) return true;
             barrados.push({ id: i.id, g });
             return false;
@@ -1579,7 +1580,7 @@ export default async function handler(req, res) {
       // 17/11 (dono: "o que não tiver a ver com o vídeo nem sobe"): problema SÉRIO não sobe nem com "subir assim mesmo"
       if (conferido) {
         const { problemasGraves } = await import('../../../lib/travaQualidade');
-        const graves = problemasGraves(cf);
+        const graves = problemasGraves(cf, d);
         if (graves.length)
           return res.status(409).json({ erro: `Não sobe: o vídeo não ficou bom.\n${graves.join('\n')}\n\nUse 🎬 Refazer ou descarte.`, problemas: graves, bloqueado: true });
       }

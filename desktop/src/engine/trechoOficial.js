@@ -262,4 +262,4 @@ async function inserirTrechosOficiais(rc, locais, dir, { log = () => {}, checar 
   return feitos;
 }
 
-module.exports = { inserirTrechosOficiais, acharTrecho, lerVtt, acharFrase };
+module.exports = { inserirTrechosOficiais, acharTrecho, lerVtt, acharFrase, rodarYt };

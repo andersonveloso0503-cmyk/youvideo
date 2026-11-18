@@ -86,6 +86,16 @@ async function baixarTudo(receita, dirCache, onProgresso, checar) {
   return locais;
 
   async function baixarUm(i) {
+    // 18/11: vídeo oficial do jogo no YouTube (trailer da produtora, listado pelo IGDB): baixa com o yt-dlp, até 720p
+    if (/^https:\/\/(www\.)?youtube\.com\/watch\?v=[\w-]{11}$/.test(urls[i])) {
+      const destino = path.join(dirCache, 'montagem', 'yt-' + urls[i].slice(-11) + '.mp4');
+      if (!(fs.existsSync(destino) && fs.statSync(destino).size > 0)) {
+        fs.mkdirSync(path.dirname(destino), { recursive: true });
+        await require('./trechoOficial').rodarYt(['-f', 'bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[height<=720]/b', '--merge-output-format', 'mp4', '--no-playlist', '-o', destino, urls[i]], { prazo: 240e3 });
+      }
+      locais[urls[i]] = destino;
+      return;
+    }
     const comoMp4 = path.join(dirCache, 'montagem', nomeCache(urls[i]).replace(/\.m3u8$/i, '') + '.hls.mp4');
     if (/\.m3u8(\?|$)/i.test(urls[i])) locais[urls[i]] = await baixarStreaming(urls[i], comoMp4);
     else {
