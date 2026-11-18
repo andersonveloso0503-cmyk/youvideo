@@ -522,10 +522,14 @@ function gerarAssNarracao({ W, H, palavras, duracao, marca, curto, cta, textos, 
     for (const [a, b] of trechos) linhas.push(`Dialogue: 3,${tempo(a)},${tempo(b)},Manchete,,0,0,0,,{\\fad(150,150)}${txt}`);
   }
   if (temCab) {
-    const tamC = Math.round(W * 0.034);
+    // 18/11 (dono: "o cabeçalho está saindo um pouco da tela"): a letra encolhe sozinha para os dois lados caberem
+    // (seção + bolinhas à esquerda, canal à direita), com folga no meio
+    const letras = String(cabecalho.secao || '').length + String(cabecalho.canal || '').length;
+    // (celular comprido corta ~9% de cada lado do Short: margem de 10% e letra que cabe no meio)
+    const tamC = Math.round(Math.min(W * 0.03, (W * 0.62) / (letras * 0.74 + 6)));
     const pad = Math.round(tamC * 0.32);
     const topo = Math.round(H * 0.088);
-    const lado = Math.round(W * 0.04);
+    const lado = Math.round(W * 0.1) + pad;
     // caixa azul-marinho quase opaca atrás do texto (BorderStyle 3), igual em qualquer cena
     linhas.splice(linhas.indexOf('[Events]') - 1, 0,
       `Style: CabSecao,Montserrat ExtraBold,${tamC},&H00E0CCBE,&H000000FF,&H002A1A0B,&H00000000,-1,0,0,0,100,100,${Math.round(tamC * 0.06)},0,3,${pad},0,7,${lado},${lado},${topo},1`,
