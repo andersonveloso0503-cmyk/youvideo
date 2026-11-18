@@ -42,5 +42,14 @@ export default async function handler(req, res) {
   const ia = (await getDb().collection('youvideo_config').doc('ia').get()).data() || {};
   const conf = {};
   for (const d of snap.docs) { const c = d.data().conferencia?.status || '-'; conf[c] = (conf[c] || 0) + 1; }
-  res.status(200).json({ agora: new Date().toISOString(), ia: { semCreditoEm: ia.semCreditoEm ? new Date(ia.semCreditoEm).toISOString() : '', msg: ia.semCreditoMsg || '' }, conferencias: conf, pcs, atualizacoes: cmds, contagem: cont, itens: req.query.q ? itens.filter((i) => i.titulo.toLowerCase().includes(String(req.query.q).toLowerCase())).slice(0, 8) : itens.slice(0, 8) });
+  // 18/11: de qual conta é a chave do ElevenLabs (plano e saldo; a chave nunca aparece)
+  let eleven = null;
+  try {
+    const r = await fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY || '' }, signal: AbortSignal.timeout(8000) });
+    const j = await r.json().catch(() => ({}));
+    eleven = r.ok ? { plano: j.tier, usados: j.character_count, limite: j.character_limit, renova: j.next_character_count_reset_unix ? new Date(j.next_character_count_reset_unix * 1000).toISOString().slice(0, 10) : '' } : { erro: `${r.status} ${String(j?.detail?.message || j?.detail?.status || '').slice(0, 120)}` };
+  } catch (e) {
+    eleven = { erro: String(e.message || e).slice(0, 120) };
+  }
+  res.status(200).json({ agora: new Date().toISOString(), eleven, ia: { semCreditoEm: ia.semCreditoEm ? new Date(ia.semCreditoEm).toISOString() : '', msg: ia.semCreditoMsg || '' }, conferencias: conf, pcs, atualizacoes: cmds, contagem: cont, itens: req.query.q ? itens.filter((i) => i.titulo.toLowerCase().includes(String(req.query.q).toLowerCase())).slice(0, 8) : itens.slice(0, 8) });
 }
