@@ -129,6 +129,9 @@ const Painel = (() => {
   function avisos(precisa) {
     const box = q('#pnAvisos');
     const linhas = precisa.map((t) => `<div class="pn-aviso"><i style="color:#f0b86a">!</i><span>${esc(t)}</span></div>`);
+    // 18/11: as IAs que conferem os vídeos (Claude e Gemini) ficaram sem crédito e nada subia
+    const semCred = (ultimo.aprovar || []).filter((i) => i.conferencia?.status === 'sem_credito').length;
+    if (semCred) linhas.unshift(`<div class="pn-aviso"><i style="color:#ff5a4f">!</i><span><b>As IAs que conferem os vídeos estão sem crédito</b> (Claude: console.anthropic.com → Billing; Gemini: aistudio.google.com → Billing). ${semCred} vídeo(s) esperando: sobem sozinhos quando o crédito voltar, ou aprove na mão em Aprovar.</span></div>`);
     const cr = ultimo.creditos?.itens || [];
     if (cr.length && !cr.some((i) => i.nivel === 'critico')) {
       const baixos = cr.filter((i) => i.nivel === 'baixo');

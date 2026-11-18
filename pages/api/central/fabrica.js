@@ -410,7 +410,8 @@ export default async function handler(req, res) {
           itens = itens.filter((i) => {
             if (!['pendente', 'erro'].includes(i.youtube?.status)) return true;
             const cf = docsLista.find((d) => d.id === i.id)?.data()?.conferencia;
-            if (cf && ['pendente', 'conferindo', 'corrigindo'].includes(cf.status)) return false; // espera terminar
+            if (cf?.status === 'sem_credito' && i.youtube?.aprovadoEm && !i.youtube?.aprovadoSozinho) return true; // o dono assistiu e aprovou na mão
+            if (cf && ['pendente', 'conferindo', 'corrigindo', 'sem_credito'].includes(cf.status)) return false; // espera terminar (sem_credito: só sobe sozinho depois de conferido; o dono pode aprovar na mão)
             const g = problemasGraves(cf);
             if (!g.length) return true;
             barrados.push({ id: i.id, g });
