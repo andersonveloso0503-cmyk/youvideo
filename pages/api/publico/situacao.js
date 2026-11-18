@@ -4,7 +4,7 @@ import { getDb } from '../../../lib/firebase-admin';
 
 export default async function handler(req, res) {
   const desde = new Date(Date.now() - 36 * 3600e3).toISOString();
-  const snap = await getDb().collection('youvideo_fila').where('criadoEm', '>=', desde).get();
+  const snap = await getDb().collection('youvideo_fila').where('criadoEm', '>=', req.query.q ? new Date(Date.now() - 96 * 3600e3).toISOString() : desde).get();
   const itens = snap.docs.map((d) => {
     const x = d.data();
     return {
@@ -22,6 +22,9 @@ export default async function handler(req, res) {
       confEm: x.conferencia?.em || '',
       pc: x.pc || x.montadoPor || x.fabrica?.pc || '',
       ilustracoes: (x.arquivos || []).map((a) => a?.ilustracao?.tipo).filter(Boolean).join(','),
+      ativo: x.fabrica?.ativo !== false,
+      descartadoPor: x.fabrica?.descartadoPor || '',
+      aprovadoSozinho: x.fabrica?.youtube?.aprovadoSozinho || '',
       criadoEm: x.criadoEm,
       atualizadoEm: x.atualizadoEm || '',
     };
@@ -39,5 +42,5 @@ export default async function handler(req, res) {
   const ia = (await getDb().collection('youvideo_config').doc('ia').get()).data() || {};
   const conf = {};
   for (const d of snap.docs) { const c = d.data().conferencia?.status || '-'; conf[c] = (conf[c] || 0) + 1; }
-  res.status(200).json({ agora: new Date().toISOString(), ia: { semCreditoEm: ia.semCreditoEm ? new Date(ia.semCreditoEm).toISOString() : '', msg: ia.semCreditoMsg || '' }, conferencias: conf, pcs, atualizacoes: cmds, contagem: cont, itens: itens.slice(0, 8) });
+  res.status(200).json({ agora: new Date().toISOString(), ia: { semCreditoEm: ia.semCreditoEm ? new Date(ia.semCreditoEm).toISOString() : '', msg: ia.semCreditoMsg || '' }, conferencias: conf, pcs, atualizacoes: cmds, contagem: cont, itens: req.query.q ? itens.filter((i) => i.titulo.toLowerCase().includes(String(req.query.q).toLowerCase())).slice(0, 8) : itens.slice(0, 8) });
 }
