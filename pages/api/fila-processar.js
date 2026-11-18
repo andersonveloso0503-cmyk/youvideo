@@ -974,8 +974,11 @@ export default async function handler(req, res) {
   if (soFabrica) await (await import('../../lib/politicaMesmoDia')).arrumarFilaPolitica(db, 'politica').catch(() => {});
   if (soFabrica) await (await import('../../lib/politicaMesmoDia')).arrumarFilaPolitica(db, 'games').catch(() => {});
 
+  // 18/11: as melhores dos parados por falta de crédito sobem (até 5 por canal por dia)
+  if (soFabrica) await (await import('../../lib/melhoresDoDia')).melhoresDoDia(db).then((r) => console.log('[melhores-do-dia]', JSON.stringify(r))).catch((e) => console.log('[melhores-do-dia] erro', String(e.message || e).slice(0, 150)));
   // Conferência final (texto, legenda, cenas, capa) do vídeo pronto que vai para o ✅ Aprovar: roda junto com a produção
-  const conf = soFabrica ? import('../../lib/conferenciaFinal').then((m) => m.conferirPendentes(db, 1)).catch(() => 0) : Promise.resolve(0);
+  // (18/11: 3 por volta, para os parados por falta de crédito serem conferidos ainda hoje)
+  const conf = soFabrica ? import('../../lib/conferenciaFinal').then((m) => m.conferirPendentes(db, 3)).catch(() => 0) : Promise.resolve(0);
   const feitos = [];
   const vistos = new Set();
   try {
