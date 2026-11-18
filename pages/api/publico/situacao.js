@@ -4,7 +4,7 @@ import { getDb } from '../../../lib/firebase-admin';
 
 export default async function handler(req, res) {
   const desde = new Date(Date.now() - 36 * 3600e3).toISOString();
-  const snap = await getDb().collection('youvideo_fila').where('criadoEm', '>=', req.query.q ? new Date(Date.now() - 96 * 3600e3).toISOString() : desde).get();
+  const snap = await getDb().collection('youvideo_fila').where('criadoEm', '>=', req.query.q || req.query.canal ? new Date(Date.now() - 96 * 3600e3).toISOString() : desde).get();
   const itens = snap.docs.map((d) => {
     const x = d.data();
     return {
@@ -51,5 +51,5 @@ export default async function handler(req, res) {
   } catch (e) {
     eleven = { erro: String(e.message || e).slice(0, 120) };
   }
-  res.status(200).json({ agora: new Date().toISOString(), eleven, ia: { semCreditoEm: ia.semCreditoEm ? new Date(ia.semCreditoEm).toISOString() : '', msg: ia.semCreditoMsg || '' }, conferencias: conf, pcs, atualizacoes: cmds, contagem: cont, itens: req.query.q ? itens.filter((i) => i.titulo.toLowerCase().includes(String(req.query.q).toLowerCase())).slice(0, 8) : itens.slice(0, 8) });
+  res.status(200).json({ agora: new Date().toISOString(), eleven, ia: { semCreditoEm: ia.semCreditoEm ? new Date(ia.semCreditoEm).toISOString() : '', msg: ia.semCreditoMsg || '' }, conferencias: conf, pcs, atualizacoes: cmds, contagem: cont, itens: req.query.canal ? itens.filter((i) => i.canal === req.query.canal).slice(0, 15) : req.query.q ? itens.filter((i) => i.titulo.toLowerCase().includes(String(req.query.q).toLowerCase())).slice(0, 8) : itens.slice(0, 8) });
 }
