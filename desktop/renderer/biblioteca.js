@@ -717,7 +717,7 @@ const Biblioteca = (() => {
           <span class="nota">📅 Vai ao ar: ${esc(quando)}</span>
           <div class="ap-conf"></div>
           ${curto && ['games', 'politica'].includes(i.tipo)
-            ? `<div class="ap-capas" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"></div><button type="button" class="btn-mini ap-capa-nova" style="align-self:flex-start" title="Fazer as duas capas de novo (melhor e econômica)">🎨 Outras capas</button>`
+            ? `<div class="ap-capas" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap"></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn-mini ap-capa-nova" title="Fazer as capas de novo (econômica e grátis)">🎨 Outras capas</button><button type="button" class="btn-mini ap-capa-prompt" title="Copia o pedido da capa para você colar no Gemini ou no ChatGPT">📋 Prompt da capa</button><button type="button" class="btn-mini ap-capa-enviar" title="Envia a capa que você fez no editor">🖼️ Enviar capa</button><input type="file" class="ap-capa-arquivo" accept="image/png,image/jpeg,image/webp" style="display:none"></div>`
             : i.thumbnailUrl ? `<a href="#" class="nota ver-capa">🖼 ver a capa</a>` : ''}
           <div style="display:flex;gap:6px;margin-top:auto;flex-wrap:wrap">
             <button type="button" class="btn-primario ap-ok" style="flex:1">✅ Aprovar</button>
@@ -820,6 +820,62 @@ const Biblioteca = (() => {
             capaNova.textContent = '🎨 Outras capas';
           }
         };
+      // 18/11 (dono): 📋 copia o prompt da capa (ele cola no Gemini/ChatGPT, que faz a capa no crédito dele)
+      // e 🖼️ envia a imagem pronta, que vira a capa do vídeo
+      const btPrompt = card.querySelector('.ap-capa-prompt');
+      if (btPrompt)
+        btPrompt.onclick = async () => {
+          btPrompt.disabled = true;
+          try {
+            const r = await window.api.fabrica.acao({ id: i.id, acao: 'capa-prompt' });
+            await navigator.clipboard.writeText(r.prompt);
+            if (r.referencia) window.api.abrir.link(r.referencia);
+            avisar(`Prompt copiado! Cole no Gemini (gemini.google.com) ou no ChatGPT${r.referencia ? ' e anexe a imagem do jogo que abri para você' : ''}. Texto da capa: "${r.texto}". Depois clique em 🖼️ Enviar capa.`);
+          } catch (e) {
+            avisar(msgErro(e), true);
+          } finally {
+            btPrompt.disabled = false;
+          }
+        };
+      const btEnviar = card.querySelector('.ap-capa-enviar');
+      const arq = card.querySelector('.ap-capa-arquivo');
+      if (btEnviar && arq) {
+        btEnviar.onclick = () => arq.click();
+        arq.onchange = async () => {
+          const f = arq.files && arq.files[0];
+          arq.value = '';
+          if (!f) return;
+          btEnviar.disabled = true;
+          btEnviar.textContent = '🖼️ Enviando...';
+          try {
+            // reduz para no máximo 1080x1920 (ou 1920x1080) em JPG, para subir rápido
+            const url = URL.createObjectURL(f);
+            const img = await new Promise((ok, erro) => {
+              const im = new Image();
+              im.onload = () => ok(im);
+              im.onerror = () => erro(new Error('Não consegui abrir essa imagem.'));
+              im.src = url;
+            });
+            const max = img.width > img.height ? [1920, 1080] : [1080, 1920];
+            const esc2 = Math.min(1, max[0] / img.width, max[1] / img.height);
+            const cv = document.createElement('canvas');
+            cv.width = Math.round(img.width * esc2);
+            cv.height = Math.round(img.height * esc2);
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            URL.revokeObjectURL(url);
+            const r = await window.api.fabrica.acao({ id: i.id, acao: 'capa-enviar', imagem: cv.toDataURL('image/jpeg', 0.9) });
+            capaAtual = r.url;
+            card.querySelector('video')?.setAttribute('poster', capaAtual);
+            desenharCapas(r.opcoes || []);
+            avisar('Sua capa foi colocada: é ela que vai para o YouTube');
+          } catch (e) {
+            avisar(msgErro(e), true);
+          } finally {
+            btEnviar.disabled = false;
+            btEnviar.textContent = '🖼️ Enviar capa';
+          }
+        };
+      }
       const acao = async (nome, msg, bt) => {
         bt.disabled = true;
         try {

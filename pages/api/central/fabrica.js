@@ -30,7 +30,7 @@ import { COLECAO_BRASIL } from '../../../lib/brasilInacreditavel';
 import { normalizarPersonagem, temasInfantisDaIa, gerarRoteiroInfantil, EPISODIOS_PINGO, slug as slugInfantil, thumbInfantil, planejarTemporada, lerRoteiroDeFora, criarShortDaMusica } from '../../../lib/infantil';
 import { enviarAnimacao, checarAnimacao } from '../../../lib/pipeline';
 
-export const config = { maxDuration: 300 };
+export const config = { maxDuration: 300, api: { bodyParser: { sizeLimit: '8mb' } } }; // 8mb: a capa que o dono envia (18/11)
 
 import { legendaDasRedes, proximoHorarioIg } from '../../../lib/instagramLote'; // a prévia do infantil escreve um roteiro inteiro (pode passar de 1 min)
 
@@ -1534,6 +1534,30 @@ export default async function handler(req, res) {
       }
       await ref.update({ capaOpcoes: opcoes });
       return res.status(200).json({ ok: true, opcoes, aviso: semCredito ? 'Os créditos do Gemini acabaram: veio só a capa grátis (foto real). Recarregue no Google AI Studio para voltar a ter as capas da IA.' : '' });
+    }
+    // 18/11 (dono: "um botão de prompt: eu largo esse prompt num editor, ele faz a capa e coloco ali na tela de aprovar"):
+    // 📋 Prompt da capa — o mesmo pedido que a IA usava, pronto para colar no Gemini/ChatGPT (a capa sai no crédito dele, não da API)
+    if (b.acao === 'capa-prompt') {
+      const d = (await ref.get()).data() || {};
+      const { montarPromptCapa, textoDaCapa } = await import('../../../lib/capaShortIa');
+      const tipo = d.games ? 'games' : 'politica';
+      const ref1 = d.games ? d.capaUrl || (d.arquivos || []).find((x) => x.imageUrl)?.imageUrl || null : null;
+      const { prompt, manchete } = montarPromptCapa({ tipo, titulo: d.roteiro?.titulo || d.tema, descricao: d.roteiro?.descricao, texto: String(b.texto || '').trim() || textoDaCapa(d), deitada: d.formato === 'longo', comReferencia: !!ref1 });
+      return res.status(200).json({ prompt, texto: manchete, referencia: ref1 });
+    }
+    // 🖼️ Enviar capa — a imagem que o dono fez no editor vira a capa do vídeo
+    if (b.acao === 'capa-enviar') {
+      const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(String(b.imagem || ''));
+      if (!m) return res.status(400).json({ erro: 'Envie uma imagem JPG, PNG ou WEBP.' });
+      const buf = Buffer.from(m[2], 'base64');
+      if (buf.length < 5000 || buf.length > 7e6) return res.status(400).json({ erro: 'Imagem muito pequena ou muito grande.' });
+      const { put } = await import('@vercel/blob');
+      const ext = m[1].split('/')[1].replace('jpeg', 'jpg');
+      const bl = await put(`thumbnails/manual-${String(b.id)}-${Date.now()}.${ext}`, buf, { access: 'public', contentType: m[1], token: process.env.MEDIA_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN });
+      const d = (await ref.get()).data() || {};
+      const opcoes = [{ modelo: 'manual', nome: 'Sua capa', url: bl.url }, ...(d.capaOpcoes || []).filter((o) => o.modelo !== 'manual')].slice(0, 4);
+      await ref.update({ thumbnailUrl: bl.url, capaIa: true, capaOpcoes: opcoes });
+      return res.status(200).json({ ok: true, url: bl.url, opcoes });
     }
     if (b.acao === 'capa-escolher') {
       const url = String(b.url || '');
