@@ -753,7 +753,7 @@ export default async function handler(req, res) {
             if (item.formato !== 'short' && !item.desafio && (item.politica || item.games)) {
               try {
                 const { capaShortIa, textoDaCapa } = await import('../../lib/capaShortIa');
-                thumbnailUrl = await capaShortIa({ tipo: item.games ? 'games' : 'politica', titulo: item.roteiro?.titulo || item.tema, descricao: item.roteiro?.descricao, texto: textoDaCapa(item), refUrl: item.games ? item.capaUrl || primeiraImagem : null, modelo: 'pro', deitada: true });
+                thumbnailUrl = await capaShortIa({ tipo: item.games ? 'games' : 'politica', titulo: item.roteiro?.titulo || item.tema, descricao: item.roteiro?.descricao, texto: textoDaCapa(item), refUrl: item.games ? item.capaUrl || primeiraImagem : null, modelo: 'economica', deitada: true }); // 18/11: só o modelo barato
                 capaIa = true;
                 console.log(`[capa-ia] longo ${item.games ? 'games' : 'politica'}: ${item.roteiro?.titulo}`);
               } catch (e) {
@@ -788,7 +788,11 @@ export default async function handler(req, res) {
                 // Fase de comparação (até o dono escolher um modelo na Vercel: CAPA_SHORT_MODELO=pro|economica):
                 // faz as duas, a "melhor" vai como capa e a outra fica para ele comparar e trocar no ✅ Aprovar
                 const escolhido = process.env.CAPA_SHORT_MODELO;
-                if (escolhido) {
+                // 18/11 (dono: "não posso gastar em 3 dias meus créditos com a capa"): a capa do Short no Nano Banana Pro
+                // foi ~metade do gasto no Gemini. Short agora usa a capa GRÁTIS (foto real + texto grande) — a capa
+                // que vale no Short é colocada pela extensão do Chrome. Para voltar à IA: CAPA_SHORT_IA=1 na Vercel.
+                if (process.env.CAPA_SHORT_IA !== '1') throw new Error('capa do Short: grátis (sem IA)');
+                if (escolhido && escolhido !== 'pro') {
                   thumbnailUrl = await capaShortIa({ ...base, modelo: escolhido });
                 } else {
                   // Gasto no AI Studio (15/11): antes fazia DUAS capas por Short (Pro + Econômica). Agora UMA: a Econômica,
@@ -797,8 +801,7 @@ export default async function handler(req, res) {
                     thumbnailUrl = await capaShortIa({ ...base, modelo: 'economica' });
                   } catch (eEco) {
                     console.log(`[capa-ia] econômica falhou (${String(eEco.message || eEco).slice(0, 100)}), tenta a Pro`);
-                    if (/depleted|quota|billing|credit/i.test(String(eEco.message || ''))) throw eEco; // sem crédito: não adianta a Pro
-                    thumbnailUrl = await capaShortIa({ ...base, modelo: 'pro' });
+                    throw eEco; // 18/11: nunca mais a Pro (cara) — vai a capa grátis
                   }
                 }
                 capaIa = true;

@@ -1516,7 +1516,7 @@ export default async function handler(req, res) {
       };
       const { capaShortGratis, imagensDaCapa } = await import('../../../lib/capaShortGratis');
       const [pro, economica, gratis] = await Promise.allSettled([
-        capaShortIa({ ...base, modelo: 'pro' }),
+        Promise.reject(new Error('Pro desligada (18/11: cara demais)')),
         capaShortIa({ ...base, modelo: 'economica' }),
         // grátis: a foto real e livre do assunto (a que já está no vídeo) + o texto gigante — sempre sai, mesmo sem crédito
         capaShortGratis({ tipo: base.tipo, texto: base.texto, imagens: await imagensDaCapa(d) }),
