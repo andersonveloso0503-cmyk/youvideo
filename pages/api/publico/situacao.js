@@ -18,6 +18,8 @@ export default async function handler(req, res) {
       confDetalhe: String((x.conferencia?.etapas || []).find((e) => /^Confer/.test(e?.nome || ''))?.detalhe || '').slice(0, 600),
       agendado: x.fabrica?.youtube?.publicarEm || x.fabrica?.youtube?.agendadoPara || '',
       conferencia: x.conferencia?.status || '',
+      nota: x.conferencia?.nota ?? null,
+      confEm: x.conferencia?.em || '',
       pc: x.pc || x.montadoPor || x.fabrica?.pc || '',
       ilustracoes: (x.arquivos || []).map((a) => a?.ilustracao?.tipo).filter(Boolean).join(','),
       criadoEm: x.criadoEm,
@@ -34,5 +36,8 @@ export default async function handler(req, res) {
     .sort((a, b) => b.criadoEm - a.criadoEm)
     .slice(0, 12)
     .map((c) => ({ pc: c.pc, status: c.status, erro: c.erro || '', de: c.deNome, em: new Date(c.criadoEm).toISOString(), feito: c.feitoEm ? new Date(c.feitoEm).toISOString() : '' }));
-  res.status(200).json({ agora: new Date().toISOString(), pcs, atualizacoes: cmds, contagem: cont, itens: itens.slice(0, 8) });
+  const ia = (await getDb().collection('youvideo_config').doc('ia').get()).data() || {};
+  const conf = {};
+  for (const d of snap.docs) { const c = d.data().conferencia?.status || '-'; conf[c] = (conf[c] || 0) + 1; }
+  res.status(200).json({ agora: new Date().toISOString(), ia: { semCreditoEm: ia.semCreditoEm ? new Date(ia.semCreditoEm).toISOString() : '', msg: ia.semCreditoMsg || '' }, conferencias: conf, pcs, atualizacoes: cmds, contagem: cont, itens: itens.slice(0, 8) });
 }
