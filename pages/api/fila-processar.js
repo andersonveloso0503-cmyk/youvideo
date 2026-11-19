@@ -1002,6 +1002,12 @@ export default async function handler(req, res) {
       .filter((d) => !['concluido', 'erro'].includes(d.data().status))
       .filter((d) => (!soFabrica || d.data().fabrica) && (!d.data().fabrica || d.data().status !== 'pendente' || prioridade(d) <= limite))
       .sort((x, y) => prioridade(x).localeCompare(prioridade(y)));
+    // 19/11: canal pausado no Compilador (Contas YouTube): não produz nada para ele (nem gasta crédito)
+    {
+      const { lerPausas } = await import('../../lib/pausas');
+      const pausas = await lerPausas().catch(() => ({}));
+      if (Object.keys(pausas).length) docs = docs.filter((d) => !pausas[String(d.data().fabrica?.canalYoutube?.id || '')]);
+    }
     if (!docs.length) { await conf; return res.status(200).json({ mensagem: 'Fila vazia, nada a processar.' }); }
 
     // Até ~3 min por chamada, um passo de cada item

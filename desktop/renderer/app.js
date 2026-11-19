@@ -941,6 +941,16 @@ window.api.ao?.('studio:login', (lista) => {
 window.api.canais.studioPendentes?.().then((r) => {
   studioSemLogin = r?.semLogin || [];
 }).catch(() => {});
+// 19/11: canais pausados (vale para a nuvem e para todos os PCs)
+let canaisPausados = {};
+function carregarPausas() {
+  window.api.canais.pausas?.().then((r) => {
+    canaisPausados = r || {};
+    renderCanais();
+  }).catch(() => {});
+}
+setTimeout(carregarPausas, 1500);
+setInterval(carregarPausas, 5 * 60e3);
 function renderCanais() {
   $('#qtdCanais').textContent = canais.length;
   if (typeof Subir !== 'undefined') Subir.renderCanais();
@@ -954,8 +964,25 @@ function renderCanais() {
   canais.forEach((c) => {
     const li = document.createElement('li');
     li.className = 'canal';
-    li.innerHTML = `${c.thumb ? `<img src="${c.thumb}" />` : '<span class="sem-foto"></span>'}<span class="info"><b></b><small>conectado em ${new Date(c.conectadoEm).toLocaleDateString('pt-BR')}</small></span><button class="btn-mini destaque" data-arrumar title="Confere os vídeos que já estão no canal: categoria, idioma e títulos fracos">🛠 Arrumar vídeos</button><button class="btn-mini" data-studio title="Entre uma vez na conta Google deste canal: o Compilador usa o YouTube Studio para trocar a capa dos Shorts (pela API o Short não mostra a capa)">🔑 Entrar no Studio</button><button class="btn-mini perigo" data-desconectar>Desconectar</button>`;
+    li.innerHTML = `${c.thumb ? `<img src="${c.thumb}" />` : '<span class="sem-foto"></span>'}<span class="info"><b></b><small>conectado em ${new Date(c.conectadoEm).toLocaleDateString('pt-BR')}</small></span><button class="btn-mini destaque" data-arrumar title="Confere os vídeos que já estão no canal: categoria, idioma e títulos fracos">🛠 Arrumar vídeos</button><button class="btn-mini" data-studio title="Entre uma vez na conta Google deste canal: o Compilador usa o YouTube Studio para trocar a capa dos Shorts (pela API o Short não mostra a capa)">🔑 Entrar no Studio</button><button class="btn-mini" data-pausar></button><button class="btn-mini perigo" data-desconectar>Desconectar</button>`;
     li.querySelector('b').textContent = c.titulo;
+    // ⏸ Pausar: a nuvem para de produzir e nenhum PC sobe nada neste canal até retomar
+    const pausado = !!canaisPausados[c.id];
+    if (pausado) li.querySelector('small').textContent = `⏸ PAUSADO desde ${new Date(canaisPausados[c.id].em).toLocaleDateString('pt-BR')} — nada é feito nem sobe neste canal`;
+    const bPausar = li.querySelector('[data-pausar]');
+    bPausar.textContent = pausado ? '▶ Retomar' : '⏸ Pausar';
+    bPausar.title = pausado ? 'Volta a produzir e subir vídeos neste canal' : 'Para de produzir e de subir vídeos neste canal (em todos os PCs)';
+    if (pausado) bPausar.classList.add('destaque');
+    bPausar.onclick = async () => {
+      if (!pausado && !confirm(`Pausar o canal "${c.titulo}"?\n\nA nuvem para de produzir vídeos para ele e nenhum PC sobe nada nele até você clicar em Retomar.`)) return;
+      bPausar.disabled = true;
+      try {
+        canaisPausados = (await window.api.canais.pausar({ id: c.id, titulo: c.titulo, pausado: !pausado })) || {};
+      } catch (e) {
+        alert(`Não consegui ${pausado ? 'retomar' : 'pausar'}: ${e.message || e}`);
+      }
+      renderCanais();
+    };
     li.querySelector('[data-arrumar]').onclick = () => Arrumar.abrir(c);
     const bStudio = li.querySelector('[data-studio]');
     if (studioSemLogin.includes(c.id)) bStudio.classList.add('destaque'), (bStudio.textContent = '🔑 Entrar no Studio (capas esperando)');

@@ -189,6 +189,7 @@ export default async function handler(req, res) {
       if (cfg.autoAprovar === false) return res.status(200).json({ pulou: 'automação desligada' });
       if (await (await import('../../../lib/freioProducao')).iaSemCredito()) return res.status(200).json({ pulou: 'IAs sem crédito: nada novo até o crédito voltar' }); // 18/11
       if (!cfg.canalYoutube?.id) return res.status(200).json({ pulou: 'escolha o canal do Brasil Inacreditável no Compilador' });
+      if (await (await import('../../../lib/pausas')).canalPausado(cfg.canalYoutube.id)) return res.status(200).json({ pulou: 'canal pausado' }); // 19/11
       // Marcador "escrevendo" esquecido (a Vercel parou no meio): vira falha para não travar
       const escrevendo = (await col.where('status', '==', 'escrevendo').get()).docs;
       let ocupado = false;

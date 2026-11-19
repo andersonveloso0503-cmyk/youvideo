@@ -82,6 +82,8 @@ contextBridge.exposeInMainWorld('api', {
     autorizar: chamar('canais:autorizar'),
     porToken: chamar('canais:porToken'),
     remover: chamar('canais:remover'),
+    pausas: chamar('canais:pausas'),
+    pausar: chamar('canais:pausar'),
     conferir: chamar('canais:conferir'),
     corrigir: chamar('canais:corrigir'),
     desprogramar: chamar('canais:desprogramar'),

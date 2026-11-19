@@ -709,6 +709,10 @@ class Fila extends EventEmitter {
     job.cancelado = false;
     job.naoAntesDe = null;
     try {
+      // 19/11: canal pausado (Contas YouTube → ⏸ Pausar): não sobe nada, por nenhum caminho
+      if ((await Central.pausas(cfg, { fresco: true }))[String(e.canalId)]) {
+        throw new Error('Não subi: este canal está PAUSADO (Contas YouTube). Retome o canal e clique em tentar de novo.');
+      }
       // Trava geral (qualquer caminho: Fábrica, Biblioteca, Subir vídeos): canal de games/política NUNCA recebe
       // título/descrição de "história bíblica". O vídeo não sobe e fica com erro explicando o motivo.
       if (!e.forcarBiblico && canalSemBiblia(cfg, e.canalId, this.obterCanal(e.canalId)?.titulo, e.categoria) && TEXTO_BIBLICO.test(`${e.titulo || ''} ${e.descricao || ''}`)) {
@@ -1662,6 +1666,7 @@ class Fila extends EventEmitter {
           },
         });
         try {
+          if ((await Central.pausas(cfg, { fresco: true }))[String(p.publicar.canalId)]) throw new Error('Não subi: este canal está PAUSADO (Contas YouTube). Retome o canal e clique em tentar de novo.');
           const r = await YT.publicar({
             credenciais: cfg.google,
             redirectOriginal: canal.redirect,

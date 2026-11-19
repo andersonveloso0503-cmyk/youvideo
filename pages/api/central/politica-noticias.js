@@ -176,6 +176,13 @@ export default async function handler(req, res) {
   const cfg = db.collection('youvideo_config').doc('politica_noticias');
 
   try {
+    // 19/11: canal da política/história pausado no Compilador: a automação não cria nada
+    if (req.method === 'GET' && req.query.auto) {
+      const { canalPausado } = await import('../../../lib/pausas');
+      const { canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
+      const canal = await canalDaPolitica(db, await canalDosGamesId(db)).catch(() => null);
+      if (canal?.id && (await canalPausado(canal.id))) return res.status(200).json({ pulou: `canal "${canal.titulo || canal.id}" pausado` });
+    }
     // Vídeo LONGO da semana (2 por semana, quarta e sábado): junta as notícias de maior nota dos últimos dias
     // 1 documentário longo de ARQUEOLOGIA/HISTÓRIA por semana no Noites na História (tema modelado em vídeos que deram certo).
     // Não é política: vai pelo motor dos documentários (fotos de museu/sítio, ilustrações da época) e espera o ✅ Aprovar.

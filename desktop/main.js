@@ -637,6 +637,7 @@ app.whenReady().then(() => {
       for (const it of itens) {
         const canalId = it.canalYoutube?.id;
         if (!canalId || !store.canal(canalId)) continue; // esse canal está conectado em outro PC
+        if ((await Central.pausas(cfg))[String(canalId)]) continue; // 19/11: canal pausado — não pega o vídeo
         // "subir de novo" (o antigo saiu com texto errado) ou vídeo REFEITO: o antigo tem que estar privado/apagado no YouTube
         const deNovo = Number(it.youtubeDeNovo) || (it.refeitoDe ? 1 : 0);
         if (fila.lista().some((j) => j.envio?.fabricaId === it.id && !['erro', 'cancelado'].includes(j.status) && (j.envio?.deNovo || 0) >= deNovo && (!deNovo || j.envio?.deNovo))) continue;
@@ -1426,6 +1427,9 @@ app.whenReady().then(() => {
     return true;
   });
   ipcMain.handle('canais:studioPendentes', () => ({ semLogin: fila.canaisSemLoginStudio(), total: fila.lerCapasStudio().length }));
+  // 19/11: pausa por canal (vale para a nuvem e para todos os PCs)
+  ipcMain.handle('canais:pausas', () => Central.pausas(store.ler(), { fresco: true }));
+  ipcMain.handle('canais:pausar', (_e, { id, titulo, pausado }) => Central.pausar(store.ler(), { canalId: id, titulo, pausado }));
   ipcMain.handle('canais:remover', (_e, id) => {
     store.removerCanal(id);
     sincronizarDepois();

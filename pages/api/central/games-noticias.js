@@ -224,6 +224,12 @@ export default async function handler(req, res) {
   const cfg = db.collection('youvideo_config').doc('games_noticias');
 
   try {
+    // 19/11: canal dos games pausado no Compilador: a automação não cria nada
+    if (req.method === 'GET' && req.query.auto) {
+      const { canalPausado } = await import('../../../lib/pausas');
+      const canal = await canalDosGames(db, (await cfg.get()).data());
+      if (canal?.id && (await canalPausado(canal.id))) return res.status(200).json({ pulou: `canal "${canal.titulo || canal.id}" pausado` });
+    }
     // Séries fixas (Short): jogos grátis da Epic (quinta) e mais vendidos da Steam no Brasil com preço em reais (segunda)
     if (req.method === 'GET' && req.query.auto === 'serie') {
       const r = await criarSerieGames(db, String(req.query.tipo || ''));

@@ -104,4 +104,26 @@ async function subirParaNuvem(cfg, arquivo, onProgresso) {
   return r.url;
 }
 
-module.exports = { chamar, baixar, subirParaNuvem, URL_PADRAO };
+// 19/11: canais pausados (Contas YouTube → ⏸ Pausar): nenhum PC sobe nada neles. Guarda por 1 min.
+let pausasCache = null;
+let pausasEm = 0;
+async function pausas(cfg, { fresco = false } = {}) {
+  if (!cfg?.centralToken) return pausasCache || {};
+  if (!fresco && pausasCache && Date.now() - pausasEm < 60e3) return pausasCache;
+  try {
+    const r = await chamar(cfg, '/api/central/pausas');
+    pausasCache = r?.canais || {};
+    pausasEm = Date.now();
+  } catch {
+    /* sem internet: fica com a última lista conhecida */
+  }
+  return pausasCache || {};
+}
+async function pausar(cfg, { canalId, titulo, pausado }) {
+  const r = await chamar(cfg, '/api/central/pausas', { metodo: 'POST', corpo: { canalId, titulo, pausado: !!pausado } });
+  pausasCache = r?.canais || {};
+  pausasEm = Date.now();
+  return pausasCache;
+}
+
+module.exports = { chamar, baixar, subirParaNuvem, URL_PADRAO, pausas, pausar };
