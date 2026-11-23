@@ -21,6 +21,8 @@ const CONVITES = [
   '▶ Siga a Página e compartilhe com quem precisa ouvir isso hoje 🙏',
 ];
 function comConviteYoutube(legenda, item) {
+  return legenda; // 23/11: canais do YouTube encerrados — nada de convite para o YouTube nas legendas
+  // eslint-disable-next-line no-unreachable
   if (item.conta || item.origem !== 'fabrica' || /youtube\.com|youtu\.be/i.test(legenda)) return legenda;
   const dia = Math.floor(new Date(item.quando || Date.now()).getTime() / 86400e3);
   const convite = CONVITES[dia % CONVITES.length];

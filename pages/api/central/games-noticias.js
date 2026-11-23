@@ -226,6 +226,8 @@ export default async function handler(req, res) {
   try {
     // 19/11: canal dos games pausado no Compilador: a automação não cria nada
     if (req.method === 'GET' && req.query.auto) {
+      // 23/11: YouTube desligado e os games ainda não têm Página no Facebook: a automação não cria nada
+      if ((await import('../../../lib/modoRedes')).YOUTUBE_DESLIGADO) return res.status(200).json({ pulou: 'YouTube desligado; games ainda sem Página no Facebook' });
       const { canalPausado } = await import('../../../lib/pausas');
       const canal = await canalDosGames(db, (await cfg.get()).data());
       if (canal?.id && (await canalPausado(canal.id))) return res.status(200).json({ pulou: `canal "${canal.titulo || canal.id}" pausado` });

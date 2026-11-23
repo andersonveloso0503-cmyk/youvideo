@@ -626,6 +626,7 @@ app.whenReady().then(() => {
   };
   async function fabricaParaYoutube() {
     const cfg = store.ler();
+    if (YT.YOUTUBE_DESLIGADO) return; // 23/11: YouTube desligado — não pega vídeo nenhum para subir
     if (buscandoFabrica || !cfg.centralToken) return;
     buscandoFabrica = true;
     try {

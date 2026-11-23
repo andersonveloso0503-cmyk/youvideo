@@ -279,6 +279,7 @@ export default async function handler(req, res) {
         const yo = orig?.data?.()?.fabrica?.youtube;
         if (!yo || yo.status === 'revisar') continue;
         if (d.data().conferencia && d.data().conferencia.status !== 'ok') continue; // 17/11: refeito só sobe sozinho se a conferência passou
+        if ((await import('../../../lib/modoRedes')).YOUTUBE_DESLIGADO) continue; // 23/11: YouTube desligado — o dono aprova (vai para o Facebook)
         await d.ref.update({ 'fabrica.youtube': { status: 'pendente', aprovadoEm: new Date().toISOString(), aprovadoSozinho: 'refeito' } }).catch(() => {});
         sozinhos.add(d.id);
       }
@@ -1324,6 +1325,8 @@ export default async function handler(req, res) {
     }
     // Subir de novo (vídeo pronto que subiu com texto errado e você deixou privado/apagou): o PC sobe outra vez
     // com o título e a descrição certos do site, no próximo horário livre (ou agora, se o horário já passou)
+    if ((b.acao === 'youtube-de-novo' || b.acao === 'youtube-repetir') && (await import('../../../lib/modoRedes')).YOUTUBE_DESLIGADO)
+      return res.status(409).json({ erro: 'O YouTube está desligado (canais encerrados). Nada sobe no YouTube até 2027.' });
     if (b.acao === 'youtube-de-novo') {
       const d = (await ref.get()).data() || {};
       if (d.status !== 'concluido' || !d.videoUrl) return res.status(400).json({ erro: 'Só dá para subir de novo um vídeo pronto.' });
@@ -1588,6 +1591,28 @@ export default async function handler(req, res) {
         if (cf.status !== 'ok') {
           const probs = (cf.etapas || []).filter((e) => e.ok === false).map((e) => `• ${e.nome}: ${String(e.detalhe || '').slice(0, 140)}`).slice(0, 6);
           return res.status(409).json({ erro: `A conferência achou problema neste vídeo:\n${(probs.length ? probs : ['• A conferência não terminou ou deu erro.']).join('\n')}`, problemas: probs.length ? probs : ['• A conferência não terminou ou deu erro.'], precisaConfirmar: true });
+        }
+      }
+      // 23/11: YouTube desligado (canais encerrados). Documentário de história aprovado vai para a Página do
+      // Facebook "Noites na História", 1 por dia às 19h. Os outros tipos ainda não têm Página.
+      {
+        const { YOUTUBE_DESLIGADO, proximoHorarioFacebook } = await import('../../../lib/modoRedes');
+        if (YOUTUBE_DESLIGADO) {
+          const conta = d.documentario && !d.politica && !d.games && !d.brasil ? 'noites' : '';
+          if (!conta) return res.status(409).json({ erro: 'O YouTube está desligado e este tipo de vídeo ainda não tem Página no Facebook. Por enquanto só os documentários de história vão para o Facebook (Página Noites na História).' });
+          if (!d.videoUrl) return res.status(400).json({ erro: 'O vídeo ainda não está pronto.' });
+          const { titulo, legenda } = legendaDasRedes(d, conta);
+          const quando = await proximoHorarioFacebook(db, conta);
+          const ag = await db.collection('youvideo_agenda').add({
+            titulo, legenda, videoUrl: d.videoUrl, thumbnailUrl: d.thumbnailUrl || null, conta, curto: d.formato === 'short',
+            quando, redes: { facebook: { status: 'pendente' } }, pendente: true,
+            origem: 'fabrica-aprovado', filaId: ref.id, criadoEm: new Date().toISOString(),
+          });
+          await ref.update({
+            'fabrica.youtube': { status: 'desligado', aprovadoEm: new Date().toISOString() },
+            'envios.facebook': { status: 'agendado', agendaId: ag.id, quando, em: new Date().toISOString() },
+          });
+          return res.status(200).json({ ok: true, facebook: quando, aviso: `Vai para a Página Noites na História no Facebook em ${new Date(quando).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}.` });
         }
       }
       await ref.update({ 'fabrica.youtube': { status: 'pendente', aprovadoEm: new Date().toISOString() } });

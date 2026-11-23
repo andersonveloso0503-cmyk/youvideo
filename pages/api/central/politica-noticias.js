@@ -177,7 +177,11 @@ export default async function handler(req, res) {
 
   try {
     // 19/11: canal da política/história pausado no Compilador: a automação não cria nada
-    if (req.method === 'GET' && req.query.auto) {
+    // 23/11: YouTube desligado. Política e notícia da cidade param; só o documentário de história da semana
+    // continua (vai para a Página do Facebook Noites na História depois do ✅ Aprovar)
+    if (req.method === 'GET' && req.query.auto && req.query.auto !== 'historia' && (await import('../../../lib/modoRedes')).YOUTUBE_DESLIGADO)
+      return res.status(200).json({ pulou: 'YouTube desligado; política e cidade paradas' });
+    if (req.method === 'GET' && req.query.auto && req.query.auto !== 'historia') {
       const { canalPausado } = await import('../../../lib/pausas');
       const { canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
       const canal = await canalDaPolitica(db, await canalDosGamesId(db)).catch(() => null);

@@ -1003,7 +1003,10 @@ export default async function handler(req, res) {
       .filter((d) => (!soFabrica || d.data().fabrica) && (!d.data().fabrica || d.data().status !== 'pendente' || prioridade(d) <= limite))
       .sort((x, y) => prioridade(x).localeCompare(prioridade(y)));
     // 19/11: canal pausado no Compilador (Contas YouTube): não produz nada para ele (nem gasta crédito)
-    {
+    if ((await import('../../lib/modoRedes')).YOUTUBE_DESLIGADO) {
+      // 23/11: YouTube desligado — só produz o que tem Página no Facebook (documentário de história); o resto não gasta crédito
+      docs = docs.filter((d) => { const x = d.data(); return !x.fabrica || (x.documentario && !x.politica && !x.games && !x.brasil); });
+    } else {
       const { lerPausas } = await import('../../lib/pausas');
       const pausas = await lerPausas().catch(() => ({}));
       if (Object.keys(pausas).length) docs = docs.filter((d) => !pausas[String(d.data().fabrica?.canalYoutube?.id || '')]);

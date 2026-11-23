@@ -68,6 +68,7 @@ export default async function handler(req, res) {
     }
     const descricaoFinal = [descricaoCortada, '', hashtags].filter(Boolean).join('\n');
 
+    if ((await import('../../lib/modoRedes')).YOUTUBE_DESLIGADO) throw new Error('YouTube desligado (canais encerrados em nov/2026): nada sobe no YouTube.');
     const videoRes = await fetch(videoUrl);
     if (!videoRes.ok || !videoRes.body) {
       throw new Error('Não foi possível baixar o vídeo montado a partir da URL da Shotstack');

@@ -217,7 +217,12 @@ function categoriaDoVideo({ categoria, tipo, canalTitulo } = {}) {
   return canalFalado(canalTitulo) ? CATEGORIA_FALADO : CATEGORIA_MUSICA;
 }
 
+// 23/11/2026: canais do YouTube encerrados (spam + circumvention). Pela regra, o dono não pode usar nenhum canal
+// até poder pedir um canal novo (19/11/2027). Nada sobe no YouTube. Para religar: false aqui e em lib/modoRedes.js.
+const YOUTUBE_DESLIGADO = true;
+
 async function publicar({ credenciais, refreshToken, redirectOriginal, arquivo, titulo, descricao, tags, privacidade, miniatura, categoria, idioma, agendarPara, onProgresso, conteudoIa = false, paraCriancas = false }) {
+  if (YOUTUBE_DESLIGADO) throw new Error('YouTube desligado: os canais foram encerrados e nada sobe no YouTube até 2027.');
   const auth = cliente(credenciais, redirectOriginal || REDIRECT);
   auth.setCredentials({ refresh_token: refreshToken });
   const yt = google.youtube({ version: 'v3', auth });
@@ -859,6 +864,7 @@ async function desprogramarVideos({ credenciais, refreshToken, redirectOriginal,
 
 /** Publica AGORA um vídeo que está privado/agendado: tira a data e deixa público. */
 async function publicarAgora({ credenciais, refreshToken, redirectOriginal, id }) {
+  if (YOUTUBE_DESLIGADO) throw new Error('YouTube desligado: os canais foram encerrados.');
   const yt = youtubeDoCanal({ credenciais, refreshToken, redirectOriginal });
   const v = await yt.videos.list({ part: ['status'], id: [id] });
   const st = v.data.items?.[0]?.status;
@@ -979,7 +985,8 @@ async function monetizacao({ credenciais, refreshToken, redirectOriginal }) {
   };
 }
 
-module.exports = { monetizacao, arrumarPlaylistsDoCanal, desempenhoRecente, retencaoDosVideos, videosQueExistem, metricasParaMelhorar,
+module.exports = {
+  YOUTUBE_DESLIGADO, monetizacao, arrumarPlaylistsDoCanal, desempenhoRecente, retencaoDosVideos, videosQueExistem, metricasParaMelhorar,
   comentariosSemResposta,
   responderComentario,
   tituloParecido,

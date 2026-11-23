@@ -879,8 +879,9 @@ const Biblioteca = (() => {
       const acao = async (nome, msg, bt) => {
         bt.disabled = true;
         try {
+          let r = null;
           try {
-            await window.api.fabrica.acao({ id: i.id, acao: nome });
+            r = await window.api.fabrica.acao({ id: i.id, acao: nome });
           } catch (e1) {
             // A conferência achou problema: mostra e só sobe se você confirmar
             const m = String(e1?.message || e1);
@@ -889,9 +890,9 @@ const Biblioteca = (() => {
               bt.disabled = false;
               return;
             }
-            await window.api.fabrica.acao({ id: i.id, acao: nome, forcar: true });
+            r = await window.api.fabrica.acao({ id: i.id, acao: nome, forcar: true });
           }
-          avisar(msg);
+          avisar(r?.aviso || msg); // 23/11: YouTube desligado — o site diz quando vai para o Facebook
           card.remove();
           const resto = q('#aprovarLista').children.length;
           marcarContagem(resto);
@@ -901,7 +902,7 @@ const Biblioteca = (() => {
           avisar(msgErro(e), true);
         }
       };
-      card.querySelector('.ap-ok').onclick = (e) => acao('video-aprovar', `Aprovado: "${i.titulo}" sobe para o YouTube (e para o Instagram do canal, se for Short) no horário marcado`, e.currentTarget);
+      card.querySelector('.ap-ok').onclick = (e) => acao('video-aprovar', `Aprovado: "${i.titulo}"`, e.currentTarget);
       card.querySelector('.ap-refazer').onclick = (e) => {
         if (!confirm(`Refazer "${i.titulo}" com imagens novas?\nQuando ficar pronto, ele volta para esta lista.`)) return;
         acao('refazer-documentario', 'Refazendo: quando ficar pronto, volta para a aba ✅ Aprovar', e.currentTarget);
