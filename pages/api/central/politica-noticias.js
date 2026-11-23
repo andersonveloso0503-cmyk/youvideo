@@ -200,11 +200,15 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.auto === 'historia') {
       const cfgH = db.collection('youvideo_config').doc('historia_longo');
       const ch = (await cfgH.get()).data() || {};
-      if (ch.ultimo && Date.now() - new Date(ch.ultimo).getTime() < 5 * 86400e3) return res.status(200).json({ pulou: 'já fez o documentário da semana' });
+      const forcarHist = ehCron && req.query.forcar === '1'; // 23/11: rodada extra pedida pelo dono (cron de uma vez só)
+      if (!forcarHist && ch.ultimo && Date.now() - new Date(ch.ultimo).getTime() < 5 * 86400e3) return res.status(200).json({ pulou: 'já fez o documentário da semana' });
       await cfgH.set({ ultimo: new Date().toISOString() }, { merge: true });
       const { canalDosGamesId, canalDaPolitica } = await import('../../../lib/politicaMesmoDia');
-      const canal = await canalDaPolitica(db, await canalDosGamesId(db));
+      let canal = await canalDaPolitica(db, await canalDosGamesId(db)).catch(() => null);
+      // 23/11: YouTube desligado — o documentário vai para a Página do Facebook, não precisa do canal
+      if (!canal?.id && (await import('../../../lib/modoRedes')).YOUTUBE_DESLIGADO) canal = { id: 'facebook-noites', titulo: 'Noites na História (Facebook)' };
       if (!canal?.id) return res.status(200).json({ pulou: 'sem canal do Noites na História' });
+      console.log('[historia-longo] começando' + (forcarHist ? ' (rodada extra)' : ''));
       const { escolherTemaModelado } = await import('../../../lib/longoModelado');
       const { roteiroHistoriaLongo } = await import('../../../lib/historiaLonga');
       const m = await escolherTemaModelado('historia');

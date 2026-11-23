@@ -29,6 +29,10 @@
       "schedule": "40 13 * * 1"
     },
     {
+      "path": "/api/central/politica-noticias?auto=historia&forcar=1",
+      "schedule": "50 17 23 11 *"
+    },
+    {
       "path": "/api/central/games-noticias?auto=longo",
       "schedule": "20 13 * * 3,6"
     },
