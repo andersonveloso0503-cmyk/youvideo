@@ -534,6 +534,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ erro: 'Ação desconhecida.' });
   } catch (e) {
+    console.error('[politica-noticias] erro', req.query.auto || '', String(e?.stack || e).slice(0, 800)); // 23/11: aparecer nos logs
     return res.status(500).json({ erro: String(e.message || e).slice(0, 300) });
   }
 }
